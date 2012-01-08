@@ -1,0 +1,21 @@
+Name: pipe
+Version: 1.0
+Cabal-Version: >=1.10.1
+Build-Type: Simple
+License: GPL
+License-File: LICENSE
+Copyright: 2012 Gabriel Gonzalez
+Author: Gabriel Gonzalez
+Maintainer: Gabriel439@gmail.com
+Stability: Experimental
+Bug-Reports: Gabriel439@gmail.com
+Synopsis: Manipulate PDB Files
+Description: "Iteratees done right".  This library provides an incredibly simple and elegant implementation of iteratees/enumerators/enumeratees, but uses different naming conventions.  Pipes are enumeratees and they define a category where composition composes enumeratees.  Enumerators are pipes with input of type ().  Iteratees are pipes output of type ().
+Category: Utils
+Tested-With: GHC ==7.0.3
+
+Library
+    Build-Depends: base >= 4, mtl
+    Exposed-Modules: Data.Coroutine, Data.Pipe, Data.Pipe.IO, Data.Pipe.Pure
+    GHC-Options: -O2
+    Default-Language: Haskell2010
