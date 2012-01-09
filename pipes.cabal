@@ -13,6 +13,9 @@ Synopsis: Compositional pipelines
 Description: \"Iteratees done right\".  This library implements iteratees\/enumerators\/enumeratees simply and elegantly, but uses different naming conventions.  'Pipe's are enumeratees and they define two categories where composition composes enumeratees with either 'Lazy' or 'Strict' semantics.  Enumerators and iteratees are just 'Pipe's with one end closed.
 Category: Utils
 Tested-With: GHC ==7.0.3
+Source-Repository head
+    Type: git
+    Location: https://github.com/Gabriel439/Haskell-Pipes-Library
 
 Library
     Build-Depends: base >= 4, mtl
