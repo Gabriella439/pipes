@@ -50,33 +50,37 @@ module Control.Pipe.Common (
 
             * Evaluate downstream stages before upstream stages
 
-            * Pipe terminations propagate upstream
+            * 'Pipe' terminations immediately propagate upstream
 
-            * The most downstream 'Pipe' that cleanly terminates produces the
-              return value
+            * If a 'Pipe' 'await's input from a terminated 'Pipe', it terminates
+              itself instead of blocking
+
+            * The most downstream 'Pipe' that reaches the end of its monad
+              produces the final return value
 
         ['Strict' composition]
 
             * Evaluate upstream stages before downstream stages
 
-            * Pipes terminations propagate downstream
+            * 'Pipe' terminations immediately propagate downstream
 
-            * The most upstream 'Pipe' that cleanly terminates produces the
-              return value
+            * If a 'Pipe' 'yield's output to a terminated 'Pipe', it terminates
+              itself instead of blocking
+
+            * The most upstream 'Pipe' that reaches the end of its monad
+              produces the final return value
 
         You probably want 'Lazy' composition.
 
-        Both category implementations satisfy the category laws:
+        Both category implementations enforce the category laws:
 
-        * Composition is associative.  You will get the exact same sequence of
-          monadic actions and the same return value upon running the 'Pipe'
-          regardless of how you group composition if you only use one type
-          of composition (i.e. only 'Lazy' composition or only 'Strict'
-          composition).
+        * Composition is associative (within each instance).  This is not
+          merely associativity of monadic effects, but rather true
+          associativity.  The result of composition produces the exact same
+          composite 'Pipe' regardless of how you group composition.
 
-        * 'id' is the identity 'Pipe'.  Composing a 'Pipe' with 'id' will not
-          affect the pipe's sequence of monadic actions or return value when
-          you run it.
+        * 'id' is the identity 'Pipe'.  Composing a 'Pipe' with 'id' returns the
+          original pipe.  'id' is implemented identically for both newtypes.
     -}
     Lazy(..),
     Strict(..),
@@ -96,6 +100,20 @@ module Control.Pipe.Common (
 
         '<-<' and '>->' use 'Strict' composition (Mnemonic: - for pessimistic
         evaluation) 
+
+        However, the above operators won't work with 'id' because they work on
+        'Pipe's whereas 'id' is a newtype on a 'Pipe'.  However, both 'Category'
+        instances share the same 'id' implementation:
+
+> instance Category (Lazy m r) where
+>     id = Lazy $ pipe id
+>     ....
+> instance Category (Strict m r) where
+>     id = Strict $ pipe id
+>     ...
+
+        So if you need an identity 'Pipe' that works with the above convenience
+        operators, use @pipe id@, which is just 'id' without the newtype.
     -}
     (<+<),
     (>+>),
@@ -126,8 +144,8 @@ import Prelude hiding ((.), id)
 data Pipe a b m r =
     Pure r                     -- pure = Pure
   | M     (m   (Pipe a b m r)) -- Monad
-  | Await (a -> Pipe a b m r ) -- Functor
-  | Yield (b,   Pipe a b m r ) -- Functor
+  | Await (a -> Pipe a b m r ) -- ((->) a) Functor
+  | Yield (b,   Pipe a b m r ) -- ((,)  b) Functor
 
 instance (Monad m) => Functor (Pipe a b m) where
     fmap f c = case c of
@@ -203,7 +221,7 @@ p1 <-< p2 = unStrict (Strict p1 <<< Strict p2)
 p1 >+> p2 = unLazy   (Lazy   p1 >>> Lazy   p2)
 p1 >-> p2 = unStrict (Strict p1 >>> Strict p2)
 
--- The associativities help pipe chains detect termination quickly
+-- These associativities help pipe chains detect termination quickly
 infixr 9 <+<, >->
 infixl 9 >+>, <-<
 

@@ -310,10 +310,12 @@ You shall not pass!
     ... but this wouldn't type-check, because @fromList@ has a return type of
     @()@ and @deliver@ has a return type of @[Int]@.  Composition requires that
     they match because the return value can potentially come from any 'Pipe' in
-    the 'Pipeline', so every 'Pipe' in the chain has to have a return value
-    ready just in case its value is used.  Fortunately, we don't have to rewrite
-    the @fromList@ function because we can use vertical concatenation
-    to add a return value to it:
+    the 'Pipeline', so every 'Pipe' has to have a return value ready just in
+    case its value is used.  This was not a conscious design choice, but rather
+    a requirement of the 'Category' laws.
+
+    Fortunately, we don't have to rewrite the @fromList@ function because we can
+    use vertical concatenation to add a return value to it:
 
 >>> runPipe $ deliver 3 <+< (fromList [1..10] >> return [])
 [1,2,3]
@@ -324,9 +326,9 @@ You shall not pass!
 Just [1,2,3]
 
     When would the return value of @fromList@ ever be used?  Under 'Lazy'
-    composition, its return value would get chosen if it terminated before
-    @deliver@ was done 'await'ing input from it.  For example, let's say I make
-    a mistake and request more input than @fromList@ can deliver:
+    composition, @fromList@ would provide the return value if it terminated
+    before @deliver@ was done 'await'ing input from it.  For example, let's say
+    I make a mistake and request more input than @fromList@ can deliver:
 
 >>> runPipe $ (Just <$> deliver 99) <+< (fromList [1..10] >> return Nothing)
 Nothing
@@ -361,13 +363,13 @@ Nothing
     @toList@ and its original source:
 
 > -- This is the actual implementation for id in both Category instances
-> id = Lazy $ forever $ await >>= yield 
+> id = Lazy $ pipe id
 
     The identity 'Pipe' never terminates, so if I were to insert it between
     @toList@ and @fromList@, @toList@ would no longer work:
 
->>> runPipe $ toList <+< unLazy id <+< (fromList [1..5] >> return [])
-??? -- we can't really say because this is an imaginary example
+>>> runPipe $ toList <+< pipe id <+< (fromList [1..5] >> return [])
+??? -- we dont't know the result because this is an imaginary example
 
     The answer certainly wouldn't be @[1,2,3,4,5]@ because @toList@ would never
     terminate as long as it was coupled to the non-terminating 'id', despite the
@@ -376,17 +378,16 @@ Nothing
     non-compositional.  It only works if it is coupled directly to the desired
     'Pipe' and breaks when you introduce intermediate stages.
 
-    I implemented the 'Category' laws only because I thought it would be a
-    convenient instance, but the process of doing so forced me to create a
-    library that enforces modularity and compositionality.  So when you write
-    a 'Pipe', you can be sure that it will:
+    Fortunately, it's impossible to write @toList@ as specified.  The 'Category'
+    instances are correct by construction and you can't violate the 'Category'
+    laws when writing 'Pipe's.  'Pipe's leverage Haskell's type system to force
+    you to write robust and modular code.
 
-    * seamlessly compose with other 'Pipe's with no additional code (just
-      compose them and you are done!)
-
-    * allow arbitrary insertion of intermediate 'Pipe's as long as types match
-
-    * handle mixtures of terminating/non-terminating 'Pipe's gracefully
+    What if I wanted to create a 'Pipe' like the @Tee@ shell command that copies
+    all input to a file before passing it along to the next 'Pipe'?  We already
+    established that 'Pipe's can't detect termination because any attempt to
+    'yield' to or 'await' from a terminated 'Pipe' will shut itself down without
+    any chance to call any finalization code.
  -}
 module Control.Pipe (module Control.Pipe.Common) where
 
