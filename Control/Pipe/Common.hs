@@ -18,7 +18,7 @@
     <http://www.gnu.org/licenses/>.
 -}
 
-module Data.Pipe.Common (
+module Control.Pipe.Common (
     -- * Types
     Pipe,
     Zero,
@@ -32,10 +32,11 @@ module Data.Pipe.Common (
         ordinary @do@ notation.  Since 'Pipe' is also a monad transformer, you
         can use 'lift' to invoke the base monad.  For example:
 
-> runItByMe :: Pipe a a IO ()
-> runItByMe = forever $ do
+> check :: Pipe a a IO r
+> check = forever $ do
 >     x <- await
->     ok <- lift $ emailMeAndWaitForResponse x
+>     lift $ putStrLn $ "Can " ++ (show x) ++ " pass?"
+>     ok <- lift $ read <$> getLine
 >     when ok (yield x)
     -}
     await,
@@ -49,7 +50,7 @@ module Data.Pipe.Common (
 
             * Evaluate downstream stages before upstream stages
 
-            * Flow terminates when the consumer cannot proceed
+            * Pipe terminations propagate upstream
 
             * The most downstream 'Pipe' that cleanly terminates produces the
               return value
@@ -58,7 +59,7 @@ module Data.Pipe.Common (
 
             * Evaluate upstream stages before downstream stages
 
-            * Flow terminates when the producer cannot proceed
+            * Pipes terminations propagate downstream
 
             * The most upstream 'Pipe' that cleanly terminates produces the
               return value
@@ -69,11 +70,13 @@ module Data.Pipe.Common (
 
         * Composition is associative.  You will get the exact same sequence of
           monadic actions and the same return value upon running the 'Pipe'
-          regardless of how you group composition.
+          regardless of how you group composition if you only use one type
+          of composition (i.e. only 'Lazy' composition or only 'Strict'
+          composition).
 
-        * 'id' is the identity.  Composing a 'Pipe' with 'id' will not affect
-          the pipe's sequence of monadic actions or return value when you run
-          it.
+        * 'id' is the identity 'Pipe'.  Composing a 'Pipe' with 'id' will not
+          affect the pipe's sequence of monadic actions or return value when
+          you run it.
     -}
     Lazy(..),
     Strict(..),
@@ -230,9 +233,9 @@ instance (Monad m) => Category (Strict m r) where
     Run the 'Pipe' monad transformer, converting it back into the base monad
 
     'runPipe' will not work on a pipe that has loose input or output ends.  If
-    your pipe is still generating output, use the 'discard' pipe to discard the
-    output.  If your pipe still requires input, then how do you expect to run
-    it?
+    your pipe is still generating unhandled output, use the 'discard' pipe to
+    discard the output.  If your pipe still requires input, then how do you
+    expect to run it?
 -}
 runPipe :: (Monad m) => Pipeline m r -> m r
 runPipe p' = case p' of
