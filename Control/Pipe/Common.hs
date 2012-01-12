@@ -48,27 +48,21 @@ module Control.Pipe.Common (
 
         ['Lazy' composition]
 
-            * Evaluate downstream stages before upstream stages
+            * Control begins at the downstream 'Pipe'
 
-            * 'Pipe' terminations immediately propagate upstream
+            * 'await' statements transfer control upstream
 
-            * If a 'Pipe' 'await's input from a terminated 'Pipe', it terminates
-              itself instead of blocking
-
-            * The most downstream 'Pipe' that reaches the end of its monad
-              produces the final return value
+            * 'yield' statements restore control downstream and bind to the
+              return value of 'await'
 
         ['Strict' composition]
 
-            * Evaluate upstream stages before downstream stages
+            * Control begins at the upstream 'Pipe'
 
-            * 'Pipe' terminations immediately propagate downstream
+            * 'yield' statements transfer control downstream
 
-            * If a 'Pipe' 'yield's output to a terminated 'Pipe', it terminates
-              itself instead of blocking
-
-            * The most upstream 'Pipe' that reaches the end of its monad
-              produces the final return value
+            * 'await' statements bind the 'yielded' value and restore control
+              upstream
 
         You probably want 'Lazy' composition.
 
