@@ -81,9 +81,9 @@ module Control.Pipe.Common (
 
 > p1 <+< p2 = unLazy $ Lazy p1 <<< Lazy p2
 
-        '<+<' and '<-<' correspond to '<<<' from "Control.Category"
+        '<+<' and '<-<' correspond to '<<<' from @Control.Category@
 
-        '>+>' and '>+>' correspond to '>>>' from "Control.Category"
+        '>+>' and '>+>' correspond to '>>>' from @Control.Category@
 
         '<+<' and '>+>' use 'Lazy' composition (Mnemonic: + for optimistic
         evaluation)
@@ -133,8 +133,8 @@ import Prelude hiding ((.), id)
 
     The Pipe type is partly inspired by Mario Blazevic's Coroutine in his
     concurrency article from Issue 19 of The Monad Reader and partly inspired by
-    the Trace data type from "A Language Based Approach to Unifying Events and
-    Threads".
+    the Trace data type from \"A Language Based Approach to Unifying Events and
+    Threads\".
 -}
 data Pipe a b m r =
     Pure r                     -- pure = Pure
