@@ -17,6 +17,7 @@
     along with the Haskell Pipes Library.  If not, see
     <http://www.gnu.org/licenses/>.
 -}
+{-# LANGUAGE Rank2Types #-}
 
 module Control.Pipe.Common (
     -- * Types
@@ -25,7 +26,7 @@ module Control.Pipe.Common (
     Producer,
     Consumer,
     Pipeline,
-    -- * Creating Pipes
+    -- * Create Pipes
     {-|
         'yield' and 'await' are the only two primitives you need to create
         'Pipe's.  Because 'Pipe' is a monad, you can assemble them using
@@ -42,43 +43,38 @@ module Control.Pipe.Common (
     await,
     yield,
     pipe,
-    -- * Composing Pipes
+    discard,
+    -- * Compose Pipes
     {-|
         There are two possible category implementations for 'Pipe':
 
         ['Lazy' composition]
 
-            * Control begins at the downstream 'Pipe'
+            * Use as little input as possible
 
-            * 'await' statements transfer control upstream
-
-            * 'yield' statements restore control downstream and bind to the
-              return value of 'await'
+            * Ideal for infinite input streams that never need finalization
 
         ['Strict' composition]
 
-            * Control begins at the upstream 'Pipe'
+            * Use as much input as possible
 
-            * 'yield' statements transfer control downstream
-
-            * 'await' statements bind the 'yielded' value and restore control
-              upstream
-
-        You probably want 'Lazy' composition.
+            * Ideal for finite input streams that need finalization
 
         Both category implementations enforce the category laws:
 
         * Composition is associative (within each instance).  This is not
           merely associativity of monadic effects, but rather true
-          associativity.  The result of composition produces the exact same
-          composite 'Pipe' regardless of how you group composition.
+          associativity.  The result of composition produces identical
+          composite 'Pipe's regardless of how you group composition.
 
         * 'id' is the identity 'Pipe'.  Composing a 'Pipe' with 'id' returns the
-          original pipe.  'id' is implemented identically for both newtypes.
+          original pipe.
+
+        Both categories prioritize downstream effects over upstream effects.
     -}
     Lazy(..),
     Strict(..),
-    -- ** Composition operators
+    -- ** Compose Pipes
     {-|
         I provide convenience functions for composition that take care of
         newtype wrapping and unwrapping.  For example:
@@ -107,15 +103,15 @@ module Control.Pipe.Common (
 >     ...
 
         So if you need an identity 'Pipe' that works with the above convenience
-        operators, use @pipe id@, which is just 'id' without the newtype.
+        operators, you can use 'idP' which is just @pipe id@.
     -}
     (<+<),
     (>+>),
     (<-<),
     (>->),
-    -- * Running Pipes
-    runPipe,
-    discard
+    idP,
+    -- * Run Pipes
+    runPipe
     ) where
 
 import Control.Applicative
@@ -134,12 +130,30 @@ import Prelude hiding ((.), id)
     [@m@] The base monad
 
     [@r@] The type of the monad's final result
+
+    The Pipe type is partly inspired by Mario Blazevic's Coroutine in his
+    concurrency article from Issue 19 of The Monad Reader and partly inspired by
+    the Trace data type from "A Language Based Approach to Unifying Events and
+    Threads".
 -}
 data Pipe a b m r =
     Pure r                     -- pure = Pure
   | M     (m   (Pipe a b m r)) -- Monad
   | Await (a -> Pipe a b m r ) -- ((->) a) Functor
   | Yield (b,   Pipe a b m r ) -- ((,)  b) Functor
+{- I could have factored Pipe as:
+
+data Computation f r = Pure r | F (f (Computation f r))
+data PipeF a b m r = Await (a -> r) | Yield (b, r) | M (m r)
+newtype Pipe a b m r = P { unP :: Computation (PipeF a b m) r }
+
+   This makes the Functor, Applicative, and Monad instances much simpler at the
+   expense of making the Category instances *much* harder to follow because of
+   excessive newtype and constructor wrapping/unwrapping.  Since the Category
+   instance is the meat of the library, I opted to in-line PipeF into
+   computation to make it much simpler.  It's a shame, because the Computation
+   type is very useful in its own right and I will probably create a separate
+   library around it. -}
 
 instance (Monad m) => Functor (Pipe a b m) where
     fmap f c = case c of
@@ -166,8 +180,13 @@ instance (Monad m) => Monad (Pipe a b m) where
 
 instance MonadTrans (Pipe a b) where lift = M . liftM pure
 
--- | A datatype with no exposed constructors
+-- | A data type with no exposed constructors
 data Zero = Zero
+{- I'm not quite sure that this is the correct approach.  I also considered
+   using "()" or universal quantification (i.e. Producer b m r =
+   forall a . Pipe a b m r).  What I really want is some way to provide runPipe
+   some compile-time guarantee that its argument Pipe has no residual await or
+   yield statements.  -}
 
 -- | A pipe that can only produce values
 type Producer b m r = Pipe Zero b m r
@@ -204,8 +223,15 @@ yield x = Yield (x, Pure ())
 pipe :: (Monad m) => (a -> b) -> Pipe a b m r
 pipe f = forever $ await >>= yield . f
 
+-- | The 'discard' pipe silently discards all input fed to it.
+discard :: (Monad m) => Pipe a b m r
+discard = forever await
+
 newtype Lazy   m r a b = Lazy   { unLazy   :: Pipe a b m r}
 newtype Strict m r a b = Strict { unStrict :: Pipe a b m r}
+
+idP :: (Monad m) => Pipe a a m r
+idP = pipe id
 
 (<+<), (<-<) :: (Monad m) => Pipe b c m r -> Pipe a b m r -> Pipe a c m r
 p1 <+< p2 = unLazy   (Lazy   p1 <<< Lazy   p2)
@@ -215,47 +241,41 @@ p1 <-< p2 = unStrict (Strict p1 <<< Strict p2)
 p1 >+> p2 = unLazy   (Lazy   p1 >>> Lazy   p2)
 p1 >-> p2 = unStrict (Strict p1 >>> Strict p2)
 
--- These associativities help pipe chains detect termination quickly
+-- These associativities help composition detect termination quickly
 infixr 9 <+<, >->
 infixl 9 >+>, <-<
 
+{- If you assume id = forever $ await >>= yield, then the below are the only two
+   Category instances possible.  I couldn't find any other useful definition of
+   id, but perhaps I'm not being creative enough. -}
 instance (Monad m) => Category (Lazy m r) where
     id = Lazy $ pipe id
     Lazy p1' . Lazy p2' = Lazy $ case (p1', p2') of
-        (Yield (x1, p1), p2            ) -> yield x1 >> p1 <+< p2
-        (M m1          , p2            ) -> lift m1 >>= \p1 -> p1 <+< p2
-        (Pure r1       , _             ) -> Pure r1
+        (Yield (x1, p1), p2            ) -> yield x1 >>         p1 <+< p2
+        (M m1          , p2            ) -> lift m1  >>= \p1 -> p1 <+< p2
+        (p1            , Await f2      ) -> await    >>= \x  -> p1 <+< f2 x
+        (p1            , M m2          ) -> lift m2  >>= \p2 -> p1 <+< p2
         (Await f1      , Yield (x2, p2)) -> f1 x2 <+< p2
-        (p1            , Await f2      ) -> await >>= \x -> p1 <+< f2 x
-        (p1            , M m2          ) -> lift m2 >>= \p2 -> p1 <+< p2
+        (Pure r1       , _             ) -> Pure r1
         (_             , Pure r2       ) -> Pure r2
 
 instance (Monad m) => Category (Strict m r) where
     id = Strict $ pipe id
-    Strict p1' . Strict p2' = Strict $ case (p1', p2') of
-        (_             , Pure r2       ) -> Pure r2
-        (p1            , M m2          ) -> lift m2 >>= \p2 -> p1 <-< p2
-        (p1            , Await f2      ) -> await >>= \x -> p1 <-< f2 x
-        (Await f1      , Yield (x2, p2)) -> f1 x2 <-< p2
-        (Pure r1       , _             ) -> Pure r1
-        (M m1          , p2            ) -> lift m1 >>= \p1 -> p1 <-< p2
-        (Yield (x1, p1), p2            ) -> yield x1 >> p1 <-< p2
+    Strict p1 . Strict p2 = Strict $ (p1 >> discard) <+< p2
 
 {-|
     Run the 'Pipe' monad transformer, converting it back into the base monad
 
     'runPipe' will not work on a pipe that has loose input or output ends.  If
-    your pipe is still generating unhandled output, use the 'discard' pipe to
-    discard the output.  If your pipe still requires input, then how do you
-    expect to run it?
+    your pipe is still generating unhandled output, handle it.  I choose not to
+    automatically 'discard' output for you, because that is only one of many
+    ways to deal with unhandled output.
 -}
 runPipe :: (Monad m) => Pipeline m r -> m r
 runPipe p' = case p' of
     Pure r          -> return r
     M mp            -> mp >>= runPipe
+    -- Technically a blocked Pipe can still await
     Await f         -> runPipe $ f Zero
-    Yield (Zero, p) -> runPipe p
-
--- | The 'discard' pipe silently discards all input fed to it.
-discard :: (Monad m) => Consumer a m r
-discard = forever await
+    -- A blocked Pipe can not yield, but I include this as a precaution
+    Yield (_, p) -> runPipe p

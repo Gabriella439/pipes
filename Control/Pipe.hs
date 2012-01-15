@@ -112,9 +112,8 @@
     sink.  'Consumer's never use 'yield' statements.
 
     What distinguishes 'Pipe's from every other iteratee implementation is that
-    they form a 'Category'.  Because of this, you can compose 'Pipe's
-    (literally) into 'Pipelines'.  'Pipe's actually possess two 'Category'
-    instances:
+    they form a 'Category'.  Because of this, you can literally compose 'Pipe's
+    into 'Pipeline's.  'Pipe's actually possess two 'Category' instances:
 
 > newtype Lazy   m r a b = Lazy   { unLazy   :: Pipe a b m r }
 > newtype Strict m r a b = Strict { unStrict :: Pipe a b m r }
@@ -122,18 +121,18 @@
 > instance Category (Strict m r) where ...
 
     The first category composes pipes with 'Lazy' semantics and the second one
-    composes 'Pipe's with 'Strict' semantics.  You usually want 'Lazy'
-    semantics.
+    composes 'Pipe's with 'Strict' semantics.  I'll begin by demonstrating
+    'Lazy' semantics.
 
     For example, you can compose the above 'Pipe's with:
 
 > pipeline :: Pipe Zero Zero IO ()
 > pipeline :: unLazy $ Lazy printer . Lazy (take 3) . Lazy (fromList [1..])
 
-    The compiler deduces from composition that the final 'Pipe' must be blocked
-    at both ends, meaning it will never 'await' any input and it will never
-    'yield' any output.  This represents a self-contained 'Pipeline' and I
-    provide a type synonym for this common case:
+    The compiler deduces that the final 'Pipe' must be blocked at both ends,
+    meaning it will never 'await' any input and it will never 'yield' any
+    output.  This represents a self-contained 'Pipeline' and I provide a type
+    synonym for this common case:
 
 > type Pipeline m r = Pipe Zero Zero m r
 
@@ -149,7 +148,7 @@
 > pipeline = printer <+< take 3 <+< fromList [1..]
 
     Like many other monad transformers, you convert the 'Pipe' monad back to the
-    base monad some sort of \"@run...@\" function.  In this case, it's the
+    base monad using some sort of \"@run...@\" function.  In this case, it's the
     'runPipe' function:
 
 > runPipe :: (Monad m) => Pipeline m r -> m r
@@ -172,89 +171,27 @@ You shall not pass!
 
     Fascinating!  Our 'Pipe' terminated even though @printer@ never terminates
     and @fromList@ never terminates when given an infinite list.  To illustrate
-    why our 'Pipe' terminated, I'll discuss how 'Pipe' control flow works,
-    which is pretty simple.
+    why our 'Pipe' terminated, let's outline the 'Pipe' flow control rules for
+    'Lazy' composition:
 
-    A 'Pipe' does one of four things:
+    * Execution begins at the most downstream 'Pipe' (@printer@ in our example).
 
-    * It calls 'lift' to invoke an action in the base monad
+    * If a 'Pipe' 'await's input, it blocks and transfers control to the next
+      'Pipe' upstream until that 'Pipe' 'yield's back a value.
 
-    * It 'await's a value
+    * If a 'Pipe' 'yield's output, it restores control to the original
+      downstream 'Pipe' that was 'await'ing its input and binds its result to
+      the return value of the 'await' command.
 
-    * It 'yield's a value
+    * If a 'Pipe' terminates, it terminates every other 'Pipe' composed with it.
 
-    * It terminates (i.e. reaches the end of its monad)
+    The last rule follows from laziness.  If a 'Pipe' terminates then every
+    downstream 'Pipe' depending on its output cannot proceed, and upstream
+    'Pipe's are never evaluated because the terminated 'Pipe' will not request
+    values from them any longer.
 
-    Both 'Lazy' and 'Strict' composition have two things in common:
-
-    * When a 'Pipe' calls @lift x@, it executes @x@ in the base monad
-
-    * When any 'Pipe' terminates, every 'Pipe' composed with it also terminates.
-
-    So when @take'@ terminated, it brought down the entire 'Pipeline'.
-
-    Under 'Lazy' composition:
-
-    * Control begins at the most downstream 'Pipe'.
-
-    * When a 'Pipe' calls 'await', it blocks and transfers control to the next
-      'Pipe' upstream.
-
-    * If the upstream 'Pipe' 'yield's a value, that value is bound to the return
-      value of 'await' and control is restored to the original downstream
-      'Pipe'.
-
-I'll bastardize Haskell's layout rules to illustrate:
-
-> --    *******Downstream Pipe******       ********Upstream Pipe*******
-> p1 = (do lift $ putStrLn "Await x") <+< (do lift $ putStrLn "Yield 5")
->      (   x <- await               )     (   yield 5                  )
->      (   lift $ print x           )
-
->>> runPipe p1
-Await x
-Yield 5
-5
-
-    Under 'Strict' composition:
-
-    * Control begins at the most upstream 'Pipe'.
-
-    * When a 'Pipe' calls 'yield', it blocks and transfers control to the next
-      'Pipe' downstream.
-
-    * If the downstream 'Pipe' calls 'await', the original 'yield'ed
-      value is bound to the return value of 'await' and control is restored to
-      the original upstream 'Pipe'.  Yes, that means that it returns control
-      before it even uses the value.
-
-    Let's run the 'Strict' version of the above example:
-
-> p1 <-< p2 = unStrict $ Strict p1 <<< Strict p2
->
-> --    *******Downstream Pipe******       ********Upstream Pipe*******
-> p2 = (do lift $ putStrLn "Await x") <-< (do lift $ putStrLn "Yield 5")
->      (   x <- await               )     (   yield 5                  )
->      (   lift $ print x           )
-
->>> runPipe p2
-Yield 5
-Await x
-
-    Control never reaches the @print x@ statement because once the downstream
-    'Pipe' calls 'await' it restores control to the upstream 'Pipe'.  However,
-    we could restore control to the downstream 'Pipe' by 'yield'ing another
-    value:
-
-> --    *******Downstream Pipe******       ********Upstream Pipe*******
-> p3 = (do lift $ putStrLn "Await x") <-< (do lift $ putStrLn "Yield 5")
->      (   x <- await               )     (   yield 5                  )
->      (   lift $ print x           )     (   yield 3                  )
-
->>> runPipe p2
-Yield 5
-Await x
-5
+    So in our previous example, the 'Pipeline' terminated because @take' 3@
+    terminated and brought down the entire 'Pipeline' with it.
 
     'Pipe's promote loose coupling, allowing you to mix and match them
     transparently using composition.  For example, we can define a new
@@ -280,36 +217,6 @@ Enter a number:
 3
 You shall not pass!
 
-    Let's run the 'Strict' version and see what happens!
-
->>> runPipe $ printer <-< take' 3 <-< prompt
-Enter a number:
-1<Enter>
-Enter a number:
-2<Enter>
-Enter a number:
-3<Enter>
-1
-Enter a number:
-4<Enter>
-2
-You shall not pass!
-
-    Wow!  Big difference!  The 'Strict' 'Pipeline' didn't even bother to print
-    the first value until after the user had already entered three.  This
-    illustrates the important distinction between 'Lazy' and 'Strict'
-    'Pipeline's:
-
-    * 'Lazy' 'Pipeline's are \"pull-based\" and will generate as much output as
-      possible while drawing as little input as possible.
-
-    * 'Strict' 'Pipeline's are \"push-based\" and will will draw as much input
-      as possible while generating as little output as possible.
-
-    In the above example, the only reason our 'Pipeline' even printed values at
-    all is because @printer@ and @take'@ had to process some values in order to
-    make room for new output from @prompt@.
-
     You can easily \"vertically\" concatenate 'Pipe's, 'Producer's, and
     'Consumer's, all using simple monad sequencing: ('>>').  For example, here
     is how you concatenate 'Producer's:
@@ -322,7 +229,7 @@ You shall not pass!
 11
 12
 
-    Here's an example of concatenating 'Consumer's:
+    Here's how you would concatenate 'Consumer's:
 
 >>> let print' n = printer <+< take' n :: (Show a) => Int -> Consumer a IO ()
 >>> runPipe $ (print' 3 >> print' 4) <+< fromList [1..]
@@ -350,8 +257,9 @@ You shall not pass!
 7
 You shall not pass!
 
-    There is one caveat: You can only compose 'Pipe's that have the same return
-    type.  For example, I could write the following function:
+    Pipe composition imposes an important limitation: You can only compose
+    'Pipe's that have the same return type.  For example, I could write the
+    following function:
 
 > deliver :: (Monad m) => Int -> Consumer a m [a]
 > deliver n = replicateM n await
@@ -361,13 +269,13 @@ You shall not pass!
 >>> runPipe $ deliver 3 <+< fromList [1..10] -- wrong!
 
     ... but this wouldn't type-check, because @fromList@ has a return type of
-    @()@ and @deliver@ has a return type of @[Int]@.  Composition requires that
-    every 'Pipe' has a return value ready in case it terminates first.
-    This was not a conscious design choice, but rather a requirement of the
-    'Category' laws.
+    @()@ and @deliver@ has a return type of @[Int]@.  'Lazy' composition
+    requires that every 'Pipe' has a return value ready in case it terminates
+    first.  This was not a conscious design choice, but rather a requirement of
+    the 'Category' instance.
 
     Fortunately, we don't have to rewrite the @fromList@ function because we can
-    use vertical concatenation to add a return value to it:
+    add a return value using vertical concatenation:
 
 >>> runPipe $ deliver 3 <+< (fromList [1..10] >> return [])
 [1,2,3]
@@ -384,22 +292,19 @@ Just [1,2,3]
 >>> runPipe $ (Just <$> deliver 99) <+< (fromList [1..10] *> pure Nothing)
 Nothing
 
-    The 'Category' instance just saved me from programming a run-time failure by
-    forcing me to handle all possible ways my program could terminate.
+    The type system saved me by forcing me to handle all possible ways my
+    program could terminate.
 
     Now what if you want to write a 'Pipe' that only reads from its input end
-    (i.e. a Consumer) and returns a list of every value delivered to it when its
-    input 'Pipe' terminates?
+    (i.e. a 'Consumer') and returns a list of every value delivered to it when
+    its input 'Pipe' terminates?
 
 > toList :: (Monad m) => Consumer a m [a]
 > toList = ???
 
-    You can't write such a 'Pipe' because it is not compositional!  More
-    specifically, @toList@ cannot monitor its input and return a value upon
-    input termination because if the input terminates then the input provides
-    the return value, not @toList@, and the input brings down @toList@ with it
-    when it terminates.  This is a good thing because if @toList@ could find a
-    way to work around this limitation, it wouldn't be compositional.
+    You can't write such a 'Pipe' because if its input terminates then it brings
+    down @toList@ with it!  This is a good thing because @toList@ as defined
+    is not compositional.
 
     To see why, let's say you somehow got @toList@ to work and the following
     imaginary code sample worked:
@@ -407,19 +312,19 @@ Nothing
 >>> runPipe $ toList <+< (fromList [1..5] >> return [])
 [1,2,3,4,5]
 
-    For @toList@ to work, it must return its value when the 'Pipe' immediately 
-    upstream (@fromList@ in this case) terminates.  This behavior immediately
-    leads to a problem.  What if I were to insert an \"identity\" 'Pipe' between
+    @toList@ is defined to return its value when the 'Pipe' immediately upstream
+    (@fromList@ in this case) terminates.  This behavior immediately leads to a
+    problem.  What if I were to insert an \"identity\" 'Pipe' between
     @toList@ and @fromList@:
 
 > identity = forever $ await >>= yield
-> -- This is how id in both categories is implemented
+> -- This is how id in both categories is actually implemented
 
     This 'Pipe' forwards every valued untouched, so we would expect it to not
     have any affect if we were to insert it in the middle:
 
 >>> runPipe $ toList <+< identity <+< (fromList [1..5] >> return [])
-??? -- Something other than [1,2,3,4,5], perhaps even non-termination
+??? -- Oops! Something other than [1,2,3,4,5], perhaps even non-termination
 
     The answer couldn't be @[1,2,3,4,5]@ because @toList@ would monitor 
     @identity@ instead of @fromList@ and since @identity@ never terminates
@@ -433,23 +338,32 @@ Nothing
     implementing 'Pipe''s 'Category' instance.  Satisfying the 'Category' laws
     forces code to be compositional.
 
-    You might think that this will lead to resource management problems because
-    of never releasing resources upon termination, but you'd be wrong.  To
-    illustrate, let's use the following example:
+    Note that a terminated 'Pipe' only brings down 'Pipe's composed with it.  To
+    illustrate this, let's use the following example:
 
 > p = do a <+< b
 >        c
 
     @a@, @b@, and @c@ are 'Pipe's, and @c@ shares the same input and output as
-    @a <+< b@, otherwise we cannot combine them within the same 'Monad'.  In the
+    @a <+< b@, otherwise we cannot combine them within the same monad.  In the
     above example, either @a@ or @b@ could terminate and bring down the other
     one since they are composed, but @c@ is guaranteed to continue after
-    @a <+< b@ terminates because it is not composed with them.
+    @a <+< b@ terminates because it is not composed with them.  Conceptually,
+    we can think of this as @c@ automatically taking over the 'Pipe''s
+    channeling responsibilities when @a <+< b@ can no longer continue.  There
+    is no need to \"restart\" the input or output manually as in some other
+    iteratee libraries.
 
-    Because 'Pipe' is a 'Monad' and a 'Category', it covers any possible
-    behavior you could desire while still forcing you to write robust and
-    composable code.  Let's use a resource management example.  Say we have the
-    file \"test.txt\" with the following contents:
+    The @pipes@ library, unlike other iteratee libraries, grounds its vertical
+    and horizontal concatenation in mathematics by deriving horizontal
+    concatenation ('.') from 'Category' instance and vertical concatenation
+    ('>>') from its 'Monad' instance.  This makes it easier to reason about
+    'Pipe's because you can leverage your intuition about 'Category's and
+    'Monad's to understand their behavior.  The only 'Pipe'-specific primitives
+    are the 'await' and 'yield' functions.
+
+    'Lazy' composition has one important defect: resource finalization.  Let's
+    say we have the file \"test.txt\" with the following contents:
 
 > This is a test.
 > Don't panic!
@@ -465,10 +379,10 @@ Nothing
 >       else do
 >           s <- lift $ hGetLine h
 >           yield s
->           readFile' 
+>           readFile' h
 
     We can use our 'Monad' and 'Category' instances to generate a
-    resource-efficient 'Pipeline':
+    resource-efficient version that only reads as many lines as we request:
 
 > read' n = do
 >         lift $ putStrLn "Opening file ..."
@@ -495,7 +409,8 @@ Closing file ...
     In the first example, @take' n <+< readFile' h@ terminates because
     @take'@ only requested 2 lines.  In the second example, it terminates
     because @readFile'@ ran out of input.  However, in both cases the 'Pipe'
-    frees \"test.txt\" immediately when it was no longer needed.
+    never reads more lines than we request frees \"test.txt\" immediately when
+    it was no longer needed.
 
     Even more importantly, the @file@ is never opened if we replace @printer@
     with a 'Pipe' that never demands input:
@@ -503,8 +418,7 @@ Closing file ...
 >>> runPipe $ (lift $ putStrLn "I don't need input") <+< read' 2
 I don't need input
 
-    We say that the file is opened \"on-demand\".  There is still one problem,
-    though. What if we wrote:
+    There is still one problem, though. What if we wrote:
 
 >>> runPipe $ printer <+< take' 1 <+< read' 3
 Opening file ...
@@ -512,11 +426,76 @@ Opening file ...
 
     Oh no!  Our 'Pipe' didn't properly close our file!  @take' 1@ terminated
     before @read' 3@, preventing @read' 3@ from properly closing \"test.txt\".
-    So while you can efficiently and lazily allocate resources using this
-    library, it lacks modularity and composability in this respect.  This
-    remains the only inelegant aspect of this library's implementation.
+    We can force the @read' 3@ 'Pipe' to close the file by using the 'discard'
+    function:
+
+> discard :: (Monad m) => Pipe a b m r
+> discard = forever await
+
+    If we append 'discard' to @take' 1@, we will drive @read' 3@ to completion
+    by continuing to pull values from it:
+
+>>> runPipe $ printer <+< (take' 1 >> discard) <+< read' 3
+Opening file ...
+"This is a test."
+Closing file ...
+
+   This allows @read' 3@ to complete so it can properly finalize itself.  I
+   include a convenience operator for this behavior:
+
+> p1 <-< p2 = (p1 >> discard) <+< p2
+
+   Interestingly, '<-<' forms a 'Category', too, namely the 'Strict' category.
+   This 'Category' draws down all input by default (as the name suggests).  I
+   call it the 'Strict' 'Category' because 'discard' resembles 'seq'.  'discard'
+   drives its input to continue until one upstream 'Pipe' terminates and this
+   behavior resembles forcing its input to weak head normal form.  If every
+   'Pipe' drives its input to weak head normal form, you get 'Strict'
+   composition.
+
+   'Strict' composition works terribly on infinite inputs, as you would expect:
+
+>>> runPipe $ printer <-< take' 3 <-< prompt
+Enter a number:
+1<Enter>
+1
+Enter a number:
+2<Enter>
+2
+Enter a number:
+3<Enter>
+3
+You shall not pass!
+Enter a number:
+4<Enter>
+5<Enter>
+6<Enter>
+... <Prompts for input indefinitely and discards it>
+
+    'Strict' composition works best for inputs that are finite and require
+    finalization.  'Lazy' composition works best for inputs that are infinite
+    (and obviously an infinite input never needs finalization).
+
+    However, unlike conventional strictness in Haskell, 'Strict' 'Pipe's do not
+    load the entire input in memory.  They still stream and immediately handle
+    input just as 'Lazy' 'Pipe's.  The only difference is that they guarantee
+    input finalization (for better or for worse).  Also, for 'Strict'
+    'Pipeline's the return value must come from the most upstream 'Pipe'.  Other
+    than that, 'Strict' composition will have the exact same sequence of monadic
+    effects, resource usage, memory profile, and performance.
+
+    Like Haskell, you can mix 'Lazy' and 'Strict' composition.  Keep in mind,
+    though, that while '<+<' is associative with itself and '<-<' is associative
+    with itself, mixtures of them are not associative.  Alternatively, you
+    could stick to 'Lazy' composition and sprinkle 'discard' statements
+    wherever you desire strictness.  It's up to you.  However, when designing
+    library functions, make them 'Lazy' by default, since you can make 'Lazy'
+    code 'Strict' by adding a 'discard' statement, but you can't make 'Strict'
+    code 'Lazy'.
 -}
 
 module Control.Pipe (module Control.Pipe.Common) where
 
+import Control.Category
+import Control.Monad.Trans
 import Control.Pipe.Common

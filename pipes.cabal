@@ -22,10 +22,10 @@ Description:
     this library introduces no new operators, using only its 'Monad' and
     'Category' instances to implement all behavior.
   .
-  * /Clearer naming conventions/: (Enumeratee?  Really?).  Enumeratees are called
-   'Pipe's, Enumerators are 'Producer's, and Iteratees are 'Consumer's.
-   'Producer's and 'Consumer's are just type synonyms for 'Pipe's with eithe
-   the input or output end closed.
+  * /Clearer naming conventions/: Enumeratees are called 'Pipe's, Enumerators
+    are 'Producer's, and Iteratees are 'Consumer's.  'Producer's and 'Consumer's
+    are just type synonyms for 'Pipe's with either the input or output end
+    closed.
   .
   * /Pipes are Categories/: You compose them using ordinary composition.
     There are actually two 'Category' instances: one for 'Lazy' composition and
@@ -33,35 +33,26 @@ Description:
   .
   * /Intuitive/: Pipe composition is easier to reason about because it is a true
     'Category'.  Composition works seamlessly and you don't have to worry about
-    binding results, restarting iteratees, feeding new input, etc.  \"It just
-    works\".
-  .
-  * /Finite and infinite Pipes compose transparently/: This actually falls out
-    naturally from the Category implementations and was an unintended benefit.
-    Like Haskell functions, you can pass infinite inputs to finite handlers
-    with no special considerations.  This promotes very modular code and
-    separation of concerns.  All 'Pipe's gracefully handle infinite/finite input
-    and infinite/finite handlers because they make no distinction.
+    restarting iteratees, feeding new input, etc.  \"It just works\".
   .
   * /"Vertical" concatenation works flawlessly on everything/: ('>>')
     concatenates 'Pipe's, but since everything is a 'Pipe', you can use it to
     concatenate 'Producer's, 'Consumer's, and even intermediate 'Pipe' stages.
-    Concatenation always works the way you expect.
+    Vertical Concatenation always works the way you expect, picking up where the
+    previous 'Pipe' left off.
   .
   * /Symmetric implementation/: Most iteratee libraries are either
     enumerator-driven or iteratee-driven.  'Pipe's are implemented
-    symmetrically, which is why they can be composed with either 'Lazy' or
-    'Strict' semantics.
+    symmetrically, which is why they can be composed with either 'Lazy'
+    ('Consumer'-driven) or 'Strict' ('Producer'-driven) semantics.
   .
   Check out "Control.Pipe" for a copious introduction (in the spirit of the
   @iterIO@ library) and "Control.Pipe.Common" for the actual implementation.
   .
   This library does not yet provide convenience 'Pipe's for common operations,
-  but they are forthcoming.  However, I encourage you to write your own to see
+  but they are forthcoming.  However, there are several examples in the
+  documentation to get you started and I encourage you to write your own to see
   how easy they are to write.
-  .
-  I'd like to acknowledge Mario Blazevic, whose concurrency article from Issue
-  19 of The Monad Reader inspired a significant portion of this library.
 Category: Control, Enumerator
 Tested-With: GHC ==7.0.3
 Source-Repository head
