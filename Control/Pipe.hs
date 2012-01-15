@@ -127,7 +127,7 @@
     For example, you can compose the above 'Pipe's with:
 
 > pipeline :: Pipe Zero Zero IO ()
-> pipeline :: unLazy $ Lazy printer . Lazy (take 3) . Lazy (fromList [1..])
+> pipeline :: unLazy $ Lazy printer . Lazy (take' 3) . Lazy (fromList [1..])
 
     The compiler deduces that the final 'Pipe' must be blocked at both ends,
     meaning it will never 'await' any input and it will never 'yield' any
@@ -145,7 +145,7 @@
     So you can rewrite @pipeline@ as:
 
 > pipeline :: Pipeline IO ()
-> pipeline = printer <+< take 3 <+< fromList [1..]
+> pipeline = printer <+< take' 3 <+< fromList [1..]
 
     Like many other monad transformers, you convert the 'Pipe' monad back to the
     base monad using some sort of \"@run...@\" function.  In this case, it's the
