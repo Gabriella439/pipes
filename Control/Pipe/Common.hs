@@ -1,7 +1,6 @@
 module Control.Pipe.Common (
     -- * Types
     Pipe,
-    Zero,
     Producer,
     Consumer,
     Pipeline,
@@ -97,6 +96,7 @@ import Control.Applicative
 import Control.Category
 import Control.Monad
 import Control.Monad.Trans
+import Data.Void
 import Prelude hiding ((.), id)
 
 {-|
@@ -159,22 +159,14 @@ instance (Monad m) => Monad (Pipe a b m) where
 
 instance MonadTrans (Pipe a b) where lift = M . liftM pure
 
--- | A data type with no exposed constructors
-data Zero = Zero
-{- I'm not quite sure that this is the correct approach.  I also considered
-   using "()" or universal quantification (i.e. Producer b m r =
-   forall a . Pipe a b m r).  What I really want is some way to provide runPipe
-   some compile-time guarantee that its argument Pipe has no residual await or
-   yield statements.  -}
-
 -- | A pipe that can only produce values
-type Producer b m r = Pipe Zero b m r
+type Producer b m r = Pipe Void b m r
 
 -- | A pipe that can only consume values
-type Consumer a m r = Pipe a Zero m r
+type Consumer a m r = Pipe a Void m r
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline m r = Pipe Zero Zero m r
+type Pipeline m r = Pipe Void Void m r
 
 {-|
     Wait for input from upstream within the 'Pipe' monad:
@@ -255,6 +247,6 @@ runPipe p' = case p' of
     Pure r          -> return r
     M mp            -> mp >>= runPipe
     -- Technically a blocked Pipe can still await
-    Await f         -> runPipe $ f Zero
+    Await f         -> runPipe $ f undefined
     -- A blocked Pipe can not yield, but I include this as a precaution
     Yield (_, p) -> runPipe p
