@@ -232,10 +232,10 @@ instance (Monad m) => Category (Lazy m r) where
     Lazy p1' . Lazy p2' = Lazy $ case (p1', p2') of
         (Yield (x1, p1), p2            ) -> yield x1 >>         p1 <+< p2
         (M m1          , p2            ) -> lift m1  >>= \p1 -> p1 <+< p2
+        (Pure r1       , _             ) -> Pure r1
+        (Await f1      , Yield (x2, p2)) -> f1 x2 <+< p2
         (p1            , Await f2      ) -> await    >>= \x  -> p1 <+< f2 x
         (p1            , M m2          ) -> lift m2  >>= \p2 -> p1 <+< p2
-        (Await f1      , Yield (x2, p2)) -> f1 x2 <+< p2
-        (Pure r1       , _             ) -> Pure r1
         (_             , Pure r2       ) -> Pure r2
 
 instance (Monad m) => Category (Strict m r) where
