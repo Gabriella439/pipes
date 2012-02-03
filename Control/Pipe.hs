@@ -107,7 +107,7 @@
     For example, you can compose the above 'Pipe's with:
 
 > pipeline :: Pipe Zero Zero IO ()
-> pipeline :: unLazy $ Lazy printer . Lazy (take' 3) . Lazy (fromList [1..])
+> pipeline = unLazy $ Lazy printer . Lazy (take' 3) . Lazy (fromList [1..])
 
     The compiler deduces that the final 'Pipe' must be blocked at both ends,
     meaning it will never 'await' any input and it will never 'yield' any
