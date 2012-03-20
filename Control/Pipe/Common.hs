@@ -1,6 +1,6 @@
 module Control.Pipe.Common (
     -- * Types
-    Pipe,
+    Pipe(..),
     Zero,
     Producer,
     Consumer,
