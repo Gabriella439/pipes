@@ -35,58 +35,60 @@
 
 > take' :: (Monad m) => Int -> Pipe a a m ()
 
-    'Pipe's are conservative about using the base monad.  In fact, you can only
-    invoke the base monad by using the 'lift' function from 'Pipe''s
-    'MonadTrans' instance.  If you never use 'lift', your 'Pipe' will translate
-    into pure code.
+    'Pipe's use the base monad conservatively.  In fact, you can only invoke the
+    base monad by using the 'lift' function from 'Pipe''s 'MonadTrans' instance.    If you never use 'lift', your 'Pipe' will translate into pure code.
 
     Now let's create a function that converts a list into a 'Pipe' by
     'yield'ing each element of the list:
 
-> fromList :: (Monad m) => [a] -> Pipe Zero a m ()
+> fromList :: (Monad m) => [a] -> Pipe () a m ()
 > fromList = mapM_ yield
 
-    The 'Zero' in the type signature represents a type with no constructors
-    and we use it to block the input end of the 'Pipe' so that it can't request
-    any input from an upstream 'Pipe'.  You can think of @fromList@ as a one way
-    'Pipe' that can only deliver output, which makes it suitable for the first
-    stage in a 'Pipeline'.  I provide a type synonym for this common case:
+    Note that @fromList xs@ has an input type of @()@.  Ideally, we would like
+    to guarantee at a type level that @fromList@ will not call 'await', however
+    this is impossible.  No choice of an input type forbids a 'Pipe' from
+    calling 'await'.  However, we can set the input type to @()@ so that we can
+    trivially satisfy any await request by feeding it a @()@.
 
-> type Producer b m r = Pipe Zero b m r
+    By setting a Pipe's input to @()@, we block it from receiving any (useful)
+    input.  Such a pipe can only deliver output, which makes it suitable for the
+    first stage in a 'Pipeline'.  I provide a type synonym for this common case:
 
-    You can then rewrite the type signature for @fromList@ as:
+> type Producer b m r = Pipe () b m r
+
+    'Producer's resemble enumerators in other libraries because they are a
+    data source.  You can then use the 'Producer' type synonym to rewrite the
+    type signature for @fromList@ as:
 
 > fromList :: (Monad m) => [a] -> Producer a m ()
 
-    Note that you don't have to block the input end with the 'Zero' type.  If
+    Note that you don't have to block the input end with the @()@ type.  If
     you let the compiler infer the type, you would get:
 
-> fromList :: (Monad m) => [a] -> Pipe b a m ()
+> fromList :: (Monad m) => [a] -> Pipe t a m ()
 
-    The compiler says that the input could be anything since without any calls
-    to 'await' it can't infer the input type.  I only provide the 'Zero' type
-    as a convenience so that you can intentionally block 'Pipe' ends.
-
-    'Producer's resemble enumerators in other libraries because they are a data
-    source.  'Producer's never use 'await' statements.
+    The compiler correctly infers that the input could be anything since it is
+    never used.  This more polymorphic type signature is suitable, but you can
+    set the input to @()@ to ensure that you do not inadvertently attach a
+    useful pipe upstream.
 
     Now let's create a 'Pipe' that prints every value delivered to it and never
     terminates:
 
-> printer :: (Show a) => Pipe a Zero IO b
+> printer :: (Show a) => Pipe a Void IO r
 > printer = forever $ do
 >     x <- await
 >     lift $ print x
 
-    The 'Zero' in @printer@'s type signature indicates that it never delivers
+    The 'Void' in @printer@'s type signature indicates that it never delivers
     output downstream, so it represents the final stage in a 'Pipeline'.  Again,
     I provide a type synonym for this common case:
 
-> type Consumer a m r = Pipe a Zero m r
+> type Consumer a m r = Pipe a Void m r
 
     So we could instead write @printer@'s type as:
 
-> printer :: (Show a) => Consumer a IO b
+> printer :: (Show a) => Consumer a IO r
 
     'Consumer's resemble iteratees in other libraries because they are a data
     sink.  'Consumer's never use 'yield' statements.
@@ -106,15 +108,15 @@
 
     For example, you can compose the above 'Pipe's with:
 
-> pipeline :: Pipe Zero Zero IO ()
+> pipeline :: Pipe () Void IO ()
 > pipeline = unLazy $ Lazy printer . Lazy (take' 3) . Lazy (fromList [1..])
 
     The compiler deduces that the final 'Pipe' must be blocked at both ends,
-    meaning it will never 'await' any input and it will never 'yield' any
+    meaning it will never 'await' useful input and it will never 'yield' any
     output.  This represents a self-contained 'Pipeline' and I provide a type
     synonym for this common case:
 
-> type Pipeline m r = Pipe Zero Zero m r
+> type Pipeline m r = Pipe () Void m r
 
     Also, I provide convenience operators for composing 'Pipe's without the
     burden of wrapping and unwrapping newtypes.  For example, to compose 'Pipe's
@@ -133,13 +135,8 @@
 
 > runPipe :: (Monad m) => Pipeline m r -> m r
 
-    'runPipe' only works on self-contained 'Pipeline's.  This is the only
-    function in the entire library that actually requires the 'Zero' type
-    because it must guarantee that its argument 'Pipe' will never try to
-    'await' or 'yield'.  You don't need to worry about explicitly giving it
-    capped 'Pipe's because self-contained 'Pipe's will automatically have
-    polymorphic input and output ends and 'runPipe' will just assume those ends
-    are 'Zero'.
+    'runPipe' only works on self-contained 'Pipeline's.  You don't need to worry    about explicitly giving it blocked 'Pipe's because self-contained pipelines
+    will automatically have polymorphic input and output ends.
 
     Let's try using 'runPipe':
 
