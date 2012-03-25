@@ -160,13 +160,13 @@ instance (Monad m) => Monad (Pipe a b m) where
 instance MonadTrans (Pipe a b) where lift = M . liftM pure
 
 -- | A pipe that can only produce values
-type Producer b m r = Pipe () b m r
+type Producer b = Pipe () b
 
 -- | A pipe that can only consume values
-type Consumer a m r = Pipe a Void m r
+type Consumer a = Pipe a Void
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline m r = Pipe () Void m r
+type Pipeline = Pipe () Void
 
 {-|
     Wait for input from upstream within the 'Pipe' monad:
