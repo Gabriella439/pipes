@@ -51,7 +51,6 @@ module Control.Pipe.Common (
         Both categories prioritize downstream effects over upstream effects.
     -}
     Lazy(..),
-    Strict(..),
     -- ** Compose Pipes
     {-|
         I provide convenience functions for composition that take care of
@@ -85,8 +84,6 @@ module Control.Pipe.Common (
     -}
     (<+<),
     (>+>),
-    (<-<),
-    (>->),
     idP,
     -- * Run Pipes
     runPipe
@@ -115,74 +112,58 @@ import Prelude hiding ((.), id)
     the Trace data type from \"A Language Based Approach to Unifying Events and
     Threads\".
 -}
-data Pipe a b m r =
-    Pure r                     -- pure = Pure
-  | M     (m   (Pipe a b m r)) -- Monad
-  | Await (a -> Pipe a b m r ) -- ((->) a) Functor
-  | Yield (b,   Pipe a b m r ) -- ((,)  b) Functor
-{- I could have factored Pipe as:
 
-data Computation f r = Pure r | F (f (Computation f r))
-data PipeF a b m r = Await (a -> r) | Yield (b, r) | M (m r)
-newtype Pipe a b m r = P { unP :: Computation (PipeF a b m) r }
+data FreeT f m r = FreeT { runFreeT :: m (Either r (f (FreeT f m r))) }
 
-   This makes the Functor, Applicative, and Monad instances much simpler at the
-   expense of making the Category instances *much* harder to follow because of
-   excessive newtype and constructor wrapping/unwrapping.  Since the Category
-   instance is the meat of the library, I opted to in-line PipeF into
-   computation to make it much simpler.  It's a shame, because the Computation
-   type is very useful in its own right and I will probably create a separate
-   library around it. -}
+instance (Functor f, Monad m) => Monad (FreeT f m) where
+    return = FreeT . return . Left
+    m >>= f = FreeT $ runFreeT m >>= \x -> case x of
+        Left  r -> runFreeT $ f r
+        Right a -> return $ Right $ fmap (>>= f) a
 
-instance (Monad m) => Functor (Pipe a b m) where
-    fmap f c = case c of
-        Pure r   -> Pure $ f r
-        M mc     -> M     $ liftM (fmap f) mc
-        Await fc -> Await $ fmap  (fmap f) fc
-        Yield fc -> Yield $ fmap  (fmap f) fc
+instance (Functor f, Monad m) => Functor (FreeT f m) where fmap = liftM
 
-instance (Monad m) => Applicative (Pipe a b m) where
-    pure = Pure
-    f <*> x = case f of
-        Pure r   -> fmap r x
-        M mc     -> M     $ liftM (<*> x) mc
-        Await fc -> Await $ fmap  (<*> x) fc
-        Yield fc -> Yield $ fmap  (<*> x) fc
+instance (Functor f, Monad m) => Applicative (FreeT f m) where
+    pure = return
+    (<*>) = ap
 
-instance (Monad m) => Monad (Pipe a b m) where
-    return = pure
-    m >>= f = case m of
-        Pure r   -> f r
-        M mc     -> M     $ liftM (>>= f) mc
-        Await fc -> Await $ fmap  (>>= f) fc
-        Yield fc -> Yield $ fmap  (>>= f) fc
+instance MonadTrans (FreeT f) where lift = FreeT . liftM Left
 
-instance MonadTrans (Pipe a b) where lift = M . liftM pure
+wrap :: (Monad m) => f (FreeT f m r) -> FreeT f m r
+wrap = FreeT . return . Right
+
+data PipeF a b r = Await (a -> r) | Yield (b, r)
+
+instance Functor (PipeF a b) where
+    fmap f (Await a) = Await $ fmap f a
+    fmap f (Yield y) = Yield $ fmap f y
+
+type Pipe a b m r = FreeT (PipeF a b) m r
 
 -- | A pipe that can only produce values
-type Producer b = Pipe () b
+type Producer b m r = Pipe () b m r
 
 -- | A pipe that can only consume values
-type Consumer a = Pipe a Void
+type Consumer a m r = Pipe a Void m r
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline = Pipe () Void
+type Pipeline m r = Pipe () Void m r
 
 {-|
     Wait for input from upstream within the 'Pipe' monad:
 
     'await' blocks until input is ready.
 -}
-await :: Pipe a b m a
-await = Await Pure 
+await :: (Monad m) => Pipe a b m a
+await = wrap $ Await pure
 
 {-|
     Pass output downstream within the 'Pipe' monad:
 
     'yield' blocks until the output has been received.
 -}
-yield :: b -> Pipe a b m ()
-yield x = Yield (x, Pure ())
+yield :: (Monad m) => b -> Pipe a b m ()
+yield x = wrap $ Yield (x, pure ())
 
 {-|
     Convert a pure function into a pipe
@@ -199,40 +180,38 @@ discard :: (Monad m) => Pipe a b m r
 discard = forever await
 
 newtype Lazy   m r a b = Lazy   { unLazy   :: Pipe a b m r}
-newtype Strict m r a b = Strict { unStrict :: Pipe a b m r}
 
 idP :: (Monad m) => Pipe a a m r
 idP = pipe id
 
-(<+<), (<-<) :: (Monad m) => Pipe b c m r -> Pipe a b m r -> Pipe a c m r
-p1 <+< p2 = unLazy   (Lazy   p1 <<< Lazy   p2)
-p1 <-< p2 = unStrict (Strict p1 <<< Strict p2)
+(<+<) :: (Monad m) => Pipe b c m r -> Pipe a b m r -> Pipe a c m r
+p1 <+< p2 = FreeT $ do
+    e1 <- runFreeT p1
+    let p1' = FreeT $ return e1
+    case e1 of
+        Right (Await f1) -> do
+            e2 <- runFreeT p2
+            case e2 of
+                Right (Yield (x, p)) -> runFreeT $ f1 x <+< p
+                Right (Await f2) -> return $ Right $ Await $ fmap (p1' <+<) f2
+                Left r -> return $ Left r
+        Right (Yield y) -> return $ Right $ Yield $ fmap (<+< p2) y
+        Left r -> return $ Left r
+        
 
-(>+>), (>->) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
-p1 >+> p2 = unLazy   (Lazy   p1 >>> Lazy   p2)
-p1 >-> p2 = unStrict (Strict p1 >>> Strict p2)
+(>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
+(>+>) = flip (<+<)
 
 -- These associativities help composition detect termination quickly
-infixr 9 <+<, >->
-infixl 9 >+>, <-<
+infixr 9 <+<
+infixl 9 >+>
 
 {- If you assume id = forever $ await >>= yield, then the below are the only two
    Category instances possible.  I couldn't find any other useful definition of
    id, but perhaps I'm not being creative enough. -}
 instance (Monad m) => Category (Lazy m r) where
     id = Lazy $ pipe id
-    Lazy p1' . Lazy p2' = Lazy $ case (p1', p2') of
-        (Yield (x1, p1), p2            ) -> yield x1 >>         p1 <+< p2
-        (M m1          , p2            ) -> lift m1  >>= \p1 -> p1 <+< p2
-        (Pure r1       , _             ) -> Pure r1
-        (Await f1      , Yield (x2, p2)) -> f1 x2 <+< p2
-        (p1            , Await f2      ) -> await    >>= \x  -> p1 <+< f2 x
-        (p1            , M m2          ) -> lift m2  >>= \p2 -> p1 <+< p2
-        (_             , Pure r2       ) -> Pure r2
-
-instance (Monad m) => Category (Strict m r) where
-    id = Strict $ pipe id
-    Strict p1 . Strict p2 = Strict $ (p1 >> discard) <+< p2
+    Lazy p1 . Lazy p2 = Lazy $ p1 <+< p2
 
 {-|
     Run the 'Pipe' monad transformer, converting it back into the base monad
@@ -243,8 +222,9 @@ instance (Monad m) => Category (Strict m r) where
     ways to deal with unhandled output.
 -}
 runPipe :: (Monad m) => Pipeline m r -> m r
-runPipe p' = case p' of
-    Pure r          -> return r
-    M mp            -> mp >>= runPipe
-    Await f         -> runPipe $ f ()
-    Yield (_, p) -> runPipe p
+runPipe p' = do
+    e <- runFreeT p'
+    case e of
+        Left r -> return r
+        Right (Await f) -> runPipe $ f ()
+        Right (Yield (_, p)) -> runPipe p
