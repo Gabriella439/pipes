@@ -179,8 +179,6 @@ pipe f = forever $ await >>= yield . f
 discard :: (Monad m) => Pipe a b m r
 discard = forever await
 
-newtype Lazy   m r a b = Lazy   { unLazy   :: Pipe a b m r}
-
 idP :: (Monad m) => Pipe a a m r
 idP = pipe id
 
@@ -188,16 +186,15 @@ idP = pipe id
 p1 <+< p2 = FreeT $ do
     e1 <- runFreeT p1
     let p1' = FreeT $ return e1
-    case e1 of
-        Right (Await f1) -> do
+    runFreeT $ case e1 of
+        Right (Await f1) -> FreeT $ do
             e2 <- runFreeT p2
-            case e2 of
-                Right (Yield (x, p)) -> runFreeT $ f1 x <+< p
-                Right (Await f2) -> return $ Right $ Await $ fmap (p1' <+<) f2
-                Left r -> return $ Left r
-        Right (Yield y) -> return $ Right $ Yield $ fmap (<+< p2) y
-        Left r -> return $ Left r
-        
+            runFreeT $ case e2 of
+                Right (Yield (x, p)) -> f1 x <+< p
+                Right (Await f2    ) -> wrap $ Await $ fmap (p1' <+<) f2
+                Left r               -> return r
+        Right (Yield y) -> wrap $ Yield $ fmap (<+< p2) y
+        Left r          -> return r
 
 (>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
 (>+>) = flip (<+<)
@@ -205,6 +202,8 @@ p1 <+< p2 = FreeT $ do
 -- These associativities help composition detect termination quickly
 infixr 9 <+<
 infixl 9 >+>
+
+newtype Lazy m r a b = Lazy { unLazy :: Pipe a b m r}
 
 {- If you assume id = forever $ await >>= yield, then the below are the only two
    Category instances possible.  I couldn't find any other useful definition of
@@ -222,9 +221,9 @@ instance (Monad m) => Category (Lazy m r) where
     ways to deal with unhandled output.
 -}
 runPipe :: (Monad m) => Pipeline m r -> m r
-runPipe p' = do
-    e <- runFreeT p'
+runPipe p = do
+    e <- runFreeT p
     case e of
-        Left r -> return r
+        Left r          -> return r
         Right (Await f) -> runPipe $ f ()
-        Right (Yield (_, p)) -> runPipe p
+        Right (Yield y) -> runPipe $ snd y
