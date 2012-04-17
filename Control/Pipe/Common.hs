@@ -1,6 +1,10 @@
 module Control.Pipe.Common (
     -- * Types
-    Pipe(..),
+    FreeF(..),
+    FreeT(..),
+    free,
+    PipeF(..),
+    Pipe,
     Producer,
     Consumer,
     Pipeline,
@@ -113,13 +117,17 @@ import Prelude hiding ((.), id)
     Threads\".
 -}
 
-data FreeT f m r = FreeT { runFreeT :: m (Either r (f (FreeT f m r))) }
+data FreeF f r x = Pure r | Free (f x)
+
+data FreeT f m r = FreeT { runFreeT :: m (FreeF f r (FreeT f m r)) }
 
 instance (Functor f, Monad m) => Monad (FreeT f m) where
-    return = FreeT . return . Left
-    m >>= f = FreeT $ runFreeT m >>= \x -> case x of
-        Left  r -> runFreeT $ f r
-        Right a -> return $ Right $ fmap (>>= f) a
+    return = FreeT . return . Pure
+    m >>= f = FreeT $ do
+        x <- runFreeT m
+        runFreeT $ case x of
+            Pure r -> f r
+            Free a -> free $ fmap (>>= f) a
 
 instance (Functor f, Monad m) => Functor (FreeT f m) where fmap = liftM
 
@@ -127,10 +135,10 @@ instance (Functor f, Monad m) => Applicative (FreeT f m) where
     pure = return
     (<*>) = ap
 
-instance MonadTrans (FreeT f) where lift = FreeT . liftM Left
+instance MonadTrans (FreeT f) where lift = FreeT . liftM Pure
 
-wrap :: (Monad m) => f (FreeT f m r) -> FreeT f m r
-wrap = FreeT . return . Right
+free :: (Monad m) => f (FreeT f m r) -> FreeT f m r
+free = FreeT . return . Free
 
 data PipeF a b r = Await (a -> r) | Yield (b, r)
 
@@ -155,7 +163,7 @@ type Pipeline m r = Pipe () Void m r
     'await' blocks until input is ready.
 -}
 await :: (Monad m) => Pipe a b m a
-await = wrap $ Await pure
+await = free $ Await pure
 
 {-|
     Pass output downstream within the 'Pipe' monad:
@@ -163,7 +171,7 @@ await = wrap $ Await pure
     'yield' blocks until the output has been received.
 -}
 yield :: (Monad m) => b -> Pipe a b m ()
-yield x = wrap $ Yield (x, pure ())
+yield x = free $ Yield (x, pure ())
 
 {-|
     Convert a pure function into a pipe
@@ -187,14 +195,14 @@ p1 <+< p2 = FreeT $ do
     e1 <- runFreeT p1
     let p1' = FreeT $ return e1
     runFreeT $ case e1 of
-        Right (Await f1) -> FreeT $ do
+        Free (Await f1) -> FreeT $ do
             e2 <- runFreeT p2
             runFreeT $ case e2 of
-                Right (Yield (x, p)) -> f1 x <+< p
-                Right (Await f2    ) -> wrap $ Await $ fmap (p1' <+<) f2
-                Left r               -> return r
-        Right (Yield y) -> wrap $ Yield $ fmap (<+< p2) y
-        Left r          -> return r
+                Free (Yield (x, p)) -> f1 x <+< p
+                Free (Await f2    ) -> free $ Await $ fmap (p1' <+<) f2
+                Pure r              -> return r
+        Free (Yield y) -> free $ Yield $ fmap (<+< p2) y
+        Pure r          -> return r
 
 (>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
 (>+>) = flip (<+<)
@@ -224,6 +232,6 @@ runPipe :: (Monad m) => Pipeline m r -> m r
 runPipe p = do
     e <- runFreeT p
     case e of
-        Left r          -> return r
-        Right (Await f) -> runPipe $ f ()
-        Right (Yield y) -> runPipe $ snd y
+        Pure r         -> return r
+        Free (Await f) -> runPipe $ f ()
+        Free (Yield y) -> runPipe $ snd y
