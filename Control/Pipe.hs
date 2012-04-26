@@ -474,5 +474,6 @@ Enter a number:
 module Control.Pipe (module Control.Pipe.Common) where
 
 import Control.Category
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 import Control.Pipe.Common
+import Data.Void
