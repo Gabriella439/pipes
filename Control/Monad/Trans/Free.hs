@@ -2,7 +2,7 @@
 
     A free monad over a functor resembles a \"list\" of that functor:
 
-    * 'return' behaves like @[]@ by not applying the functor at all
+    * 'return' behaves like @[]@ by not using the functor at all
 
     * 'free' behaves like @(:)@ by prepending another layer of the functor
 -}
