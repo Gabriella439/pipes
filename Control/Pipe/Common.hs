@@ -12,13 +12,14 @@ module Control.Pipe.Common (
     yield,
     pipe,
     -- * Compose Pipes
-    -- $compose
+    -- $newtype
     Lazy(..),
-    -- ** Convenience operations
     -- $convenience
     (<+<),
     (>+>),
     idP,
+    -- $category
+
     -- * Run Pipes
     runPipe
     ) where
@@ -31,12 +32,12 @@ import Data.Void (Void)
 import Prelude hiding ((.), id)
 
 {- $types
-    The Pipe type is strongly inspired by Mario Blazevic's @Coroutine@ type in
+    The 'Pipe' type is strongly inspired by Mario Blazevic's @Coroutine@ type in
     his concurrency article from Issue 19 of The Monad Reader and is formulated
     in the exact same way.
 
-    His @Coroutine@ type is a free monad transformer (i.e. 'FreeT') and his
-    @InOrOut@ functor is 'PipeF'.
+    His @Coroutine@ type is actually a free monad transformer (i.e. 'FreeT')
+    and his @InOrOut@ functor corresponds to 'PipeF'.
 -}
 data PipeF a b x = Await (a -> x) | Yield (b, x)
 
@@ -58,7 +59,7 @@ instance Functor (PipeF a b) where
 -}
 type Pipe a b m r = FreeT (PipeF a b) m r
 
--- | A pipe that produce values
+-- | A pipe that produces values
 type Producer b m r = Pipe () b m r
 
 -- | A pipe that consumes values
@@ -84,7 +85,7 @@ type Pipeline m r = Pipe () Void m r
 -}
 
 {-|
-    Wait for input from upstream within the 'Pipe' monad.
+    Wait for input from upstream.
 
     'await' blocks until input is available from upstream.
 -}
@@ -92,7 +93,7 @@ await :: (Monad m) => Pipe a b m a
 await = free $ Await return
 
 {-|
-    Pass output downstream within the 'Pipe' monad.
+    Pass output downstream.
 
     'yield' restores control back upstream and binds the result to 'await'.
 -}
@@ -109,40 +110,10 @@ yield b = free $ Yield (b, return ())
 pipe :: (Monad m) => (a -> b) -> Pipe a b m r
 pipe f = forever $ await >>= yield . f
 
-{- $compose
-    Pipes form a category when you wrap them in a newtype meaning that you can
-    compose two pipes using @unLazy (Lazy p1 . Lazy p2)@.  This composition
-    binds the output of @p2@ to the input of @p1@.  For example:
-
-> unLazy $ Lazy (await >>= lift . print) . Lazy (yield 3)
-> = lift (print 3)
-
-    'id' is the identity pipe which forwards all output untouched:
-
-> id = Lazy $ forever $ do
->   x <- await
->   yield x
-
-    Pipes are lazy, meaning that control begins at the downstream pipe and
-    control only transfers upstream when the downstream pipe 'await's input from
-    upstream.  If a pipe never 'await's input, then pipes upstream of it will
-    never run.
-
-    Upstream pipes relinquish control back downstream whenever they 'yield' an
-    output value.  This binds the 'yield'ed value to the return value of the
-    downstream 'await'.  The upstream pipe does not regain control unless the
-    downstream pipe requests input again.
-
-    The 'Category' instance obeys the 'Category' laws.  In other words:
-
-    * Composition is associative.  The result of composition produces the exact
-      same composite 'Pipe' regardless of how you group composition.
-
-    * 'id' is the identity pipe.  Composing a pipe with 'id' returns the
-       original pipe.
-
-    The 'Category' laws are \"correct by construction\", meaning that you cannot
-    break them despite the library's internals being fully exposed.
+{- $newtype
+    Pipes form a 'Category', but if you want to define a proper 'Category'
+    instance you have to wrap the 'Pipe' type using a newtype in order to
+    rearrange the type variables:
 -}
 
 newtype Lazy m r a b = Lazy { unLazy :: Pipe a b m r}
@@ -155,25 +126,18 @@ instance (Monad m) => Category (Lazy m r) where
     Lazy p1 . Lazy p2 = Lazy $ p1 <+< p2
 
 {- $convenience
-    You don't need to use the 'Lazy' newtype to take advantage of pipe
-    composition.  I provide convenient wrappers around ('.') and 'id' that take
-    care of newtype wrapping and unwrapping for you:
+    This means that if you want to compose pipes using ('.') from the 'Category'
+    type class, you end up with a newtype mess: @unLazy (Lazy p1 . Lazy p2)@.
+
+    You can avoid this by using convenient operators that do this newtype
+    wrapping and unwrapping for you:
 
 > p1 <+< p2 = unLazy $ Lazy p1 . Lazy p2
+>
 > idP = unLazy id
-
-    ('<+<') corresponds to ('<<<')/('.') from @Control.Category@
-
-    ('>+>') corresponds to ('>>>') from @Control.Category@
-
-    'idP' corresponds to 'id' from @Control.Category@
-
-    You can then rewrite the above example as:
-
-> (await >>= lift . print) <+< yield 3
-> = lift (print 3)
 -}
 
+-- | Corresponds to ('<<<')/('.') from @Control.Category@
 (<+<) :: (Monad m) => Pipe b c m r -> Pipe a b m r -> Pipe a c m r
 p1 <+< p2 = FreeT $ do
     x1 <- runFreeT p1
@@ -188,6 +152,7 @@ p1 <+< p2 = FreeT $ do
                 Free (Yield (x, p)) -> f1 x <+< p
                 Free (Await f2    ) -> free $ Await $ fmap (p1' <+<) f2
 
+-- | Corresponds to ('>>>') from @Control.Category@
 (>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
 (>+>) = flip (<+<)
 
@@ -196,10 +161,87 @@ p1 <+< p2 = FreeT $ do
 infixr 9 <+<
 infixl 9 >+>
 
+-- | Corresponds to 'id' from @Control.Category@
 idP :: (Monad m) => Pipe a a m r
 idP = pipe id
 
--- | Run the 'Pipe' monad transformer, converting it back into the base monad.
+{- $category
+    You can compose two pipes using @p1 <+< p2@, which binds the output of @p2@
+    to the input of @p1@.  For example:
+
+> (await >>= lift . print) <+< yield 0
+> = lift (print 0)
+
+    'idP' is the identity pipe which forwards all output untouched:
+
+> idP = forever $ do
+>   x <- await
+>   yield x
+
+    Pipes are lazy, meaning that control begins at the downstream pipe and
+    control only transfers upstream when the downstream pipe 'await's input from
+    upstream.  If a pipe never 'await's input, then pipes upstream of it will
+    never run:
+
+    Upstream pipes relinquish control back downstream whenever they 'yield' an
+    output value.  This binds the 'yield'ed value to the return value of the
+    downstream 'await'.  The upstream pipe does not regain control unless the
+    downstream pipe requests input again.
+
+    When a pipe terminates, it also terminates any pipes composed with it.
+
+    The 'Category' instance obeys the 'Category' laws.  In other words:
+
+    * Composition is truly associative.  The result of composition produces the
+      exact same composite 'Pipe' regardless of how you group composition:
+
+> (p1 <+< p2) <+< p3 = p1 <+< (p2 <+< p3)
+
+    * 'idP' is a true identity pipe.  Composing a pipe with 'id' returns the
+      exact same original pipe:
+
+> p <+< idP = p
+> idP <+< p = p
+
+    The 'Category' laws are \"correct by construction\", meaning that you cannot
+    break them despite the library's internals being fully exposed.  The above
+    equalities are true using the strongest denotational semantics possible in
+    Haskell, namely that both sides of the equals sign correspond to the exact
+    same value in Haskell, constructor-for-constructor, value-for-value.  You
+    cannot create a function that can distinguish the results.
+
+    Actually, all other class instances for pipes provide the same strong
+    guarantees for their corresponding laws.  I only emphasize the guarantee for
+    the 'Category' instance because it seems so implausible that it works at
+    all.
+-}
+
+{-|
+    Run the 'Pipe' monad transformer, converting it back into the base monad.
+
+    'runPipe' imposes two conditions:
+
+    * The pipe's input, if any, is trivially satisfiable (i.e. @()@)
+
+    * The pipe does not 'yield' any output
+
+    The latter restriction makes 'runPipe' less polymorphic than it could be,
+    and I settled on the restriction for three reasons:
+
+    * It prevents against accidental data loss.
+
+    * It prevents wastefully draining a scarce resource by gratuitously
+      demanding values from it.
+
+    * It encourages an idiomatic pipe programming style where input is consumed
+      in a structured way using a 'Consumer'.
+
+    If you believe that discarding output is the appropriate behavior, you can
+    specify this by explicitly feeding your output to a pipe that gratuitously
+    discards it:
+
+> runPipe $ forever await <+< p
+-}
 runPipe :: (Monad m) => Pipeline m r -> m r
 runPipe p = do
     e <- runFreeT p

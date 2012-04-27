@@ -1,10 +1,11 @@
 {-|
-    This library only provides a single data type: 'Pipe'.
+    This library represents streaming computations using a single data type:
+    'Pipe'.
 
     'Pipe' is a monad transformer that extends the base monad with the ability
-    to 'await' input from or 'yield' output to other 'Pipe's.  'Pipe's resemble
+    to 'await' input from or 'yield' output to other pipes.  Pipes resemble
     enumeratees in other libraries because they receive an input stream and
-    transform it into a new stream.
+    transform it into a new output stream.
 
     I'll introduce our first 'Pipe', which is a verbose version of the Prelude's
     'take' function:
@@ -16,72 +17,64 @@
 >         yield x
 >     lift $ putStrLn "You shall not pass!"
 
-    This 'Pipe' allows the first @n@ values it receives to pass through
-    undisturbed, then it outputs a cute message and shuts down.  Shutdown is
-    automatic when you reach the end of the monad.  You don't need to send a
-    special signal to connected 'Pipe's to let them know you are done handling
-    input or generating output.
+    This pipe forwards the first @n@ values it receives undisturbed, then it
+    outputs a cute message.
 
-    Let's dissect the above 'Pipe''s type to learn a bit about how 'Pipe's work:
+    Let's dissect the above pipe's type to learn a bit about how pipes work:
 
 >      | Input Type | Output Type | Base monad | Return value
 > Pipe   a            a             IO           ()
 
-    So @take'@ 'await's input of type @a@ from upstream 'Pipe's and 'yield's
-    output of type @a@ to downstream 'Pipe's.  @take'@ uses 'IO' as its base
-    monad because it invokes the 'putStrLn' function.  If we remove the call to
-    'putStrLn' the compiler infers the following type instead, which is
-    polymorphic in the base monad:
+    So @take'@ 'await's input values of type @a@ from upstream pipes and
+    'yield's output values of type @a@ to downstream pipes.  @take'@ uses 'IO'
+    as its base monad because it invokes the 'putStrLn' function.  If we were to
+    remove the call to 'putStrLn', the compiler would infer the following type
+    instead, which is polymorphic in the base monad:
 
 > take' :: (Monad m) => Int -> Pipe a a m ()
 
-    'Pipe's use the base monad conservatively.  In fact, you can only invoke the
-    base monad by using the 'lift' function from 'Pipe''s 'MonadTrans' instance.    If you never use 'lift', your 'Pipe' will translate into pure code.
+    Now let's create a function that converts a list into a pipe by 'yield'ing
+    each element of the list:
 
-    Now let's create a function that converts a list into a 'Pipe' by
-    'yield'ing each element of the list:
-
-> fromList :: (Monad m) => [a] -> Pipe () a m ()
+> fromList :: (Monad m) => [b] -> Pipe a b m ()
 > fromList = mapM_ yield
 
-    Note that @fromList xs@ has an input type of @()@.  Ideally, we would like
-    to guarantee at a type level that @fromList@ will not call 'await', however
-    this is impossible.  No choice of an input type forbids a 'Pipe' from
-    calling 'await'.  However, we can set the input type to @()@ so that we can
-    trivially satisfy any await request by feeding it a @()@.
+    Note that @fromList xs@ is polymorphic in its input.  This is because it
+    does not 'await' any input.  If you wish, you could type-restrict it to:
 
-    By setting a Pipe's input to @()@, we block it from receiving any (useful)
-    input.  Such a pipe can only deliver output, which makes it suitable for the
-    first stage in a 'Pipeline'.  I provide a type synonym for this common case:
+> fromList :: (Monad m) => [b] -> Pipe () b m ()
+
+    There is no type that can forbid a pipe from 'await'ing, but you can
+    guarantee that if it does 'await', the request is trivially satisfiable by
+    supplying it with @()@.
+
+    Such a pipe can serve as the first stage in a 'Pipeline'.  I provide a type
+    synonym for this common case:
 
 > type Producer b m r = Pipe () b m r
 
-    'Producer's resemble enumerators in other libraries because they are a
-    data source.  You can then use the 'Producer' type synonym to rewrite the
-    type signature for @fromList@ as:
+    'Producer's resemble enumerators in other libraries because they serve as a
+    data source.
 
-> fromList :: (Monad m) => [a] -> Producer a m ()
+    You can then use the 'Producer' type synonym to rewrite the type signature
+    for @fromList@ as:
 
-    Note that you don't have to block the input end with the @()@ type.  If
-    you let the compiler infer the type, you would get:
+> fromList :: (Monad m) => [b] -> Producer b m ()
 
-> fromList :: (Monad m) => [a] -> Pipe t a m ()
+    Now let's create a pipe that prints every value delivered to it:
 
-    The compiler correctly infers that the input could be anything since it is
-    never used.  This more polymorphic type signature is suitable, but you can
-    set the input to @()@ to ensure that you do not inadvertently attach a
-    useful pipe upstream.
-
-    Now let's create a 'Pipe' that prints every value delivered to it and never
-    terminates:
-
-> printer :: (Show a) => Pipe a Void IO r
+> printer :: (Show a) => Pipe a b IO r
 > printer = forever $ do
 >     x <- await
 >     lift $ print x
 
-    The 'Void' in @printer@'s type signature indicates that it never delivers
-    output downstream, so it represents the final stage in a 'Pipeline'.  Again,
+    Here, @printer@ is polymorphic in its output.  We can type-restrict it to
+    guarantee it will never 'yield' by setting the output to 'Void', from
+    @Data.Void@:
+
+> printer :: (Show a) => Pipe a Void IO r
+
+    A pipe that never yields can be the final stage in a 'Pipeline'.  Again,
     I provide a type synonym for this common case:
 
 > type Consumer a m r = Pipe a Void m r
@@ -90,39 +83,32 @@
 
 > printer :: (Show a) => Consumer a IO r
 
-    'Consumer's resemble iteratees in other libraries because they are a data
-    sink.  'Consumer's never use 'yield' statements.
+    'Consumer's resemble iteratees in other libraries because they serve as data
+    sink.
 
-    What distinguishes 'Pipe's from every other iteratee implementation is that
-    they form a 'Category'.  Because of this, you can literally compose 'Pipe's
-    into 'Pipeline's.  'Pipe's actually possess two 'Category' instances:
+    What distinguishes pipes from every other iteratee implementation is that
+    they form a true 'Category'.  Because of this, you can literally compose
+    pipes into 'Pipeline's using ordinary composition:
 
-> newtype Lazy   m r a b = Lazy   { unLazy   :: Pipe a b m r }
-> newtype Strict m r a b = Strict { unStrict :: Pipe a b m r }
-> instance Category (Lazy   m r) where ...
-> instance Category (Strict m r) where ...
-
-    The first category composes pipes with 'Lazy' semantics and the second one
-    composes 'Pipe's with 'Strict' semantics.  I'll begin by demonstrating
-    'Lazy' semantics.
+> newtype Lazy m r a b = Lazy { unLazy :: Pipe a b m r }
+> instance Category (Lazy m r) where ...
 
     For example, you can compose the above 'Pipe's with:
 
 > pipeline :: Pipe () Void IO ()
 > pipeline = unLazy $ Lazy printer . Lazy (take' 3) . Lazy (fromList [1..])
 
-    The compiler deduces that the final 'Pipe' must be blocked at both ends,
+    The compiler deduces that the final pipe must be blocked at both ends,
     meaning it will never 'await' useful input and it will never 'yield' any
     output.  This represents a self-contained 'Pipeline' and I provide a type
     synonym for this common case:
 
 > type Pipeline m r = Pipe () Void m r
 
-    Also, I provide convenience operators for composing 'Pipe's without the
-    burden of wrapping and unwrapping newtypes.  For example, to compose 'Pipe's
-    using 'Lazy' semantics, just use the '<+<' operator:
+    Also, I provide '<+<' as a convenience operator for composing pipes without
+    the burden of wrapping and unwrapping newtypes:
 
-> p1 <+< p2 = unLazy $ Lazy p1 <<< Lazy p2 -- (<<<) is the same as (.)
+> p1 <+< p2 = unLazy $ Lazy p1 . Lazy p2
 
     So you can rewrite @pipeline@ as:
 
@@ -135,8 +121,9 @@
 
 > runPipe :: (Monad m) => Pipeline m r -> m r
 
-    'runPipe' only works on self-contained 'Pipeline's.  You don't need to worry    about explicitly giving it blocked 'Pipe's because self-contained pipelines
-    will automatically have polymorphic input and output ends.
+    'runPipe' only works on self-contained 'Pipeline's.  You don't need to worry
+    about explicitly type-restricting any of your pipes because self-contained
+    pipelines will automatically have polymorphic input and output ends.
 
     Let's try using 'runPipe':
 
@@ -146,31 +133,43 @@
 3
 You shall not pass!
 
-    Fascinating!  Our 'Pipe' terminated even though @printer@ never terminates
+    Fascinating!  Our pipe terminates even though @printer@ never terminates
     and @fromList@ never terminates when given an infinite list.  To illustrate
-    why our 'Pipe' terminated, let's outline the 'Pipe' flow control rules for
-    'Lazy' composition:
+    why our pipe terminates, let's outline the pipe flow control rules for
+    composition:
 
-    * Execution begins at the most downstream 'Pipe' (@printer@ in our example).
+    * Pipes are lazy, so execution begins at the most downstream pipe
+      (@printer@ in our example).
 
-    * If a 'Pipe' 'await's input, it blocks and transfers control to the next
-      'Pipe' upstream until that 'Pipe' 'yield's back a value.
+    * Upstream pipes only run if input is requested from them and they only run
+      as far as necessary to satisfy that input.
 
-    * If a 'Pipe' 'yield's output, it restores control to the original
-      downstream 'Pipe' that was 'await'ing its input and binds its result to
-      the return value of the 'await' command.
+    * If a pipe terminates, it terminates every other pipe composed with it.
 
-    * If a 'Pipe' terminates, it terminates every other 'Pipe' composed with it.
+    Another way to think of this is like a stack where each pipe is a frame on
+    that stack:
 
-    The last rule follows from laziness.  If a 'Pipe' terminates then every
-    downstream 'Pipe' depending on its output cannot proceed, and upstream
-    'Pipe's are never evaluated because the terminated 'Pipe' will not request
-    values from them any longer.
+    * If a pipe 'await's input, it blocks and pushes the next pipe upstream onto
+      the stack until that pipe 'yield's back a value.
+
+    * If a pipe 'yield's output, it pops itself off the stack and restores
+      control to the original downstream pipe that was 'await'ing its input.
+      This binds its result to the return value of the 'await' command.
+
+    All of these flow control rules follow directly from the 'Category' laws.
+
+    The termination rule might seem surprising until you realize what
+    termination implies.  If a 'Pipe' terminates then:
+
+    * Downstream pipes depending on its output cannot proceed
+
+    * Upstream pipes won't be further evaluated because the terminated pipe will
+      not request any further input from them
 
     So in our previous example, the 'Pipeline' terminated because @take' 3@
     terminated and brought down the entire 'Pipeline' with it.
 
-    'Pipe's promote loose coupling, allowing you to mix and match them
+    Pipes promote loose coupling, allowing you to mix and match them
     transparently using composition.  For example, we can define a new
     'Producer' pipe that indefinitely prompts the user for integers:
 
@@ -235,7 +234,7 @@ You shall not pass!
 You shall not pass!
 
     Pipe composition imposes an important limitation: You can only compose
-    'Pipe's that have the same return type.  For example, I could write the
+    pipes that have the same return type.  For example, I could write the
     following function:
 
 > deliver :: (Monad m) => Int -> Consumer a m [a]
@@ -246,10 +245,10 @@ You shall not pass!
 >>> runPipe $ deliver 3 <+< fromList [1..10] -- wrong!
 
     ... but this wouldn't type-check, because @fromList@ has a return type of
-    @()@ and @deliver@ has a return type of @[Int]@.  'Lazy' composition
-    requires that every 'Pipe' has a return value ready in case it terminates
-    first.  This was not a conscious design choice, but rather a requirement of
-    the 'Category' instance.
+    @()@ and @deliver@ has a return type of @[Int]@.  Composition requires that
+    every pipe has a return value ready in case it terminates first.  This was
+    not a conscious design choice, but rather a requirement of the 'Category'
+    instance.
 
     Fortunately, we don't have to rewrite the @fromList@ function because we can
     add a return value using vertical concatenation:
@@ -269,8 +268,8 @@ Just [1,2,3]
 >>> runPipe $ (Just <$> deliver 99) <+< (fromList [1..10] *> pure Nothing)
 Nothing
 
-    The type system saved me by forcing me to handle all possible ways my
-    program could terminate.
+    The type system saved me by forcing me to cover all corner cases and handle
+    every way my program could terminate.
 
     Now what if you want to write a 'Pipe' that only reads from its input end
     (i.e. a 'Consumer') and returns a list of every value delivered to it when
