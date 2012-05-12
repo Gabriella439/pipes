@@ -12,15 +12,15 @@ Bug-Reports: mailto:Gabriel439@gmail.com
 Synopsis: Compositional pipelines
 Description:
   \"Iteratees done right\".  This library implements
-  iteratees\/enumerators\/enumeratees simply and elegantly, but uses different
+  iteratees\/enumerators\/enumeratees simply and elegantly, using different
   naming conventions.
   .
   Advantages over traditional iteratee implementations:
   .
   * /Simpler semantics/: There is only one data type ('Pipe'), two primitives
     ('await' and 'yield'), and only one way to compose 'Pipe's ('.').  In fact,
-    this library introduces no new operators, using only its 'Monad' and
-    'Category' instances to implement all behavior.
+    this library implements its entire behavior using its 'Monad' and 'Category'
+    instances.
   .
   * /Clearer naming conventions/: Enumeratees are called 'Pipe's, Enumerators
     are 'Producer's, and Iteratees are 'Consumer's.  'Producer's and 'Consumer's
@@ -28,8 +28,6 @@ Description:
     closed.
   .
   * /Pipes are Categories/: You compose them using ordinary composition.
-    There are actually two 'Category' instances: one for 'Lazy' composition and
-    one for 'Strict' composition.  Both instances satisfy the 'Category' laws.
   .
   * /Intuitive/: Pipe composition is easier to reason about because it is a true
     'Category'.  Composition works seamlessly and you don't have to worry about
@@ -41,18 +39,15 @@ Description:
     Vertical Concatenation always works the way you expect, picking up where the
     previous 'Pipe' left off.
   .
-  * /Symmetric implementation/: Most iteratee libraries are either
-    enumerator-driven or iteratee-driven.  'Pipe's are implemented
-    symmetrically, which is why they can be composed with either 'Lazy'
-    ('Consumer'-driven) or 'Strict' ('Producer'-driven) semantics.
+  Check out "Control.Pipe" for a copious tutorial and "Control.Pipe.Common" for
+  the actual implementation.
   .
-  Check out "Control.Pipe" for a copious introduction (in the spirit of the
-  @iterIO@ library) and "Control.Pipe.Common" for the actual implementation.
+  This library currently lacks two important features which are a high priority
+  for upcoming releases:
   .
-  This library does not yet provide convenience 'Pipe's for common operations,
-  but they are forthcoming.  However, there are several examples in the
-  documentation to get you started and I encourage you to write your own to see
-  how easy they are to write.
+  * Automatic resource management
+  .
+  * A standard library of functions for common applications
 Category: Control, Enumerator
 Tested-With: GHC ==7.0.3
 Source-Repository head

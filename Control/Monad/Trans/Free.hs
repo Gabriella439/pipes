@@ -2,17 +2,17 @@
 
     A free monad over a functor resembles a \"list\" of that functor:
 
-    * 'return' behaves like @[]@ by not using the functor at all
+    * 'pure' behaves like @[]@ by not using the functor at all
 
-    * 'free' behaves like @(:)@ by prepending another layer of the functor
+    * 'wrap' behaves like @(:)@ by prepending another layer of the functor
 -}
 module Control.Monad.Trans.Free (
     -- * The Free monad
+    FreeF(..),
     Free(..),
-    free,
+    wrap,
     runFree,
     -- * The FreeT monad transformer
-    FreeF(..),
     FreeT(..),
     ) where
 
@@ -21,40 +21,57 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Data.Functor.Identity
 
--- | The underlying functor for the 'Free' monad:
-data FreeF f r x = Return r | Free (f x)
+data FreeF f r x = Pure r | Wrap (f x)
 
 {-|
-    A free monad transformer layers a free monad on top of an existing monad
+    The 'Free' type is isomorphic to:
+
+> data Free f r = Pure r | Wrap (f (Free f r))
+
+    ... except that if you want to pattern match against those constructors, you
+    must first use 'runFree' to unwrap the value first.
+
+    Similarly, you don't use the raw constructors to build a value of type
+    'Free'.  You instead use the smart constructors 'pure' (from
+    @Control.Applicative@) and 'wrap'.
+-}
+type Free f = FreeT f Identity
+
+wrap :: (Monad m) => f (FreeT f m r) -> FreeT f m r
+wrap = FreeT . return . Wrap
+
+runFree :: Free f r -> FreeF f r (Free f r)
+runFree = runIdentity . runFreeT
+
+{-|
+    A free monad transformer alternates nesting the base functor @f@ and the
+    base monad @m@.
 
     * @f@ - The functor that generates the free monad
 
     * @m@ - The base monad
 
     * @r@ - The type of the return value
+
+    This type commonly arises in coroutine/iteratee libraries under various
+    names.
 -}
 data FreeT f m r = FreeT { runFreeT :: m (FreeF f r (FreeT f m r)) }
 
-type Free f = FreeT f Identity
-
 instance (Functor f, Monad m) => Monad (FreeT f m) where
-    return = FreeT . return . Return
+    return = FreeT . return . Pure
     m >>= f = FreeT $ do
         x <- runFreeT m
         runFreeT $ case x of
-            Return r -> f r
-            Free a   -> free $ fmap (>>= f) a
+            Pure r -> f r
+            Wrap a -> wrap $ fmap (>>= f) a
 
-instance (Functor f, Monad m) => Functor (FreeT f m) where fmap = liftM
+instance (Functor f, Monad m) => Functor (FreeT f m) where
+    fmap = liftM
 
 instance (Functor f, Monad m) => Applicative (FreeT f m) where
     pure = return
     (<*>) = ap
 
-instance MonadTrans (FreeT f) where lift = FreeT . liftM Return
-
-free :: (Monad m) => f (FreeT f m r) -> FreeT f m r
-free = FreeT . return . Free
-
-runFree :: Free f r -> FreeF f r (Free f r)
-runFree = runIdentity . runFreeT
+instance MonadTrans (FreeT f) where
+    lift = FreeT . liftM Pure

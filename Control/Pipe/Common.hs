@@ -1,4 +1,7 @@
 module Control.Pipe.Common (
+    -- * Introduction
+    -- $summary
+
     -- * Types
     -- $types
     PipeF(..),
@@ -21,15 +24,43 @@ module Control.Pipe.Common (
     -- $category
 
     -- * Run Pipes
+    -- $runpipe
     runPipe
     ) where
 
+import Control.Applicative
 import Control.Category
 import Control.Monad (forever)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Free
 import Data.Void (Void)
 import Prelude hiding ((.), id)
+
+{- $summary
+    I completely expose the 'Pipe' data type and internals in order to encourage
+    people to write their own 'Pipe' functions.  This does not compromise the
+    correctness or safety of the library whatsoever and you can feel free to
+    use the constructors directly without violating any laws or invariants.
+
+    I promote using the 'Monad' and 'Category' instances to build and compose
+    pipes, but this does not mean that they are the only option.  In fact, any
+    combinator provided by other iteratee libraries can be recreated for pipes,
+    too.  However, I don't copy the functions found in other libraries in order
+    to encourage people to find principled and theoretically grounded solutions
+    rather than devise ad-hoc solutions characteristic of other libraries.
+
+    For example, you can't create a pipe like @toList@ that folds a pipe it is
+    composed with, but nothing prevents you from writing a function that folds a
+    pipe without using composition:
+
+> fold' :: (Monad m) => Producer a m r -> m [a]
+> fold' p = do
+>     x <- runFreeT p
+>     case x of
+>         Pure _ -> return []
+>         Wrap (Await f)      -> fold' $ f ()
+>         Wrap (Yield (a, p)) -> liftM (p:) (fold' p)
+-}
 
 {- $types
     The 'Pipe' type is strongly inspired by Mario Blazevic's @Coroutine@ type in
@@ -63,7 +94,7 @@ type Pipe a b m r = FreeT (PipeF a b) m r
 type Producer b m r = Pipe () b m r
 
 -- | A pipe that consumes values
-type Consumer a m r = Pipe a Void m r
+type Consumer b m r = Pipe b Void m r
 
 -- | A self-contained pipeline that is ready to be run
 type Pipeline m r = Pipe () Void m r
@@ -90,15 +121,15 @@ type Pipeline m r = Pipe () Void m r
     'await' blocks until input is available from upstream.
 -}
 await :: (Monad m) => Pipe a b m a
-await = free $ Await return
+await = wrap $ Await return
 
 {-|
-    Pass output downstream.
+    Deliver output downstream.
 
     'yield' restores control back upstream and binds the result to 'await'.
 -}
 yield :: (Monad m) => b -> Pipe a b m ()
-yield b = free $ Yield (b, return ())
+yield b = wrap $ Yield (b, return ())
 
 {-|
     Convert a pure function into a pipe
@@ -143,14 +174,14 @@ p1 <+< p2 = FreeT $ do
     x1 <- runFreeT p1
     let p1' = FreeT $ return x1
     runFreeT $ case x1 of
-        Return r       -> return r
-        Free (Yield y) -> free $ Yield $ fmap (<+< p2) y
-        Free (Await f1) -> FreeT $ do
+        Pure r         -> pure r
+        Wrap (Yield y) -> wrap $ Yield $ fmap (<+< p2) y
+        Wrap (Await f1) -> FreeT $ do
             x2 <- runFreeT p2
             runFreeT $ case x2 of
-                Return r            -> return r
-                Free (Yield (x, p)) -> f1 x <+< p
-                Free (Await f2    ) -> free $ Await $ fmap (p1' <+<) f2
+                Pure r              -> pure r
+                Wrap (Yield (x, p)) -> f1 x <+< p
+                Wrap (Await f2    ) -> wrap $ Await $ fmap (p1' <+<) f2
 
 -- | Corresponds to ('>>>') from @Control.Category@
 (>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
@@ -181,7 +212,7 @@ idP = pipe id
     Pipes are lazy, meaning that control begins at the downstream pipe and
     control only transfers upstream when the downstream pipe 'await's input from
     upstream.  If a pipe never 'await's input, then pipes upstream of it will
-    never run:
+    never run.
 
     Upstream pipes relinquish control back downstream whenever they 'yield' an
     output value.  This binds the 'yield'ed value to the return value of the
@@ -197,7 +228,7 @@ idP = pipe id
 
 > (p1 <+< p2) <+< p3 = p1 <+< (p2 <+< p3)
 
-    * 'idP' is a true identity pipe.  Composing a pipe with 'id' returns the
+    * 'idP' is a true identity pipe.  Composing a pipe with 'idP' returns the
       exact same original pipe:
 
 > p <+< idP = p
@@ -210,12 +241,27 @@ idP = pipe id
     same value in Haskell, constructor-for-constructor, value-for-value.  You
     cannot create a function that can distinguish the results.
 
-    Actually, all other class instances for pipes provide the same strong
+    Actually, all other class instances for 'Pipe's provide the same strong
     guarantees for their corresponding laws.  I only emphasize the guarantee for
-    the 'Category' instance because it seems so implausible that it works at
-    all.
+    the 'Category' instance because it is one of the most distinguishing
+    features of this library.
 -}
 
+{- $runpipe
+    Note that you can also unwrap a 'Pipe' a single step at a time using
+    'runFreeT' (since 'Pipe' is just a type synonym for a free monad
+    transformer).  This will take you to the next /external/ 'await' or 'yield'
+    statement.
+
+    This means that a closed 'Pipeline' will unwrap to a single step, in which
+    case you would have been better served by 'runPipe'.  This directly follows
+    from the 'Category' laws, which guarantee that you cannot resolve a
+    composite pipe into its component pipes.  When you compose two pipes, the
+    internal await and yield statements fuse and completely disappear.
+
+    'runFreeT' is ideal for more advanced users who wish to write their own
+    'Pipe' functions while waiting for me to find more elegant solutions.
+-}
 {-|
     Run the 'Pipe' monad transformer, converting it back into the base monad.
 
@@ -246,6 +292,6 @@ runPipe :: (Monad m) => Pipeline m r -> m r
 runPipe p = do
     e <- runFreeT p
     case e of
-        Return r       -> return r
-        Free (Await f) -> runPipe $ f ()
-        Free (Yield y) -> runPipe $ snd y
+        Pure   r       -> return r
+        Wrap (Await f) -> runPipe $ f ()
+        Wrap (Yield y) -> runPipe $ snd y
