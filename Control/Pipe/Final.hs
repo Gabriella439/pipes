@@ -2,7 +2,7 @@ module Control.Pipe.Final where
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.Free
 import Control.Pipe.Common
 import Data.Void
@@ -91,10 +91,12 @@ schedule r p = FreeT $ do
         Wrap (Await f) -> wrap $ Yield (Left r, wrap $ Await f)
         Wrap (Yield y) -> wrap $ Yield $ fmap (schedule r) y
 
-yieldH :: (Monad m) => b -> Pipe (Either r a) (m (), b) m ()
+-- The API exposed to users
+
+yieldH :: (Monad m) => b -> Pipe a (m (), b) m ()
 yieldH x = yield (unit, x)
 
-awaitS :: (Monad m) => Pipe (Either r a) (m (), b) m a
+awaitS :: (Monad m) => Pipe (Either r a) b m a
 awaitS = await >>= either (\_ -> awaitS) return
 
 idF :: (Monad m) => Frame a a m r
@@ -103,8 +105,18 @@ idF = forever $ awaitS >>= yieldH
 (<-<) :: (Monad m) => Frame b c m r -> Frame a b m r -> Frame a c m r
 p1 <-< p2 = mult unit p1 <~< comult p2
 
+produce :: (Monad m) => Producer (m (), b) m r -> Frame a b m r
+produce = pure
+
 upgrade :: (Monad m) => Frame a b m r -> PipeS a b m r
 upgrade p = join $ fmap (<+< (forever $ yield ())) p
+
+-- catchH unit = id
+catchH :: (Monad m) => m () -> Frame a b m r -> Frame a b m r
+catchH m p = (forever $ awaitS >>= \x -> yield (m, x)) <-< p
+
+-- catchS :: (Monad m) => 
+-- catchS f p = p <-< (forever $ await >>= either f yieldH)
 
 runFrame :: (Monad m) => Frame () Void m r -> m r
 runFrame p = go (upgrade p) where

@@ -56,6 +56,10 @@ Source-Repository head
 
 Library
     Build-Depends: base >= 4 && < 5, transformers, void
-    Exposed-Modules: Control.Pipe, Control.Pipe.Common, Control.Monad.Trans.Free
+    Exposed-Modules:
+        Control.Pipe,
+        Control.Pipe.Common,
+        Control.Pipe.Final,
+        Control.Monad.Trans.Free
     GHC-Options: -O2
     Default-Language: Haskell2010
