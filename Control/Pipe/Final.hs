@@ -7,6 +7,8 @@ import Control.Monad.Trans.Free
 import Control.Pipe.Common
 import Data.Void
 
+-- TODO: Turn all type synonyms into newtypes for clearer type errors
+
 -- Pipe with a 'D'owngraded stage
 type PipeD a b m r = Pipe a b m (Producer b m r)
 
@@ -96,26 +98,6 @@ awaitF' m = await >>= maybe (lift m >> awaitF) return
 yieldF' :: (Monad m) => m () -> b -> Pipe a (m (), b) m ()
 yieldF' m x = yield (m, x)
 
--- The API exposed to users
-
-yieldF :: (Monad m) => b -> Pipe a (m (), b) m ()
-yieldF x = yield (unit, x)
-
-awaitF :: (Monad m) => Pipe (Maybe a) b m a
-awaitF = await >>= maybe awaitF return
-
-idF :: (Monad m) => Frame a a m r
-idF = forever $ awaitF >>= yieldF
-
-(<-<) :: (Monad m) => Frame b c m r -> Frame a b m r -> Frame a c m r
-p1 <-< p2 = mult unit p1 <~< comult p2
-
-produce :: (Monad m) => Producer (m (), b) m r -> Frame a b m r
-produce = pure
-
-upgrade :: (Monad m) => Frame a b m r -> PipeS a b m r
-upgrade p = join $ fmap (<+< (forever $ yield ())) p
-
 -- catchU unit = id
 catchU :: (Monad m) => m () -> Frame a b m r -> Frame a b m r
 catchU m p = (forever $ awaitF >>= yieldF' m) <-< p
@@ -124,8 +106,34 @@ catchU m p = (forever $ awaitF >>= yieldF' m) <-< p
 catchD :: (Monad m) => m () -> Frame a b m r -> Frame a b m r
 catchD m p = p <-< (forever $ awaitF' m >>= yieldF)
 
+-- The API intended for library users
+
+idF :: (Monad m) => Frame a a m r
+idF = forever $ awaitF >>= yieldF
+
+(<-<) :: (Monad m) => Frame b c m r -> Frame a b m r -> Frame a c m r
+p1 <-< p2 = mult unit p1 <~< comult p2
+
+yieldF :: (Monad m) => b -> Pipe a (m (), b) m ()
+yieldF x = yield (unit, x)
+
+awaitF :: (Monad m) => Pipe (Maybe a) b m a
+awaitF = await >>= maybe awaitF return
+
+produce :: (Monad m) => Producer (m (), b) m r -> Frame a b m r
+produce = pure
+
+upgrade :: (Monad m) => Frame a b m r -> PipeS a b m r
+upgrade p = join $ fmap (<+< (forever $ yield ())) p
+
 catchP :: (Monad m) => m () -> Frame a b m r -> Frame a b m r
 catchP m = catchU m . catchD m
+
+finallyP :: (Monad m) => m () -> Frame a b m r -> Frame a b m r
+finallyP m p = do
+    r <- catchP m p
+    lift m
+    return r
 
 runFrame :: (Monad m) => Frame () Void m r -> m r
 runFrame p = go (upgrade p) where
