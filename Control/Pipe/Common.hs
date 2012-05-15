@@ -1,3 +1,5 @@
+{-# LANGUAGE Rank2Types #-}
+
 module Control.Pipe.Common (
     -- * Introduction
     -- $summary
@@ -88,16 +90,16 @@ instance Functor (PipeF a b) where
 
     * @r@ - The type of the return value
 -}
-type Pipe a b m r = FreeT (PipeF a b) m r
+type Pipe a b = FreeT (PipeF a b)
 
 -- | A pipe that produces values
-type Producer b m r = Pipe () b m r
+type Producer b = Pipe () b
 
 -- | A pipe that consumes values
-type Consumer b m r = Pipe b Void m r
+type Consumer b = Pipe b Void
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline m r = Pipe () Void m r
+type Pipeline = Pipe () Void
 
 {- $create
     'yield' and 'await' are the only two primitives you need to create pipes.
