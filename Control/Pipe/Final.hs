@@ -7,7 +7,14 @@ import Control.Monad.Trans.Free
 import Control.Pipe.Common
 import Data.Void
 
+-- Pipe with a 'D'owngraded stage
 type PipeD a b m r = Pipe a b m (Producer b m r)
+
+-- 'S'afe pipe that finalizes resources promptly and deterministically
+type PipeS a b m r = Pipe (Either r a) (m (), b) m r
+
+-- Safe pipe with a downgrade stage
+type Frame a b m r = PipeD (Either r a) (m (), b) m r
 
 (<~<) :: (Monad m) => PipeD b c m r -> PipeD a b m r -> PipeD a c m r
 p1 <~< p2 = FreeT $ do
@@ -36,8 +43,6 @@ p1 <~| p2 = FreeT $ do
                 Pure r -> pure r
                 Wrap (Yield (b, p2')) -> f b <~| p2'
                 Wrap (Await a) -> wrap $ Await $ fmap (p1 <~|) a
-
-type Frame a b m r = PipeD (Either r a) (m (), b) m r
 
 unit :: (Monad m) => m ()
 unit = return ()
@@ -98,5 +103,14 @@ idF = forever $ awaitS >>= yieldH
 (<-<) :: (Monad m) => Frame b c m r -> Frame a b m r -> Frame a c m r
 p1 <-< p2 = mult unit p1 <~< comult p2
 
+upgrade :: (Monad m) => Frame a b m r -> PipeS a b m r
+upgrade p = join $ fmap (<+< (forever $ yield ())) p
+
 runFrame :: (Monad m) => Frame () Void m r -> m r
-runFrame = runPipe . join
+runFrame p = go (upgrade p) where
+    go p = do
+        x <- runFreeT p
+        case x of
+            Pure r -> return r
+            Wrap (Await f) -> go $ f (Right ())
+            Wrap (Yield y) -> go $ snd y
