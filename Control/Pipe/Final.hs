@@ -11,10 +11,10 @@ import Data.Void
 type PipeD a b m r = Pipe a b m (Producer b m r)
 
 -- 'S'afe pipe that finalizes resources promptly and deterministically
-type PipeS a b m r = Pipe (Either r a) (m (), b) m r
+type PipeS a b m r = Pipe (Maybe a) (m (), b) m r
 
 -- Safe pipe with a downgrade stage
-type Frame a b m r = PipeD (Either r a) (m (), b) m r
+type Frame a b m r = PipeD (Maybe a) (m (), b) m r
 
 (<~<) :: (Monad m) => PipeD b c m r -> PipeD a b m r -> PipeD a c m r
 p1 <~< p2 = FreeT $ do
@@ -49,55 +49,54 @@ unit = return ()
 
 mult :: (Monad m)
  => m ()
- -> PipeD (Either r        b ) (m (), c) m r
- -> PipeD (Either r (m (), b)) (m (), c) m r
+ -> PipeD (Maybe        b ) (m (), c) m r
+ -> PipeD (Maybe (m (), b)) (m (), c) m r
 mult m p = FreeT $ do
     x <- runFreeT p
     runFreeT $ case x of
         Pure p' -> pure $ lift m >> p'
         Wrap (Yield ((m', c), p')) -> wrap $ Yield ((m >> m', c), mult m p')
         Wrap (Await f) -> wrap $ Await $ \e -> case e of
-            Left r -> mult unit (f $ Left r)
-            Right (m', b) -> mult m' (f $ Right b)
+            Nothing      -> mult unit (f   Nothing)
+            Just (m', b) -> mult m'   (f $ Just b )
 
-comult :: (Monad m) =>
-    PipeD (Either r a)           (m (), b)  m r
- -> PipeD (Either r a) (Either r (m (), b)) m r
+comult :: (Monad m)
+ => PipeD (Maybe a)        (m (), b)  m r
+ -> PipeD (Maybe a) (Maybe (m (), b)) m r
 comult p = FreeT $ do
     x <- runFreeT p
     runFreeT $ case x of
         Pure p' -> pure $ warn p'
-        Wrap (Yield (b', p')) -> wrap $ Yield (Right b', comult p')
+        Wrap (Yield (b', p')) -> wrap $ Yield (Just b', comult p')
         Wrap (Await f) -> wrap $ Await $ \e -> case e of
-            Left  r -> schedule r $ comult (f e)
-            Right _ ->              comult (f e)
+            Nothing -> schedule $ comult (f e)
+            Just _  ->            comult (f e)
 
 warn :: (Monad m) =>
-    Producer           (m (), b)  m r
- -> Producer (Either r (m (), b)) m r
+    Producer        (m (), b)  m r
+ -> Producer (Maybe (m (), b)) m r
 warn p = do
-    r <- pipe Right <+< p
-    yield (Left r)
+    r <- pipe Just <+< p
+    yield Nothing
     return r
 
-schedule :: (Monad m) =>
-    r
- -> PipeD (Either r a) (Either r (m (), b)) m r
- -> PipeD (Either r a) (Either r (m (), b)) m r
-schedule r p = FreeT $ do
+schedule :: (Monad m)
+ => PipeD (Maybe a) (Maybe (m (), b)) m r
+ -> PipeD (Maybe a) (Maybe (m (), b)) m r
+schedule p = FreeT $ do
     x <- runFreeT p
     runFreeT $ case x of
         Pure p' -> pure p'
-        Wrap (Await f) -> wrap $ Yield (Left r, wrap $ Await f)
-        Wrap (Yield y) -> wrap $ Yield $ fmap (schedule r) y
+        Wrap (Await f) -> wrap $ Yield (Nothing, wrap $ Await f)
+        Wrap (Yield y) -> wrap $ Yield $ fmap schedule y
 
 -- The API exposed to users
 
 yieldH :: (Monad m) => b -> Pipe a (m (), b) m ()
 yieldH x = yield (unit, x)
 
-awaitS :: (Monad m) => Pipe (Either r a) b m a
-awaitS = await >>= either (\_ -> awaitS) return
+awaitS :: (Monad m) => Pipe (Maybe a) b m a
+awaitS = await >>= maybe awaitS return
 
 idF :: (Monad m) => Frame a a m r
 idF = forever $ awaitS >>= yieldH
@@ -124,5 +123,5 @@ runFrame p = go (upgrade p) where
         x <- runFreeT p
         case x of
             Pure r -> return r
-            Wrap (Await f) -> go $ f (Right ())
+            Wrap (Await f) -> go $ f (Just ())
             Wrap (Yield y) -> go $ snd y
