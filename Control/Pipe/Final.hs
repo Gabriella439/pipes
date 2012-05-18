@@ -7,44 +7,47 @@ import Control.Monad.Trans.Free
 import Control.Pipe.Common
 import Data.Void
 
--- TODO: Turn all type synonyms into newtypes for clearer type errors
+-- TODO: Newtype Frame
+-- Define functor instance for Frame
+-- Define transformation from Producer to Frame
+-- Make types of comult functions more general
 
 -- Pipe with a 'D'owngraded stage
 type PipeD a b m r = Pipe a b m (Producer b m r)
 
--- 'S'afe pipe that finalizes resources promptly and deterministically
-type PipeS a b m r = Pipe (Maybe a) (m (), b) m r
+-- Frame that forms a 'M'onad but lacks a downgrade stage
+type FrameM a b m r = Pipe (Maybe a) (m (), b) m r
 
--- Safe pipe with a downgrade stage
+-- Frame with a downgrade stage, but does not form a monad
 type Frame a b m r = PipeD (Maybe a) (m (), b) m r
 
 (<~<) :: (Monad m) => PipeD b c m r -> PipeD a b m r -> PipeD a c m r
 p1 <~< p2 = FreeT $ do
     x1 <- runFreeT p1
     runFreeT $ case x1 of
-        Pure p1' -> pure p1'
+        Pure p1'       -> pure p1'
         Wrap (Yield y) -> wrap $ Yield $ fmap (<~< p2) y
-        Wrap (Await f) -> FreeT $ do
+        Wrap (Await f1) -> FreeT $ do
             let p1 = FreeT $ return x1
             x2 <- runFreeT p2
             runFreeT $ case x2 of
-                Pure p2' -> pure $ p1 <~| p2'
-                Wrap (Yield (b, p2')) -> f b <~< p2'
-                Wrap (Await a) -> wrap $ Await $ fmap (p1 <~<) a
+                Pure p2'              -> pure $ p1 <~| p2'
+                Wrap (Yield (b2, p2')) -> f1 b2 <~< p2'
+                Wrap (Await f2      ) -> wrap $ Await $ fmap (p1 <~<) f2
 
 (<~|) :: (Monad m) => PipeD b c m r -> Producer b m r -> Producer c m r
 p1 <~| p2 = FreeT $ do
     x1 <- runFreeT p1
     runFreeT $ case x1 of
-        Pure p' -> p'
+        Pure p1'        -> p1'
         Wrap (Yield y) -> wrap $ Yield $ fmap (<~| p2) y
         Wrap (Await f) -> FreeT $ do
             let p1 = FreeT $ return x1
             x2 <- runFreeT p2
             runFreeT $ case x2 of
-                Pure r -> pure r
-                Wrap (Yield (b, p2')) -> f b <~| p2'
-                Wrap (Await a) -> wrap $ Await $ fmap (p1 <~|) a
+                Pure r                -> pure r
+                Wrap (Yield (b2, p2')) -> f b2 <~| p2'
+                Wrap (Await f2      ) -> wrap $ Await $ fmap (p1 <~|) f2
 
 unit :: (Monad m) => m ()
 unit = return ()
@@ -63,28 +66,28 @@ mult m p = FreeT $ do
             Just (m', b) -> mult m'   (f $ Just b )
 
 comult :: (Monad m)
- => PipeD (Maybe a)        (m (), b)  m r
- -> PipeD (Maybe a) (Maybe (m (), b)) m r
+ => PipeD (Maybe a)        b  m r
+ -> PipeD (Maybe a) (Maybe b) m r
 comult p = FreeT $ do
     x <- runFreeT p
     runFreeT $ case x of
         Pure p' -> pure $ warn p'
-        Wrap (Yield (b', p')) -> wrap $ Yield (Just b', comult p')
+        Wrap (Yield (b, p')) -> wrap $ Yield (Just b, comult p')
         Wrap (Await f) -> wrap $ Await $ \e -> case e of
             Nothing -> schedule $ comult (f e)
             Just _  ->            comult (f e)
 
 warn :: (Monad m) =>
-    Producer        (m (), b)  m r
- -> Producer (Maybe (m (), b)) m r
+    Producer        b  m r
+ -> Producer (Maybe b) m r
 warn p = do
     r <- pipe Just <+< p
     yield Nothing
     return r
 
 schedule :: (Monad m)
- => PipeD (Maybe a) (Maybe (m (), b)) m r
- -> PipeD (Maybe a) (Maybe (m (), b)) m r
+ => PipeD (Maybe a) (Maybe b) m r
+ -> PipeD (Maybe a) (Maybe b) m r
 schedule p = FreeT $ do
     x <- runFreeT p
     runFreeT $ case x of
@@ -93,18 +96,10 @@ schedule p = FreeT $ do
         Wrap (Yield y) -> wrap $ Yield $ fmap schedule y
 
 awaitF' :: (Monad m) => m () -> Pipe (Maybe a) b m a
-awaitF' m = await >>= maybe (lift m >> awaitF) return
+awaitF' m = await >>= maybe (lift m >> awaitF' m) return
 
 yieldF' :: (Monad m) => m () -> b -> Pipe a (m (), b) m ()
 yieldF' m x = yield (m, x)
-
--- catchU unit = id
-catchU :: (Monad m) => m () -> Frame a b m r -> Frame a b m r
-catchU m p = (forever $ awaitF >>= yieldF' m) <-< p
-
--- catchD counit = id
-catchD :: (Monad m) => m () -> Frame a b m r -> Frame a b m r
-catchD m p = p <-< (forever $ awaitF' m >>= yieldF)
 
 -- The API intended for library users
 
@@ -120,14 +115,15 @@ yieldF x = yield (unit, x)
 awaitF :: (Monad m) => Pipe (Maybe a) b m a
 awaitF = await >>= maybe awaitF return
 
-produce :: (Monad m) => Producer (m (), b) m r -> Frame a b m r
-produce = pure
+downgrade :: (Monad m) => Producer (m (), b) m r -> Frame a b m r
+downgrade = pure
 
-upgrade :: (Monad m) => Frame a b m r -> PipeS a b m r
+upgrade :: (Monad m) => Frame a b m r -> FrameM a b m r
 upgrade p = join $ fmap (<+< (forever $ yield ())) p
 
 catchP :: (Monad m) => m () -> Frame a b m r -> Frame a b m r
-catchP m = catchU m . catchD m
+catchP m p =
+    (forever $ awaitF >>= yieldF' m) <-< p <-< (forever $ awaitF' m >>= yieldF)
 
 finallyP :: (Monad m) => m () -> Frame a b m r -> Frame a b m r
 finallyP m p = do
