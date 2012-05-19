@@ -179,7 +179,7 @@ You shall not pass!
 
 > printer <+< fromList [1..]
 
-    The result is identical to:
+    The result is indistinguishable from:
 
 > lift (mapM_ print [1..])
 

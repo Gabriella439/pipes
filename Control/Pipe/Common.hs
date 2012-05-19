@@ -24,7 +24,6 @@ module Control.Pipe.Common (
     (>+>),
     idP,
     -- $category
-
     -- * Run Pipes
     -- $runpipe
     runPipe
@@ -41,27 +40,16 @@ import Prelude hiding ((.), id)
 {- $summary
     I completely expose the 'Pipe' data type and internals in order to encourage
     people to write their own 'Pipe' functions.  This does not compromise the
-    correctness or safety of the library whatsoever and you can feel free to
-    use the constructors directly without violating any laws or invariants.
+    correctness or safety of the library at all and you can feel free to use the
+    constructors directly without violating any laws or invariants.
 
     I promote using the 'Monad' and 'Category' instances to build and compose
     pipes, but this does not mean that they are the only option.  In fact, any
     combinator provided by other iteratee libraries can be recreated for pipes,
-    too.  However, I don't copy the functions found in other libraries in order
-    to encourage people to find principled and theoretically grounded solutions
-    rather than devise ad-hoc solutions characteristic of other libraries.
-
-    For example, you can't create a pipe like @toList@ that folds a pipe it is
-    composed with, but nothing prevents you from writing a function that folds a
-    pipe without using composition:
-
-> fold' :: (Monad m) => Producer a m r -> m [a]
-> fold' p = do
->     x <- runFreeT p
->     case x of
->         Pure _ -> return []
->         Wrap (Await f)      -> fold' $ f ()
->         Wrap (Yield (a, p)) -> liftM (p:) (fold' p)
+    too.  However, this core library does not provide many of the functions
+    found in other libraries in order to encourage people to find principled and
+    theoretically grounded solutions rather than devise ad-hoc solutions
+    characteristic of other iteratee implementations.
 -}
 
 {- $types
@@ -148,12 +136,8 @@ pipe f = forever $ await >>= yield . f
     instance you have to wrap the 'Pipe' type using a newtype in order to
     rearrange the type variables:
 -}
-
 newtype Lazy m r a b = Lazy { unLazy :: Pipe a b m r}
 
-{- If you assume id = forever $ await >>= yield, then this is the only Category
-   instance possible.  I couldn't find any other useful definition of id, but
-   perhaps I'm not being creative enough. -}
 instance (Monad m) => Category (Lazy m r) where
     id = Lazy idP
     Lazy p1 . Lazy p2 = Lazy $ p1 <+< p2

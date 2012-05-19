@@ -1,4 +1,6 @@
 module Control.Pipe.Final (
+    -- * Introduction
+    -- $intro
     -- * Types
     Prompt(..),
     Ensure,
@@ -18,11 +20,13 @@ module Control.Pipe.Final (
     catchP,
     finallyP,
     -- * Compose Frames
-    idF,
+    -- $compose
     (<-<),
     (>->),
+    idF,
     FrameC(..),
     -- * Run Frames
+    -- $run
     runFrame
     ) where
 
@@ -34,6 +38,24 @@ import Control.Monad.Trans.Free
 import Control.Pipe.Common
 import Data.Void
 import Prelude hiding ((.), id)
+
+{- $intro
+    A 'Frame' is a higher-order type built on top of 'Pipe'.  It enables a
+    richer composition with the ability to finalize resources...
+
+    * Promptly: You can close resources when you no longer need input from them
+
+    * Deterministically: It ensures that every 'Frame' is finalized no matter
+      which frame terminates
+
+    'Frame's differ from 'Pipe's in that they do not form monads, but instead
+    form parametrized monads.  Unfortunately, parametrized monads are not
+    mainstream in Haskell and require a ton of extensions along with a modified
+    Prelude in order to recover @do@ notation, so this first release of the
+    'Frame' implementation essentially \"in-lines\" the parametrized monad by
+    splitting it into two monads.  Future releases may split off a version that
+    takes advantage of parametrized monads for even simpler code.
+-}
 
 {-|
     A pipe type that enables 'Prompt' finalization 
@@ -48,7 +70,9 @@ import Prelude hiding ((.), id)
     upstream to downstream.
 
     Note that this type does not form a 'Monad', however with extensions it
-    can be rewritten as a parametrized monad.
+    can be rewritten as a parametrized monad.  For now, though, it requires
+    splitting the type into two separate monads, one for before and after
+    finalizing upstream.
 -}
 newtype Prompt a b m r = Prompt { unPrompt :: Pipe a b m (Producer b m r) }
 
@@ -117,6 +141,10 @@ awaitF = await >>= maybe awaitF return
 >     yieldF x1
 >     x2 <- awaitF
 >     close $ yieldF x2
+
+    If a non-terminating pipe demands input indefinitely, there is no need to
+    'close' it.  It will type-check if the return value is polymorphic as a 
+    result of non-termination.
 -}
 
 {-|
@@ -147,6 +175,58 @@ bindClosed (Prompt p) f = Prompt $ fmap (>>= f) p
 reopen :: (Monad m) => Frame a b m r -> Ensure a b m r
 reopen (Prompt p) = join $ fmap (<+< (forever $ yield ())) p
 
+{- $ensure
+    The third (optional) step to convert 'Pipe' code to 'Frame' code is to use
+    'catchP' or 'finallyP' to register finalizers for blocks of code.
+
+> contrived :: Frame a a IO ()
+> contrived = Prompt $ do
+>     catchP (putStrLn "Stage 1 interrupted") $ do
+>         x1 <- awaitF
+>         catchP (putStrLn "Stage 1(b) interrupted") $ yieldF x1
+>     catchP (putStrLn "Stage 2 interrupted") $ do
+>         x2 <- awaitF
+>         close $ yieldF x2
+-}
+
+{-|
+    @catchP m p@ registers @m@ to be called only if another composed
+    pipe terminates before @p@ is done.
+-}
+catchP :: (Monad m) => m () -> Ensure a b m r -> Ensure a b m r
+catchP m p = FreeT $ do
+    x <- runFreeT p
+    runFreeT $ case x of
+        Pure r -> pure r
+        Wrap (Yield ((m', b), p')) -> wrap $ Yield ((m' >> m, b), catchP m p')
+        Wrap (Await f) -> wrap $ Await $ \e -> case e of
+            Nothing -> lift m >> catchP m (f e)
+            Just _  ->           catchP m (f e)
+{- Equivalent to:
+
+awaitF' m = await >>= maybe (lift m >> awaitF' m) return
+
+yieldF' m x = yield (m, x)
+
+catchP m p =  reopen $
+     (forever $ awaitF >>= yieldF' m)
+ <-< Prompt (fmap close p)
+ <-< (forever $ awaitF' m >>= yieldF) -}
+
+{-|
+    'finallyP' is like 'catchP' except that it also calls the finalizer if @p@
+    completes normally.
+-}
+finallyP :: (Monad m) => m () -> Ensure a b m r -> Ensure a b m r
+finallyP m p = do
+    r <- catchP m p
+    lift m
+    return r
+
+{- Internal type used to annotate internal functions without descending into
+   newtype hell. -}
+type Prompt' a b m r = Pipe a b m (Producer b m r)
+
 (<~<) :: (Monad m) => Prompt' b c m r -> Prompt' a b m r -> Prompt' a c m r
 p1 <~< p2 = FreeT $ do
     x1 <- runFreeT p1
@@ -160,10 +240,6 @@ p1 <~< p2 = FreeT $ do
                 Pure p2'              -> pure $ p1 <~| p2'
                 Wrap (Yield (b2, p2')) -> f1 b2 <~< p2'
                 Wrap (Await f2      ) -> wrap $ Await $ fmap (p1 <~<) f2
-
-{- Internal type used to annotate internal functions without descending into
-   newtype hell. -}
-type Prompt' a b m r = Pipe a b m (Producer b m r)
 
 (<~|) :: (Monad m) => Prompt' b c m r -> Producer b m r -> Producer c m r
 p1 <~| p2 = FreeT $ do
@@ -225,12 +301,57 @@ schedule p = FreeT $ do
         Wrap (Await f) -> wrap $ Yield (Nothing, wrap $ Await f)
         Wrap (Yield y) -> wrap $ Yield $ fmap schedule y
 
+{- $compose
+    The fourth step to convert 'Pipe' code to 'Frame' code is to use ('<-<') to
+    compose 'Frame's instead of ('<+<').
+
+> printer  :: Frame a Void IO r
+> fromList :: (Monad m) => [a] -> Frame () a m ()
+>
+> p :: Frame () Void IO ()
+> p = printer <-< contrived <-< fromList [1..]
+
+    Similarly, 'idF' replaces 'idP'.
+
+    The 'FrameC' category uses the 'Prompt' type to strictly order finalizers
+    from upstream to downstream.  The rules for finalization are:
+
+    * When any 'Frame' closes its input end and downgrades to a
+      'Producer', it finalizes all frames upstream of it.  These finalizers are
+      ordered from upstream to downstream.
+
+    * A 'Frame' is responsible for finalizing its own resources under ordinary
+      operation (either manually, or using 'finallyP').
+
+    * When a 'Frame' terminates, everything downstream of it is finalized.
+      These finalizers are ordered from upstream to downstream.
+
+    The 'Category' instance for 'FrameC' provides the same strong guarantees as
+    the 'Lazy' category.  Besides the theoretical advantages, this confers many
+    practical advantages, too:
+
+    * Registered finalizers are guaranteed to be called exactly once.
+      Finalizers are never duplicated or dropped in corner cases.
+
+    * The grouping of composition will never affect the ordering or behavior of
+      finalizers.
+
+    * Finalization does not grow more complex the more 'Frame's you add in your
+      'Stack'.
+
+    * You can reason about the finalization behavior of each 'Frame'
+      independently of other 'Frame's it is composed with.
+-}
+
+-- | Corresponds to 'id' from @Control.Category@
 idF :: (Monad m) => Frame a a m r
 idF = Prompt $ forever $ awaitF >>= yieldF
 
+-- | Corresponds to ('<<<')/('.') from @Control.Category@
 (<-<) :: (Monad m) => Frame b c m r -> Frame a b m r -> Frame a c m r
 (Prompt p1) <-< (Prompt p2) = Prompt $ mult unit p1 <~< comult p2
 
+-- | Corresponds to ('>>>') from @Control.Category@
 (>->) :: (Monad m) => Frame a b m r -> Frame b c m r -> Frame a c m r
 (>->) = flip (<-<)
 
@@ -240,54 +361,30 @@ instance (Monad m) => Category (FrameC m r) where
     (FrameC p1) . (FrameC p2) = FrameC $ p1 <-< p2
     id = FrameC idF
 
-{- $ensure
-    The third (optional) step to convert 'Pipe' code to 'Frame' code is to use
-    'catchP' or 'finallyP' to register finalizers for blocks of code.
+{- $run
+    The final step to convert 'Pipe' code to 'Frame' code is to replace
+    'runPipe' with 'runFrame'.
 
-> contrived :: Frame a a IO ()
-> contrived = Prompt $ do
->     catchP (putStrLn "Stage 1 interrupted") $ do
->         x1 <- awaitF
->         catchP (putStrLn "Stage 1(b) interrupted") $ yieldF x1
->     catchP (putStrLn "Stage 2 interrupted") $ do
->         x2 <- awaitF
->         close $ yieldF x2
+> printer  :: Frame a Void IO r
+> take     :: (Monad m) => Int -> Frame a a m ()
+> fromList :: (Monad m) => [a] -> Frame () a m ()
+
+>>> runFrame $ printer <-< contrived <-< fromList [1..]
+1
+2
+
+>>> runFrame $ printer <-< contrived <-< fromList [1]
+1
+Stage 2 interrupted
+
+>>> runFrame $ printer <-< take 1 <-< contrived <-< fromList [1..]
+Stage 1(b) interrupted
+Stage 1 interrupted
+1
+
 -}
 
-{-|
-    @catchP m p@ registers @m@ to be called only if another composed
-    pipe terminates before @p@ is done.
--}
-catchP :: (Monad m) => m () -> Ensure a b m r -> Ensure a b m r
-catchP m p = FreeT $ do
-    x <- runFreeT p
-    runFreeT $ case x of
-        Pure r -> pure r
-        Wrap (Yield ((m', b), p')) -> wrap $ Yield ((m' >> m, b), catchP m p')
-        Wrap (Await f) -> wrap $ Await $ \e -> case e of
-            Nothing -> lift m >> catchP m (f e)
-            Just _  ->           catchP m (f e)
-{- Equivalent to:
-
-awaitF' m = await >>= maybe (lift m >> awaitF' m) return
-
-yieldF' m x = yield (m, x)
-
-catchP m p =  reopen $
-     (forever $ awaitF >>= yieldF' m)
- <-< Prompt (fmap close p)
- <-< (forever $ awaitF' m >>= yieldF) -}
-
-{-|
-    'finallyP' is like 'catchP' except that it also calls the finalizer if @p@
-    completes normally.
--}
-finallyP :: (Monad m) => m () -> Ensure a b m r -> Ensure a b m r
-finallyP m p = do
-    r <- catchP m p
-    lift m
-    return r
-
+-- | Convert a 'Frame' back to the base monad.
 runFrame :: (Monad m) => Stack m r -> m r
 runFrame p = go (reopen p) where
     go p = do
