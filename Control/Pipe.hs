@@ -1,4 +1,51 @@
-{-|
+module Control.Pipe (
+    -- * Types
+    -- $type
+
+    -- * Composition
+    -- $compose
+
+    -- * Modularity
+    -- $modular
+
+    -- * Vertical Concatenation
+    -- $vertical
+
+    -- * Return Values
+    -- $return
+
+    -- * Termination
+    -- $terminate
+
+    -- * Resource Management
+    -- $resource
+
+    -- * Frames
+    -- $frame
+
+    -- * Frame Composition
+    -- $framecompose
+
+    -- * Frame vs. Ensure
+    -- $frameensure
+
+    -- * Folds
+    -- $fold
+
+    -- * Strictness
+    -- $strict
+
+    module Control.Pipe.Common,
+    module Control.Pipe.Final
+    ) where
+
+import Control.Category
+import Control.Monad.Trans.Class
+import Control.Pipe.Common
+import Control.Pipe.Final
+import Data.Void
+
+{- $type
     This library represents streaming computations using a single data type:
     'Pipe'.
 
@@ -85,7 +132,9 @@
 
     'Consumer's resemble iteratees in other libraries because they function as
     data sinks.
+-}
 
+{- $compose
     What distinguishes pipes from every other iteratee implementation is that
     they form a true 'Category'.  Because of this, you can literally compose
     pipes into 'Pipeline's using ordinary composition:
@@ -184,8 +233,11 @@ You shall not pass!
 > lift (mapM_ print [1..])
 
     ... which is what we would have written by hand if we had not used pipes at
-    all!  All 'runPipe' does is just remove the 'lift'!  In fact, given a
-    loop like:
+    all!  All 'runPipe' does is just remove the 'lift'!
+-}
+
+{- $modular
+    Given a loop like:
 
 > loop :: IO r
 > loop = forever $ do
@@ -241,6 +293,9 @@ Enter a number:
 3
 You shall not pass!
 
+-}
+
+{- $vertical
     You can easily \"vertically\" concatenate pipes, 'Producer's, and
     'Consumer's, all using simple monad sequencing: ('>>').  For example, here
     is how you concatenate 'Producer's:
@@ -281,6 +336,9 @@ You shall not pass!
 7
 You shall not pass!
 
+-}
+
+{- $return
     Pipe composition imposes an important requirement: You can only compose
     pipes that have the same return type.  For example, I could write the
     following function:
@@ -316,6 +374,9 @@ Nothing
 
     The type system saved me by forcing me to cover all corner cases and handle
     every way my program could terminate.
+-}
+
+{- $terminate
 
     Now what if you wanted to write a pipe that only reads from its input end
     (i.e. a 'Consumer') and returns a list of every value delivered to it when
@@ -382,14 +443,15 @@ Nothing
     pipes because you can leverage your intuition about 'Category's and 'Monad's
     to understand their behavior.  The only 'Pipe'-specific primitives are
     'await' and 'yield'.
+-}
 
+{- $resource
     Here's another problem with 'Pipe' composition: resource finalization.
-    Composition has one important defect: resource finalization.  Let's say we
-    have the file \"test.txt\" with the following contents:
+    Let's say we have the file \"test.txt\" with the following contents:
 
-> This is a test.
-> Don't panic!
-> Calm down, please!
+> Line 1
+> Line 2
+> Line 3
 
   .. and we wish to lazily read one line at a time from it:
 
@@ -404,50 +466,56 @@ Nothing
     We could then try to be slick and use our 'Monad' and 'Category' instances
     to generate a lazy version that only reads as many lines as we request:
 
+> read' :: FilePath -> Producer Text IO ()
 > read' = do
 >     lift $ putStrLn "Opening file ..."
->     h <- lift $ openFile "test.txt"
+>     h <- lift $ openFile file ReadMode
 >     readFile' h
 >     lift $ putStrLn "Closing file ..."
 >     lift $ hClose h
 
     Now compose!
 
->>> runPipe $ printer <+< read'
+>>> runPipe $ printer <+< read' "test.xt"
 Opening file ...
-"This is a test."
-"Don't panic!"
-"Calm down, please!"
+"Line 1"
+"Line 2"
+"Line 3"
 Closing file ...
 
-    So far, so good.  Equally important, the @file@ is never opened if we
-    replace @printer@ with a pipe that never demands input:
+    So far, so good.  Equally important, the file is never opened if we replace
+    @printer@ with a pipe that never demands input:
 
->>> runPipe $ (lift $ putStrLn "I don't need input") <+< read'
+>>> runPipe $ (lift $ putStrLn "I don't need input") <+< read' "test.txt"
 I don't need input
 
     There is still one problem, though. What if we wrote:
 
->>> runPipe $ printer <+< take' 1 <+< read'
+>>> runPipe $ printer <+< take' 2 <+< read' "test.txt"
 Opening file ...
-"This is a test."
+"Line 1"
+"Line 2"
+You shall not pass!
 
-    Oh no!  Our pipe didn't properly close our file!  @take' 1@ terminated
+    Oh no!  Our pipe didn't properly close our file!  @take' 2@ terminated
     before @read'@, preventing @read'@ from properly closing \"test.txt\".
-    'Pipe' composition also fails to guarantee deterministic finalization.
+    This is why 'Pipe' composition fails to guarantee deterministic
+    finalization.
+-}
 
+{- $frame
     So how could we implement finalization, then?  The answer is to build a
     higher-order type on top of 'Pipe' and define a new composition that permits
     prompt, deterministic finalization.
 
-    To do this, we import 'Control.Pipe.Final', which exports the 'Frame' type,
+    To do this, we import "Control.Pipe.Final", which exports the 'Frame' type,
     analogous to the 'Pipe' type, except more powerful.  To demonstrate it in
     action, let's rewrite our @take'@ function to be a 'Frame' instead.
 
 > take' :: Int -> Frame a a IO ()
 > take' n
->   | n < 1 = Prompt $ close $ lift $ putStrLn "You shall not pass!"
->   | otherwise = Prompt $ do
+>   | n < 1 = Frame $ close $ lift $ putStrLn "You shall not pass!"
+>   | otherwise = Frame $ do
 >         replicateM_ (n - 1) $ do
 >             x <- awaitF
 >             yieldF x
@@ -458,50 +526,57 @@ Opening file ...
 
     The type signature looks the same, except 'Pipe' has been replaced with
     'Frame'.  Also, now we have 'awaitF' instead of 'await' and 'yieldF' instead
-    of 'yield'.  However, you'll notice two new things: 'Prompt' and 'close'.
+    of 'yield'.  However, you'll notice two new things: 'close' and 'Frame'.
 
-    'Prompt' serves a newtype constructor to give clearer type errors and
+    'close' signals when we no longer need input from upstream.  If you try to
+    request input other than @()@ after the 'close', you will get a type error.
+    Whenever you 'close' a frame, composition finalizes every upstream frame and
+    removes them from the pipeline.  The type error reflects the fact that if
+    you 'awaitF' past that point there is no longer anything upstream to request
+    input from.
+
+    'Frame' is a newtype constructor that I use to give clearer type errors and
     abstract away the underlying implementation.  The reason is that if you were
-    to expand out the full type that 'Prompt' wraps you would get:
+    to expand out the full type that 'Frame' wraps you would get:
 
-> Pipe (Maybe a) (m (), b) m (Producer (m (), b)) m r
+> Frame a b m r ~ Pipe (Maybe a) (m (), b) m (Pipe (Maybe ()) (m (), b) m r)
 > -- Yuck!
 
-    However, you don't need to understand that type to use 'Frame's, so forget
-    about it.  Really, the only reason the type is that complicated is because I
-    avoid using language extensions to implement 'Frame's, otherwise it would be
-    much simpler.
+    Really, the only reason the type is that complicated is because I avoid
+    using language extensions to implement 'Frame's, otherwise it would look
+    more like:
 
-    'close' matters a lot, though.  It signals when we no longer need input
-    from upstream.  If you try to 'await' after the 'close', you will get a type
-    error.
+> Pipe (Maybe a) (m (), b) m r
 
-    'close' tells composition when it is safe to finalize upstream frames.  When
-    you 'close' a frame, composition finalizes every upstream frame immediately.
-    Composition actually removes the upstream frames completely when you 'close'
-    a frame, which is why it is a type error to 'await' past that point, since
-    composition wouldn't even know how to supply it with input.
+    ... which isn't so bad.  In fact, it's not hard to understand what that
+    type is doing.  The 'Maybe' is used to supply a 'Nothing' to 'await's when
+    upstream terminates before 'yield'ing a value.  The @m ()@ is the most
+    recent finalizer which is yielded alongside every value so that downstream
+    pipes can finalize you if they terminate before requesting another value.
+    The finalization machinery uses these tricks behind the scene to guarantee
+    that your finalizers get called.  I provide a type synonym for this:
 
-    However, I haven't really shown you how to register finalizers.  That's
-    easy, since you just use 'catchP' or 'finallyP', which are identical to
-    their exception-handling counterparts, except they handle terminations.
-    Let's rewrite our @read'@ function using finalizers:
+> type Ensure a b m r = Pipe (Maybe a) (m (), b) m r
 
-> readFile' :: FilePath -> Frame () T.Text IO ()
-> readFile' file = Prompt $ do
->     h <- lift $ openFile file ReadMode
->     finallyP (putStrLn ("Closing " ++ file) >> hClose h) $ go h
->   where
->     go h = do
->         eof <- lift $ hIsEOF h
->         case eof of
->             True  -> close $ return ()
->             False -> do
->                 line <- lift $ T.hGetLine h
->                 yieldF line
->                 go h
+    In other words, an 'Ensure'd pipe can intercept upstream termination and
+    register finalizers for downstream to call in the event of premature
+    termination.
 
-> readFile' :: Handle -> Ensure Text IO ()
+    Using this type synonym, we can rewrite the type that 'Frame' wraps:
+
+> Frame a b m r ~ Ensure a b m (Ensure () b m r)
+
+    The first half of the type is the part of the pipe before you call 'close',
+    the second half of the type is the part of the pipe after you call 'close'.
+    Notice how the second half has a blocked input end.
+
+    However, I haven't yet shown you how to register finalizers.  That's easy,
+    though, since you just use 'catchP' or 'finallyP', which are identical to
+    their exception-handling counterparts, except they catch 'Frame'
+    terminations in either direction.  Let's rewrite our @read'@ function using
+    finalizers:
+
+> readFile' :: Handle -> Ensure () Text IO ()
 > readFile' h = do
 >     eof <- lift $ hIsEOF h
 >     when (not eof) $ do
@@ -509,19 +584,176 @@ Opening file ...
 >         yieldF s
 >         readFile' h
 >
-> read' :: Frame Void Text IO ()
-> read' = Prompt $ do
+> read' :: FilePath Frame () Text IO ()
+> read' = Frame $ close $ do
 >     lift $ putStrLn "Opening file ..."
->     h <- lift $ openFile "test.txt"
+>     h <- lift $ openFile file ReadMode
 >     finallyP (putStrLn "Closing file ..." >> hClose h)
 >              (readFile' h)
 
+    Notice how @read'@ closes its input end immediately because it never
+    requires input.  Also, the 'finallyP' ensures that the finalizer is called
+    both if @read'@ terminates normally or is interrupted by another 'Frame'
+    terminating first.
+
+    Now, all we need to do is rewrite @printer@ to be a 'Frame':
+
+> printer :: (Show b) => Frame b Void IO r
+> printer = Frame $ forever $ do
+>     x <- awaitF
+>     lift $ print x
+
+    This time we don't even need a 'close' statement because @printer@ never
+    stops needing input.  Any non-terminating 'Frame' with a polymorphic return
+    type can skip calling 'close' altogether, and it will type-check.
 -}
 
-module Control.Pipe (module Control.Pipe.Common) where
+{- $framecompose
 
-import Control.Category
-import Control.Monad.Trans.Class
-import Control.Pipe.Common
-import Control.Pipe.Final
-import Data.Void
+    Just like with 'Pipe's, we can compose 'Frame's, except now we use ('<-<'):
+
+> stack :: Frame Void () IO ()
+> stack = printer <-< take' 1 <-< read' "test.txt"
+
+    I call a complete set of 'Frame's a 'Stack', to reflect the fact that
+    'Frame' composition uses the exact same tricks stack-based programming uses
+    to guarantee deterministic finalization.  When a 'Frame' terminates it
+    finalizes upstream 'Frame's as if they were a heap and it propagates an
+    exceptional value ('Nothing' in this case) for downstream 'Frame's to
+    intercept.  I provide a type synonym to reflect this:
+
+> type Stack m r = Frame Void () IO r
+
+    So we can rewrite the type of @stack@ to be:
+
+> stack :: Stack IO ()
+
+    To run a 'Stack', we use 'runFrame', which is the 'Frame'-based analog to
+    'runPipe':
+
+>>> runFrame stack
+Opening file ...
+"Line 1"
+Closing file ...
+"Line 2"
+You shall not pass!
+
+    Not only did it correctly finalize the file this time, but it did so as
+    promptly as possible!  I programmed @take'@ so that it knew it would not
+    need @read'@ any longer before it 'yield'ed the second value, so it
+    finalized the file before 'yield'ing the second value for @printer@.
+    @take'@ did this without knowing anything about the 'Frame' upstream of it.
+    One of the big advantages of 'Frame's is that you can reason about the
+    finalization behavior of each 'Frame' in complete isolation from other
+    'Frame's, allowing you to completely decouple their finalization
+    behavior.
+-}
+
+{- $frameensure
+    However, keep in mind that while 'Ensure' is a 'Monad', 'Frame' is not!
+    However, you can achieve the best of both worlds by programming all your
+    pipes in the 'Ensure' monad, and then only adding 'close' at the last minute    when you are building your 'Stack'.  For example, if we wanted to read from
+    multiple files, it would be much better to just remove the 'close' function
+    from the @read'@ implementation, so it operates in the 'Ensure' monad:
+
+> read' :: FilePath -> Ensure () Text IO ()
+
+    Then use 'close' only after we've already concatenated our files:
+
+> files :: Frame () Text IO ()
+> files = close $ do
+>     read' "test.txt"
+>     read' "dictionary.txt"
+>     read' "poem.txt"
+
+    This is a more idiomatic 'Frame' programming style that lets you take
+    advantage of both the 'Monad' and 'Category' instances.
+
+    The beauty of compositional finalization is we can decompose complicated
+    problems into smaller ones.  Imagine that we have a resource that needs a
+    fine-grained finalization behavior like in our @take'@ function which does
+    a cute little optimization to finalize early.  We can always decompose our
+    frame into one that does the straight-forward thing (like @read'@) and then
+    just compose it with @take'@ to get the cute optimization for free.  In this
+    way we've decomposed the problem into two separate problems: generating the
+    resource and doing the cute optimization.
+-}
+
+{- $fold
+    'Frame's can actually do much more than manage finalization!  Using
+    'Frame's, we can now correctly implement folds like @toList@ in a way that
+    is truly compositional:
+
+> toList :: (Monad m) => Frame a Void m [a]
+> toList = Frame go where
+>     go = do
+>         x <- await
+>         case x of
+>             Nothing -> close $ pure []
+>             Just a  -> fmap (fmap (a:)) go
+>             -- the extra fmap is an unfortunate extra detail
+
+    This time I used an ordinary 'await', instead of 'awaitF', so I could access
+    the underlying 'Maybe' values that these 'Frame's are passing around.
+    Similarly, you could use 'yield' instead of 'yieldF' if you wanted to
+    manually manage the finalizers passed downstream at each 'yield' statement
+    instead of using the 'catchP' or 'finallyP' convenience functions.  Using
+    these advanced features does not break any of the 'Category' laws.  I could
+    expose every single internal of the library and you would not be able to
+    break the 'Category' laws because the 'Frame's generated are still
+    indistinguishable at the value level and fuse into the hand-written
+    implementation.  The compositionality of 'Frame's is just as strong as the
+    compositionality of 'Pipe's.
+
+    Now let's use our @toList@ function:
+
+>>> runFrame $ (Just <$> toList) <-< (Nothing <$ fromList [1..3])
+Just [1,2,3]
+
+    I still had to provide a return value for @fromList@ ('Nothing' in this
+    case), because when @fromList@ terminates, it cannot guarantee that its
+    return value will come from itself or from @toList@.  When @toList@ receives
+    a 'Nothing' from upstream, it can choose to terminate and over-ride the
+    return value from upstream or 'await' again and defer to the upstream return
+    value (@fromList@ in this case).  It doesn't even have to immediately
+    decide.  It could just 'yield' more values downstream and forget it had even
+    received a 'Nothing' and if downstream terminates then composition will
+    still ensure that everything \"just works\" the way you would expect and no
+    finalizers are missed or duplicated.
+
+    Composition handles every single corner case of finalization.  This directly
+    follows from enforcing the 'Category' laws, because categories have no
+    corners!
+-}
+
+{- $strict
+    We can go a step further and modify @toList@ into something even cooler:
+
+> strict :: (Monad m) => Frame a a m ()
+> strict = Frame $ do
+>     xs <- go
+>     close $ mapM_ yieldF xs
+>   where
+>     go = do
+>         x <- await
+>         case x of
+>             Nothing -> pure []
+>             Just a  -> fmap (a:) go
+
+    As the name suggests, @strict@ is strict in its input.  We can use @strict@
+    to load the entire resource into memory immediately, allowing us to finalize
+    it early.  Let's use this to create a strict version of our file reader:
+
+>>> runFrame $ printer <-< take' 2 <-< strict <-< read' "test.txt"
+Opening file ...
+Closing file ...
+"Line 1"
+"Line 2"
+You shall not pass!
+
+    Now we have a way to seamlessly switch from laziness to strictness all
+    implemented entirely within Haskell without the use of artificial 'seq'
+    annotations.
+-}
+
+

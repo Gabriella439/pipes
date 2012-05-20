@@ -1,6 +1,7 @@
 module Control.Pipe.Final (
     -- * Introduction
     -- $intro
+
     -- * Types
     Prompt,
     Ensure,
@@ -41,12 +42,12 @@ import Prelude hiding ((.), id)
 
 {- $intro
     A 'Frame' is a higher-order type built on top of 'Pipe'.  It enables a
-    richer composition with the ability to finalize resources:
+    richer composition with the ability to finalize resources in a manner that
+    is:
 
-    * Promptly: You can close resources when you no longer need input from them
+    * Prompt: You can close resources when you no longer need input from them
 
-    * Deterministically: It ensures that every 'Frame' is finalized no matter
-      which frame terminates
+    * Deterministic: Composition finalizes every 'Frame' when one terminates
 
     'Frame's differ from 'Pipe's in that they do not form monads, but instead
     form parametrized monads.  Unfortunately, parametrized monads are not
@@ -56,12 +57,6 @@ import Prelude hiding ((.), id)
     splitting it into two monads.  Future releases will split off a version that
     takes advantage of parametrized monads for a much simpler underlying type
     and a significantly cleaner implementation.
-
-    The section on \"Types\" is an in-depth explanation of the underlying type,
-    which is unfortunately complicated because of in-lining the parametrized
-    monad.  I tried to strike a balance between using newtypes to improve type
-    errors and abstract over the internals and using type synonyms to avoid
-    newtype hell.
 
     Ordinary users should start at the section \"Create Frames\", but if you
     encounter weird type errors and want to understand them, then consult the
@@ -77,21 +72,21 @@ import Prelude hiding ((.), id)
     pipe code and the second monad only permits pipe code that doesn't need
     input.
 
-    This allows the finalization machinery to safely and promptly finalize
-    upstream before beginning the second block, so the earlier the code
-    transitions to the second monad (using the 'close' function), the more
-    promptly upstream gets finalized.
-
-    For example if @p = Pipe@, the first monad is an ordinary 'Pipe' and the
-    second monad is a 'Producer':
+    For example if @p = Pipe@, the first monad becomes an ordinary 'Pipe' and
+    the second monad becomes a 'Producer':
 
 > Prompt Pipe a b m r = Pipe a b m (Pipe () b m r)
+
+    The pipe does not require input by the time it reaches the second block,
+    meaning that the finalization machinery can safely finalize upstream
+    resources the moment.  The earlier you use 'close' the input end,
+    the more promptly you release upstream resources.
 
     The finalization machinery also finalizes downstream pipes when the
     second monad terminates.  I use this trick to ensure a strict ordering of
     finalizers from upstream to downstream.
 
-    I don't actually use the 'Prompt' type synonym, since that requires
+    I don't actually use the 'Prompt' type synonym, since that would require
     newtyping everything, but I will reference it in documentation to clarify
     type signatures.
 -}
@@ -107,11 +102,14 @@ type Prompt p a b m r = p a b m (p () b m r)
     'Nothing' once.  This allows it to finalize itself and if it terminates then
     its return value takes precedence over upstream's return value.  However, if
     it 'await's again, it defers to upstream's return value and never regains
-    control.
+    control.  You do not need to \"rethrow\" the 'Nothing' (nor can you):
+    composition takes care of this for you.
 
     On the output end, the pipe must supply its most up-to-date finalizer
     alongside every value it 'yield's downstream.  This finalizer is guaranteed
-    to be called if downstream terminates first.
+    to be called if downstream terminates first.  You do not need to relay
+    upstream finalizers alongside the pipe's own finalizer (nor can you):
+    composition takes care of this for you.
 
     The combination of these two tricks allows a bidirectional guarantee of
     deterministic finalization that satisfies the 'Category' laws.
@@ -131,14 +129,13 @@ type Ensure a b m r = Pipe (Maybe a) (m (), b) m r
 
 > type Frame a b m r = Prompt Ensure a b m r
 -}
-newtype Frame a b m r = Frame { unFrame ::
-    Pipe (Maybe a) (m (), b) m (Pipe (Maybe ()) (m (), b) m r) }
+newtype Frame a b m r = Frame { unFrame :: Ensure a b m (Ensure () b  m r) }
 
 instance (Monad m) => Functor (Frame a b m) where
     fmap f (Frame p) = Frame $ fmap (fmap f) p
 
 -- | A 'Stack' is a 'Frame' that doesn't need input and doesn't generate output
-type Stack m r = Frame () Void m r
+type Stack = Frame () Void
 
 {- $create
     The first step to convert 'Pipe' code to 'Frame' code is to replace all
@@ -184,7 +181,7 @@ close :: (Monad m) => Ensure () b m r -> Ensure a b m (Ensure () b m r)
 close = pure
 
 {-|
-    Use this to bind to the 'close'd half of the frame if you want to continue
+    Use this to bind to the 'close'd half of the 'Frame' if you want to continue
     where it left off but you still don't require input.
 
     This function would not be necessary if 'Prompt' were implemented as a
@@ -339,16 +336,16 @@ schedule p = FreeT $ do
 > printer  :: Frame a Void IO r
 > fromList :: (Monad m) => [a] -> Frame () a m ()
 >
-> p :: Frame () Void IO ()
+> p :: Stack IO ()
 > p = printer <-< contrived <-< fromList [1..]
 
     Similarly, 'idF' replaces 'idP'.
 
     When a 'Frame' terminates, the 'FrameC' category strictly orders the
-    finalizers from upstream to downstream.  Specifically
+    finalizers from upstream to downstream.  Specifically:
 
-    * When any 'Frame' 'close's its input end, it finalizes all frames upstream
-      of it.  These finalizers are ordered from upstream to downstream.
+    * When any 'Frame' 'close's its input end, it finalizes all 'Frame's
+      upstream of it.  These finalizers are ordered from upstream to downstream.
 
     * A 'Frame' is responsible for finalizing its own resources under ordinary
       operation (either manually, or using 'finallyP').
@@ -359,8 +356,7 @@ schedule p = FreeT $ do
     The 'Category' instance for 'FrameC' provides the same strong guarantees as
     the 'Lazy' category.  This confers many practical advantages:
 
-    * Registered finalizers are guaranteed to be called exactly once.
-      Finalizers are never duplicated or dropped in corner cases.
+    * Finalizers are never duplicated or dropped in corner cases.
 
     * The grouping of composition will never affect the ordering or behavior of
       finalizers.
