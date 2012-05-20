@@ -326,7 +326,7 @@ Nothing
 
     You can't write such a pipe because if its input terminates then it brings
     down @toList@ with it!  This is correct because @toList@ as defined is not
-    compositional!
+    compositional (yet!).
 
     To see why, let's say you somehow got @toList@ to work and the following
     imaginary code sample worked:
@@ -376,13 +376,14 @@ Nothing
     other iteratee libraries.
 
     The @pipes@ library, unlike other iteratee libraries, grounds its vertical
-    and horizontal concatenation in mathematics by deriving horizontal
+    and horizontal concatenation in category theory by deriving horizontal
     concatenation ('.') from its 'Category' instance and vertical concatenation
     ('>>') from its 'Monad' instance.  This makes it easier to reason about
     pipes because you can leverage your intuition about 'Category's and 'Monad's
     to understand their behavior.  The only 'Pipe'-specific primitives are
     'await' and 'yield'.
 
+    Here's another problem with 'Pipe' composition: resource finalization.
     Composition has one important defect: resource finalization.  Let's say we
     have the file \"test.txt\" with the following contents:
 
@@ -400,55 +401,121 @@ Nothing
 >         yield s
 >         readFile' h
 
-    We can use our 'Monad' and 'Category' instances to generate a lazy version
-    that only reads as many lines as we request:
+    We could then try to be slick and use our 'Monad' and 'Category' instances
+    to generate a lazy version that only reads as many lines as we request:
 
-> read' n = do
->         lift $ putStrLn "Opening file ..."
->         h <- lift $ openFile "test.txt"
->         take' n <+< readFile' h
->         lift $ putStrLn "Closing file ..."
->         lift $ hClose h
+> read' = do
+>     lift $ putStrLn "Opening file ..."
+>     h <- lift $ openFile "test.txt"
+>     readFile' h
+>     lift $ putStrLn "Closing file ..."
+>     lift $ hClose h
 
     Now compose!
 
->>> runPipe $ printer <+< read' 2
-Opening file ...
-"This is a test."
-"Don't panic!"
-Closing file ...
-
->>> runPipe $ printer <+< read' 99
+>>> runPipe $ printer <+< read'
 Opening file ...
 "This is a test."
 "Don't panic!"
 "Calm down, please!"
 Closing file ...
 
-    In the first example, @take' n <+< readFile' h@ terminates because
-    @take'@ only requested 2 lines.  In the second example, it terminates
-    because @readFile'@ ran out of input.  However, in both cases the pipe never    reads more lines than we request and frees \"test.txt\" immediately when it
-    was no longer needed.
+    So far, so good.  Equally important, the @file@ is never opened if we
+    replace @printer@ with a pipe that never demands input:
 
-    Even more importantly, the @file@ is never opened if we replace @printer@
-    with a pipe that never demands input:
-
->>> runPipe $ (lift $ putStrLn "I don't need input") <+< read' 2
+>>> runPipe $ (lift $ putStrLn "I don't need input") <+< read'
 I don't need input
 
     There is still one problem, though. What if we wrote:
 
->>> runPipe $ printer <+< take' 1 <+< read' 3
+>>> runPipe $ printer <+< take' 1 <+< read'
 Opening file ...
 "This is a test."
 
     Oh no!  Our pipe didn't properly close our file!  @take' 1@ terminated
-    before @read' 3@, preventing @read' 3@ from properly closing \"test.txt\".
+    before @read'@, preventing @read'@ from properly closing \"test.txt\".
+    'Pipe' composition also fails to guarantee deterministic finalization.
 
-    So for now, you will have to manually ensure that resources get finalized
-    deterministically and promptly.  I am currently working on a solution that
-    handles automatic, prompt, and deterministic finalization of resources while
-    preserving compositionality, but until then you are on your own.
+    So how could we implement finalization, then?  The answer is to build a
+    higher-order type on top of 'Pipe' and define a new composition that permits
+    prompt, deterministic finalization.
+
+    To do this, we import 'Control.Pipe.Final', which exports the 'Frame' type,
+    analogous to the 'Pipe' type, except more powerful.  To demonstrate it in
+    action, let's rewrite our @take'@ function to be a 'Frame' instead.
+
+> take' :: Int -> Frame a a IO ()
+> take' n
+>   | n < 1 = Prompt $ close $ lift $ putStrLn "You shall not pass!"
+>   | otherwise = Prompt $ do
+>         replicateM_ (n - 1) $ do
+>             x <- awaitF
+>             yieldF x
+>         x <- awaitF
+>         close $ do
+>             lift $ putStrLn "You shall not pass!"
+>             yieldF x
+
+    The type signature looks the same, except 'Pipe' has been replaced with
+    'Frame'.  Also, now we have 'awaitF' instead of 'await' and 'yieldF' instead
+    of 'yield'.  However, you'll notice two new things: 'Prompt' and 'close'.
+
+    'Prompt' serves a newtype constructor to give clearer type errors and
+    abstract away the underlying implementation.  The reason is that if you were
+    to expand out the full type that 'Prompt' wraps you would get:
+
+> Pipe (Maybe a) (m (), b) m (Producer (m (), b)) m r
+> -- Yuck!
+
+    However, you don't need to understand that type to use 'Frame's, so forget
+    about it.  Really, the only reason the type is that complicated is because I
+    avoid using language extensions to implement 'Frame's, otherwise it would be
+    much simpler.
+
+    'close' matters a lot, though.  It signals when we no longer need input
+    from upstream.  If you try to 'await' after the 'close', you will get a type
+    error.
+
+    'close' tells composition when it is safe to finalize upstream frames.  When
+    you 'close' a frame, composition finalizes every upstream frame immediately.
+    Composition actually removes the upstream frames completely when you 'close'
+    a frame, which is why it is a type error to 'await' past that point, since
+    composition wouldn't even know how to supply it with input.
+
+    However, I haven't really shown you how to register finalizers.  That's
+    easy, since you just use 'catchP' or 'finallyP', which are identical to
+    their exception-handling counterparts, except they handle terminations.
+    Let's rewrite our @read'@ function using finalizers:
+
+> readFile' :: FilePath -> Frame () T.Text IO ()
+> readFile' file = Prompt $ do
+>     h <- lift $ openFile file ReadMode
+>     finallyP (putStrLn ("Closing " ++ file) >> hClose h) $ go h
+>   where
+>     go h = do
+>         eof <- lift $ hIsEOF h
+>         case eof of
+>             True  -> close $ return ()
+>             False -> do
+>                 line <- lift $ T.hGetLine h
+>                 yieldF line
+>                 go h
+
+> readFile' :: Handle -> Ensure Text IO ()
+> readFile' h = do
+>     eof <- lift $ hIsEOF h
+>     when (not eof) $ do
+>         s <- lift $ hGetLine h
+>         yieldF s
+>         readFile' h
+>
+> read' :: Frame Void Text IO ()
+> read' = Prompt $ do
+>     lift $ putStrLn "Opening file ..."
+>     h <- lift $ openFile "test.txt"
+>     finallyP (putStrLn "Closing file ..." >> hClose h)
+>              (readFile' h)
+
 -}
 
 module Control.Pipe (module Control.Pipe.Common) where
@@ -456,4 +523,5 @@ module Control.Pipe (module Control.Pipe.Common) where
 import Control.Category
 import Control.Monad.Trans.Class
 import Control.Pipe.Common
+import Control.Pipe.Final
 import Data.Void
