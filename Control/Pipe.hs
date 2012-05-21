@@ -270,8 +270,8 @@ You shall not pass!
     promotes loose coupling and allows you to freely mix and match those
     components.
 
-    For example, let's define a new data source that indefinitely prompts the
-    user for integers:
+    To demonstrate this, let's define a new data source that indefinitely
+    prompts the user for integers:
 
 > prompt :: Producer Int IO a
 > prompt = forever $ do
@@ -463,8 +463,8 @@ Nothing
 >         yield s
 >         readFile' h
 
-    We could then try to be slick and use our 'Monad' and 'Category' instances
-    to generate a lazy version that only reads as many lines as we request:
+    We could then try to be slick and write a lazy version that only reads as
+    many lines as we request:
 
 > read' :: FilePath -> Producer Text IO ()
 > read' = do
@@ -497,10 +497,10 @@ Opening file ...
 "Line 2"
 You shall not pass!
 
-    Oh no!  Our pipe didn't properly close our file!  @take' 2@ terminated
-    before @read'@, preventing @read'@ from properly closing \"test.txt\".
-    This is why 'Pipe' composition fails to guarantee deterministic
-    finalization.
+    Oh no!  While it was lazy and only read two lines from the file, it was also
+    too lazy to properly close our file!  @take' 2@ terminated before @read'@,
+    preventing @read'@ from properly closing \"test.txt\".  This is why 'Pipe'
+    composition fails to guarantee deterministic finalization.
 -}
 
 {- $frame
@@ -560,7 +560,9 @@ You shall not pass!
 
     In other words, an 'Ensure'd pipe can intercept upstream termination and
     register finalizers for downstream to call in the event of premature
-    termination.
+    termination.  A good way to think about the distinction between 'Ensure'
+    and 'Frame' is that 'Ensure' is the 'Monad' and 'Frame' is the 'Category',
+    unlike 'Pipe', which is both at the same time.
 
     Using this type synonym, we can rewrite the type that 'Frame' wraps:
 
@@ -584,7 +586,7 @@ You shall not pass!
 >         yieldF s
 >         readFile' h
 >
-> read' :: FilePath Frame () Text IO ()
+> read' :: FilePath -> Frame () Text IO ()
 > read' = Frame $ close $ do
 >     lift $ putStrLn "Opening file ..."
 >     h <- lift $ openFile file ReadMode
@@ -650,7 +652,10 @@ You shall not pass!
 -}
 
 {- $frameensure
-    However, keep in mind that while 'Ensure' is a 'Monad', 'Frame' is not!
+    Unfortunately, in the absence of extensions I have to split the 'Monad' and
+    'Category' into two separate types.  'Ensure' is the 'Monad', 'Frame' is the
+    'Category'.
+
     However, you can achieve the best of both worlds by programming all your
     pipes in the 'Ensure' monad, and then only adding 'close' at the last minute    when you are building your 'Stack'.  For example, if we wanted to read from
     multiple files, it would be much better to just remove the 'close' function

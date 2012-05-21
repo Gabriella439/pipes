@@ -20,7 +20,7 @@ Description:
   * /Simpler semantics/: There is only one data type ('Pipe'), two primitives
     ('await' and 'yield'), and only one way to compose 'Pipe's ('.').  In fact,
     this library implements its entire behavior using its 'Monad' and 'Category'
-    instances.
+    instances and enforces their laws strictly!
   .
   * /Clearer naming conventions/: Enumeratees are called 'Pipe's, Enumerators
     are 'Producer's, and Iteratees are 'Consumer's.  'Producer's and 'Consumer's
@@ -41,13 +41,6 @@ Description:
   .
   Check out "Control.Pipe" for a copious tutorial and "Control.Pipe.Common" for
   the actual implementation.
-  .
-  This library currently lacks two important features which are a high priority
-  for upcoming releases:
-  .
-  * Automatic resource management
-  .
-  * A standard library of functions for common applications
 Category: Control, Enumerator
 Tested-With: GHC ==7.0.3
 Source-Repository head
