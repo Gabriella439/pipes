@@ -119,7 +119,7 @@ import Data.Void
     guarantee it will never 'yield' by setting the output to 'Void', from
     @Data.Void@:
 
-> printer :: (Show a) => Pipe b Void IO r
+> printer :: (Show b) => Pipe b Void IO r
 
     A pipe that never yields can be the final stage in a 'Pipeline'.  Again,
     I provide a type synonym for this common case:
