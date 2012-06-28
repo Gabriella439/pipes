@@ -160,12 +160,12 @@ p1 <+< p2 = FreeT $ do
     x1 <- runFreeT p1
     let p1' = FreeT $ return x1
     runFreeT $ case x1 of
-        Pure r         -> pure r
-        Wrap (Yield y) -> wrap $ Yield $ fmap (<+< p2) y
+        Return r        -> return r
+        Wrap (Yield y ) -> wrap $ Yield $ fmap (<+< p2) y
         Wrap (Await f1) -> FreeT $ do
             x2 <- runFreeT p2
             runFreeT $ case x2 of
-                Pure r              -> pure r
+                Return r            -> return r
                 Wrap (Yield (x, p)) -> f1 x <+< p
                 Wrap (Await f2    ) -> wrap $ Await $ fmap (p1' <+<) f2
 
@@ -278,6 +278,6 @@ runPipe :: (Monad m) => Pipeline m r -> m r
 runPipe p = do
     e <- runFreeT p
     case e of
-        Pure   r       -> return r
+        Return r       -> return r
         Wrap (Await f) -> runPipe $ f ()
         Wrap (Yield y) -> runPipe $ snd y

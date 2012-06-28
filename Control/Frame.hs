@@ -1,16 +1,47 @@
 {-# LANGUAGE GADTs, TypeOperators #-}
 
-import Control.Monad.Instances ()
+module Control.Frame (
+    C,
+    O,
+    M,
+    FrameF(..),
+    Frame,
+    yieldF,
+    awaitF,
+    close,
+    yield,
+    await,
+    (<-<),
+    idF,
+    FrameC(..),
+    runFrame
+    ) where
+
+import Control.Category
 import Control.IMonad
 import Control.IMonad.Trans
 import Control.IMonad.Trans.Free
+import Control.Monad.Instances ()
 import Data.Maybe
 import Data.Void
+import Prelude hiding ((.), id)
 
-data C
+-- | Input end is open, receiving values of type @a@
 data O a
+
+-- | Input end is closed
+data C
+
+-- | Input end is open, receiving values of type @Maybe a@
 type M a = O (Maybe a)
 
+{-|
+    Base functor for a pipe that can close its input end
+
+    * @b@ - Output type
+    * @x@ - Next step
+    * @i@ - Current step's index
+-}
 data FrameF b x i where
     Yield ::  b -> x    i   -> FrameF b x  i
     Await :: (a -> x (O a)) -> FrameF b x (O a)
@@ -22,19 +53,21 @@ instance IFunctor (FrameF b) where
         Await a   -> Await (f . a)
         Close c   -> Close (f c)
 
-yieldF :: (Monad m) => m () -> b -> IFreeT (FrameF (m (), b)) (U m) (() := i) i
+type Frame b m i j r = IFreeT (FrameF (m (), b)) (U m) (r := j) i
+
+yieldF :: (Monad m) => m () -> b -> Frame b m i i ()
 yieldF m x = liftF $ Yield (m, x) (V ())
 
-awaitF :: (Monad m) => IFreeT (FrameF (m (), b)) (U m) (Maybe a := M a) (M a)
+awaitF :: (Monad m) => Frame b m (M a) (M a) (Maybe a)
 awaitF = liftF $ Await V
 
-close :: (Monad m) => IFreeT (FrameF b) (U m) (() := C) (M a)
+close :: (Monad m) => Frame b m (M a) C ()
 close = liftF $ Close (V ())
 
-yield :: (Monad m) => b -> IFreeT (FrameF (m (), b)) (U m) (() := i) i
+yield :: (Monad m) => b -> Frame b m i i ()
 yield = yieldF (return ())
 
-await :: (Monad m) => IFreeT (FrameF (m (), b)) (U m) (a := M a) (M a)
+await :: (Monad m) => Frame b m (M a) (M a) a
 await = awaitF !>= maybe await returnR
 
 (<~<) :: (Monad m)
@@ -69,9 +102,6 @@ p1 <~| p2 = IFreeT $ U $ do
             unU $ runIFreeT $ case x2 of
                 Return r           -> returnI r
                 Wrap (Yield b p2') -> f1 b <~| p2' 
-
-idP :: (Monad m) => IFreeT (FrameF (m (), a)) (U m) (r := C) (M a)
-idP = foreverR $ await !>= yield
 
 heap :: (Monad m)
  => m ()
@@ -109,13 +139,22 @@ warn p = IFreeT $ U $ do
         Wrap (Yield b p') -> wrap $ Yield (Just b) (warn  p')
 
 (<-<) :: Monad m
- => IFreeT (FrameF (m (), c)) (U m) (r := C) (M b)
- -> IFreeT (FrameF (m (), b)) (U m) (r := C) (M a)
- -> IFreeT (FrameF (m (), c)) (U m) (r := C) (M a)
+ => Frame c m (M b) C r -- IFreeT (FrameF (m (), c)) (U m) (r := C) (M b)
+ -> Frame b m (M a) C r -- IFreeT (FrameF (m (), b)) (U m) (r := C) (M a)
+ -> Frame c m (M a) C r -- IFreeT (FrameF (m (), c)) (U m) (r := C) (M a)
 p1 <-< p2 = heap (return ()) p1 <~< stack False p2
 
+idF :: (Monad m) => Frame a m (M a) C r -- IFreeT (FrameF (m (), a)) (U m) (r := C) (M a)
+idF = foreverR $ await !>= yield
+
+newtype FrameC m r a b = FrameC { unFrameC :: Frame b m (M a) C r }
+
+instance (Monad m) => Category (FrameC m r) where
+    id = FrameC idF
+    (FrameC p1) . (FrameC p2) = FrameC (p1 <-< p2)
+
 runFrame :: (Monad m)
- => IFreeT (FrameF (m (), Void)) (U m) (r := C) (M ()) -> m r
+ => Frame Void m (M ()) C r -> m r -- IFreeT (FrameF (m (), Void)) (U m) (r := C) (M ()) -> m r
 runFrame p = do
     x <- unU $ runIFreeT p
     case x of
@@ -124,7 +163,7 @@ runFrame p = do
         Wrap (Await   f ) -> runFrame (f $ Just ())
 
 runFrame' :: (Monad m)
- => IFreeT (FrameF (m (), Void)) (U m) (r := C) C -> m r
+ => Frame Void m C C r -> m r -- IFreeT (FrameF (m (), Void)) (U m) (r := C) C -> m r
 runFrame' p = do
     x <- unU $ runIFreeT p
     case x of

@@ -36,13 +36,11 @@ module Control.Pipe (
     -- $strict
 
     module Control.Pipe.Common,
-    module Control.Pipe.Final
     ) where
 
 import Control.Category
 import Control.Monad.Trans.Class
 import Control.Pipe.Common
-import Control.Pipe.Final
 import Data.Void
 
 {- $type
