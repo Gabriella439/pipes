@@ -62,7 +62,7 @@ import Data.Void
 import Prelude hiding ((.), id)
 
 -- For documentation
-import Control.Pipe.Common hiding (await, yield, Await, Yield)
+import Control.Pipe hiding (await, yield, Await, Yield)
 
 {- $types
     The first step to convert 'Pipe' code to 'Frame' code is to translate the

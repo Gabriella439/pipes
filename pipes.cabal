@@ -39,8 +39,8 @@ Description:
     Vertical Concatenation always works the way you expect, picking up where the
     previous 'Pipe' left off.
   .
-  Check out "Control.Pipe" for a copious tutorial and "Control.Pipe.Common" for
-  the actual implementation.
+  Check out "Control.Pipe.Tutorial" for a copious introductory tutorial and
+  "Control.Pipe" for the actual implementation.
 Category: Control, Enumerator
 Tested-With: GHC ==7.0.3
 Source-Repository head
@@ -49,6 +49,6 @@ Source-Repository head
 
 Library
     Build-Depends: base >= 4 && < 5, transformers, void, index-core, free-monads
-    Exposed-Modules: Control.Pipe, Control.Pipe.Common, Control.Frame
+    Exposed-Modules: Control.Pipe, Control.Pipe.Tutorial, Control.Frame
     GHC-Options: -O2
     Default-Language: Haskell2010
