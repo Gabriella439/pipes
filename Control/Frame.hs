@@ -66,13 +66,12 @@ import Control.Pipe.Common hiding (await, yield, Await, Yield)
 
 {- $types
     The first step to convert 'Pipe' code to 'Frame' code is to translate the
-    types.  All types of the form @Pipe a b m r@ become @Frame b m (M a) C r@
-    suffix to all 'Pipe' type constructors.  For example, given the following
-    type signatures from the tutorial:
+    types.  All types of the form \"@Pipe a b m r@\" become
+    \"@Frame b m (M a) C r@\".  For example, given the following type signatures
+    from the tutorial:
 
 > printer  :: (Show a) => Pipe b Void IO r
 > take'    :: Int -> Pipe b b IO ()
-> -- To use the finalization example, change fromList's base monad to 'IO'
 > fromList :: (Monad m) => [b] -> Pipe () b m ()
 
     ... you would replace them with:
@@ -80,6 +79,8 @@ import Control.Pipe.Common hiding (await, yield, Await, Yield)
 > printer  :: (Show a) => Frame Void IO (M a) C r
 > take'    :: Int -> Frame a IO (M a) C ()
 > fromList :: (Monad m) => [a] -> Frame a m (M ()) C ()
+> -- To use the finalization example, change fromList's base monad to 'IO'
+> fromList :: [a] -> Frame a IO (M ()) C ()
 -}
 
 -- | Index representing an open input end, receiving values of type @a@
@@ -164,8 +165,8 @@ type Stack m r = Frame Void m (M ()) C r
 -- >     liftU $ putStrLn "You shall not pass!"
 -- >
 -- > fromList xs = do
--- >     mapMR_ yield xs
 -- >     close
+-- >     mapMR_ yield xs
 
 {- $primitives
     'yieldF' guards against downstream termination by yielding the most
@@ -232,8 +233,8 @@ await = awaitF !>= maybe await returnR
 >     close
 >
 > fromList xs = catchF (putStrLn "fromList interrupted") $ do
->     mapMR_ yield xs
 >     close
+>     mapMR_ yield xs
 
     These convenience functions register block-level finalizers to be called if
     another 'Frame' terminates first.  The naming conventions are:
@@ -373,9 +374,11 @@ stack t p = IFreeT $ U $ do
     unU $ runIFreeT $ case x of
         Wrap (Close   p') -> wrap $ Close $ warn p'
         Wrap (Yield b p') -> wrap $ Yield (Just b) (stack t p')
-        Wrap (Await   f ) -> wrap $ Await $ \e -> case t of
-            False ->                        stack (isNothing e) (f e)
-            True  -> wrap $ Yield Nothing $ stack (isNothing e) (f e)
+        Wrap (Await   f ) ->
+            let p' = wrap $ Await $ \e -> stack (isNothing e) (f e)
+             in case t of
+                    False -> p'
+                    True  -> wrap $ Yield Nothing p'
 
 warn :: (Monad m)
  => IFreeT (FrameF        b ) (U m) (r := C) C
@@ -384,7 +387,7 @@ warn p = IFreeT $ U $ do
     x <- unU $ runIFreeT p
     unU $ runIFreeT $ case x of
         Return r -> wrap $ Yield Nothing (returnI r)
-        Wrap (Yield b p') -> wrap $ Yield (Just b) (warn  p')
+        Wrap (Yield b p') -> wrap $ Yield (Just b) (warn p')
 
 {- $compose
     The fourth step to convert 'Pipe' code to 'Frame' code is to replace ('<+<')
@@ -434,7 +437,19 @@ instance (Monad m) => Category (FrameC m r) where
     The fifth step to convert 'Pipe' code to 'Frame' code is to use 'runFrame'
     instead of 'runPipe':
 
-> runFrame $ printer <-< take' 3 <-< fromList [1..]
+>>> runFrame $ printer <-< take' 3 <-< fromList [1..]
+1
+2
+3
+fromList interrupted
+You shall not pass!
+printer interrupted
+>>> runFrame $ printer <-< take' 3 <-< fromList [1]
+1
+You shall not pass!
+take' interrupted
+printer interrupted
+
 -}
 
 {-|
