@@ -406,8 +406,9 @@ warn p = IFreeT $ U $ do
 
     * Finalizers are always ordered from upstream to downstream.
 
-    As with 'Pipe's, the 'Category' laws are correct-by-construction and cannot
-    be broken.
+    The 'Category' laws are correct-by-construction and cannot be broken, so you
+    don't have to be careful when using 'Frame's.  Any mistakes will be caught
+    as type errors.
 
     Note that you may only compose 'Frame's that begin open and end closed.
 -}
