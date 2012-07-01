@@ -5,7 +5,7 @@
 
     * Prompt and deterministic finalization
 
-    'Frame's differ from 'Pipe's because they form indexed monads rather than
+    'Frame's differ from 'Pipe's because they form restricted monads rather than
     forming ordinary monads.  This means you must use rebind @do@ notation to
     use restricted monads from the @index-core@ package.  See the
     \"Create Frames\" section for details.  For even more details, consult the
@@ -46,9 +46,9 @@ module Control.Frame (
     (<-<),
     (>->),
     idF,
+    FrameC(..),
     -- * Run Frames
     -- $run
-    FrameC(..),
     runFrame
     ) where
 
@@ -142,7 +142,7 @@ type Stack m r = Frame Void m (M ()) C r
 --
 -- "Control.Frame" replaces all 'Pipe' 'await's and 'yield's with their
 -- corresponding 'Frame' counterparts.  @Control.IMonad.Do@ rebinds @do@
--- notation to work with indexed monads, which also requires using the
+-- notation to work with restricted monads, which also requires using the
 -- @RebindableSyntax@ extension and hiding the 'Monad' class from the @Prelude@.
 --
 -- You also must use the restricted monad utility functions, which have the

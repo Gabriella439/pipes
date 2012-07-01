@@ -15,13 +15,11 @@ module Control.Pipe (
     yield,
     pipe,
     -- * Compose Pipes
-    -- $newtype
-    Lazy(..),
-    -- $convenience
+    -- $category
     (<+<),
     (>+>),
     idP,
-    -- $category
+    PipeC(..),
     -- * Run Pipes
     -- $runpipe
     runPipe
@@ -89,8 +87,8 @@ type Pipeline = Pipe () Void
 
 {- $create
     'yield' and 'await' are the only two primitives you need to create pipes.
-    Since 'Pipe a b m' is a monad, you can assemble 'yield' and 'await'
-    statements using ordinary @do@ notation.  Since 'Pipe a b' is also a monad
+    Since @Pipe a b m@ is a monad, you can assemble 'yield' and 'await'
+    statements using ordinary @do@ notation.  Since @Pipe a b@ is also a monad
     transformer, you can use 'lift' to invoke the base monad.  For example, you
     could write a pipe stage that requests permission before forwarding any
     output:
@@ -129,28 +127,65 @@ yield b = wrap $ Yield (b, return ())
 pipe :: (Monad m) => (a -> b) -> Pipe a b m r
 pipe f = forever $ await >>= yield . f
 
-{- $newtype
-    Pipes form a 'Category', but if you want to define a proper 'Category'
-    instance you have to wrap the 'Pipe' type using a newtype in order to
-    rearrange the type variables:
--}
-newtype Lazy m r a b = Lazy { unLazy :: Pipe a b m r}
+{- $category
+    'Pipe's form a 'Category', meaning that you can compose 'Pipe's and also
+    define an identity 'Pipe'.
 
-instance (Monad m) => Category (Lazy m r) where
-    id = Lazy idP
-    Lazy p1 . Lazy p2 = Lazy $ p1 <+< p2
+    'Pipe' composition binds the output of the upstream 'Pipe' to the input of
+    the downstream 'Pipe'.  Like Haskell functions, 'Pipe's are lazy, meaning
+    that upstream 'Pipe's are only evaluated as far as necessary to generate
+    enough input for downstream 'Pipe's.  If any 'Pipe' terminates, it also
+    terminates every 'Pipe' composed with it.
 
-{- $convenience
+    If you want to define a proper 'Category' instance you have to wrap the
+    'Pipe' type using the newtype 'PipeC' in order to rearrange the type
+    variables.
+
     This means that if you want to compose pipes using ('.') from the 'Category'
-    type class, you end up with a newtype mess: @unLazy (Lazy p1 . Lazy p2)@.
+    type class, you end up with a newtype mess:
+
+> unPipeC (PipeC p1 . PipeC p2)
 
     You can avoid this by using convenient operators that do this newtype
     wrapping and unwrapping for you:
 
-> p1 <+< p2 = unLazy $ Lazy p1 . Lazy p2
+> p1 <+< p2 = unPipeC $ PipeC p1 . PipeC p2
 >
-> idP = unLazy id
+> idP = unPipeC id
+
+    The 'Category' instance obeys the 'Category' laws.  In other words:
+
+    * Composition is truly associative.  The result of composition produces the
+      exact same composite 'Pipe' regardless of how you group composition, so it
+      is perfectly safe to omit the parentheses altogether:
+
+> (p1 <+< p2) <+< p3 = p1 <+< (p2 <+< p3) = p1 <+< p2 <+< p3
+
+    * 'idP' is a true identity pipe.  Composing a pipe with 'idP' returns the
+      exact same original pipe:
+
+> p <+< idP = p
+> idP <+< p = p
+
+    The 'Category' laws are \"correct by construction\", meaning that you cannot
+    break them despite the library's internals being fully exposed.  The above
+    equalities are true using the strongest denotational semantics possible in
+    Haskell, namely that both sides of the equals sign correspond to the exact
+    same value in Haskell, constructor-for-constructor, value-for-value.  You
+    cannot create a function that can distinguish the results.
+
+    Actually, all other class instances in this library provide the same strong
+    guarantees for their corresponding laws.  I only emphasize the guarantee for
+    the 'Category' instance because it is one of the most distinguishing
+    features of this library, making it far more extensible than other
+    implementations.
 -}
+
+newtype PipeC m r a b = PipeC { unPipeC :: Pipe a b m r}
+
+instance (Monad m) => Category (PipeC m r) where
+    id = PipeC idP
+    PipeC p1 . PipeC p2 = PipeC $ p1 <+< p2
 
 -- | Corresponds to ('<<<')/('.') from @Control.Category@
 (<+<) :: (Monad m) => Pipe b c m r -> Pipe a b m r -> Pipe a c m r
@@ -179,57 +214,6 @@ infixl 9 >+>
 -- | Corresponds to 'id' from @Control.Category@
 idP :: (Monad m) => Pipe a a m r
 idP = pipe id
-
-{- $category
-    You can compose two pipes using @p1 <+< p2@, which binds the output of @p2@
-    to the input of @p1@.  For example:
-
-> (await >>= lift . print) <+< yield 0
-> = lift (print 0)
-
-    'idP' is the identity pipe which forwards all output untouched:
-
-> idP = forever $ do
->   x <- await
->   yield x
-
-    Pipes are lazy, meaning that control begins at the downstream pipe and
-    control only transfers upstream when the downstream pipe 'await's input from
-    upstream.  If a pipe never 'await's input, then pipes upstream of it will
-    never run.
-
-    Upstream pipes relinquish control back downstream whenever they 'yield' an
-    output value.  This binds the 'yield'ed value to the return value of the
-    downstream 'await'.  The upstream pipe does not regain control unless the
-    downstream pipe requests input again.
-
-    When a pipe terminates, it also terminates any pipes composed with it.
-
-    The 'Category' instance obeys the 'Category' laws.  In other words:
-
-    * Composition is truly associative.  The result of composition produces the
-      exact same composite 'Pipe' regardless of how you group composition:
-
-> (p1 <+< p2) <+< p3 = p1 <+< (p2 <+< p3)
-
-    * 'idP' is a true identity pipe.  Composing a pipe with 'idP' returns the
-      exact same original pipe:
-
-> p <+< idP = p
-> idP <+< p = p
-
-    The 'Category' laws are \"correct by construction\", meaning that you cannot
-    break them despite the library's internals being fully exposed.  The above
-    equalities are true using the strongest denotational semantics possible in
-    Haskell, namely that both sides of the equals sign correspond to the exact
-    same value in Haskell, constructor-for-constructor, value-for-value.  You
-    cannot create a function that can distinguish the results.
-
-    Actually, all other class instances for 'Pipe's provide the same strong
-    guarantees for their corresponding laws.  I only emphasize the guarantee for
-    the 'Category' instance because it is one of the most distinguishing
-    features of this library.
--}
 
 {- $runpipe
     Note that you can also unwrap a 'Pipe' a single step at a time using
