@@ -257,10 +257,10 @@ await = awaitF !>= maybe await returnR
     only use the \'@D@\'-suffixed version as upstream has been closed off.  This
     is a consequence of a deficiency in Haskell's type system that will take
     time to work around.  However an \'@F@\'-suffixed block that begins before a
-    'close' statement may continue through it normally.  So, for code intended
-    only for producers, use 'catchD' \/ 'finallyD', otherwise use 'catchF' \/
-    'finallyF'.  In future releases, the \'@D@\'-suffixed versions will be
-    removed and merged into the \'@F@\'-suffixed versions.
+    'close' statement may continue through it normally.  So, for code blocks
+    after a 'close' statement, use 'catchD' \/ 'finallyD', otherwise use
+    'catchF' \/ 'finallyF'.  In future releases, the \'@D@\'-suffixed versions
+    will be removed and merged into the \'@F@\'-suffixed versions.
 -}
 
 {-|
@@ -407,8 +407,7 @@ warn p = IFreeT $ U $ do
     * Finalizers are always ordered from upstream to downstream.
 
     The 'Category' laws are correct-by-construction and cannot be broken, so you
-    don't have to be careful when using 'Frame's.  Any mistakes will be caught
-    as type errors.
+    don't have to be careful when using 'Frame's.
 
     Note that you may only compose 'Frame's that begin open and end closed.
 -}
@@ -422,6 +421,9 @@ p1 <-< p2 = heap (return ()) p1 <~< stack False p2
 (>->) :: Monad m
  => Frame b m (M a) C r -> Frame c m (M b) C r -> Frame c m (M a) C r
 (>->) = flip (<-<)
+
+infixr 9 <-<
+infixr 9 >->
 
 -- | Corresponds to 'id' from @Control.Category@
 idF :: (Monad m) => Frame a m (M a) C r

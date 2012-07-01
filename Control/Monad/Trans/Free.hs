@@ -32,9 +32,8 @@ import Control.Monad.Trans.Class
 import Data.Functor.Identity
 
 {- $freet
-    This differs substantially from the simple implementation in
-    "Control.Monad.Free" because of the requirement to nest the constructors
-    within the base monad.
+    This differs substantially from the non-monad-transformer version because
+    of the requirement to nest the constructors within the base monad.
 
     To deconstruct a free monad transformer, use 'runFreeT' to unwrap it and
     bind the result in the base monad.  You can then pattern match against the
@@ -92,7 +91,7 @@ liftF :: (Functor f, Monad m) => f r -> FreeT f m r
 liftF x = wrap $ fmap return x
 
 {- $free
-    The 'Free' type is isomorphic to the type provided in "Control.Monad.Free":
+    The 'Free' type is isomorphic to the following simple implementation:
 
 > data Free f r = Return r | Wrap (f (Free f r))
 

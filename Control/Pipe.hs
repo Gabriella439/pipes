@@ -1,3 +1,8 @@
+{-|
+    'Pipe' is a monad transformer that enriches the base monad with the ability
+    to 'await' or 'yield' data to and from other 'Pipe's.
+-}
+
 module Control.Pipe (
     -- * Introduction
     -- $summary
@@ -56,6 +61,8 @@ import Prelude hiding ((.), id)
     His @Coroutine@ type is actually a free monad transformer (i.e. 'FreeT')
     and his @InOrOut@ functor corresponds to 'PipeF'.
 -}
+
+-- | The base functor for the 'Pipe' type
 data PipeF a b x = Await (a -> x) | Yield (b, x)
 
 -- I could use the "DerivingFunctor" extension, but I want to remain portable
@@ -181,6 +188,7 @@ pipe f = forever $ await >>= yield . f
     implementations.
 -}
 
+-- | 'Pipe's form a 'Category' instance when you rearrange the type variables
 newtype PipeC m r a b = PipeC { unPipeC :: Pipe a b m r}
 
 instance (Monad m) => Category (PipeC m r) where

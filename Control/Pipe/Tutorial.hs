@@ -256,7 +256,7 @@ You shall not pass!
 >     y <- await
 >     dataSink y
 >
-> stage3 <+< stage2 <+< stage1 == lift loop
+> stage3 <+< stage2 <+< stage1 = lift loop
 
     In other words, 'Pipe's let you decompose loops into modular components,
     which promotes loose coupling and allows you to freely mix and match those

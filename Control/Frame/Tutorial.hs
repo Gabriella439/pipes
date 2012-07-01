@@ -22,38 +22,38 @@ module Control.Frame.Tutorial (
     -- * Finalization
     -- $ensure
 
-    -- * Frame Composition
-    -- $framecompose
-
-    -- * Frame vs. Ensure
-    -- $frameensure
-
     -- * Folds
     -- $fold
 
     -- * Strictness
     -- $strict
+
+    -- * Robustness
+    -- $robust
     ) where
 
+-- For documentation
+import Control.Category
 import Control.Frame
 import Control.IMonad
 import Control.IMonad.Trans
 import Control.Monad.Trans.Class
+import Control.Pipe hiding (await, yield, Await, Yield)
 
 {- $restrict1
-    'Frame's extend 'Pipe's with two important features:
+    'Frame's extend 'Pipe's with two new features:
 
     * Folding input and intercepting upstream termination
 
     * Guaranteeing prompt and deterministic finalization
 
     However, these extra features comes with some added complexity: restricted
-    monads.  Restricted monads sound scarier than they actually are, so I'll
-    demonstrate that if you are comfortable with monads, then restricted monads
-    are not a big leap.
+    monads, also known as indexed monads.  Restricted monads sound scarier than
+    they are, so I'll demonstrate that if you are comfortable using monads, then
+    you'll be comfortable using restricted monads.
 
     Let's translate the @take'@ function from the 'Pipe's tutorial into a
-    'Frame' to see what changes when we start using restricted monads:
+    'Frame' to see what changes when we use restricted monads:
 
 -}
 -- $extension
@@ -72,10 +72,10 @@ import Control.Monad.Trans.Class
 -- >     close
 -- >     liftU $ putStrLn "You shall not pass!"
 {- $restrict2
-    I've included all imports this time and highlighted the new
-    @RebindableSyntax@ extension.  The imports from the @Control.IMonad@
-    hierarchy belong to the @index-core@ package, which provides the core
-    restricted monad functionality.
+    This time I includedd all imports and highlighted the new @RebindableSyntax@
+    extension.  The new imports belong to the @Control.IMonad@ hierarchy from
+    the @index-core@ package, which provides the core restricted monad
+    functionality.
 
     Yet, you almost wouldn't even know you were using an restricted monad just
     by looking at the code.  This is because @index-core@ can rebind @do@
@@ -93,9 +93,9 @@ import Control.Monad.Trans.Class
 
     However, you are not obligated to rebind @do@ notation to use 'Frame's.  You
     can choose to keep ordinary @do@ notation and desugar the restricted monad
-    by hand.  Just import @Control.IMonad@ instead, drop the
-    @RebindableSyntax@ extension, and don't hide 'Monad'.  Then you can desugar
-    @take'@ manually using the restricted monad operators:
+    by hand.  Just import @Control.IMonad@ instead, drop the @RebindableSyntax@
+    extension, and don't hide 'Monad'.  Then you can desugar @take'@ manually
+    using the restricted monad operators:
 
 > import Control.Frame
 > import Control.IMonad
@@ -109,20 +109,20 @@ import Control.Monad.Trans.Class
 >     close        !>= \_ ->
 >     liftU $ putStrLn "You shall not pass!"
 
-    However, for this tutorial I will use the rebound @do@ notation, since it's
-    prettier and easier to use.
+    However, for this tutorial I will use the @do@ notation, since it's prettier
+    and easier to use.
 
-    You'll also notice operators that resemble the ones in @Control.Monad@,
+    You'll also notice functions that resemble the ones in @Control.Monad@,
     except with an \'@R@\' suffix on the end of them, like 'replicateMR_'.
     Most functions in @Control.Monad@ have a restricted counterpart provided by
     @Control.IMonad.Restrict@ (which is in turn re-exported by
-    @Control.IMonad@).
+    @Control.IMonad@), such as 'whenR', 'foreverR', and 'mapMR'.
 
     Also, every time you lift an operation from the base monad, you must use
     'liftU' instead of 'lift'.  'Frame's are \"restricted monad transformers\",
-    and they would normally lift the base restricted monad using 'liftI', but
+    and they would normally lift a base restricted monad using 'liftI', but
     they can also lift ordinary monads, too, using 'liftU' (mnemonic: \"lift\"
-    and \'U\'pgrade to a restricted monad).
+    an ordinary monad and \'U\'pgrade it to a restricted monad).
 -}
 
 {- $types
@@ -140,14 +140,14 @@ import Control.Monad.Trans.Class
     input end (@M a@), and ends with a closed input end (@C@).
 
     @take'@ finishes with a closed input end because it called the 'close'
-    function, which seals off and finalizes upstream.  You can see that 'close'
-    changes the index just by looking at its type:
+    function, which seals off and finalizes upstream.  You can see that the
+    'close' primitive changes the index just by looking at its type:
 
 > close :: Monad m => Frame b m (M a) C ()
 
     The 'close' instruction begins with an open input end (@M a@) and finishes
-    with a closed input end.  If you tried to call 'close' twice, you'd get a
-    type error:
+    with a closed input end (@C@).  If you tried to call 'close' twice, you'd
+    get a type error:
 
 > -- wrong!
 > do close
@@ -155,17 +155,19 @@ import Control.Monad.Trans.Class
 
     This prevents you from accidentally finalizing upstream twice.
 
-    'close' also forbids you from 'await'ing input from upstream after you have
-    already closed it.  If you try, you will get a type error
+    'close' is the only primitive that changes the index, and there is no way to
+    reopen the input once you have closed it.  'close' also forbids you from
+    'await'ing input from upstream after you have already closed it.  If you
+    try, you will get a type error
 
 > -- wrong!
 > do close
 >    await
 
     This prevents you from requesting input from a finalized pipe.  In fact,
-    once you 'close' upstream, it disappears from the 'Pipeline' completely.
-    You couldn't get input from upstream even if you somehow allowed 'await'
-    statements after 'close'.
+    once you 'close' your input end, every upstream 'Frame' disappears
+    completely.  You couldn't get input from upstream anyway, even if you
+    somehow allowed 'await' statements after 'close'.
 
     You can check out 'await''s type signature to see why it won't type-check
     after 'close':
@@ -173,65 +175,73 @@ import Control.Monad.Trans.Class
 > await :: Monad m => Frame b m (M a) (M a) a
 
     'await' must begin with the input end open (@M a@) and it leaves the input
-    end open when done (@M a@).  However, you can use a 'yield' anywhere:
+    end open when done (@M a@).  However, you can still use a 'yield' anywhere:
 
 > yield :: Monad m => b -> Frame b m i i ()
 
     'yield' will work whether or not the input end is open, and it leaves the
-    input end in the same state it found it in.
+    input end in the same state once 'yield' is done.
+-}
 
-    Also, if a 'Frame' never terminates, there is no need to explicitly close
-    it, especially if it indefinitely requires input:
+{- $prompt
+    Every 'Frame' must close its input end /exactly/ one time before you can
+    compose it with other 'Frame's.  The only exception is if a 'Frame' never
+    terminates:
 
+> -- This type-checks because foreverR is polymorphic in the final index
 > printer :: (Show b) => Frame Void IO (M b) C r
 > printer = foreverR $ do
 >     a <- await
 >     liftU $ print a
--}
 
-{- $prompt
     However, when a 'Frame' no longer needs input then you should 'close' it as
     early as possible.  The earlier you 'close' upstream, the more promptly
     upstream gets finalized.
 
-    For example, if you write a stand-alone producer from start to finish, you
-    can be sure it will never need upstream, so you can close it immediately:
+    If you write a stand-alone producer from start to finish, you can be sure it
+    will never need upstream, so you can close it immediately:
 
-> fromList :: (M.Monad m) => [b] -> Frame b m (M ()) C ()
+> -- I'm keeping fromList's input end polymorphic for a later example
+> fromList :: (M.Monad m) => [b] -> Frame b m (M a) C ()
 > fromList xs = do
 >     close
 >     mapMR_ yield xs
 
-    However, if you wanted to provide @fromList@ as a library function, you
-    would remove the 'close' statement as you cannot guarantee that your user
-    won't want to 'await' after @fromList@.  Therefore, a good rule of thumb is
-    to always let the user decide when to 'close' the 'Frame' unless you intend
-    you component to be a stand-alone 'Frame'.
+    However, if @fromList@ were a library function, you would remove the 'close'
+    statement as you cannot guarantee that your user won't want to 'await' after
+    @fromList@.  Or, the user might want to call @fromList@ twice within the
+    same 'Frame', and having two close statements would lead to a type error.
+    Therefore, a good rule of thumb when writing library code for 'Frame's is to
+    always let the user decide when to 'close' the 'Frame' unless you are
+    writing a stand-alone 'Frame'.
 
-    For simplicity, I will treat @fromList@ as a stand-alone 'Frame' and include
-    'close' for the purposes of this tutorial.
+    So for right now, I will leave the 'close' in @fromList@ for simplicity and
+    treat it as a stand-alone 'Frame'.  Also, it will come in handy for a later
+    example.
 -}
 
 {- $compose
     Composition works just like 'Pipe's, except you use the ('<-<') composition
     operator instead of ('<+<'):
 
-stack :: Stack IO ()
-stack = printer <-< take' 3 <-< fromList [1..]
+> stack :: Stack IO ()
+> stack = printer <-< take' 3 <-< fromList [1..]
 
     The 'Frame' equivalent to 'Pipeline' is a 'Stack' (mnemonic: call stack;
-    also the name 'Frame' refers to a frame on a call stack):
+    also the name 'Frame' refers to a call stack frame):
 
 > type Stack m r = Frame Void m (M ()) C r
 
-    Similarly, you use 'runFrame' instead of 'runPipe':
+    Similarly, you use 'runFrame' instead of 'runPipe' to convert the 'Frame'
+    back to the base monad:
 
 >>> runFrame stack
 1
 2
 3
+You shall not pass!
 
-    However, carefully check out the type of composition:
+    However, let's carefully inspect the type of composition:
 
 > (<-<) :: Monad m
 >  => Frame c m (M b) C r
@@ -243,16 +253,15 @@ stack = printer <-< take' 3 <-< fromList [1..]
     before it may be used.  'runFrame' has the exact same restriction:
 
 > runFrame :: Monad m => Stack m r -> m r
->          ~  Monad m => Frame Void m (M ()) C r -> m r
+> runFrame ~  Monad m => Frame Void m (M ()) C r -> m r
 
     Composition specifically requires the user to define when to finalize
-    upstream and does not assume this occurs at the end of the 'Frame', since
-    this would violate either the 'Monad' or 'Category' laws.  For stand-alone
-    'Frame's this is not a problem, since they will know when they no longer
-    need input, but smaller library components designed to be assembled into
-    complete 'Frame's should let the user decide at the last moment where to
-    'close' the 'Pipe' since there is no way to know ahead of time when the
-    user wants to stop 'await'ing input.
+    upstream and does not assume this occurs at the end of the 'Frame'.  This
+    doesn't pose a problem for stand-alone 'Frame's, since they will know when
+    they no longer need input, but smaller library components designed to be
+    assembled into larger 'Frame's should let the user decide at the very last
+    moment where to 'close' the 'Pipe'.  There is no way to know ahead of time
+    where the 'close' should be until the complete 'Frame' has been assembled.
 -}
 
 {- $ensure
@@ -270,164 +279,209 @@ stack = printer <-< take' 3 <-< fromList [1..]
 > read' file = do
 >     liftU $ putStrLn "Opening file..."
 >     h <- liftU $ openFile file ReadMode
->     -- The following requires "import qualified Prelude as M"
+>     -- The following requires "import qualified Control.Monad as M"
 >     finallyD (putStrLn "Closing file ..." M.>> hClose h) $ readFile' h
 
-    The 'finallyD' function registers a block-level finalizer that is guaranteed
-    to execute if a downstream 'Pipe' terminates or if the block completes
-    normally.  The more general 'finallyF' function will call the finalizer if
-    any 
--}
+    The 'finallyD' function registers a block-level finalizer that executes if a
+    downstream 'Pipe' terminates or if the block completes normally.  The more
+    general 'finallyF' function will call the finalizer if /any/ 'Frame'
+    terminates.
 
-{- $framecompose
+    Usually you would always want to use 'finallyF', but because of some type
+    limitations you can only use 'finallyD' after a 'Frame' is closed.  A future
+    release of this library will fix this and merge 'finallyD' into 'finallyF'.
+    So that means that for everything beginning before a 'close' statement, use
+    'finallyF', otherwise use 'finallyD'.
 
-    Just like with 'Pipe's, we can compose 'Frame's, except now we use ('<-<'):
+    Similarly, you can use the 'catchF' / 'catchD' counterparts to the
+    \"finally\" functions.  The \"catch\" functions run the finalizer only if
+    another 'Frame' terminates before the block is done, but not if the block
+    terminates normally.
 
-> stack :: Frame Void () IO ()
-> stack = printer <-< take' 1 <-< read' "test.txt"
+    We don't 'close' the @read'@ function because it's not a stand-alone
+    'Frame'.  We want to be able to concatenate multiple @read'@s together
+    within the same 'Frame', like so:
 
-    I call a complete set of 'Frame's a 'Stack', to reflect the fact that
-    'Frame' composition uses the exact same tricks stack-based programming uses
-    to guarantee deterministic finalization.  When a 'Frame' terminates it
-    finalizes upstream 'Frame's as if they were a heap and it propagates an
-    exceptional value ('Nothing' in this case) for downstream 'Frame's to
-    intercept.  I provide a type synonym to reflect this:
+> files = do
+>     close
+>     read' "file1.txt"
+>     read' "file2.txt"
 
-> type Stack m r = Frame Void () IO r
+    So let's assume those two files have the following contents:
 
-    So we can rewrite the type of @stack@ to be:
+    \"@file1.txt@\"
 
-> stack :: Stack IO ()
+> Line 1
+> Line 2
+> Line 3
 
-    To run a 'Stack', we use 'runFrame', which is the 'Frame'-based analog to
-    'runPipe':
+    \"@file2.txt@\"
 
->>> runFrame stack
-Opening file ...
-"Line 1"
+> A
+> B
+> C
+
+    We can now check to see if our @files@ producer works:
+
+>>> runFrame $ printer <-< files
+Opening file...
+"Line1"
+"Line2"
+"Line3"
 Closing file ...
-"Line 2"
+Opening file...
+"A"
+"B"
+"C"
+Closing file ...
+
+    More importantly, files are never opened if they aren't demanded and they
+    are always properly finalized if the consumer terminates early:
+
+>>> runFrame $ printer <-< take' 2 <-< files
+Opening file...
+"Line1"
+"Line2"
+Closing file ...
 You shall not pass!
 
-    Not only did it correctly finalize the file this time, but it did so as
-    promptly as possible!  I programmed @take'@ so that it knew it would not
-    need @read'@ any longer before it 'yield'ed the second value, so it
-    finalized the file before 'yield'ing the second value for @printer@.
-    @take'@ did this without knowing anything about the 'Frame' upstream of it.
-    One of the big advantages of 'Frame's is that you can reason about the
-    finalization behavior of each 'Frame' in complete isolation from other
-    'Frame's, allowing you to completely decouple their finalization
-    behavior.
--}
+    So we get lazy, deterministic, and prompt resource management.  Nice!
 
-{- $frameensure
-    Unfortunately, in the absence of extensions I have to split the 'Monad' and
-    'Category' into two separate types.  'Ensure' is the 'Monad', 'Frame' is the
-    'Category'.
-
-    However, you can achieve the best of both worlds by programming all your
-    'Pipe's in the 'Ensure' monad, and then only adding 'close' at the last
-    minute when you are building your 'Stack'.  For example, if we wanted to
-    read from multiple files, it would be much better to just remove the 'close'
-    function from the @read'@ implementation, so it operates in the 'Ensure'
-    monad:
-
-> read' :: FilePath -> Ensure () Text IO ()
-
-    Then use 'close' only after we've already concatenated our files:
-
-> files :: Frame () Text IO ()
-> files = close $ do
->     read' "test.txt"
->     read' "dictionary.txt"
->     read' "poem.txt"
-
-    This is a more idiomatic 'Frame' programming style that lets you take
-    advantage of both the 'Monad' and 'Category' instances.
-
-    The beauty of compositional finalization is we can decompose complicated
-    problems into smaller ones.  Imagine that we have a resource that needs a
-    fine-grained finalization behavior like in our @take'@ function which does
-    a cute little optimization to finalize early.  We can always decompose our
-    frame into one that does the straight-forward thing (like @read'@) and then
-    just compose it with @take'@ to get the cute optimization for free.  In this
-    way we've decomposed the problem into two separate problems: generating the
-    resource and doing the cute optimization.
 -}
 
 {- $fold
-    'Frame's can actually do much more than manage finalization!  Using
+    'Frame's can actually do more than just manage finalization!  Using
     'Frame's, we can now correctly implement folds like @toList@ in a way that
     is truly compositional:
 
-> toList :: (Monad m) => Frame a Void m [a]
-> toList = Frame go where
->     go = do
->         x <- await
->         case x of
->             Nothing -> close $ pure []
->             Just a  -> fmap (fmap (a:)) go
->             -- the extra fmap is an unfortunate extra detail
+> toList :: (M.Monad m) => Frame b m (M a) (M a) [a]
+> toList = do
+>     a' <- awaitF
+>     case a' of
+>         Nothing -> return []
+>         Just a  -> do
+>             as <- toList
+>             return (a:as)
 
-    This time I used an ordinary 'await', instead of 'awaitF', so I could access
-    the underlying 'Maybe' values that these 'Frame's are passing around.
-    Similarly, you could use 'yield' instead of 'yieldF' if you wanted to
-    manually manage the finalizers passed downstream at each 'yield' statement
-    instead of using the 'catchP' or 'finallyP' convenience functions.  Using
-    these advanced features does not break any of the 'Category' laws.  I could
-    expose every single internal of the library and you would not be able to
-    break the 'Category' laws because the 'Frame's generated are still
-    indistinguishable at the value level and fuse into the hand-written
-    implementation.  The compositionality of 'Frame's is just as strong as the
-    compositionality of 'Pipe's.
+    We used one new function this time: 'awaitF'.  This is like 'await' except
+    that it returns a 'Nothing' if upstream terminates before 'yield'ing back a
+    value.  This allows you to intercept upstream termination and do some
+    cleanup, and in our case we use it to end the fold.
 
-    Now let's use our @toList@ function:
+    You only receive a 'Nothing' once when you use 'awaitF'.  Any attempt to
+    request more input after you receive the first 'Nothing' will terminate the
+    current 'Frame' using the upstream return value.  In fact, 'await' is built
+    on top of 'awaitF':
 
->>> runFrame $ (Just <$> toList) <-< (Nothing <$ fromList [1..3])
-Just [1,2,3]
+> await = do
+>     a' <- awaitF
+>     case a' of
+>         Nothing -> await
+>         Just a  -> return a
 
-    I still had to provide a return value for @fromList@ ('Nothing' in this
-    case), because when @fromList@ terminates, it cannot guarantee that its
-    return value will come from itself or from @toList@.  When @toList@ receives
-    a 'Nothing' from upstream, it can choose to terminate and over-ride the
-    return value from upstream or 'await' again and defer to the upstream return
-    value (@fromList@ in this case).  It doesn't even have to immediately
-    decide.  It could just 'yield' more values downstream and forget it had even
-    received a 'Nothing' and if downstream terminates then composition will
-    still ensure that everything \"just works\" the way you would expect and no
-    finalizers are missed or duplicated.
+    If it gets a 'Nothing', it just ignores it and 'await's again, choosing to
+    not do any cleanup.
 
-    Composition handles every single corner case of finalization.  This directly
-    follows from enforcing the 'Category' laws, because categories have no
-    corners!
+    Now let's make sure our @toList@ function works.  I didn't make @toList@ a
+    stand-alone 'Frame', so we will have to include a 'close' statement to
+    complete it before composing it:
+
+> p1 = do
+>     xs <- toList
+>     close
+>     return (Just xs)
+>
+> p2 xs = do
+>     fromList xs
+>     return Nothing -- Remember: they need the same return type
+
+>>> runFrame $ p1 <-< p2 [1..10]
+Just [1,2,3,4,5,6,7,8,9,10]
 -}
 
 {- $strict
-    We can go a step further and modify @toList@ into something even cooler:
+    Lazy resource management has one important disadvantage: we can't free the
+    resource until downstream no longer needs input.  Many libraries duplicate
+    their code to provide Lazy and Strict versions, allowing the user to decide
+    if they want:
 
-> strict :: (Monad m) => Frame a a m ()
-> strict = Frame $ do
->     xs <- go
->     close $ mapM_ yieldF xs
->   where
->     go = do
->         x <- await
->         case x of
->             Nothing -> pure []
->             Just a  -> fmap (a:) go
+    * Lazy input, which conserves memory, but holds onto the resource until
+      downstream is done processing it
 
-    As the name suggests, @strict@ is strict in its input.  We can use @strict@
-    to load the entire resource into memory immediately, allowing us to finalize
-    it early.  Let's use this to create a strict version of our file reader:
+    * Strict input, which loads everything into memory, but can then immediately
+      dispose of the resource before the input is processed
 
->>> runFrame $ printer <-< take' 2 <-< strict <-< read' "test.txt"
-Opening file ...
+    What if there were a way to seamlessly switch between those semantics or
+    even choose something in between?  Well, it turns out we can!
+
+    First, we can combine @fromList@ and @toList@ into something even cooler:
+
+> strict :: (M.Monad m) => Frame a m (M a) C ()
+> strict = do
+>     xs <- toList
+>     fromList xs
+
+    As the name suggests, the @strict@ function is strict in its input.
+    @strict@ loads the entire input into memory, finalizes upstream, then
+    proceeds to hand the input off to downstream.  We can prove this just by
+    using it:
+
+>>> runFrame $ printer <-< strict <-< files
+> Opening file...
+> Closing file ...
+> Opening file...
+> Closing file ...
+> "Line1"
+> "Line2"
+> "Line3"
+> "A"
+> "B"
+> "C"
+
+    Both files were disposed of immediately, at the expense of using more
+    memory.
+
+    But what if we want something in between strictness and laziness?  Maybe 
+    something like this:
+
+>>> runFrame $ printer <-< strict <-< take' 2 <-< files
+Opening file...
 Closing file ...
-"Line 1"
-"Line 2"
 You shall not pass!
+"Line1"
+"Line2"
 
-    Now we have a way to seamlessly switch from laziness to strictness all
-    implemented entirely within Haskell without the use of artificial 'seq'
-    annotations.
+    Now we have the best of both worlds.  We can pick and choose how much of
+    our source to strictly load into memory.  In the above example, we specified
+    that we wanted to be strict only in the first two lines of our input, and as
+    a result the third line of \"@file1.txt@\" is never read and \"@file2.txt@\"
+    is never even opened!
+
+    Now we have a way to seamlessly slide anywhere on the spectrum between
+    laziness and strictness, and it's all implemented entirely within Haskell
+    in a way that is elegant and intuitive without the use of artificial and
+    clumsy 'seq' annotations.
+-}
+
+{- $robust
+    The 'Frame' implementation exposes all internals, yet this does not
+    compromise safety or invariants in any way.  The library's implementation is
+    \"correct-by-construction\", meaning that you can extend it with your own
+    features if you so choose, and you never have to worry about accidentally
+    breaking any laws, such as the associativity of composition.
+
+    This has the following important practical benefits for finalization and
+    folds:
+
+    * Finalizers never get duplicated or dropped
+
+    * Folds can be performed anywhere within the 'Stack', not just at the most
+      downstream 'Frame', as the @strict@ example illustrates.
+
+    * You can reason about each 'Frame's finalization behavior completely
+      independently of other 'Frame's.
+
+    Composition elegantly handles every single corner case.  This directly
+    follows from strictly enforcing the 'Category' laws, because categories have
+    no corners!
 -}
