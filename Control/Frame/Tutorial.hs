@@ -72,7 +72,7 @@ import Control.Pipe hiding (await, yield, Await, Yield)
 -- >     close
 -- >     liftU $ putStrLn "You shall not pass!"
 {- $restrict2
-    This time I includedd all imports and highlighted the new @RebindableSyntax@
+    This time I included all imports and highlighted the new @RebindableSyntax@
     extension.  The new imports belong to the @Control.IMonad@ hierarchy from
     the @index-core@ package, which provides the core restricted monad
     functionality.

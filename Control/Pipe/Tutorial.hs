@@ -439,7 +439,7 @@ Nothing
 
 {- $resource
     Here's another problem with 'Pipe' composition: resource finalization.
-    Let's say we have the file \"test.txt\" with the following contents:
+    Let's say we have the file \"@test.txt@\" with the following contents:
 
 > Line 1
 > Line 2

@@ -6,10 +6,10 @@
     * Prompt and deterministic finalization
 
     'Frame's differ from 'Pipe's because they form restricted monads rather than
-    forming ordinary monads.  This means you must use rebind @do@ notation to
-    use restricted monads from the @index-core@ package.  See the
-    \"Create Frames\" section for details.  For even more details, consult the
-    @index-core@ package.
+    forming ordinary monads.  This means you must rebind @do@ notation to use
+    restricted monads from the @index-core@ package.  See the \"Create Frames\"
+    section for details.  For even more details, consult the @index-core@
+    package.
 -}
 
 {-# LANGUAGE GADTs, TypeOperators #-}
@@ -406,8 +406,8 @@ warn p = IFreeT $ U $ do
 
     * Finalizers are always ordered from upstream to downstream.
 
-    The 'Category' laws are correct-by-construction and cannot be broken, so you
-    don't have to be careful when using 'Frame's.
+    The 'Category' laws cannot be broken, so you don't have to be careful when
+    using 'Frame's.
 
     Note that you may only compose 'Frame's that begin open and end closed.
 -}
