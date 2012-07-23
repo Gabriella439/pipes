@@ -28,6 +28,7 @@ module Control.Monad.Trans.Free (
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Data.Functor.Identity
 
@@ -78,6 +79,9 @@ instance (Functor f, Monad m) => Monad (FreeT f m) where
         runFreeT $ case x of
             Return r -> f r
             Wrap   w -> wrap $ fmap (>>= f) w
+
+instance (Functor f, MonadIO m) => MonadIO (FreeT f m) where
+    liftIO = lift . liftIO
 
 instance MonadTrans (FreeT f) where
     lift = FreeT . liftM Return
