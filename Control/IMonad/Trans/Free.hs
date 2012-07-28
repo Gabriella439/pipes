@@ -29,7 +29,7 @@ import Control.IMonad.Trans
 data IFreeF f r (x :: * -> *) i = Return (r i) | Wrap (f x i)
 
 -- | Indexed equivalent to @FreeT@
-data IFreeT f m r i = IFreeT { runIFreeT :: m (IFreeF f r (IFreeT f m r)) i }
+newtype IFreeT f m r i = IFreeT { runIFreeT :: m (IFreeF f r (IFreeT f m r)) i }
 
 instance (IFunctor f, IMonad m) => IFunctor (IFreeT f m) where
     fmapI f x = x ?>= returnI . f

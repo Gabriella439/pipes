@@ -201,14 +201,14 @@ p1 <+< p2 = FreeT $ do
     x1 <- runFreeT p1
     let p1' = FreeT $ return x1
     runFreeT $ case x1 of
-        Return r        -> return r
-        Wrap (Yield y ) -> wrap $ Yield $ fmap (<+< p2) y
-        Wrap (Await f1) -> FreeT $ do
+        Pure r          -> return r
+        Free (Yield y ) -> wrap $ Yield $ fmap (<+< p2) y
+        Free (Await f1) -> FreeT $ do
             x2 <- runFreeT p2
             runFreeT $ case x2 of
-                Return r            -> return r
-                Wrap (Yield (x, p)) -> f1 x <+< p
-                Wrap (Await f2    ) -> wrap $ Await $ fmap (p1' <+<) f2
+                Pure r            -> return r
+                Free (Yield (x, p)) -> f1 x <+< p
+                Free (Await f2    ) -> wrap $ Await $ fmap (p1' <+<) f2
 
 -- | Corresponds to ('>>>') from @Control.Category@
 (>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
@@ -268,6 +268,6 @@ runPipe :: (Monad m) => Pipeline m r -> m r
 runPipe p = do
     e <- runFreeT p
     case e of
-        Return r       -> return r
-        Wrap (Await f) -> runPipe $ f ()
-        Wrap (Yield y) -> runPipe $ snd y
+        Pure r         -> return r
+        Free (Await f) -> runPipe $ f ()
+        Free (Yield y) -> runPipe $ snd y
