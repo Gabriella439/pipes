@@ -63,12 +63,11 @@ import Prelude hiding ((.), id)
 -}
 
 -- | The base functor for the 'Pipe' type
-data PipeF a b x = Await (a -> x) | Yield (b, x)
+data PipeF a b x = Await (a -> x) | Yield b x
 
--- I could use the "DerivingFunctor" extension, but I want to remain portable
 instance Functor (PipeF a b) where
-    fmap f (Await a) = Await $ fmap f a
-    fmap f (Yield y) = Yield $ fmap f y
+    fmap f (Await   g) = Await (f . g)
+    fmap f (Yield b x) = Yield b (f x)
 
 {-|
     The base type for pipes
@@ -122,7 +121,7 @@ await = wrap $ Await return
     'yield' restores control back upstream and binds the result to 'await'.
 -}
 yield :: (Monad m) => b -> Pipe a b m ()
-yield b = wrap $ Yield (b, return ())
+yield b = wrap $ Yield b (return ())
 
 {-|
     Convert a pure function into a pipe
@@ -202,13 +201,13 @@ p1 <+< p2 = FreeT $ do
     let p1' = FreeT $ return x1
     runFreeT $ case x1 of
         Pure r          -> return r
-        Free (Yield y ) -> wrap $ Yield $ fmap (<+< p2) y
+        Free (Yield b p1') -> wrap $ Yield b $ p1' <+< p2
         Free (Await f1) -> FreeT $ do
             x2 <- runFreeT p2
             runFreeT $ case x2 of
-                Pure r            -> return r
-                Free (Yield (x, p)) -> f1 x <+< p
-                Free (Await f2    ) -> wrap $ Await $ fmap (p1' <+<) f2
+                Pure r             -> return r
+                Free (Yield b p2') -> f1 b <+< p2'
+                Free (Await   f2 ) -> wrap $ Await $ \a -> p1' <+< f2 a
 
 -- | Corresponds to ('>>>') from @Control.Category@
 (>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
@@ -269,5 +268,5 @@ runPipe p = do
     e <- runFreeT p
     case e of
         Pure r         -> return r
-        Free (Await f) -> runPipe $ f ()
-        Free (Yield y) -> runPipe $ snd y
+        Free (Await   f) -> runPipe $ f ()
+        Free (Yield _ p) -> runPipe p
