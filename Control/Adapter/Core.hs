@@ -70,16 +70,27 @@ type Opening arg ret = Adapter  arg ret  () Void
 -- | A self-contained 'Program', ready to be run by 'runProgram'
 type Program         = Adapter Void  ()  () Void
 
+{-| Request input from upstream, passing a parameter to upstream
+
+    @need a'@ passes @a'@ as a parameter to upstream that upstream can use to
+    decide what response to return.  'need' binds upstream's response to the
+    return value. -}
 need :: (Monad m) => a' -> Adapter a' a b' b m a
 need a' = liftF $ Need a' id
 
+{-| Provide output downstream
+
+    @give b@ responds to a 'need' request by supplying the value @b@.  'give'
+    blocks until downstream uses 'need' to request a new value, binding the
+    parameter supplied by 'need' as the return value. -}
 give :: (Monad m) => b  -> Adapter a' a b' b m b'
 give b  = liftF $ Give b  id
 
 infixr 9 <-<
 infixl 9 >->
 
-{-| Compose two adapters
+{-| Compose two adapters, satisfying all 'need' requests from downstream with
+    'give' responses from upstream
 
     Corresponds to ('<<<') from @Control.Category@ -}
 (<-<) :: (Monad m)
@@ -100,7 +111,8 @@ p1 <-< p2 = \c' -> FreeT $ do
                     let p1' = \_ -> FreeT $ return x1
                     wrap $ Need a' $ \a -> (p1' <-< (\_ -> fa a)) c'
 
-{-| Compose two adapters
+{-| Compose two adapters, satisfying all 'need' requests from downstream with
+    'give' responses from upstream
 
     Corresponds to ('>>>') from @Control.Category@ -}
 (>->) :: (Monad m)
@@ -109,7 +121,10 @@ p1 <-< p2 = \c' -> FreeT $ do
  -> (c' -> Adapter a' a c' c m r)
 (>->) = flip (<-<)
 
-{-| Trivial adapter that propagates the same interface
+{-| Trivial adapter that does not change interface at all
+
+    'idA' passes all 'need' requests further upstream, and passes all 'give'
+    requests further downstream.
 
     Corresponds to 'id' from @Control.Category@ -}
 idA :: (Monad m) => a' -> Adapter a' a a' a m r
@@ -133,9 +148,9 @@ idA = \a' -> wrap $ Need a' $ \a -> wrap $ Give a idA
     * It encourages an idiomatic programming style where unfulfilled 'need' or
       'give' statements are satisfied in a structured way using composition.
 
-    If you believe that loose 'need' or 'give' statements should be silently
+    If you believe that loose 'need' or 'give' statements should be discarded or
     ignored, then you can explicitly ignore them by using 'discard' (which
-    discards all output), and 'ignore' (which ignores all requests):
+    discards all input), and 'ignore' (which ignores all requests):
 
 > runProgram $ discard <-< p <-< ignore
 -}
