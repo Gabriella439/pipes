@@ -9,7 +9,7 @@ module Control.Adapter.Core (
     Opening,
     Program,
     -- * Build Adapters
-    need,
+    call,
     give,
     -- * Compose Adapters
     (<-<),
@@ -34,11 +34,11 @@ import Prelude hiding ((.), id)
 import Control.Pipe (Pipe)
 
 -- | The base functor for the 'Adapter' type
-data AdapterF a' a b' b x = Need a' (a -> x) | Give b (b' -> x)
+data AdapterF a' a b' b x = Call a' (a -> x) | Give b (b' -> x)
 
 instance Functor (AdapterF a' a b' b) where
     fmap f (Give b  fb') = Give b  (f . fb')
-    fmap f (Need a' fa ) = Need a' (f . fa )
+    fmap f (Call a' fa ) = Call a' (f . fa )
 
 {- $adapter
     An 'Adapter' wraps an underlying interface with a new exposed interface
@@ -61,35 +61,41 @@ instance Functor (AdapterF a' a b' b) where
 type Adapter a' a b' b = FreeT (AdapterF a' a b' b)
 
 {-| @Closure arg ret@ accepts values of type @arg@ and responds with values of
-    type @ret@ -}
+    type @ret@ 
+
+    'Closure's never 'call' anything. -}
 type Closure arg ret = Adapter Void  () arg  ret
 
--- | @Opening arg ret@ consumes a closure of type @Closure arg ret@.
+{-| @Opening arg ret@ consumes a closure of type @Closure arg ret@.
+
+    'Opening's never 'give' output. -}
 type Opening arg ret = Adapter  arg ret  () Void
 
--- | A self-contained 'Program', ready to be run by 'runProgram'
+{-| A self-contained 'Program', ready to be run by 'runProgram'
+
+    A 'Program' never 'call's anything or 'give's output. -}
 type Program         = Adapter Void  ()  () Void
 
 {-| Request input from upstream, passing a parameter to upstream
 
-    @need a'@ passes @a'@ as a parameter to upstream that upstream can use to
-    decide what response to return.  'need' binds upstream's response to the
+    @call a'@ passes @a'@ as a parameter to upstream that upstream can use to
+    decide what response to return.  'call' binds upstream's response to the
     return value. -}
-need :: (Monad m) => a' -> Adapter a' a b' b m a
-need a' = liftF $ Need a' id
+call :: (Monad m) => a' -> Adapter a' a b' b m a
+call a' = liftF $ Call a' id
 
 {-| Provide output downstream
 
-    @give b@ responds to a 'need' request by supplying the value @b@.  'give'
-    blocks until downstream uses 'need' to request a new value, binding the
-    parameter supplied by 'need' as the return value. -}
+    @give b@ responds to a 'call' request by supplying the value @b@.  'give'
+    blocks until downstream uses 'call' to request a new value, binding the
+    parameter supplied by 'call' as the return value. -}
 give :: (Monad m) => b  -> Adapter a' a b' b m b'
 give b  = liftF $ Give b  id
 
 infixr 9 <-<
 infixl 9 >->
 
-{-| Compose two adapters, satisfying all 'need' requests from downstream with
+{-| Compose two adapters, satisfying all 'call' requests from downstream with
     'give' responses from upstream
 
     Corresponds to ('<<<') from @Control.Category@ -}
@@ -102,16 +108,16 @@ p1 <-< p2 = \c' -> FreeT $ do
     runFreeT $ case x1 of
         Pure           r   -> return r
         Free (Give c  fc') -> wrap $ Give c (fc' <-< p2)
-        Free (Need b' fb ) -> FreeT $ do
+        Free (Call b' fb ) -> FreeT $ do
             x2 <- runFreeT $ p2 b'
             runFreeT $ case x2 of
                 Pure           r   -> return r
                 Free (Give b  fb') -> ((\_ -> fb b) <-< fb') c'
-                Free (Need a' fa ) -> do
+                Free (Call a' fa ) -> do
                     let p1' = \_ -> FreeT $ return x1
-                    wrap $ Need a' $ \a -> (p1' <-< (\_ -> fa a)) c'
+                    wrap $ Call a' $ \a -> (p1' <-< (\_ -> fa a)) c'
 
-{-| Compose two adapters, satisfying all 'need' requests from downstream with
+{-| Compose two adapters, satisfying all 'call' requests from downstream with
     'give' responses from upstream
 
     Corresponds to ('>>>') from @Control.Category@ -}
@@ -123,17 +129,17 @@ p1 <-< p2 = \c' -> FreeT $ do
 
 {-| Trivial adapter that does not change interface at all
 
-    'idA' passes all 'need' requests further upstream, and passes all 'give'
-    requests further downstream.
+    'idA' passes all 'call' requests further upstream, and passes all 'give'
+    responses further downstream.
 
     Corresponds to 'id' from @Control.Category@ -}
 idA :: (Monad m) => a' -> Adapter a' a a' a m r
-idA = \a' -> wrap $ Need a' $ \a -> wrap $ Give a idA
--- i.e. idA = foreverK $ need >=> give
+idA = \a' -> wrap $ Call a' $ \a -> wrap $ Give a idA
+-- i.e. idA = foreverK $ call >=> give
 
 {- $run
     'runProgram' ensures that the 'Adapter' passed to it does not have any
-    unsatisfied 'give' or 'need' statements.
+    unsatisfied 'give' or 'call' statements.
 
     This restriction makes 'runProgram' less polymorphic than it could be, and
     I settled on this restriction for three reasons:
@@ -145,10 +151,10 @@ idA = \a' -> wrap $ Need a' $ \a -> wrap $ Give a idA
     * It prevents wastefully draining a scarce resource by gratuitously
       driving it to completion
 
-    * It encourages an idiomatic programming style where unfulfilled 'need' or
+    * It encourages an idiomatic programming style where unfulfilled 'call' or
       'give' statements are satisfied in a structured way using composition.
 
-    If you believe that loose 'need' or 'give' statements should be discarded or
+    If you believe that loose 'call' or 'give' statements should be discarded or
     ignored, then you can explicitly ignore them by using 'discard' (which
     discards all input), and 'ignore' (which ignores all requests):
 
@@ -163,11 +169,11 @@ runProgram' p = do
     case x of
         Pure          r    -> return r
         Free (Give _ fb ) -> runProgram' $ fb  ()
-        Free (Need _ fa') -> runProgram' $ fa' ()
+        Free (Call _ fa') -> runProgram' $ fa' ()
 
 -- | Discard all responses
 discard :: (Monad m) => () -> Opening () a m r
-discard () = forever $ need ()
+discard () = forever $ call ()
 
 -- | Ignore all requests
 ignore  :: (Monad m) => a -> Closure a () m r
