@@ -3,8 +3,6 @@
 
     'Proxy's generalize @Pipe@s by parametrizing requests with arguments. -}
 
-{-# LANGUAGE Rank2Types #-}
-
 module Control.Proxy (
     -- * Types
     -- $types
