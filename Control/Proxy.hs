@@ -1,5 +1,5 @@
-{-| A 'Proxy' 'request's input from upstream servers and 'respond's to
-    downstream clients with output.
+{-| A 'Proxy' 'request's input from upstream and 'respond's with output to
+    downstream.
 
     'Proxy's generalize @Pipe@s in that requests are parametrized by an
     argument. -}
@@ -62,7 +62,7 @@ import Prelude hiding ((.), id)
 
     * @a'@ - The argument supplied to the upstream interface
 
-    * @a @ - The return value provided by underlying interface
+    * @a @ - The return value provided by the upstream interface
 
     * @b'@ - The argument supplied by the downstream interface
 
@@ -111,9 +111,8 @@ type Session        = Proxy Void  ()  () Void
 >     bytes' <- respond bs
 >     truncate maxBytes bytes'
 
-    Every 'Proxy' receives its initial input through its last parameter (@bytes@
-    in the above example), and subsequent inputs are bound by the 'respond'
-    command.
+    You define a 'Proxy' as a function of its initial input (@bytes@ in the
+    above example), and subsequent inputs are bound by the 'respond' command.
 -}
 
 {-| 'request' input from upstream, passing an argument with the request
@@ -133,15 +132,18 @@ respond :: (Monad m) => b  -> Proxy a' a b' b m b'
 respond b  = liftF $ Respond b  id
 
 {- $compose
-    'Proxy' forms a 'Category', where ('<-<') is composition and 'idT' is the
-    identity.  The identity laws mean that 'idT' is truly transparent:
+    'Proxy' defines a 'Category', where the objects are the interfaces and the
+    morphisms are 'Proxy's parametrized on their initial input.
+
+    ('<-<') is composition and 'idT' is the identity.  The identity laws
+    guarantee that 'idT' is truly transparent:
 
 > idT <-< p = p
 >
 > p <-< idT = p
 
-    ... and the associativity law means that 'Proxy' composition is independent
-    of grouping:
+    ... and the associativity law guarantees that 'Proxy' composition does not
+    depend on the grouping:
 
 > (p1 <-< p2) <-< p3 = p1 <-< (p2 <-< p3)
 
@@ -265,7 +267,8 @@ foreverK k = let r = k >=> r in r
 
 {- $pipe
     The following definitions are drop-in replacements for their 'Pipe'
-    equivalents. -}
+    equivalents.  Consult "Control.Pipe" and "Control.Pipe.Tutorial" for more
+    extensive documentation. -}
 
 {-| The type variables of @Pipe a b m r@ signify:
 
