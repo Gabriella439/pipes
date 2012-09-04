@@ -1,8 +1,7 @@
 {-| A 'Proxy' 'request's input from upstream and 'respond's with output to
     downstream.
 
-    'Proxy's generalize @Pipe@s in that requests are parametrized by an
-    argument. -}
+    'Proxy's generalize @Pipe@s by parametrizing requests with arguments. -}
 
 {-# LANGUAGE Rank2Types #-}
 
@@ -123,7 +122,7 @@ type Session        = Proxy Void  ()  () Void
 request :: (Monad m) => a' -> Proxy a' a b' b m a
 request a' = liftF $ Request a' id
 
-{-| 'respond' with an output for upstream and bind the next 'request'
+{-| 'respond' with an output for downstream and bind downstream's next 'request'
 
     @respond b@ satisfies a downstream 'request' by supplying the value @b@.
     'respond' blocks until downstream 'request's a new value and binds the
