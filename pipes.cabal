@@ -58,6 +58,7 @@ Library
         Control.Frame,
         Control.Frame.Tutorial,
         Control.IMonad.Trans.Free,
+        Control.Proxy,
         Control.Pipe,
         Control.Pipe.Tutorial
     GHC-Options: -O2
