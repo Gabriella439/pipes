@@ -62,7 +62,7 @@ import Prelude hiding ((.), id)
 
     * @resp_a@ - The response provided by the upstream interface
 
-    * @req_b @ - The argument supplied by the downstream interface
+    * @req_b @ - The request supplied by the downstream interface
 
     * @resp_b@ - The response provided to the downstream interface
 
@@ -125,7 +125,7 @@ request a' = liftF $ Request a' id
 
     @respond b@ satisfies a downstream 'request' by supplying the value @b@.
     'respond' blocks until downstream 'request's a new value and binds the
-    parameter from the next 'request' as its return value. -}
+    argument from the next 'request' as its return value. -}
 respond :: (Monad m) => b  -> Proxy a' a b' b m b'
 respond b  = liftF $ Respond b  id
 
