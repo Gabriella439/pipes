@@ -56,19 +56,19 @@ import Prelude hiding ((.), id)
     A 'Proxy' communicates with an upstream interface and a downstream
     interface.
 
-    The type variables of @Proxy a' a b' b m r@ signify:
+    The type variables of @Proxy req_a resp_a req_b resp_b m r@ signify:
 
-    * @a'@ - The argument supplied to the upstream interface
+    * @req_a @ - The request supplied to the upstream interface
 
-    * @a @ - The return value provided by the upstream interface
+    * @resp_a@ - The response provided by the upstream interface
 
-    * @b'@ - The argument supplied by the downstream interface
+    * @req_b @ - The argument supplied by the downstream interface
 
-    * @b @ - The return value provided to the downstream interface
+    * @resp_b@ - The response provided to the downstream interface
 
-    * @m @ - The base monad
+    * @m     @ - The base monad
 
-    * @r @ - The final return value -}
+    * @r     @ - The final return value -}
 
 -- | The base functor for the 'Proxy' type
 data ProxyF a' a b' b x = Request a' (a -> x) | Respond b (b' -> x)
@@ -80,27 +80,27 @@ instance Functor (ProxyF a' a b' b) where
 -- | A 'Proxy' converts one interface to another
 type Proxy a' a b' b = FreeT (ProxyF a' a b' b)
 
-{-| @Server arg ret@ receives requests with arguments of type @arg@ and sends
-    responses of type @ret@.
+{-| @Server req resp@ receives requests of type @req@ and sends responses of
+    type @resp@.
 
     'Server's only 'respond' and never 'request' anything. -}
-type Server arg ret = Proxy Void  () arg  ret
+type Server req resp = Proxy Void   () req resp
 
-{-| @Client arg ret@ sends requests with arguments of type @arg@ and receives
-    responses of type @ret@.
+{-| @Client req resp@ sends requests of type @req@ and receives responses of
+    type @resp@.
 
     'Client's only 'request' and never 'respond' to anything. -}
-type Client arg ret = Proxy  arg ret  () Void
+type Client req resp = Proxy  req resp () Void
 
 {-| A self-contained 'Session', ready to be run by 'runSession'
 
     'Session's never 'request' anything or 'respond' to anything. -}
-type Session        = Proxy Void  ()  () Void
+type Session         = Proxy Void   ()  () Void
 
 {- $build
-    @Proxy a b m@ is a monad and @Proxy a b@ is a monad transformer.  This means
-    you can assemble a 'Proxy' using @do@ notation using only 'request',
-    'respond', and 'lift':
+    @Proxy@ forms both a monad and a monad transformer.  This means you can
+    assemble a 'Proxy' using @do@ notation using only 'request', 'respond', and
+    'lift':
 
 > truncate :: Int -> Int -> Proxy Int ByteString Int ByteString IO r
 > truncate maxBytes bytes = do

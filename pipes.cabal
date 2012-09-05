@@ -39,8 +39,13 @@ Description:
     Vertical Concatenation always works the way you expect, picking up where the
     previous 'Pipe' left off.
   .
+  * /Bidirectionality/: The library now provides a bidirectional 'Pipe' type,
+    called a 'Proxy'.
+  .
   Check out "Control.Pipe.Tutorial" for a copious introductory tutorial and
-  "Control.Pipe" for the actual implementation.
+  "Control.Pipe" for the actual implementation.  "Control.Proxy.Tutorial"
+  introduces bidirectional iteratees that are backwards-compatible with 'Pipe's
+  and "Control.Proxy" provides the implementation.
 Category: Control, Enumerator
 Tested-With: GHC ==7.4.1
 Source-Repository head

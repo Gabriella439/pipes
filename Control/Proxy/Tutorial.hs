@@ -13,11 +13,14 @@ module Control.Proxy.Tutorial (
     -- * Idioms
     -- $idioms
 
+    -- * The importance of compositionality
+    -- $compose
+
+    -- * Mixing monads and composition
+    -- $monads
+
     -- * Pipe Compatibility
     -- $pipes
-
-    -- * Future extensions
-    -- $future
     ) where
 
 import Control.Monad.Trans.Class
@@ -26,11 +29,11 @@ import Control.Proxy
 {- $basics
     The 'Proxy' type models composable chains of client-server interactions.
 
-    An 'Proxy' is a monad transformer that extends the base monad with the
-    ability to 'request' input from its upstream interface and 'respond' with
-    output to requests on its downstream interface.
+    A 'Proxy' is a monad transformer that extends the base monad with the
+    ability to 'request' input from upstream and 'respond' with output to
+    downstream.
 
-    For example, consider the following contrived remote procedure call
+    For example, consider the following toy remote procedure call
     'Server':
 
 > import Control.Proxy
@@ -51,7 +54,12 @@ import Control.Proxy
 
     Our 'Server' receives questions about 'Int's, and responds with answers that
     are 'Int's.  The base monad is 'IO' because our 'Server' 'lift's two
-    'putStrLn' statements to chat out loud.
+    'putStrLn' statements to chat out loud.  The return value is polymorphic
+    because our 'Server' never terminates.
+
+    Note that the base monad doesn't always need to be 'IO'.  Unlike typical
+    servers, these kinds of 'Server's are pure syntax trees with no side
+    effects unless you call 'lift'.
 
     Now we can write a 'Client' that interacts with our 'Server':
 
@@ -70,7 +78,7 @@ import Control.Proxy
 > Client   Int      | Int    | IO         | ()
 
     Our 'Client' asks questions about 'Int's and receives answers that are
-    'Int's.  The client also uses 'IO' as the base monad.
+    'Int's.  The 'Client' also uses 'IO' as the base monad.
 
     We can then compose the 'Client' and 'Server' into a 'Session' using the
     ('<-<') operator:
@@ -198,9 +206,9 @@ Client received : 6
 >
 > session     :: ()  -> Session                IO ()
 
-    This initial input is what properly initializes each 'Proxy' and always
-    corresponds to the input received from the downstream interface, which you
-    can see if you expand out the 'Server' and 'Client' type synonyms:
+    This input initializes each 'Proxy' and corresponds to the input on the
+    downstream interface.  I will expand the 'Server' and 'Client' type synonyms
+    to show this:
 
 >                +- Initial Arg = This -+
 >                |                      |
@@ -211,34 +219,25 @@ Client received : 6
 >
 > session     :: ()  -> Proxy  Void ()  ()  Void IO ()
 
-    Every 'Proxy' receives its initial argument through a parameter (otherwise
-    we cannot initialize it correctly), but receives all subsequent arguments
-    from 'respond' statements (if any).
-
-    A 'Client' receives an empty argument (i.e. @()@) so it can be initialized
-    at any time, and a client cannot 'respond' so it never receives any
-    subsequent arguments.
-
-    Both a 'Proxy' and 'Server' use their parameter to receive their first
-    request and then receive all further requests by binding the result of the
-    'respond' command.
+    Composition supplies the first request through this initial parameters
+    and all subsequent requests are bound to 'respond' statements.
 
     This means that the actual types you compose are all of the form:
 
-> proxy :: b' -> Proxy a' a b' b m r
+> proxy :: req_b -> Proxy req_a resp_a req_b resp_b m r
 -}
 
 {- $composition
     'Proxy' composition posseses an identity 'Proxy' that is completely
     transparent to anything upstream or downstream of it:
 
-> idT :: (Monad m) => arg -> Proxy arg ret arg ret m r
+> idT :: (Monad m) => req -> Proxy req resp req resp m r
 > idT question = do
 >     answer       <- request question
 >     nextQuestion <- respond answer
 >     idT nextQuestion
 
-    Formally, this means that:
+    Transparency means that:
 
 > idT <-< p = p
 >
@@ -266,7 +265,7 @@ Client received : 6
 
     * 'respond' blocks until it receives a new request from downstream
 
-    * If any 'Proxy' in the chain 'return's, the entire chain terminates
+    * If any 'Proxy' in the chain terminates, the entire chain terminates
 -}
 
 {- $idioms
@@ -275,17 +274,13 @@ Client received : 6
 
 > someProxy arg = do
 >     ...
->     arg' <- respond x
->     someProxy arg'
+>     nextArg <- respond x
+>     someProxy nexArg
 
     "Control.Proxy" provides the 'foreverK' utility function which abstracts
     away this manual recursion:
 
-> foreverK f = \a -> do
->     a' <- f a
->     foreverK f a'
->
-> -- or: foreverK f = f >=> foreverK f
+> foreverK f = f >=> foreverK f
 
     Using 'foreverK', we can simplify the definition of 'incrementer':
 
@@ -319,15 +314,170 @@ Client received : 6
 > --         = request >=> respond >=> request >=> respond >=> ...
 -}
 
+{- $compose
+    We can mix and match different components to rapidly define emergent
+    behaviors from a resuable set of core primitives.  For example, we could
+    replace our client with a command line prompt where the user requests
+    inputs:
+
+> inputPrompt :: (Read a, Show b) => () -> Client a b IO r
+> inputPrompt () = forever $ do
+>     str <- lift $ getLine
+>     let a = read str
+>     b <- request a
+>     lift $ print b
+>     lift $ putStrLn "*"
+
+>>> runSession $ inputPrompt <-< incrementer
+42<Enter>
+Server received : 42
+Server responded: 43
+43
+*
+666<Enter>
+Server received : 666
+Server responded: 667
+667
+*
+
+    Oh no, we lost our useful client diagnostic messages!  No worries, we can
+    abstract that functionality away into its own component:
+
+> diagnoseClient :: (Show a, Show b) => a -> Proxy a b a b IO r
+> diagnoseClient = foreverK $ \a -> do
+>     lift $ putStrLn $ "Client requested: " ++ show a
+>     b <- request a
+>     lift $ putStrLn $ "Client received : " ++ show b
+>     respond b
+
+>>> runSession $ inputPrompt <-< diagnoseClient <-< incrementer
+42<Enter>
+Client requested: 42
+Server received : 42
+Server responded: 43
+Client received : 43
+43
+*
+666<Enter>
+Client requested: 666
+Server received : 666
+Server responded: 667
+Client received : 667
+667
+*
+
+    Because of associativity, we can bundle @inputPrompt@ and @diagnoseClient@
+    into a single black box and not worry that the abstraction will leak due to
+    grouping issues:
+
+> verboseInput :: (Read a, Show b, Show a) => () -> Client a b IO r
+> verboseInput = inputPrompt <-< diagnoseClient
+
+>>> runSession $ verboseInput <-< incrementer
+<Exactly same behavior>
+
+    Or what if I want to cache the results coming out of @incrementer@?  I can
+    define a 'Proxy' to cache all requests going through it:
+
+> import qualified Data.Map as M
+>
+> cache :: (Ord a) => a -> Proxy a b a b IO r
+> cache = cache' M.empty
+>
+> cache' m a =
+>     case M.lookup a m of
+>         Nothing -> do
+>             b  <- request a
+>             a' <- respond b
+>             cache' (M.insert a b m) a'
+>         Just b  -> do
+>             lift $ putStrLn "Used cache!"
+>             a' <- respond b
+>             cache' m a'
+
+>>> runSession $ verboseInput <-< cache <-< incrementer 
+42<Enter>
+Client requested: 42
+Server received : 42
+Server responded: 43
+Client received : 43
+43
+*
+42<Enter>
+Client requested: 42
+Used cache!
+Client received : 43
+43
+*
+
+    Note that I don't distinguish between a "reverse proxy" or a "forward proxy"
+    since composition doesn't distinguish either.  You can attach the @cache@
+    'Proxy' to a 'Client':
+
+> client' = client <-< cache
+
+    ... or to a 'Server':
+
+> server' = cache <-< server
+
+    ... or anywhere in between.  It's completely up to you!
+-}
+
+{- $monads
+    All the previous examples use a single composition chain, but you need not
+    restrict yourself to that design pattern.  Remember that the result of
+    composition is a 'Proxy' itself (parametrized by an input), and 'Proxy's are
+    'Monad's, so you can bind the result of composition directly within another
+    @do@ block to generate complex behaviors:
+
+> mixedClient :: () -> Client Int Int IO r
+> mixedClient () = do
+>     oneTwoThree ()
+>     -- Here we bind composition within a larger do block
+>     (inputPrompt <-< cache) ()
+
+>>> runSession $ mixedClient <-< incrementer
+Client requested: 1
+Server received : 1
+Server responded: 2
+Client received : 2
+*
+Client requested: 2
+Server received : 2
+Server responded: 3
+Client received : 3
+*
+Client requested: 3
+Server received : 3
+Server responded: 4
+Client received : 4
+*
+42<Enter>
+Server received : 42
+Server responded: 43
+43
+*
+42<Enter>
+Used cache!
+43
+*
+
+    So feel free to use your imagination!  Up until the moment you call
+    'runSession', you can freely mix composition or @do@ notation within each
+    other.
+-}
+
 {- $pipes
     'Proxy's generalize 'Pipe's by permitting communication upstream.
     Fortunately, though, you don't need to rewrite your code if you have already
     used 'Pipe's.  "Control.Proxy" formulates all of the 'Pipe' types and
-    primitives in terms of the 'Proxy' type
+    primitives in terms of the 'Proxy' type.
 
     This means that if you wish to upgrade your 'Pipe' code to take advantage of
     upstream communication, you only need to import "Control.Proxy" instead
-    of "Control.Pipe" and everything will still work out of the box.
+    of "Control.Pipe" and everything will still work out of the box.  Then you
+    can selectively upgrade certain components to communicate upstream as
+    necessary.
 
     To understand how 'Pipe's map onto 'Proxy's, just check out the 'Pipe'
     definition in "Control.Proxy":
@@ -335,7 +485,7 @@ Client received : 6
 > type Pipe a b = Proxy () a () b
 
     In other words, a 'Pipe' is just a 'Proxy' where you never pass any
-    parameters upstream.
+    informationupstream.
 
     "Control.Pipe" will not be deprecated, however, and will be preserved for
     users who do not wish to communicate information upstream.
