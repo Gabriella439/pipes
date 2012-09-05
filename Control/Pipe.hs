@@ -1,6 +1,8 @@
 {-|
     'Pipe' is a monad transformer that enriches the base monad with the ability
     to 'await' or 'yield' data to and from other 'Pipe's.
+
+    For an extended tutorial, consult "Control.Pipe.Tutorial".
 -}
 
 module Control.Pipe (
@@ -126,7 +128,7 @@ yield b = wrap $ Yield b (return ())
 {-|
     Convert a pure function into a pipe
 
-> pipe = forever $ do
+> pipe f = forever $ do
 >     x <- await
 >     yield (f x)
 -}

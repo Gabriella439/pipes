@@ -1,7 +1,7 @@
 {-| A 'Proxy' 'request's input from upstream and 'respond's with output to
     downstream.
 
-    'Proxy's generalize @Pipe@s by parametrizing requests with arguments. -}
+    For an extended tutorial, consult "Control.Proxy.Tutorial". -}
 
 module Control.Proxy (
     -- * Types
@@ -36,6 +36,7 @@ module Control.Proxy (
     Pipeline,
     await,
     yield,
+    pipe,
     (<+<),
     (>+>),
     idP,
@@ -292,6 +293,12 @@ type Pipeline   = Pipe () Void
     'await' blocks until input is available -}
 await :: (Monad m) => Pipe a b m a
 await = request ()
+
+-- | Convert a pure function into a pipe
+pipe :: (Monad m) => (a -> b) -> Pipe a b m r
+pipe f = forever $ do
+    x <- await
+    yield (f x)
 
 {-| Deliver output downstream
 
