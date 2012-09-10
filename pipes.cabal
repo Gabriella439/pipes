@@ -66,6 +66,7 @@ Library
         Control.Proxy,
         Control.Proxy.Tutorial,
         Control.Pipe,
+        Control.Pipe.Core,
         Control.Pipe.Tutorial
     GHC-Options: -O2
     Default-Language: Haskell2010
