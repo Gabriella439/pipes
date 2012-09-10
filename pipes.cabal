@@ -64,6 +64,7 @@ Library
         Control.Frame.Tutorial,
         Control.IMonad.Trans.Free,
         Control.Proxy,
+        Control.Proxy.Core,
         Control.Proxy.Tutorial,
         Control.Pipe,
         Control.Pipe.Core,
