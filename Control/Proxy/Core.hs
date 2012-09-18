@@ -22,7 +22,7 @@ module Control.Proxy.Core (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
-import Control.Monad (ap, forever, liftM, (>=>))
+import Control.Monad (ap, forever, liftM, (>=>), (<=<))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Trans.Free
 import Control.Proxy.Class
@@ -77,6 +77,8 @@ instance ProxyC Proxy where
     p1 /</ p2 = (Proxy .) $ (unProxy . p1) /</? (unProxy . p2)
     respond b  = Proxy $ liftF $ Respond b  id
     p1 \<\ p2 = (Proxy .) $ (unProxy . p1) \<\? (unProxy . p2)
+    returnP = return
+    (<|<) = (<=<)
 
 (<-<?) :: (Monad m)
  => (c' -> FreeT (ProxyF b' b c' c) m r)

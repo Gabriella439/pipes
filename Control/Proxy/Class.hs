@@ -15,17 +15,36 @@ module Control.Proxy.Class (
     (>->),
     (\>\),
     (/>/),
+    (>|>),
     ) where
 
-infixr 9 <-<
-infixl 9 >->
+-- All associativies are designed to optimize performance
+infixr 8 /</
+infixl 8 \>\
+infixl 8 \<\
+infixr 8 />/
+infixr 7 <-<
+infixl 7 >->
+{- The priorities for <|< and >|> should match <=< and >=> from Control.Monad
+
+   I don't match the associativity for <=<, since:
+
+    * Upstream-associative binds punish the naive free monad instance that I use
+    * Do notation is upstream-associative by default
+    * It doesn't make sense to associate the operator the same way when it is
+      flipped
+
+   I consider the associativity of <=< a minor bug in Control.Monad, which I do
+   not intend to reproduce here. -}
+infixl 1 <|<
+infixr 1 >|>
 
 {- $usage
-    The 'ProxyC' class defines an interface to three separate categories that
+    The 'ProxyC' class defines an interface to four separate categories that
     encompass what it means to be \"proxy-like\", where each category defines a
     different way to compose values of the following shape:
 
-> -- The fundamental "unit" of abstraction for proxies
+> -- The fundamental unit of abstraction for proxies
 > (Monad m, ProxyC p) => a -> p b c d e m r
 
     Most users of this library will use the 'respond' and 'request' commands
@@ -38,7 +57,7 @@ infixl 9 >->
 -}
 
 {- $proxyc
-    The 'ProxyC' class uses three categories to structure the exposed API, each
+    The 'ProxyC' class uses four categories to structure the exposed API, each
     of which provides a composition operation and its identity.
 
   * The first category comprises the ('<-<') composition operator and its
@@ -49,6 +68,7 @@ infixl 9 >->
 
 > idT <-< f = f
 > f <-< idT = f
+> (f <-< g) <-< h = f <-< (g <-< h)
 
   * The next category comprises the ('/</') composition operator and its
     identity, 'request'.  The 'request' command requests parametrized input from
@@ -58,6 +78,7 @@ infixl 9 >->
 
 > request /</ f = f  -- Replacing a single 'request' with 'f' yields 'f'
 > f /</ request = f  -- Replacing every 'request' with 'request' changes nothing
+> (f /</ g) /</ h = f /</ (g /</ h)
 
   * The dual category comprises the ('\<\') composition operator and its
     identity, 'respond'.  The 'respond' command responds to the previous
@@ -67,29 +88,20 @@ infixl 9 >->
 
 > respond \<\ f = f -- Replacing every 'respond' with 'respond' changes nothing
 > f \<\ respond = f -- Replacing a single 'respond' with 'f' yields 'f'
-
-    Also, each composition operator is associative:
-
-> (f <-< g) <-< h = f <-< (g <-< h)
-> (f /</ g) /</ h = f /</ (g /</ h)
 > (f \<\ g) \<\ h = f \<\ (g \<\ h)
 
-   .. meaning that you can safely omit the parentheses when composing
-   components:
+  * The final category comprises Kleisli composition ('<|<') and its identity,
+    'returnP'.  I add these as methods to the type class to work around
+    limitations of Haskell's type class system.  You should always instantiate
+    these with ('<=<') and 'return'.
 
-> f <-< g <-< h
-> f /</ g /</ h
-> f \<\ h \<\ h
+> returnP <|< f = f
+> f <|< returnP = f
+> (f <|< g) <|< h = f <|< (g <|< h)
 
-    Additionally, all 'Proxy'-like types that implement the 'ProxyC' class
-    must also implement the 'Monad' class, for two reasons:
+-}
 
-    * This allows one to extend them using the 'ProxyTrans' class.
-
-    * The Kleisli category is the fourth and final category that completes the
-      above three categories.  -}
-
-{-| A monad whose Kleisli category overlaps three other categories.
+{-| An interface to interactive types 
 
     Laws:
 
@@ -110,6 +122,12 @@ infixl 9 >->
 > respond \<\ f = f
 > f \<\ respond = f
 > (f \<\ g) \<\ h = f \<\ (g \<\ h)
+
+    * ('<|<') and 'returnP' form a category:
+
+> returnP <|< f = f
+> f <|< returnP = f
+> (f <|< g) <|< h = f <|< (g <|< h)
 
 -}
 class ProxyC p where
@@ -151,6 +169,15 @@ class ProxyC p where
           -> (a -> p x' x b' b m a')
           -> (a -> p x' x c' c m a')
 
+    -- | Equivalent to 'return', to work around type class limitations
+    returnP :: (Monad m) => a -> p x' x y' y m a
+
+    -- | Equivalent to ('<=<'), to work around type class limitations
+    (<|<) :: (Monad m)
+          => (b -> p x' x y' y m c)
+          -> (a -> p x' x y' y m b)
+          -> (a -> p x' x y' y m c)
+
 {-| Compose two proxies, satisfying all requests from downstream with responses
     from upstream.
 
@@ -178,3 +205,12 @@ class ProxyC p where
       -> (b -> p x' x c' c m b')
       -> (a -> p x' x c' c m a')
 (/>/) = flip (\<\)
+
+{-| Equivalent to ('>=>'), to work around type class limitations
+
+    Corresponds to ('<|<') with the arguments flipped -}
+(>|>) :: (Monad m, ProxyC p)
+      => (a -> p x' x y' y m b)
+      -> (b -> p x' x y' y m c)
+      -> (a -> p x' x y' y m c)
+(>|>) = flip (<|<)
