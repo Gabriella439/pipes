@@ -7,12 +7,10 @@ module Control.Proxy.Core (
     -- * Types
     -- $types
     ProxyF(..),
-    Proxy,
+    Proxy(..),
     Server,
     Client,
     Session,
-    -- * Build Proxies
-    -- $build
     -- * Run Sessions 
     -- $run
     runSession,
@@ -155,22 +153,6 @@ type Client req resp = Proxy  req resp () Void
 
     'Session's never 'request' anything or 'respond' to anything. -}
 type Session         = Proxy Void   ()  () Void
-
-{- $build
-    @Proxy@ forms both a monad and a monad transformer.  This means you can
-    assemble a 'Proxy' using @do@ notation using only 'request', 'respond', and
-    'lift':
-
-> truncate :: Int -> Int -> Proxy Int ByteString Int ByteString IO r
-> truncate maxBytes bytes = do
->     when (bytes > maxBytes) $ lift $ putStrLn "Input truncated"
->     bs <- request (min bytes maxBytes)
->     bytes' <- respond bs
->     truncate maxBytes bytes'
-
-    You define a 'Proxy' as a function of its initial input (@bytes@ in the
-    above example), and subsequent inputs are bound by the 'respond' command.
--}
 
 {- $run
     'runSession' ensures that the 'Proxy' passed to it does not have any

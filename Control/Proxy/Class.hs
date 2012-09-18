@@ -2,8 +2,14 @@
     interface to types that implement 'Proxy'-like capabilities. -}
 
 module Control.Proxy.Class (
-    -- $compose
+    -- * Overview
+    -- $usage
+
+    -- * The ProxyC class
+    -- $proxyc
     ProxyC(..),
+
+    -- * Flipped operators
     (>->),
     (\>\),
     (/>/),
@@ -12,7 +18,7 @@ module Control.Proxy.Class (
 infixr 9 <-<
 infixl 9 >->
 
-{- $compose
+{- $usage
     The 'ProxyC' class defines an interface to three separate categories that
     encompass what it means to be \"proxy-like\", where each category defines a
     different way to compose values of the following shape:
@@ -20,31 +26,40 @@ infixl 9 >->
 > -- The fundamental "unit" of abstraction for proxies
 > (Monad m, ProxyC p) => a -> p b c d e m r
 
-    The first category comprises the ('<-<') composition operator and its
+    Most users of this library will use the 'respond' and 'request' commands
+    to define their own proxies and the ('<-<') composition operator to connect
+    predefined proxies.
+
+    Extension writers will also find the ('/</') and ('\<\') operators useful,
+    since they let you modify existing proxies that implement the 'ProxyC'
+    interface without pattern matching on a specific type.
+-}
+
+{- $proxyc
+    The 'ProxyC' class uses three categories to structure the exposed API, each
+    of which provides a composition operation and its identity.
+
+  * The first category comprises the ('<-<') composition operator and its
     identity, 'idT'.  ('<-<') embodies the most commonly used composition
     operator, which connects 'request' statements in the downstream proxy with
     'respond' statements in the upstream proxy.  'idT' represents the \"empty\"
     proxy that auto-forwards everything passing through it:
 
-> idT = request >=> respond >=> idT
-
-    Since 'idT' forwards everything, it is transparent to composition:
-
 > idT <-< f = f
 > f <-< idT = f
 
-    The next category comprises the ('/</') composition operator and its
+  * The next category comprises the ('/</') composition operator and its
     identity, 'request'.  The 'request' command requests parametrized input from
-    upstream, which is satisfied by the dual 'respond' command.  (@f /</ g@)
+    upstream, which is satisfied by the dual 'respond' command.  (@f \/<\/ g@)
     substitutes all occurences of 'request' in @f@ with @g@, which explains why
     'request' is the identity of ('/</'):
 
 > request /</ f = f  -- Replacing a single 'request' with 'f' yields 'f'
 > f /</ request = f  -- Replacing every 'request' with 'request' changes nothing
 
-    The dual category comprises the ('\<\') composition operator and its
-    identity, 'respond.  The 'respond' command responds to the previous
-    'request' and binds the argument of the next 'request'.  (@f \<\ g@)
+  * The dual category comprises the ('\<\') composition operator and its
+    identity, 'respond'.  The 'respond' command responds to the previous
+    'request' and binds the argument of the next 'request'.  (@f \\<\\ g@)
     substitutes all occurences of 'respond' in @g@ with @f@.  This explains why
     'respond' is the identity of ('\<\'):
 
@@ -57,19 +72,20 @@ infixl 9 >->
 > (f /</ g) /</ h = f /</ (g /</ h)
 > (f \<\ g) \<\ h = f \<\ (g \<\ h)
 
+   .. meaning that you can safely omit the parentheses when composing
+   components:
+
+> f <-< g <-< h
+> f /</ g /</ h
+> f \<\ h \<\ h
+
     Additionally, all 'Proxy'-like types that implement the 'ProxyC' class
-    should also implement the 'Monad' class.  This allows one to extend them
-    using the 'ProxyTrans' class.  You can also think of the Kleisli category
-    category as the fourth and final category to complete the above three
-    categories.
+    must also implement the 'Monad' class, for two reasons:
 
-    Most users of this library will use the 'respond' and 'request' commands
-    and the ('<-<') composition operator.  The ('/</') and ('\<\') operators
-    let you abstractly modify existing proxies without any knowledge of the
-    underlying type, and you will probably use these if you write your own proxy
-    utilities or proxy transformers.
--}
+    * This allows one to extend them using the 'ProxyTrans' class.
 
+    * The Kleisli category is the fourth and final category that completes the
+      above three categories.  -}
 
 {-| A monad whose Kleisli category overlaps three other categories.
 
@@ -95,7 +111,7 @@ infixl 9 >->
 
 -}
 class ProxyC p where
-    {-| 'idT' acts like a \'T\'ransparent 'Proxy', passing all requests further
+    {-| 'idT' acts like a \'T\'ransparent proxy, passing all requests further
         upstream, and passing all responses further downstream. -}
     idT :: (Monad m) => a' -> p a' a a' a m r
 
