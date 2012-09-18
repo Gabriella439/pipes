@@ -3,12 +3,14 @@
 module Control.Proxy (
     -- * Modules
     -- $modules
+    module Control.Proxy.Class,
     module Control.Proxy.Core,
-    module Control.Proxy.Class
+    module Control.Proxy.Pipe
     ) where
 
-import Control.Proxy.Core
 import Control.Proxy.Class
+import Control.Proxy.Core
+import Control.Proxy.Pipe
 
 {- $modules
     "Control.Proxy.Core" provides the core type and primitives.
