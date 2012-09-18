@@ -13,13 +13,6 @@ module Control.Proxy.Core (
     Session,
     -- * Build Proxies
     -- $build
-    request,
-    respond,
-    -- * Compose Proxies
-    -- $compose
-    (<-<),
-    (>->),
-    idT,
     -- * Run Sessions 
     -- $run
     runSession,
@@ -43,9 +36,11 @@ module Control.Proxy.Core (
     runPipe
     ) where
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Free
+import Control.Proxy.Class
 import Data.Void
 
 -- Imports for Haddock links
@@ -78,7 +73,71 @@ instance Functor (ProxyF a' a b' b) where
     fmap f (Request a' fa ) = Request a' (f . fa )
 
 -- | A 'Proxy' converts one interface to another
-type Proxy a' a b' b = FreeT (ProxyF a' a b' b)
+newtype Proxy a' a b' b m r = Proxy { unProxy :: FreeT (ProxyF a' a b' b) m r }
+
+instance (Monad m) => Functor (Proxy a' a b' b m) where
+    fmap = liftM
+
+instance (Monad m) => Applicative (Proxy a' a b' b m) where
+    pure  = return
+    (<*>) = ap
+
+instance (Monad m) => Monad (Proxy a' a b' b m) where
+    return = Proxy . return
+    m >>= f = Proxy $ unProxy m >>= (unProxy . f)
+
+instance MonadTrans (Proxy a' a b' b) where
+    lift = Proxy . lift
+
+instance ProxyC Proxy where
+    idT = request >=> respond >=> idT
+    p1 <-< p2 = (Proxy .) $ (unProxy . p1) <-<? (unProxy . p2)
+    request a' = Proxy $ liftF $ Request a' id
+    p1 /</ p2 = (Proxy .) $ (unProxy . p1) /</? (unProxy . p2)
+    respond b  = Proxy $ liftF $ Respond b  id
+    p1 \<\ p2 = (Proxy .) $ (unProxy . p1) \<\? (unProxy . p2)
+
+(<-<?) :: (Monad m)
+ => (c' -> FreeT (ProxyF b' b c' c) m r)
+ -> (b' -> FreeT (ProxyF a' a b' b) m r)
+ -> (c' -> FreeT (ProxyF a' a c' c) m r)
+p1 <-<? p2 = \c' -> FreeT $ do
+    x1 <- runFreeT $ p1 c'
+    runFreeT $ case x1 of
+        Pure           r   -> return r
+        Free (Respond c  fc') -> wrap $ Respond c (fc' <-<? p2)
+        Free (Request b' fb ) -> FreeT $ do
+            x2 <- runFreeT $ p2 b'
+            runFreeT $ case x2 of
+                Pure           r   -> return r
+                Free (Respond b  fb') -> ((\_ -> fb b) <-<? fb') c'
+                Free (Request a' fa ) -> do
+                    let p1' = \_ -> FreeT $ return x1
+                    wrap $ Request a' $ \a -> (p1' <-<? (\_ -> fa a)) c'
+
+(/</?)
+ :: (Monad m)
+ => (c' -> FreeT (ProxyF b' b x' x) m c)
+ -> (b' -> FreeT (ProxyF a' a x' x) m b)
+ -> (c' -> FreeT (ProxyF a' a x' x) m c)
+f1 /</? f2 = \a' -> FreeT $ do
+    x <- runFreeT $ f1 a'
+    runFreeT $ case x of
+        Pure a                -> return a
+        Free (Respond x  fx') -> wrap $ Respond x $ fx' /</? f2
+        Free (Request b' fb ) -> (f2 >=> (fb /</? f2)) b'
+
+(\<\?)
+ :: (Monad m)
+ => (b -> FreeT (ProxyF x' x c' c) m b')
+ -> (a -> FreeT (ProxyF x' x b' b) m a')
+ -> (a -> FreeT (ProxyF x' x c' c) m a')
+f1 \<\? f2 = \c' -> FreeT $ do
+    x <- runFreeT $ f2 c'
+    runFreeT $ case x of
+        Pure c'               -> return c'
+        Free (Respond b  fb') -> (f1 >=> (f1 \<\? fb')) b
+        Free (Request x' fx ) -> wrap $ Request x' $ f1 \<\? fx
 
 {-| @Server req resp@ receives requests of type @req@ and sends responses of
     type @resp@.
@@ -113,88 +172,6 @@ type Session         = Proxy Void   ()  () Void
     above example), and subsequent inputs are bound by the 'respond' command.
 -}
 
-{-| 'request' input from upstream, passing an argument with the request
-
-    @request a'@ passes @a'@ as a parameter to upstream that upstream can use to
-    decide what response to return.  'request' binds the response to its return
-    value. -}
-request :: (Monad m) => a' -> Proxy a' a b' b m a
-request a' = liftF $ Request a' id
-
-{-| 'respond' with an output for downstream and bind downstream's next 'request'
-
-    @respond b@ satisfies a downstream 'request' by supplying the value @b@.
-    'respond' blocks until downstream 'request's a new value and binds the
-    argument from the next 'request' as its return value. -}
-respond :: (Monad m) => b  -> Proxy a' a b' b m b'
-respond b  = liftF $ Respond b  id
-
-{- $compose
-    'Proxy' defines a 'Category', where the objects are the interfaces and the
-    morphisms are 'Proxy's parametrized on their initial input.
-
-    ('<-<') is composition and 'idT' is the identity.  The identity laws
-    guarantee that 'idT' is truly transparent:
-
-> idT <-< p = p
->
-> p <-< idT = p
-
-    ... and the associativity law guarantees that 'Proxy' composition does not
-    depend on the grouping:
-
-> (p1 <-< p2) <-< p3 = p1 <-< (p2 <-< p3)
-
-    Note that in order to compose 'Proxy's, you must write them as functions of
-    their initial argument.  All subsequent arguments are bound by the 'respond'
-    command.  In other words, the actual composable unit is:
-
-> composable :: (Monad m) => b' -> Proxy a' a b' b m r
--}
-
-infixr 9 <-<
-infixl 9 >->
-
-{-| Compose two proxies, satisfying all requests from downstream with responses
-    from upstream
-
-    Corresponds to ('.')/('<<<') from @Control.Category@ -}
-(<-<) :: (Monad m)
- => (c' -> Proxy b' b c' c m r)
- -> (b' -> Proxy a' a b' b m r)
- -> (c' -> Proxy a' a c' c m r)
-p1 <-< p2 = \c' -> FreeT $ do
-    x1 <- runFreeT $ p1 c'
-    runFreeT $ case x1 of
-        Pure           r   -> return r
-        Free (Respond c  fc') -> wrap $ Respond c (fc' <-< p2)
-        Free (Request b' fb ) -> FreeT $ do
-            x2 <- runFreeT $ p2 b'
-            runFreeT $ case x2 of
-                Pure           r   -> return r
-                Free (Respond b  fb') -> ((\_ -> fb b) <-< fb') c'
-                Free (Request a' fa ) -> do
-                    let p1' = \_ -> FreeT $ return x1
-                    wrap $ Request a' $ \a -> (p1' <-< (\_ -> fa a)) c'
-
-{-| Compose two proxies, satisfying all requests from downstream with responses
-    from upstream
-
-    Corresponds to ('>>>') from @Control.Category@ -}
-(>->) :: (Monad m)
- => (b' -> Proxy a' a b' b m r)
- -> (c' -> Proxy b' b c' c m r)
- -> (c' -> Proxy a' a c' c m r)
-(>->) = flip (<-<)
-
-{-| 'idT' acts like a \'T\'ransparent 'Proxy', passing all requests further
-    upstream, and passing all responses further downstream.
-
-    Corresponds to 'id' from @Control.Category@ -}
-idT :: (Monad m) => a' -> Proxy a' a a' a m r
-idT = \a' -> wrap $ Request a' $ \a -> wrap $ Respond a idT
--- i.e. idT = foreverK $ request >=> respond
-
 {- $run
     'runSession' ensures that the 'Proxy' passed to it does not have any
     open responses or requests.  This restriction makes 'runSession' less
@@ -219,12 +196,12 @@ idT = \a' -> wrap $ Request a' $ \a -> wrap $ Respond a idT
 -}
 -- | Run a self-contained 'Session', converting it back to the base monad
 runSession :: (Monad m) => (() -> Session m r) -> m r
-runSession p = runSession' $ p ()
+runSession p = runSession' $ unProxy $ p ()
 
 runSession' p = do
     x <- runFreeT p
     case x of
-        Pure          r    -> return r
+        Pure            r    -> return r
         Free (Respond _ fb ) -> runSession' $ fb  ()
         Free (Request _ fa') -> runSession' $ fa' ()
 
@@ -323,9 +300,11 @@ idP = idT ()
 
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
 runPipe :: (Monad m) => Pipeline m r -> m r
-runPipe p = do
+runPipe = runPipe' . unProxy
+
+runPipe' p = do
     x <- runFreeT p
     case x of
         Pure r -> return r
-        Free (Request _ f) -> runPipe (f ())
-        Free (Respond _ f) -> runPipe (f ())
+        Free (Request _ f) -> runPipe' (f ())
+        Free (Respond _ f) -> runPipe' (f ())
