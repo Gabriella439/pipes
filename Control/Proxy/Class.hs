@@ -1,5 +1,7 @@
 {-| This module provides the 'ProxyC' class which provides the abstract
-    interface to types that implement 'Proxy'-like capabilities. -}
+    interface to types that implement 'Proxy'-like capabilities.
+
+    For an extended tutorial, consult "Control.Proxy.Tutorial".-}
 
 module Control.Proxy.Class (
     -- * Overview

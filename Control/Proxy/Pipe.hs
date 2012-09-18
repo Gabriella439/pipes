@@ -1,18 +1,23 @@
--- | This module provides an API compatible with "Control.Pipe"
+{-| This module provides an API compatible with "Control.Pipe"
+
+    Consult "Control.Pipe" for more extensive documentation and
+    "Control.Pipe.Tutorial" for an extended tutorial. -}
 
 module Control.Proxy.Pipe (
-    -- * Pipe compatibility
-    -- $pipe
+    -- * Types
     Pipe,
     Producer,
     Consumer,
     Pipeline,
+    -- * Create Pipes
     await,
     yield,
     pipe,
+    -- * Compose Pipes
     (<+<),
     (>+>),
     idP,
+    -- * Run Pipes
     runPipe
     ) where
 
@@ -21,11 +26,6 @@ import Control.Monad.Trans.Free
 import Control.Proxy.Core
 import Control.Proxy.Class
 import Data.Void (Void)
-
-{- $pipe
-    The following definitions are drop-in replacements for their 'Pipe'
-    equivalents.  Consult "Control.Pipe" and "Control.Pipe.Tutorial" for more
-    extensive documentation. -}
 
 {-| The type variables of @Pipe a b m r@ signify:
 
