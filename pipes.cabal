@@ -67,6 +67,7 @@ Library
         Control.Proxy.Core,
         Control.Proxy.Class
         Control.Proxy.Pipe
+        Control.Proxy.Trans
         Control.Proxy.Tutorial,
         Control.Pipe,
         Control.Pipe.Core,
