@@ -22,9 +22,10 @@ module Control.Proxy.Core (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
-import Control.Monad (ap, forever, liftM, (>=>), (<=<))
+import Control.Monad (ap, forever, liftM, (>=>))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Trans.Free
+import Control.MFunctor
 import Control.Proxy.Class
 import Data.Void (Void)
 
@@ -126,6 +127,9 @@ f1 />/? f2 = \a' -> FreeT $ do
         Pure a'               -> return a'
         Free (Respond b  fb') -> (f2 >=> (fb' />/? f2)) b
         Free (Request x' fx ) -> wrap $ Request x' $ fx />/? f2
+
+instance MFunctor (Proxy a' a b' b) where
+    mapT nat = Proxy . hoistFreeT nat . unProxy
 
 {-| @Server req resp@ receives requests of type @req@ and sends responses of
     type @resp@.
