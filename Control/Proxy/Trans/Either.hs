@@ -25,7 +25,7 @@ import Control.Proxy.Class (
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Prelude hiding (catch)
 
--- | The 'Either' proxy transformer, which allows
+-- | The 'Either' proxy transformer
 newtype EitherP e p a' a b' b (m :: * -> *) r
   = EitherP { runEitherP :: p a' a b' b m (Either e r) }
 
