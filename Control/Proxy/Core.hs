@@ -65,20 +65,17 @@ instance (Monad m) => Applicative (Proxy a' a b' b m) where
 
 instance (Monad m) => Monad (Proxy a' a b' b m) where
     return = Proxy . return
-    m >>= f = Proxy $ unProxy m >>= (unProxy . f)
+    m >>= f = Proxy $ unProxy m >>= unProxy . f
 
 instance MonadTrans (Proxy a' a b' b) where
     lift = Proxy . lift
 
-instance ProxyC Proxy where
-    idT = request >=> respond >=> idT
-    p1 <-< p2 = (Proxy .) $ (unProxy . p1) <-<? (unProxy . p2)
-    request a' = Proxy $ liftF $ Request a' id
-    p1 /</ p2 = (Proxy .) $ (unProxy . p1) /</? (unProxy . p2)
-    respond b  = Proxy $ liftF $ Respond b  id
-    p1 \<\ p2 = (Proxy .) $ (unProxy . p1) \<\? (unProxy . p2)
-    returnP = return
-    (<|<) = (<=<)
+instance Channel Proxy where
+    idT       = Proxy . idT'
+    p1 <-< p2 = Proxy . ((unProxy . p1) <-<? (unProxy . p2))
+
+idT' :: (Monad m) => a' -> FreeT (ProxyF a' a a' a) m r
+idT' a' = wrap $ Request a' $ \a -> wrap $ Respond a idT'
 
 (<-<?) :: (Monad m)
  => (c' -> FreeT (ProxyF b' b c' c) m r)
@@ -98,29 +95,37 @@ p1 <-<? p2 = \c' -> FreeT $ do
                     let p1' = \_ -> FreeT $ return x1
                     wrap $ Request a' $ \a -> (p1' <-<? (\_ -> fa a)) c'
 
+instance Request Proxy where
+    request a' = Proxy $ liftF $ Request a' id
+    p1 /</ p2 = (Proxy .) $ (unProxy . p1) /</? (unProxy . p2)
+
 (/</?)
  :: (Monad m)
  => (c' -> FreeT (ProxyF b' b x' x) m c)
  -> (b' -> FreeT (ProxyF a' a x' x) m b)
  -> (c' -> FreeT (ProxyF a' a x' x) m c)
 f1 /</? f2 = \a' -> FreeT $ do
-    x <- runFreeT $ f1 a'
-    runFreeT $ case x of
+    x1 <- runFreeT $ f1 a'
+    runFreeT $ case x1 of
         Pure a                -> return a
         Free (Respond x  fx') -> wrap $ Respond x $ fx' /</? f2
         Free (Request b' fb ) -> (f2 >=> (fb /</? f2)) b'
 
-(\<\?)
+instance Respond Proxy where
+    respond a = Proxy $ liftF $ Respond a id
+    p1 />/ p2 = (Proxy .) $ (unProxy . p1) />/? (unProxy . p2)
+
+(/>/?)
  :: (Monad m)
- => (b -> FreeT (ProxyF x' x c' c) m b')
- -> (a -> FreeT (ProxyF x' x b' b) m a')
+ => (a -> FreeT (ProxyF x' x b' b) m a')
+ -> (b -> FreeT (ProxyF x' x c' c) m b')
  -> (a -> FreeT (ProxyF x' x c' c) m a')
-f1 \<\? f2 = \c' -> FreeT $ do
-    x <- runFreeT $ f2 c'
-    runFreeT $ case x of
-        Pure c'               -> return c'
-        Free (Respond b  fb') -> (f1 >=> (f1 \<\? fb')) b
-        Free (Request x' fx ) -> wrap $ Request x' $ f1 \<\? fx
+f1 />/? f2 = \a' -> FreeT $ do
+    x1 <- runFreeT $ f1 a'
+    runFreeT $ case x1 of
+        Pure a'               -> return a'
+        Free (Respond b  fb') -> (f2 >=> (fb' />/? f2)) b
+        Free (Request x' fx ) -> wrap $ Request x' $ fx />/? f2
 
 {-| @Server req resp@ receives requests of type @req@ and sends responses of
     type @resp@.

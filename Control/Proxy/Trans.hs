@@ -1,58 +1,38 @@
-{-| This module exports the 'ProxyTrans' class which allows users to define
-    their own proxy transformers. -}
-
+{-| You can define your own extensions to the 'Proxy' type by writing your own
+    \"proxy transformers\".  Proxy transformers are monad transformers that
+    correctly lift 'Proxy' composition from the base monad.  Stack multiple
+    proxy transformers to chain features together. -}
+    
 module Control.Proxy.Trans (
     -- * Proxy Transformers
-    -- $proxytrans
     ProxyTrans(..)
     )where
 
 import Control.Proxy.Class
 
--- Imports for documentation
-import Control.Monad ((<=<))
-
-{- $proxytrans
-    You can define your own extension to 'Proxy'-like types by structuring your
-    extension as a proxy transformer.  A proxy transformer only assumes that the
-    base type implements the 'ProxyC' and 'Monad' type classes and derives an
-    extended type that also implements 'ProxyC' and 'Monad'.  You can then layer
-    this extension within any proxy transformer stack.
--}
-
-{-| 'mapP' defines a functor from four base categories to four transformed
-    categories.  For simplicity I refer to each category by its composition
-    operator:
+{-| 'mapP' defines a functor that preserves 'Proxy' composition and Kleisli
+    composition.
 
     Laws:
 
-    * Functor from base ('<=<') category to transformed ('<=<') category
-
-> mapP (f <=< g) = mapP f <=< mapP g
-> mapP return = return
-
-    * Functor from base ('<-<') category to transformed ('<-<') category
+    * Functor between 'Proxy' categories
 
 > mapP (f <-< g) = mapP f <-< mapP g
 > mapP idT = idT
 
-    * Functor from base ('/</') category to transformed ('/</') category
+    * Functor between Kleisli categories
 
-> mapP (f /</ g) = mapP f /</ mapP g
-> mapP request = request
+> mapP (f <=< g) = mapP f <=< mapP g
+> mapP return = return
 
-    * Functor from base ('\<\') category to transformed ('\<\') category
-
-> mapP (f \<\ g) = mapP f \<\ mapP g
-> mapP respond = respond
-
-    Minimal definition, 'mapP' or 'liftP'
+    Minimal complete definition: 'mapP' or 'liftP'.  Defining 'liftP' is more
+    efficient.
 -}
 class ProxyTrans t where
-    liftP :: (ProxyC p, Monad (p b c d e m))
+    liftP :: (Monad (p b c d e m), Channel p)
           => p b c d e m r -> t p b c d e m r
     liftP f = mapP (\() -> f) ()
 
-    mapP :: (ProxyC p, Monad (p b c d e m))
+    mapP :: (Monad (p b c d e m), Channel p)
          => (a -> p b c d e m r) -> (a -> t p b c d e m r)
     mapP = (liftP .)
