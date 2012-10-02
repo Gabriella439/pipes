@@ -70,6 +70,7 @@ Library
         Control.Proxy.Pipe,
         Control.Proxy.Trans,
         Control.Proxy.Trans.Identity,
+        Control.Proxy.Trans.Either,
         Control.Proxy.Tutorial,
         Control.Pipe,
         Control.Pipe.Core,

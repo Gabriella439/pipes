@@ -1,4 +1,4 @@
--- | Top-level import for the "Control.Proxy" hierarchy
+-- | Default imports for the "Control.Proxy" hierarchy
 
 module Control.Proxy (
     -- * Modules

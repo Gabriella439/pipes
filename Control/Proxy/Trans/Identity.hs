@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts, KindSignatures #-}
 
 module Control.Proxy.Trans.Identity (
+    -- * IdentityP
     IdentityP(..)
     ) where
 
