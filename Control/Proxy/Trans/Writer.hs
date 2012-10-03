@@ -12,7 +12,9 @@ module Control.Proxy.Trans.Writer (
     -- * WriterP
     WriterP(..),
     runWriterP,
+    runWriterK,
     execWriterP,
+    execWriterK,
     -- * Writer operations
     tell,
     censor
@@ -79,15 +81,27 @@ instance (Channel p) => Channel (WriterP w p) where
 instance (Monoid w) => ProxyTrans (WriterP w) where
     liftP m = WriterP $ \w -> liftM (\r -> (r, w)) m
 
--- | Evaluate a writer computation
+-- | Run a 'WriterP' computation, producing the final result and monoid
 runWriterP :: (Monoid w) => WriterP w p a' a b' b m r -> p a' a b' b m (r, w)
 runWriterP p = unWriterP p mempty
 
--- | Evaluate a writer computation, but discard the final result
+-- | Run a 'WriterP' \'@K@\'leisli arrow, producing the final result and monoid
+runWriterK
+ :: (Monoid w)
+ => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m (r, w))
+runWriterK = (runWriterP . )
+
+-- | Evaluate a 'WriterP' computation, but discard the final result
 execWriterP
  :: (Monad (p a' a b' b m), Monoid w)
  => WriterP w p a' a b' b m r -> p a' a b' b m w
 execWriterP m = liftM snd $ runWriterP m
+
+-- | Evaluate a 'WriterP' \'@K@\'leisli arrow, but discard the final result
+execWriterK
+ :: (Monad (p a' a b' b m), Monoid w)
+ => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m w)
+execWriterK = (execWriterP .)
 
 -- | Add a value to the monoid
 tell :: (Monad (p a' a b' b m), Monoid w) => w -> WriterP w p a' a b' b m ()

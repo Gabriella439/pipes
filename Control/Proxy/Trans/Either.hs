@@ -5,6 +5,8 @@
 module Control.Proxy.Trans.Either (
     -- * EitherP
     EitherP(..),
+    runEitherK,
+    -- * Either operations
     left,
     right,
     -- * Symmetric monad
@@ -70,6 +72,11 @@ instance (Channel p) => Channel (EitherP e p) where
 
 instance ProxyTrans (EitherP e) where
     liftP = EitherP . liftM Right
+
+-- | Run an 'EitherP' \'@K@\'leisi arrow, returning either a 'Left' or 'Right'
+runEitherK
+ :: (q -> EitherP e p a' a b' b m r) -> (q -> p a' a b' b m (Either e r))
+runEitherK = (runEitherP .)
 
 -- | Abort the computation and return a 'Left' result
 left :: (Monad (p a' a b' b m)) => e -> EitherP e p a' a b' b m r

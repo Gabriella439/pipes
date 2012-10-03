@@ -7,8 +7,12 @@
 module Control.Proxy.Trans.State (
     -- * StateP
     StateP(..),
+    runStateP,
+    runStateK,
     evalStateP,
+    evalStateK,
     execStateP,
+    execStateK,
     -- * State operations
     get,
     put,
@@ -29,7 +33,7 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The strict 'State' proxy transformer
 newtype StateP s p a' a b' b (m :: * -> *) r
-  = StateP { runStateP :: s -> p a' a b' b m (r, s) }
+  = StateP { unStateP :: s -> p a' a b' b m (r, s) }
 
 instance (Monad (p a' a b' b m)) => Functor (StateP s p a' a b' b m) where
     fmap = liftM
@@ -41,8 +45,8 @@ instance (Monad (p a' a b' b m)) => Applicative (StateP s p a' a b' b m) where
 instance (Monad (p a' a b' b m)) => Monad (StateP s p a' a b' b m) where
     return a = StateP $ \s -> return (a, s)
     m >>= f = StateP $ \s -> do
-        (a, s') <- runStateP m s
-        runStateP (f a) s'
+        (a, s') <- unStateP m s
+        unStateP (f a) s'
 
 instance (MonadPlus (p a' a b' b m))
  => Alternative (StateP s p a' a b' b m) where
@@ -51,7 +55,7 @@ instance (MonadPlus (p a' a b' b m))
 
 instance (MonadPlus (p a' a b' b m)) => MonadPlus (StateP s p a' a b' b m) where
     mzero = StateP $ \_ -> mzero
-    mplus m1 m2 = StateP $ \s -> mplus (runStateP m1 s) (runStateP m2 s)
+    mplus m1 m2 = StateP $ \s -> mplus (unStateP m1 s) (unStateP m2 s)
 
 instance (MonadTrans (p a' a b' b)) => MonadTrans (StateP s p a' a b' b) where
     lift m = StateP $ \s -> lift $ liftM (\r -> (r, s)) m
@@ -60,25 +64,45 @@ instance (MonadIO (p a' a b' b m)) => MonadIO (StateP s p a' a b' b m) where
     liftIO m = StateP $ \s -> liftIO $ liftM (\r -> (r, s)) m
 
 instance (MFunctor (p a' a b' b)) => MFunctor (StateP s p a' a b' b) where
-    mapT nat = StateP . fmap (mapT nat) . runStateP
+    mapT nat = StateP . fmap (mapT nat) . unStateP
 
 instance (Channel p) => Channel (StateP s p) where
     idT a = StateP $ \_ -> idT a
     (p1 >-> p2) a = StateP $ \s ->
-        ((`runStateP` s) . p1 >-> (`runStateP` s) . p2) a
+        ((`unStateP` s) . p1 >-> (`unStateP` s) . p2) a
 
 instance ProxyTrans (StateP s) where
     liftP m = StateP $ \s -> liftM (\r -> (r, s)) m
 
--- | Evaluate a state computation, but discard the final state
-evalStateP
- :: (Monad (p a' a b' b m)) => StateP s p a' a b' b m r -> s -> p a' a b' b m r
-evalStateP m s = liftM fst $ runStateP m s
+-- | Run a 'StateP' computation, producing the final result and state
+runStateP :: s -> StateP s p a' a b' b m r -> p a' a b' b m (r, s)
+runStateP s m = unStateP m s
 
--- | Evaluate a state computation, but discard the final result
+-- | Run a 'StateP' \'@K@\'leisli arrow, procuding the final result and state
+runStateK :: s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m (r, s))
+runStateK s = (runStateP s .)
+
+-- | Evaluate a 'StateP' computation, but discard the final state
+evalStateP
+ :: (Monad (p a' a b' b m)) => s -> StateP s p a' a b' b m r -> p a' a b' b m r
+evalStateP s = liftM fst . runStateP s
+
+-- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final state
+evalStateK
+ :: (Monad (p a' a b' b m))
+ => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m r)
+evalStateK s = (evalStateP s .)
+
+-- | Evaluate a 'StateP' computation, but discard the final result
 execStateP
- :: (Monad (p a' a b' b m)) => StateP s p a' a b' b m r -> s -> p a' a b' b m s
-execStateP m s = liftM snd $ runStateP m s
+ :: (Monad (p a' a b' b m)) => s -> StateP s p a' a b' b m r -> p a' a b' b m s
+execStateP s = liftM snd . runStateP s
+
+-- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final result
+execStateK
+ :: (Monad (p a' a b' b m))
+ => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m s)
+execStateK s = (execStateP s .)
 
 -- | Get the current state
 get :: (Monad (p a' a b' b m)) => StateP s p a' a b' b m s

@@ -4,7 +4,8 @@
 
 module Control.Proxy.Trans.Identity (
     -- * IdentityP
-    IdentityP(..)
+    IdentityP(..),
+    runIdentityK
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -66,3 +67,7 @@ instance (Respond p) => Respond (IdentityP p) where
 
 instance ProxyTrans IdentityP where
     liftP = IdentityP
+
+-- | Run an 'IdentityP' \'@K@\'leisli arrow
+runIdentityK :: (q -> IdentityP p a' a b' b m r) -> (q -> p a' a b' b m r)
+runIdentityK = (runIdentityP .)

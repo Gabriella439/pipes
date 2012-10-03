@@ -5,6 +5,7 @@
 module Control.Proxy.Trans.Maybe (
     -- * MaybeP
     MaybeP(..),
+    runMaybeK,
     -- * Maybe operations
     nothing,
     just
@@ -67,6 +68,10 @@ instance (Channel p) => Channel (MaybeP p) where
 
 instance ProxyTrans MaybeP where
     liftP = MaybeP . liftM Just
+
+-- | Run a 'MaybeP' \'@K@\'leisli arrow, returning the result or 'Nothing'
+runMaybeK :: (q -> MaybeP p a' a b' b m r) -> (q -> p a' a b' b m (Maybe r))
+runMaybeK = (runMaybeP .)
 
 -- | A synonym for 'mzero'
 nothing :: (Monad (p a' a b' b m)) => MaybeP p a' a b' b m r
