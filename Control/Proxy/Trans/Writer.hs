@@ -91,7 +91,7 @@ execWriterP m = liftM snd $ runWriterP m
 
 -- | Add a value to the monoid
 tell :: (Monad (p a' a b' b m), Monoid w) => w -> WriterP w p a' a b' b m ()
-tell w' = WriterP $ \w -> let w'' = mappend w w' in return ((), w'')
+tell w' = WriterP $ \w -> let w'' = mappend w w' in w'' `seq` return ((), w'')
 
 -- | Modify the result of a writer computation
 censor
