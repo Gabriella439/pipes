@@ -101,7 +101,7 @@ class Request p where
     
     Laws:
 
-    * ('/>/') and 'request' form a category:
+    * ('/>/') and 'respond' form a category:
 
 > respond />/ f = f
 > f />/ respond = f
