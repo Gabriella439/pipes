@@ -11,6 +11,7 @@ module Control.Pipe.Core (
     -- $types
     PipeF(..),
     Pipe,
+    C,
     Producer,
     Consumer,
     Pipeline,

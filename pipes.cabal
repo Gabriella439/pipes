@@ -75,6 +75,7 @@ Library
         Control.Proxy.Trans.State,
         Control.Proxy.Trans.Writer,
         Control.Proxy.Tutorial,
+        Control.Proxy.Util
         Control.Pipe,
         Control.Pipe.Core,
         Control.Pipe.Tutorial,
