@@ -23,10 +23,13 @@ module Control.Proxy.Core (
 
 import Control.Applicative (Applicative(pure, (<*>)))
 import Control.Monad (ap, forever, liftM, (>=>))
+import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.Monad.Trans.Free
-import Control.MFunctor
-import Control.Proxy.Class
+import Control.Monad.Trans.Free (
+    FreeF(Free, Pure), FreeT(FreeT, runFreeT), liftF, hoistFreeT, wrap )
+import Control.MFunctor (MFunctor(mapT))
+import Control.Proxy.Class (
+    Channel(idT, (<-<)), Request(request, (/</)), Respond(respond, (/>/)) )
 import Data.Void (Void)
 
 {- $types
@@ -65,11 +68,14 @@ instance (Monad m) => Applicative (Proxy a' a b' b m) where
     (<*>) = ap
 
 instance (Monad m) => Monad (Proxy a' a b' b m) where
-    return = Proxy . return
+    return  = Proxy . return
     m >>= f = Proxy $ unProxy m >>= unProxy . f
 
 instance MonadTrans (Proxy a' a b' b) where
     lift = Proxy . lift
+
+instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
+    liftIO = Proxy . liftIO
 
 instance Channel Proxy where
     idT       = Proxy . idT'
@@ -85,12 +91,12 @@ idT' a' = wrap $ Request a' $ \a -> wrap $ Respond a idT'
 p1 <-<? p2 = \c' -> FreeT $ do
     x1 <- runFreeT $ p1 c'
     runFreeT $ case x1 of
-        Pure           r   -> return r
+        Pure             r    -> return r
         Free (Respond c  fc') -> wrap $ Respond c (fc' <-<? p2)
         Free (Request b' fb ) -> FreeT $ do
             x2 <- runFreeT $ p2 b'
             runFreeT $ case x2 of
-                Pure           r   -> return r
+                Pure             r    -> return r
                 Free (Respond b  fb') -> ((\_ -> fb b) <-<? fb') c'
                 Free (Request a' fa ) -> do
                     let p1' = \_ -> FreeT $ return x1
