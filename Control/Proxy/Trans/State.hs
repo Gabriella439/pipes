@@ -1,4 +1,6 @@
--- | This module provides the proxy transformer equivalent of 'StateT'.
+{-| This module provides the proxy transformer equivalent of 'StateT'.
+
+    Sequencing of computations is strict. -}
 
 {-# LANGUAGE FlexibleContexts, KindSignatures #-}
 
@@ -25,7 +27,7 @@ import Control.Proxy.Class (
     Respond(respond, (/>/)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
--- | The 'State' proxy transformer
+-- | The strict 'State' proxy transformer
 newtype StateP s p a' a b' b (m :: * -> *) r
   = StateP { runStateP :: s -> p a' a b' b m (r, s) }
 
