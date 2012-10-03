@@ -63,12 +63,12 @@ instance (MFunctor (p a' a b' b)) => MFunctor (StateP s p a' a b' b) where
     mapT nat = StateP . fmap (mapT nat) . runStateP
 
 instance (Channel p) => Channel (StateP s p) where
-    idT a = StateP $ \s -> idT a
+    idT a = StateP $ \_ -> idT a
     (p1 >-> p2) a = StateP $ \s ->
         ((`runStateP` s) . p1 >-> (`runStateP` s) . p2) a
 
 instance ProxyTrans (StateP s) where
-    liftP m = StateP $ \s ->  liftM (\r -> (r, s)) m
+    liftP m = StateP $ \s -> liftM (\r -> (r, s)) m
 
 -- | Evaluate a state computation, but discard the final state
 evalStateP
