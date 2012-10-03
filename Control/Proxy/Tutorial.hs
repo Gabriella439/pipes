@@ -178,14 +178,14 @@ Client received : 6
     'Proxy'.  In reality, though, both 'Server' and 'Client' are just type
     synonyms for special cases of 'Proxy':
 
-> type Server arg ret = Proxy Void  () arg  ret
-> type Client arg ret = Proxy  arg ret  () Void
+> type Server arg ret = Proxy C   ()  arg ret
+> type Client arg ret = Proxy arg ret ()  C
 
     A 'Server' is just a 'Proxy' that has no upstream interface, and a 'Client'
     is just a 'Proxy' that has no downstream interface.  In fact, 'Session' is
     a 'Proxy', too:
 
-> type Session        = Proxy Void  ()  () Void
+> type Session        = Proxy C   ()  ()  C
 
     A 'Session' is just a 'Proxy' that has neither an upstream interface nor a
     downstream interface.
@@ -213,11 +213,11 @@ Client received : 6
 >                +- Initial Arg = This -+
 >                |                      |
 >                v                      v
-> incrementer :: Int -> Proxy  Void ()  Int Int  IO r
-> malicious   :: Int -> Proxy  Int  Int Int Int  IO r
-> oneTwoThree :: ()  -> Proxy  Int  Int ()  Void IO ()
+> incrementer :: Int -> Proxy  C   ()  Int Int IO r
+> malicious   :: Int -> Proxy  Int Int Int Int IO r
+> oneTwoThree :: ()  -> Proxy  Int Int ()  C   IO ()
 >
-> session     :: ()  -> Proxy  Void ()  ()  Void IO ()
+> session     :: ()  -> Proxy  C   ()  ()  C   IO ()
 
     Composition supplies the first request through this initial parameters
     and all subsequent requests are bound to 'respond' statements.
@@ -485,7 +485,7 @@ Used cache!
 > type Pipe a b = Proxy () a () b
 
     In other words, a 'Pipe' is just a 'Proxy' where you never pass any
-    informationupstream.
+    information upstream.
 
     "Control.Pipe" will not be deprecated, however, and will be preserved for
     users who do not wish to communicate information upstream.

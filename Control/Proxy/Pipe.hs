@@ -1,6 +1,6 @@
 {-| This module provides an API compatible with "Control.Pipe"
 
-    Consult "Control.Pipe" for more extensive documentation and
+    Consult "Control.Pipe.Core" for more extensive documentation and
     "Control.Pipe.Tutorial" for an extended tutorial. -}
 
 module Control.Proxy.Pipe (
@@ -25,7 +25,7 @@ import Control.Monad (forever)
 import Control.Monad.Trans.Free
 import Control.Proxy.Core
 import Control.Proxy.Class
-import Data.Void (Void)
+import Data.Closed (C)
 
 {-| The type variables of @Pipe a b m r@ signify:
 
@@ -39,13 +39,13 @@ import Data.Void (Void)
 type Pipe   a b = Proxy () a () b
 
 -- | A pipe that produces values
-type Producer b = Pipe ()    b
+type Producer b = Pipe () b
 
 -- | A pipe that consumes values
-type Consumer a = Pipe  a Void
+type Consumer a = Pipe a  C
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline   = Pipe () Void
+type Pipeline   = Pipe () C
 
 {-| Wait for input from upstream
 

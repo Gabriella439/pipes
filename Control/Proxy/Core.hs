@@ -8,6 +8,7 @@ module Control.Proxy.Core (
     -- $types
     ProxyF(..),
     Proxy(..),
+    C,
     Server,
     Client,
     Session,
@@ -30,7 +31,7 @@ import Control.Monad.Trans.Free (
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
     Channel(idT, (<-<)), Request(request, (/</)), Respond(respond, (/>/)) )
-import Data.Void (Void)
+import Data.Closed (C)
 
 {- $types
     A 'Proxy' communicates with an upstream interface and a downstream
@@ -141,18 +142,18 @@ instance MFunctor (Proxy a' a b' b) where
     type @resp@.
 
     'Server's only 'respond' and never 'request' anything. -}
-type Server req resp = Proxy Void   () req resp
+type Server req resp = Proxy C   ()   req resp
 
 {-| @Client req resp@ sends requests of type @req@ and receives responses of
     type @resp@.
 
     'Client's only 'request' and never 'respond' to anything. -}
-type Client req resp = Proxy  req resp () Void
+type Client req resp = Proxy req resp ()  C
 
 {-| A self-contained 'Session', ready to be run by 'runSession'
 
     'Session's never 'request' anything or 'respond' to anything. -}
-type Session         = Proxy Void   ()  () Void
+type Session         = Proxy C   ()   ()  C
 
 {- $run
     'runSession' ensures that the 'Proxy' passed to it does not have any

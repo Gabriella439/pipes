@@ -57,8 +57,8 @@ import Control.IMonad
 import Control.IMonad.Trans
 import Control.IMonad.Trans.Free
 import Control.Monad.Instances ()
+import Data.Closed (C)
 import Data.Maybe
-import Data.Void
 import Prelude hiding ((.), id)
 
 -- For documentation
@@ -70,13 +70,13 @@ import Control.Pipe hiding (await, yield, Await, Yield)
     \"@Frame b m (M a) C r@\".  For example, given the following type signatures
     from the tutorial:
 
-> printer  :: (Show a) => Pipe b Void IO r
+> printer  :: (Show a) => Pipe b C IO r
 > take'    :: Int -> Pipe b b IO ()
 > fromList :: (Monad m) => [b] -> Pipe () b m ()
 
     ... you would replace them with:
 
-> printer  :: (Show a) => Frame Void IO (M a) C r
+> printer  :: (Show a) => Frame C IO (M a) C r
 > take'    :: Int -> Frame a IO (M a) C ()
 > fromList :: (Monad m) => [a] -> Frame a m (M ()) C ()
 > -- To use the finalization example, change fromList's base monad to 'IO'
@@ -85,9 +85,6 @@ import Control.Pipe hiding (await, yield, Await, Yield)
 
 -- | Index representing an open input end, receiving values of type @a@
 data O a
-
--- | Index representing a closed input end
-data C
 
 -- | Index representing an open input end, receiving values of type @Maybe a@
 type M a = O (Maybe a)
@@ -128,7 +125,7 @@ instance IFunctor (FrameF b) where
 type Frame b m i j r = IFreeT (FrameF (m (), b)) (U m) (r := j) i
 
 -- | A self-contained 'Frame' that is ready to be run
-type Stack m r = Frame Void m (M ()) C r
+type Stack m r = Frame C m (M ()) C r
 
 -- $create
 -- The second step to convert 'Pipe' code to 'Frame' code is to change your
@@ -469,7 +466,7 @@ runFrame p = do
         Wrap (Yield _ p') -> runFrame  p'
         Wrap (Await   f ) -> runFrame (f $ Just ())
 
-runFrame' :: (Monad m) => Frame Void m C C r -> m r
+runFrame' :: (Monad m) => Frame C m C C r -> m r
 runFrame' p = do
     x <- unU $ runIFreeT p
     case x of

@@ -35,7 +35,7 @@ import Control.Category
 import Control.Monad (forever)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Free
-import Data.Void (Void)
+import Data.Closed (C)
 import Prelude hiding ((.), id)
 
 {- $summary
@@ -86,10 +86,10 @@ type Pipe a b = FreeT (PipeF a b)
 type Producer b = Pipe () b
 
 -- | A pipe that consumes values
-type Consumer b = Pipe b Void
+type Consumer b = Pipe b C
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline = Pipe () Void
+type Pipeline = Pipe () C
 
 {- $create
     'yield' and 'await' are the only two primitives you need to create pipes.

@@ -189,7 +189,7 @@ import Control.Pipe hiding (await, yield, Await, Yield)
     terminates:
 
 > -- This type-checks because foreverR is polymorphic in the final index
-> printer :: (Show b) => Frame Void IO (M b) C r
+> printer :: (Show b) => Frame C IO (M b) C r
 > printer = foreverR $ do
 >     a <- await
 >     liftU $ print a
@@ -230,7 +230,7 @@ import Control.Pipe hiding (await, yield, Await, Yield)
     The 'Frame' equivalent to 'Pipeline' is a 'Stack' (mnemonic: call stack;
     also the name 'Frame' refers to a call stack frame):
 
-> type Stack m r = Frame Void m (M ()) C r
+> type Stack m r = Frame C m (M ()) C r
 
     Similarly, you use 'runFrame' instead of 'runPipe' to convert the 'Frame'
     back to the base monad:
@@ -253,7 +253,7 @@ You shall not pass!
     before it may be used.  'runFrame' has the exact same restriction:
 
 > runFrame :: Monad m => Stack m r -> m r
-> runFrame ~  Monad m => Frame Void m (M ()) C r -> m r
+> runFrame ~  Monad m => Frame C m (M ()) C r -> m r
 
     Composition specifically requires the user to define when to finalize
     upstream and does not assume this occurs at the end of the 'Frame'.  This

@@ -33,7 +33,6 @@ import Control.Category
 import Control.Frame hiding (await, yield)
 import Control.Monad.Trans.Class
 import Control.Pipe
-import Data.Void
 
 {- $type
     This library represents streaming computations using a single data type:
@@ -106,15 +105,15 @@ import Data.Void
 >     lift $ print x
 
     Here, @printer@ is polymorphic in its output.  We could type-restrict it to
-    guarantee it will never 'yield' by setting the output to 'Void', from
-    @Data.Void@:
+    guarantee it will never 'yield' by setting the output to 'C', an unhabited
+    type that \'@C@\'loses the output end:
 
-> printer :: (Show b) => Pipe b Void IO r
+> printer :: (Show b) => Pipe b C IO r
 
     A 'Pipe' that never 'yield's can be the final stage in a 'Pipeline'.  Again,
     I provide a type synonym for this common case:
 
-> type Consumer b m r = Pipe b Void m r
+> type Consumer b m r = Pipe b C m r
 
     So we could instead write @printer@'s type as:
 
@@ -134,7 +133,7 @@ import Data.Void
 
     For example, you can compose the above 'Pipe's with:
 
-> pipeline :: Pipe () Void IO ()
+> pipeline :: Pipe () C IO ()
 > pipeline = unPipeC $ PipeC printer . PipeC (take' 3) . PipeC (fromList [1..])
 
     The compiler deduces that the final 'Pipe' must be blocked at both ends,
@@ -142,7 +141,7 @@ import Data.Void
     output.  This represents a self-contained 'Pipeline' and I provide a type
     synonym for this common case:
 
-> type Pipeline m r = Pipe () Void m r
+> type Pipeline m r = Pipe () C m r
 
     Also, I provide '<+<' as a convenience operator for composing 'Pipe's
     without the burden of wrapping and unwrapping newtypes:
