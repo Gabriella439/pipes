@@ -4,11 +4,14 @@
 
 module Control.Proxy.Trans.Maybe (
     -- * MaybeP
-    MaybeP(..)
+    MaybeP(..),
+    -- * Maybe operations
+    nothing,
+    just
     ) where
 
-import Control.Applicative (Applicative(pure, (<*>)))
-import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
+import Control.Monad (liftM, ap, MonadPlus(mzero, mplus))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
@@ -36,6 +39,18 @@ instance (Monad (p a' a b' b m)) => Monad (MaybeP p a' a b' b m) where
             Nothing -> nothing
             Just a  -> f a
 
+instance (Monad (p a' a b' b m)) => MonadPlus (MaybeP p a' a b' b m) where
+    mzero = nothing
+    mplus m1 m2 = MaybeP $ do
+        ma <- runMaybeP m1
+        runMaybeP $ case ma of
+            Nothing -> m2
+            Just a  -> just a
+
+instance (Monad (p a' a b' b m)) => Alternative (MaybeP p a' a b' b m) where
+    empty = mzero
+    (<|>) = mplus
+
 instance (MonadTrans (p a' a b' b)) => MonadTrans (MaybeP p a' a b' b) where
     lift = MaybeP . lift . liftM Just
 
@@ -49,5 +64,10 @@ instance (Channel p) => Channel (MaybeP p) where
 instance ProxyTrans MaybeP where
     liftP = MaybeP . liftM Just
 
+-- | A synonym for 'mzero'
 nothing :: (Monad (p a' a b' b m)) => MaybeP p a' a b' b m r
 nothing = MaybeP $ return Nothing
+
+-- | A synonym for 'return'
+just :: (Monad (p a' a b' b m)) => r -> MaybeP p a' a b' b m r
+just = return
