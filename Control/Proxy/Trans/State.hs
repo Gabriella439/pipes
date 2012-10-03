@@ -12,8 +12,9 @@ module Control.Proxy.Trans.State (
     gets
     ) where
 
-import Control.Applicative (Applicative(pure, (<*>)))
-import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
+import Control.Monad (liftM, ap, MonadPlus(mzero, mplus))
+import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
@@ -39,8 +40,20 @@ instance (Monad (p a' a b' b m)) => Monad (StateP s p a' a b' b m) where
         (a, s') <- runStateP m s
         runStateP (f a) s'
 
+instance (MonadPlus (p a' a b' b m))
+ => Alternative (StateP s p a' a b' b m) where
+    empty = mzero
+    (<|>) = mplus
+
+instance (MonadPlus (p a' a b' b m)) => MonadPlus (StateP s p a' a b' b m) where
+    mzero = StateP $ \_ -> mzero
+    mplus m1 m2 = StateP $ \s -> mplus (runStateP m1 s) (runStateP m2 s)
+
 instance (MonadTrans (p a' a b' b)) => MonadTrans (StateP s p a' a b' b) where
     lift m = StateP $ \s -> lift $ liftM (\r -> (r, s)) m
+
+instance (MonadIO (p a' a b' b m)) => MonadIO (StateP s p a' a b' b m) where
+    liftIO m = StateP $ \s -> liftIO $ liftM (\r -> (r, s)) m
 
 instance (MFunctor (p a' a b' b)) => MFunctor (StateP s p a' a b' b) where
     mapT nat = StateP . fmap (mapT nat) . runStateP

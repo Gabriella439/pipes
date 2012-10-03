@@ -12,6 +12,7 @@ module Control.Proxy.Trans.Maybe (
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (liftM, ap, MonadPlus(mzero, mplus))
+import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
@@ -39,6 +40,10 @@ instance (Monad (p a' a b' b m)) => Monad (MaybeP p a' a b' b m) where
             Nothing -> nothing
             Just a  -> f a
 
+instance (Monad (p a' a b' b m)) => Alternative (MaybeP p a' a b' b m) where
+    empty = mzero
+    (<|>) = mplus
+
 instance (Monad (p a' a b' b m)) => MonadPlus (MaybeP p a' a b' b m) where
     mzero = nothing
     mplus m1 m2 = MaybeP $ do
@@ -47,12 +52,11 @@ instance (Monad (p a' a b' b m)) => MonadPlus (MaybeP p a' a b' b m) where
             Nothing -> m2
             Just a  -> just a
 
-instance (Monad (p a' a b' b m)) => Alternative (MaybeP p a' a b' b m) where
-    empty = mzero
-    (<|>) = mplus
-
 instance (MonadTrans (p a' a b' b)) => MonadTrans (MaybeP p a' a b' b) where
     lift = MaybeP . lift . liftM Just
+
+instance (MonadIO (p a' a b' b m)) => MonadIO (MaybeP p a' a b' b m) where
+    liftIO = MaybeP . liftIO . liftM Just
 
 instance (MFunctor (p a' a b' b)) => MFunctor (MaybeP p a' a b' b) where
     mapT nat = MaybeP . mapT nat . runMaybeP

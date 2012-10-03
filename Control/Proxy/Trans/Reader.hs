@@ -5,7 +5,7 @@
 module Control.Proxy.Trans.Reader (
     -- * ReaderP
     ReaderP(..),
-    withReaderT,
+    withReaderP,
     -- * Reader operations
     ask,
     local,
@@ -77,24 +77,22 @@ instance (Respond p) => Respond (ReaderP i p) where
 instance ProxyTrans (ReaderP i) where
     liftP m = ReaderP $ \_ -> m
 
--- | Fetch the value of the environment
+-- | Get the environment
 ask :: (Monad (p a' a b' b m)) => ReaderP i p a' a b' b m i
 ask = ReaderP return
 
--- | Retrieve a function of the current environment
+-- | Get a function of the environment
 asks :: (Monad (p a' a b' b m)) => (i -> r) -> ReaderP i p a' a b' b m r
 asks f = ReaderP (return . f)
 
-{-| Execute a computation in a modified environment (a more general version of
-    'local') -}
-withReaderT
+-- | Modify a computation's environment (a more general version of 'local')
+withReaderP
  :: (Monad (p a' a b' b m))
  => (j -> i) -> ReaderP i p a' a b' b m r -> ReaderP j p a' a b' b m r
-withReaderT f r = ReaderP $ runReaderP r . f
+withReaderP f r = ReaderP $ runReaderP r . f
 
-{-| Execute a computation in a modified environment (a specialization of
-    'withReaderT' -}
+-- | Modify a computation's environment (a specialization of 'withReaderP')
 local
  :: (Monad (p a' a b' b m))
  => (i -> i) -> ReaderP i p a' a b' b m r -> ReaderP i p a' a b' b m r
-local = withReaderT
+local = withReaderP
