@@ -5,6 +5,8 @@
 module Control.Proxy.Trans.State (
     -- * StateP
     StateP(..),
+    evalStateP,
+    execStateP,
     -- * State operations
     get,
     put,
@@ -65,6 +67,16 @@ instance (Channel p) => Channel (StateP s p) where
 
 instance ProxyTrans (StateP s) where
     liftP m = StateP $ \s ->  liftM (\r -> (r, s)) m
+
+-- | Evaluate a state computation, but discard the final state
+evalStateP
+ :: (Monad (p a' a b' b m)) => StateP s p a' a b' b m r -> s -> p a' a b' b m r
+evalStateP m s = liftM fst $ runStateP m s
+
+-- | Evaluate a state computation, but discard the final result
+execStateP
+ :: (Monad (p a' a b' b m)) => StateP s p a' a b' b m r -> s -> p a' a b' b m s
+execStateP m s = liftM snd $ runStateP m s
 
 -- | Get the current state
 get :: (Monad (p a' a b' b m)) => StateP s p a' a b' b m s
