@@ -71,6 +71,7 @@ Library
         Control.Proxy.Trans,
         Control.Proxy.Trans.Either,
         Control.Proxy.Trans.Identity,
+        Control.Proxy.Trans.Maybe,
         Control.Proxy.Trans.State,
         Control.Proxy.Tutorial,
         Control.Pipe,

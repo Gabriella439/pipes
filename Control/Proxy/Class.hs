@@ -41,7 +41,7 @@ class Channel p where
 
     {-| Compose two proxies, satisfying all requests from downstream with
         responses from upstream. -}
-    (>->) :: (Monad m, Channel p)
+    (>->) :: (Monad m)
           => (b' -> p a' a b' b m r)
           -> (c' -> p b' b c' c m r)
           -> (c' -> p a' a c' c m r)
