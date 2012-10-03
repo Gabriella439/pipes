@@ -5,10 +5,8 @@
 module Control.Proxy.Class (
     -- * Proxy composition
     Channel(..),
-    -- * Proxy request
-    Request(..),
-    -- * Proxy respond
-    Respond(..),
+    -- * Proxy request and respond
+    Interact(..),
     ) where
 
 {- * I use educated guesses about which associativy is optimal for each operator
@@ -55,23 +53,45 @@ class Channel p where
           -> (c' -> p a' a c' c m r)
     p1 <-< p2 = p2 >-> p1
 
-{-| The 'Request' class defines the ability to:
+{-| The 'Interact' class defines the ability to:
 
     * Request input using the 'request' command
 
     * Replace existing 'request' commands using ('\>\')
+
+    * Respond with output using the 'respond' command
+
+    * Replace existing 'respond' commands using ('/>/')
     
     Laws:
 
     * ('\>\') and 'request' form a category:
 
 > request \>\ f = f
+>
 > f \>\ request = f
+>
 > (f \>\ g) \>\ h = f \>\ (g \>\ h)
 
-    Minimal complete definition: 'request' and either ('\>\') or ('/</').
+    * ('/>/') and 'respond' form a category:
+
+> respond />/ f = f
+>
+> f />/ respond = f
+>
+> (f />/ g) />/ h = f />/ (g />/ h)
+
+    Minimal complete definition:
+
+    * 'request',
+
+    * ('\>\') or ('/</'),
+
+    * 'respond', and
+
+    * ('/>/') or ('\<\').
 -}
-class Request p where
+class Interact p where
     {-| 'request' input from upstream, passing an argument with the request
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
@@ -93,23 +113,6 @@ class Request p where
           -> (c' -> p a' a x' x m c)
     p1 /</ p2 = p2 \>\ p1
 
-{-| The 'Respond' class defines the ability to:
-
-    * Respond with output using the 'respond' command
-
-    * Replace existing 'respond' commands using ('/>/')
-    
-    Laws:
-
-    * ('/>/') and 'respond' form a category:
-
-> respond />/ f = f
-> f />/ respond = f
-> (f />/ g) />/ h = f />/ (g />/ h)
-
-    Minimal complete definition: 'respond' and either ('/>/') or ('\<\').
--}
-class Respond p where
     {-| 'respond' with an output for downstream and bind downstream's next
         'request'
           

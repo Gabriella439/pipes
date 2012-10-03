@@ -15,8 +15,7 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
     Channel(idT    , (>->)), 
-    Request(request, (\>\)), 
-    Respond(respond, (/>/)))
+    Interact(request, (\>\), respond, (/>/)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Identity' proxy transformer
@@ -57,11 +56,9 @@ instance (Channel p) => Channel (IdentityP p) where
     idT = IdentityP . idT
     p1 >-> p2 = (IdentityP .) $ runIdentityP . p1 >-> runIdentityP . p2
 
-instance (Request p) => Request (IdentityP p) where
+instance (Interact p) => Interact (IdentityP p) where
     request = IdentityP . request
     p1 \>\ p2 = (IdentityP .) $ runIdentityP . p1 \>\ runIdentityP . p2
-
-instance (Respond p) => Respond (IdentityP p) where
     respond = IdentityP . respond
     p1 />/ p2 = (IdentityP .) $ runIdentityP . p1 />/ runIdentityP . p2
 

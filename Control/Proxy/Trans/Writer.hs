@@ -25,10 +25,7 @@ import Control.Monad (liftM, ap, MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (
-    Channel(idT    , (>->)), 
-    Request(request, (\>\)), 
-    Respond(respond, (/>/)))
+import Control.Proxy.Class (Channel(idT, (>->)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Data.Monoid (Monoid(mempty, mappend))
 

@@ -20,9 +20,8 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
-    Channel(idT    , (>->)), 
-    Request(request, (\>\)), 
-    Respond(respond, (/>/)))
+    Channel(idT, (>->)), 
+    Interact(request, (\>\), respond, (/>/)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Reader' proxy transformer
@@ -66,12 +65,10 @@ instance (Channel p) => Channel (ReaderP i p) where
     (p1 >-> p2) a = ReaderP $ \i ->
         ((`unReaderP` i) . p1 >-> (`unReaderP` i) . p2) a
 
-instance (Request p) => Request (ReaderP i p) where
+instance (Interact p) => Interact (ReaderP i p) where
     request a = ReaderP $ \_ -> request a
     (p1 \>\ p2) a = ReaderP $ \i ->
         ((`unReaderP` i) . p1 \>\ (`unReaderP` i) . p2) a
-
-instance (Respond p) => Respond (ReaderP i p) where
     respond a = ReaderP $ \_ -> respond a
     (p1 />/ p2) a = ReaderP $ \i ->
         ((`unReaderP` i) . p1 />/ (`unReaderP` i) . p2) a

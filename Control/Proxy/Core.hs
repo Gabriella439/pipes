@@ -30,7 +30,7 @@ import Control.Monad.Trans.Free (
     FreeF(Free, Pure), FreeT(FreeT, runFreeT), liftF, hoistFreeT, wrap )
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
-    Channel(idT, (<-<)), Request(request, (/</)), Respond(respond, (/>/)) )
+    Channel(idT, (<-<)), Interact(request, (/</), respond, (/>/)) )
 import Data.Closed (C)
 
 {- $types
@@ -103,9 +103,11 @@ p1 <-<? p2 = \c' -> FreeT $ do
                     let p1' = \_ -> FreeT $ return x1
                     wrap $ Request a' $ \a -> (p1' <-<? (\_ -> fa a)) c'
 
-instance Request Proxy where
+instance Interact Proxy where
     request a' = Proxy $ liftF $ Request a' id
     p1 /</ p2 = (Proxy .) $ (unProxy . p1) /</? (unProxy . p2)
+    respond a = Proxy $ liftF $ Respond a id
+    p1 />/ p2 = (Proxy .) $ (unProxy . p1) />/? (unProxy . p2)
 
 (/</?)
  :: (Monad m)
@@ -118,10 +120,6 @@ f1 /</? f2 = \a' -> FreeT $ do
         Pure a                -> return a
         Free (Respond x  fx') -> wrap $ Respond x $ fx' /</? f2
         Free (Request b' fb ) -> (f2 >=> (fb /</? f2)) b'
-
-instance Respond Proxy where
-    respond a = Proxy $ liftF $ Respond a id
-    p1 />/ p2 = (Proxy .) $ (unProxy . p1) />/? (unProxy . p2)
 
 (/>/?)
  :: (Monad m)
