@@ -23,7 +23,7 @@ import Control.Monad ((>=>))
 import Control.Monad.Trans.Class (lift)
 import Control.Proxy.Class (request, respond)
 import Control.Proxy.Core (Proxy, Server, Client)
-import Control.Proxy.Util.Core (foreverK, replicateK)
+import Control.Proxy.Util.Kleisli (foreverK, replicateK)
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
     values going upstream.

@@ -1,6 +1,6 @@
--- | Utility functions that other utility functions require
+-- | Utility functions for Kleisli arrow
 
-module Control.Proxy.Util.Core (
+module Control.Proxy.Util.Kleisli (
     -- * Core utility functions
     -- $utility
     foreverK,
