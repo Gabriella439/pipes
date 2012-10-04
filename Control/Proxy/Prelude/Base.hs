@@ -1,6 +1,6 @@
--- | General purpose functions that happen to form functors
+-- | General purpose proxies
 
-module Control.Proxy.Prelude.Map (
+module Control.Proxy.Prelude.Base (
     -- * Maps
     mapB,
     mapD,
