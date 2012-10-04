@@ -225,9 +225,9 @@ runSessionK = runProxyK
 -}
 
 -- | Discard all responses
-discard :: (Monad m, Monad (p () a () C m), Interact p) => () -> p () a () C m r
+discard :: (Monad m) => () -> Proxy () a () C m r
 discard () = forever $ request ()
 
 -- | Ignore all requests
-ignore  :: (Monad m, Monad (p C () a () m), Interact p) => a -> p C () a () m r
+ignore  :: (Monad m) => a -> Proxy C () a () m r
 ignore  _  = forever $ respond ()
