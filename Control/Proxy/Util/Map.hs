@@ -13,7 +13,10 @@ module Control.Proxy.Util.Map (
     dropD,
     -- * Lists
     fromListD,
-    fromListU 
+    fromListU,
+    -- * Enumerations
+    fromToD,
+    fromToU
     ) where
 
 import Control.Monad ((>=>))
@@ -67,3 +70,21 @@ fromListD xs () = mapM_ respond xs
 -- | 'request' from \'@U@\'pstream using arguments from a list
 fromListU :: (Monad m) => [a] -> () -> Client a () m ()
 fromListU xs () = mapM_ request xs
+
+-- | 'Server' version of 'enumFromTo'
+fromToD :: (Enum a, Ord a, Monad m) => a -> a -> () -> Server () a m ()
+fromToD a1 a2 () = go a1 where
+    go n
+        | n > a2   = return ()
+        | otherwise = do
+            respond n
+            go (succ n)
+
+-- | 'Client' version of 'enumFromTo'
+fromToU :: (Enum a, Ord a, Monad m) => a -> a -> () -> Client a () m ()
+fromToU a1 a2 () = go a1 where
+    go n
+        | n > a2 = return ()
+        | otherwise = do
+            request n
+            go (succ n)
