@@ -1,6 +1,6 @@
 -- | General purpose functions that happen to form functors
 
-module Control.Proxy.Util.Map (
+module Control.Proxy.Prelude.Map (
     -- * Maps
     mapB,
     mapD,
@@ -23,7 +23,7 @@ import Control.Monad ((>=>))
 import Control.Monad.Trans.Class (lift)
 import Control.Proxy.Class (request, respond)
 import Control.Proxy.Core (Proxy, Server, Client)
-import Control.Proxy.Util.Kleisli (foreverK, replicateK)
+import Control.Proxy.Prelude.Kleisli (foreverK, replicateK)
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
     values going upstream.

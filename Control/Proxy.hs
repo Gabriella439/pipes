@@ -7,14 +7,14 @@ module Control.Proxy (
     module Control.Proxy.Core,
     module Control.Proxy.Pipe,
     module Control.Proxy.Trans,
-    module Control.Proxy.Util
+    module Control.Proxy.Prelude
     ) where
 
 import Control.Proxy.Class
 import Control.Proxy.Core
 import Control.Proxy.Pipe
 import Control.Proxy.Trans
-import Control.Proxy.Util
+import Control.Proxy.Prelude
 
 {- $modules
     "Control.Proxy.Core" provides the core 'Proxy' type.
@@ -26,7 +26,7 @@ import Control.Proxy.Util
     "Control.Proxy.Pipe" provides a backwards-compatible re-implementation of
     'Pipe's.
 
-    "Control.Proxy.Util" provides utility proxies for common tasks
+    "Control.Proxy.Prelude" provides a standard library of proxies.
 
     Consult "Control.Proxy.Tutorial" for an extended tutorial.
 -}
