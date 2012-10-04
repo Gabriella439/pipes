@@ -5,6 +5,9 @@ module Control.Proxy.Util.Map (
     mapB,
     mapD,
     mapU,
+    mapMB,
+    mapMD,
+    mapMU,
     -- * Counts
     takeB,
     dropD,
@@ -14,10 +17,10 @@ module Control.Proxy.Util.Map (
     ) where
 
 import Control.Monad ((>=>))
-import Control.Proxy.Class
-import Control.Proxy.Core
-import Control.Proxy.Util.Core
-import Prelude hiding (drop, take)
+import Control.Monad.Trans.Class (lift)
+import Control.Proxy.Class (request, respond)
+import Control.Proxy.Core (Proxy, Server, Client)
+import Control.Proxy.Util.Core (foreverK, replicateK)
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
     values going upstream.
@@ -33,6 +36,19 @@ mapD f = foreverK $ request >=> (respond . f)
 -- | @(mapU g)@ applies @g@ to all values going \'@U@\'pstream.
 mapU :: (Monad m) => (b' -> a') -> b' -> Proxy a' x b' x m r
 mapU g = foreverK $ (request . g) >=> respond
+
+{-| @(mapMB f g)@ applies the monadic function @f@ to all values going
+    downstream and the monadic function @g@ to all values going upstream. -}
+mapMB :: (Monad m) => (a -> m b) -> (b' -> m a') -> b' -> Proxy a' a b' b m r
+mapMB f g = foreverK $ lift . g >=> request >=> lift . f >=> respond
+
+-- | @(mapMD f)@ applies the monadic function @f@ to all values going downstream
+mapMD :: (Monad m) => (a -> m b) -> x -> Proxy x a x b m r
+mapMD f = foreverK $ request >=> lift . f >=> respond
+
+-- | @(mapMU g)@ applies the monadic function @g@ to all values going upstream
+mapMU :: (Monad m) => (b' -> m a') -> b' -> Proxy a' x b' x m r
+mapMU g = foreverK $ lift . g >=> request >=> respond
 
 -- | @(takeB n)@ allows @n@ upstream/downstream roundtrips to pass through
 takeB :: (Monad m) => Int -> a' -> Proxy a' a a' a m a'

@@ -14,7 +14,14 @@ module Control.Proxy.Core (
     Session,
     -- * Run Sessions 
     -- $run
+    runProxy,
+    runProxyK,
     runSession,
+    runSessionK,
+    -- * Utility Proxies
+    -- $utility
+    discard,
+    ignore
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
@@ -149,10 +156,19 @@ type Client req resp = Proxy req resp ()  C
 type Session         = Proxy C   ()   ()  C
 
 {- $run
-    'runSession' ensures that the 'Proxy' passed to it does not have any
-    open responses or requests.  This restriction makes 'runSession' less
-    polymorphic than it could be, and I settled on this restriction for four
-    reasons:
+    I provide two ways to run proxies:
+
+    * 'runProxy', which discards unhandled output from either end
+
+    * 'runSession', which type restricts its argument to ensure no loose ends
+
+    Both functions require that the input to each end is trivially satisfiable,
+    (i.e. @()@).
+
+    I recommend 'runProxy' for most use cases since it is more convenient.
+
+    'runSession' only accepts sessions that do not send unhandled data flying
+    off each end, which provides the following benefits:
 
     * It prevents against accidental data loss.
 
@@ -161,22 +177,57 @@ type Session         = Proxy C   ()   ()  C
     * It prevents wastefully draining a scarce resource by gratuitously
       driving it to completion
 
-    * It encourages an idiomatic programming style where unfulfilled requests
-      or responses are satisfied in a structured way using composition.
-
-    If you believe that loose requests or responses should be discarded or
-    ignored, then you can explicitly ignore them by using 'discard' (which
-    discards all responses), and 'ignore' (which ignores all requests):
+    However, this restriction means that you must either duplicate every utility
+    function to specialize them to the end-point positions (which I do not do),
+    or explicitly close loose ends using the 'discard' and 'ignore' proxies:
 
 > runSession $ discard <-< p <-< ignore
--}
--- | Run a self-contained 'Session', converting it back to the base monad
-runSession :: (Monad m) => (() -> Session m r) -> m r
-runSession p = runSession' $ unProxy $ p ()
 
-runSession' p = do
+    Use the \'@K@\' versions of each command if you are running sessions nested
+    within sessions.  They provide a Kleisli arrow as their result suitable to
+    be passed to another 'runProxy'/'runSession' command.
+-}
+
+{-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to the base
+    monad -}
+runProxy :: (Monad m) => (() -> Proxy a () () b m r) -> m r
+runProxy p = runProxyK p ()
+
+{-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to a Kleisli
+    arrow in the base monad -}
+runProxyK :: (Monad m) => (() -> Proxy a () () b m r) -> (() -> m r)
+runProxyK p = runProxy' . unProxy . p
+
+runProxy' :: (Monad m) => FreeT (ProxyF a () () b) m r -> m r
+runProxy' p = do
     x <- runFreeT p
     case x of
         Pure            r    -> return r
-        Free (Respond _ fb ) -> runSession' $ fb  ()
-        Free (Request _ fa') -> runSession' $ fa' ()
+        Free (Respond _ fb ) -> runProxy' $ fb  ()
+        Free (Request _ fa') -> runProxy' $ fa' ()
+
+{-| Run a self-contained 'Session' Kleisli arrow, converting it back to the base
+    monad -}
+runSession :: (Monad m) => (() -> Session m r) -> m r
+runSession = runProxy
+
+{-| Run a self-contained 'Session' Kleisli arrow, converting it back to a
+    Kleisli arrow in the base monad -}
+runSessionK :: (Monad m) => (() -> Session m r) -> (() -> m r)
+runSessionK = runProxyK
+
+{- $utility
+    'discard' provides a fallback client that gratuitously 'request's input
+    from a server, but discards all responses.
+
+    'ignore' provides a fallback server that trivially 'respond's with output
+    to a client, but ignores all request parameters.
+-}
+
+-- | Discard all responses
+discard :: (Monad m, Monad (p () a () C m), Interact p) => () -> p () a () C m r
+discard () = forever $ request ()
+
+-- | Ignore all requests
+ignore  :: (Monad m, Monad (p C () a () m), Interact p) => a -> p C () a () m r
+ignore  _  = forever $ respond ()
