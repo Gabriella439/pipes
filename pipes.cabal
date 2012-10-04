@@ -76,6 +76,7 @@ Library
         Control.Proxy.Trans.Writer,
         Control.Proxy.Tutorial,
         Control.Proxy.Prelude,
+        Control.Proxy.Prelude.IO,
         Control.Proxy.Prelude.Kleisli,
         Control.Proxy.Prelude.Map,
         Control.Pipe,
