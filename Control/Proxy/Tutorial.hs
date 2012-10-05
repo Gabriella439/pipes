@@ -275,7 +275,7 @@ Client received : 6
 > someProxy arg = do
 >     ...
 >     nextArg <- respond x
->     someProxy nexArg
+>     someProxy nextArg
 
     "Control.Proxy" provides the 'foreverK' utility function which abstracts
     away this manual recursion:
@@ -317,8 +317,8 @@ Client received : 6
 {- $compose
     We can mix and match different components to rapidly define emergent
     behaviors from a resuable set of core primitives.  For example, we could
-    replace our client with a command line prompt where the user requests
-    inputs:
+    replace our client with a command line prompt where the user provides the
+    input to the server:
 
 > inputPrompt :: (Read a, Show b) => () -> Client a b IO r
 > inputPrompt () = forever $ do
@@ -410,9 +410,9 @@ Client received : 43
 43
 *
 
-    Note that I don't distinguish between a "reverse proxy" or a "forward proxy"
-    since composition doesn't distinguish either.  You can attach the @cache@
-    'Proxy' to a 'Client':
+    Note that I don't distinguish between a \"reverse proxy\" or a \"forward
+    proxy\" since composition doesn't distinguish either.  You can attach the
+    @cache@ 'Proxy' to a 'Client':
 
 > client' = client <-< cache
 
@@ -435,6 +435,8 @@ Client received : 43
 >     oneTwoThree ()
 >     -- Here we bind composition within a larger do block
 >     (inputPrompt <-< cache) ()
+>
+> -- or: mixedClient = oneTwoThree >=> (inputPrompt <-< cache)
 
 >>> runSession $ mixedClient <-< incrementer
 Client requested: 1
@@ -480,13 +482,10 @@ Used cache!
     necessary.
 
     To understand how 'Pipe's map onto 'Proxy's, just check out the 'Pipe'
-    definition in "Control.Proxy":
+    definition in "Control.Proxy.Pipe":
 
 > type Pipe a b = Proxy () a () b
 
     In other words, a 'Pipe' is just a 'Proxy' where you never pass any
     information upstream.
-
-    "Control.Pipe" will not be deprecated, however, and will be preserved for
-    users who do not wish to communicate information upstream.
 -}

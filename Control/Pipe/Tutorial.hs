@@ -21,22 +21,26 @@ module Control.Pipe.Tutorial (
     -- * Termination
     -- $terminate
 
+    -- * Folds
+    -- $folds
+
     -- * Resource Management
     -- $resource
 
-    -- *Frames
-    -- $frames
+    -- * Bidirectional Pipes
+    -- $bidirectional
     ) where
 
 -- For documentation
 import Control.Category
 import Control.Frame hiding (await, yield)
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Free
 import Control.Pipe
 
 {- $type
-    This library represents streaming computations using a single data type:
-    'Pipe'.
+    This library represents unidirectional streaming computations using  the
+    'Pipe' type.
 
     'Pipe' is a monad transformer that extends the base monad with the ability
     to 'await' input from or 'yield' output to other 'Pipe's.  'Pipe's resemble
@@ -185,22 +189,13 @@ You shall not pass!
 
     * If a 'Pipe' terminates, it terminates every other 'Pipe' composed with it.
 
-    Another way to think of this is like a stack where each 'Pipe' is a frame on
-    that stack:
-
-    * If a 'Pipe' 'await's input, it blocks and pushes the next 'Pipe' upstream
-      onto the stack until that 'Pipe' 'yield's back a value.
-
-    * If a 'Pipe' 'yield's output, it pops itself off the stack and restores
-      control to the original downstream 'Pipe' that was 'await'ing its input.
-      This binds its result to the return value of the pending 'await' command.
-
     All of these flow control rules uniquely follow from the 'Category' laws.
 
     It might surprise you that termination brings down the entire 'Pipeline'
     until you realize that:
 
-    * Downstream 'Pipe's depending on the terminated 'Pipe' cannot proceed
+    * Downstream 'Pipe's depending on the result from the terminated 'Pipe'
+      cannot proceed
 
     * Upstream 'Pipe's won't be further evaluated because the terminated 'Pipe'
       will not request any further input from them
@@ -407,10 +402,6 @@ Nothing
     directly to the desired 'Pipe' and breaks when you introduce intermediate
     stages.
 
-    This was not an intentional design choice, but rather a direct consequence
-    of enforcing the 'Category' laws when I was implementing 'Pipe''s 'Category'
-    instance.  Satisfying the 'Category' laws forces code to be compositional.
-
     Note that a terminated 'Pipe' only brings down 'Pipe's composed with it.  To
     illustrate this, let's use the following example:
 
@@ -436,9 +427,39 @@ Nothing
     are 'await' and 'yield'.
 -}
 
+{- $folds
+    While we cannot intercept termination, we can still fold our input.  We can
+    embed 'WriterT' in our base monad, since 'Pipe' is a monad transformer, and
+    store the result in the monoid:
+
+> toList :: Consumer a (WriterT [a] m) r
+> toList = forever $ do
+>     a <- await
+>     lift $ tell [a]
+
+>>> execWriterT $ runPipe $ toList <+< fromList [1..4]
+[1,2,3,4]
+
+    But what if other pipes have a base monad that is not compatible, such as:
+
+> prompt3 :: Producer Int IO a
+> prompt3 = take' 3 <+< prompt
+
+    That's okay, because we can transparently 'lift' any Pipe's base monad,
+    using 'hoistFreeT' from @Control.Monad.Trans.Free@ in the @free@ package:
+
+>>> execWriterT $ runPipe $ toList <+< hoistFreeT lift prompt3
+3<Enter>
+4<Enter>
+6<Enter>
+[3,4,6]
+
+-}
+
 {- $resource
-    Here's another problem with 'Pipe' composition: resource finalization.
-    Let's say we have the file \"@test.txt@\" with the following contents:
+    Pipes handle streaming computations well, but do not handle resource
+    management well.  To see why, let's say we have the file \"@test.txt@\"
+    with the following contents:
 
 > Line 1
 > Line 2
@@ -492,11 +513,25 @@ You shall not pass!
     too lazy to properly close our file!  \"@take' 2@\" terminated before
     @read'@, preventing @read'@ from properly closing \"test.txt\".  This is why
     'Pipe' composition fails to guarantee deterministic finalization.
+
+    The "Control.Frame" module of this library provides a temporary solution to
+    this problem, but in the longer run there will be a more elegant solution
+    built on top of "Control.Proxy".
 -}
 
-{- $frames
-    So with 'Pipe's, we can neither write folds, nor can we finalize resources
-    deterministically.  Fortunately, there is a solution: 'Frame's.  Check out
-    "Control.Frame.Tutorial" for an introduction to a type that enriches 'Pipe's
-    with the ability to fold and finalize resources correctly.
+{- $bidirectional
+    The 'Pipe' type suffers from one restriction: it only handles a
+    unidirectional flow of information.  If you want a bidirectional 'Pipe'
+    type, then use the 'Proxy' type from "Control.Proxy", which generalizes the
+    'Pipe' type to bidirectional flow.
+
+    More importantly, the 'Proxy' type is a strict superset of the 'Pipe' type,
+    so all 'Pipe' utilities and extensions are actually written as 'Proxy'
+    utilities and extensions, in order to avoid code duplication.
+
+    So if you want to use these extensions, import "Control.Proxy" instead,
+    which exports a backwards compatible 'Pipe' implementation along with all
+    utilities and extensions.  The 'Pipe' implementation in "Control.Pipe.Core"
+    exists purely as a reference implementation for people who wish to study the
+    simpler 'Pipe' type when building their own iteratee libraries.
 -}

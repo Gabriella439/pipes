@@ -1,7 +1,5 @@
-{-|
-    'Pipe' is a monad transformer that enriches the base monad with the ability
-    to 'await' or 'yield' data to and from other 'Pipe's.
--}
+{-| The 'Pipe' type is a monad transformer that enriches the base monad with the
+    ability to 'await' or 'yield' data to and from other 'Pipe's. -}
 
 module Control.Pipe.Core (
     -- * Types
