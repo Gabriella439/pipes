@@ -11,4 +11,4 @@ import Control.Pipe.Core
 {- $modules
     "Control.Pipe.Core" provides the core type and primitives.
   
-    Consult "Control.Pipe.Tutorial" for an extended tutorial. -}
+    "Control.Pipe.Tutorial" provides an extended tutorial. -}
