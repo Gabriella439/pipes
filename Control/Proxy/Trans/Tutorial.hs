@@ -1,3 +1,5 @@
+-- | This module provides the tutorial for the "Control.Proxy.Trans" hierarchy
+
 module Control.Proxy.Trans.Tutorial (
     -- * Motivation
     -- $motivation
