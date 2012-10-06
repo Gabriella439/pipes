@@ -400,7 +400,15 @@ Caught:Error
 0
 (Left "ERROR",1)
 
-    Note that 'request' and 'respond' are not automatically liftable, although
-    that will probably change in a future release once I work out the laws for
-    how that lifting should behave.
+    Note that 'request' and 'respond' are not automatically liftable, because of
+    technical limitations with Haskell type classes.  When I resolve these
+    issues they will also be automatically promoted by proxy transformers.  For
+    now, you must lift them manually using 'liftP':
+
+> request = (liftP .) request
+> respond = (liftP .) respond
+
+    The left 'request' and 'respond' in the above equations are what the lifted
+    definitions would be for each proxy transformer if Haskell's type class
+    system didn't get in my way.
 -}
