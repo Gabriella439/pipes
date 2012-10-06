@@ -13,13 +13,16 @@ module Control.Proxy.Tutorial (
     -- * Idioms
     -- $idioms
 
-    -- * The importance of compositionality
-    -- $compose
+    -- * Reusability
+    -- $reuse
 
     -- * Mixing monads and composition
     -- $monads
 
-    -- * Pipe Compatibility
+    -- * Utility proxies
+    -- $utility
+
+    -- * Pipe compatibility
     -- $pipes
     ) where
 
@@ -183,16 +186,13 @@ Client received : 6
 
     A 'Server' is just a 'Proxy' that has no upstream interface, and a 'Client'
     is just a 'Proxy' that has no downstream interface.  In fact, 'Session' is
-    a 'Proxy', too:
+    also a 'Proxy', one with both ends closed:
 
 > type Session        = Proxy C   ()  ()  C
 
-    A 'Session' is just a 'Proxy' that has neither an upstream interface nor a
-    downstream interface.
-
-    The 'Proxy' is the unifying type of the module that all other types derive
-    from and ('<-<') always composes two 'Proxy's and returns a new 'Proxy' of
-    the correct type.
+    The 'Proxy' is the unifying type that all other types derive from and
+    ('<-<') always composes two 'Proxy's and returns a new 'Proxy' of the
+    correct type.
 
     You also probably noticed another odd thing: we parametrize every 'Proxy'
     on its initial argument:
@@ -219,7 +219,7 @@ Client received : 6
 >
 > session     :: ()  -> Proxy  C   ()  ()  C   IO ()
 
-    Composition supplies the first request through this initial parameters
+    Composition supplies the first request through this initial parameter
     and all subsequent requests are bound to 'respond' statements.
 
     This means that the actual types you compose are all of the form:
@@ -314,7 +314,7 @@ Client received : 6
 > --         = request >=> respond >=> request >=> respond >=> ...
 -}
 
-{- $compose
+{- $reuse
     We can mix and match different components to rapidly define emergent
     behaviors from a resuable set of core primitives.  For example, we could
     replace our client with a command line prompt where the user provides the
@@ -467,6 +467,65 @@ Used cache!
     So feel free to use your imagination!  Up until the moment you call
     'runProxy', you can freely mix composition or @do@ notation within each
     other.
+-}
+
+{- $utility
+    This library features several utility proxies to get you started.  They all
+    reside under the "Control.Proxy.Prelude" hierarchy and they are imported by
+    default when you import "Control.Proxy".
+
+    For example, if you wanted to print the first 3 natural numbers, you would
+    use:
+
+>>> runProxy $ printD <-< enumFromToS 1 3
+1
+2
+3
+
+    The utility functions follow a systematic naming convention that uses the
+    last letter:
+
+    * @D@: Only interacts with values going \'@D@\'ownstream towards the
+      'Client'
+
+    * @U@: Only interacts with values going \'@U@\'pstream towards the 'Server'
+
+    * @B@: Interacts with values going \'@B@\'oth ways
+
+    * @C@: Belongs in the \'@C@\'lient position
+
+    * @S@: Belongs in the \'@S@\'server position
+
+    Many utility proxies auto-forward values they receive, such as 'printD'.
+    This means we can easily combine multiple handling stages for processing
+    values:
+
+> import Control.Proxy
+> import System.IO
+>
+> main = do
+>    h <- openFile "test.txt" WriteMode
+>    runProxy $ hPrintD h <-< printD <-< enumFromToS 1 3
+>    hClose h
+
+>>> main
+1
+2
+3
+
+    The above program also wrote the same output to the file "test.txt":
+
+> $ cat test.txt
+> 1
+> 2
+> 3
+
+    'runProxy' discards any output that goes past the endpoints of the session,
+    so you don't need to worry about closing off each end.
+
+    This library does not provide 'ByteString' or 'Text' utilities in order to
+    reduce the number of dependencies of the main package.  These will be
+    released in a separate package in the near future.
 -}
 
 {- $pipes
