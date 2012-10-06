@@ -1,4 +1,4 @@
--- | Utility functions for Kleisli arrow
+-- | Utility functions for Kleisli arrows
 
 module Control.Proxy.Prelude.Kleisli (
     -- * Core utility functions
