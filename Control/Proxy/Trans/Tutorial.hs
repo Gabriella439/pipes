@@ -139,7 +139,7 @@ Caught: Error
 >      :: (Monad m)
 >      => (b' -> p a' a b' b m r)
 >      -> (c' -> p b' b c' c m r)
->      -> c' -> p a' a c' c m r
+>      -> (c' -> p a' a c' c m r)
 
     Obviously, 'Proxy' implements this class:
 
