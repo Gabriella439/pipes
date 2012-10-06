@@ -17,36 +17,29 @@ Description:
   .
   Advantages over traditional iteratee implementations:
   .
-  * /Simpler semantics/: There is only one data type ('Pipe'), two primitives
-    ('await' and 'yield'), and only one way to compose 'Pipe's ('.').  In fact,
-    this library implements its entire behavior using its 'Monad' and 'Category'
-    instances and enforces their laws strictly!
+  * /Concise API/: This library uses a few simple abstractions with a very high
+    power-to-weight ratio to reduce adoption time.
   .
-  * /Clearer naming conventions/: Enumeratees are called 'Pipe's, Enumerators
-    are 'Producer's, and Iteratees are 'Consumer's.  'Producer's and 'Consumer's
-    are just type synonyms for 'Pipe's with either the input or output end
-    closed.
+  * /Clear semantics/: All abstractions are grounded in category theory, which
+    leads to intuitive behavior (and fewer bugs, if any!).
   .
-  * /Pipes are Categories/: You compose them using ordinary composition.
+  * /Bidirectionality/: The library provides a bidirectional type, called a
+    'Proxy'.
   .
-  * /Intuitive/: Pipe composition is easier to reason about because it is a true
-    'Category'.  Composition works seamlessly and you don't have to worry about
-    restarting iteratees, feeding new input, etc.  \"It just works\".
+  * /Extension Framework/: You can elegantly mix and match extensions to the
+    base type and easily create your own!
   .
-  * /"Vertical" concatenation works flawlessly on everything/: ('>>')
-    concatenates 'Pipe's, but since everything is a 'Pipe', you can use it to
-    concatenate 'Producer's, 'Consumer's, and even intermediate 'Pipe' stages.
-    Vertical Concatenation always works the way you expect, picking up where the
-    previous 'Pipe' left off.
+  * /Extensive Documentation/: Second to none!
   .
-  * /Bidirectionality/: The library now provides a bidirectional 'Pipe' type,
-    called a 'Proxy'.
+  I recommend you begin by reading "Control.Pipe.Tutorial" which introduces the
+  basic concepts using the simpler 'Pipe' API.  Then move on to
+  "Control.Proxy.Tutorial", which introduces the 'Proxy' type which forms the
+  core abstraction of this library.  To use extensions or define your own, check
+  out "Control.Proxy.Trans.Tutorial".
   .
-  Check out "Control.Pipe.Tutorial" for a copious introductory tutorial and
-  "Control.Pipe" for the actual implementation.  "Control.Proxy.Tutorial"
-  introduces bidirectional iteratees that are backwards-compatible with 'Pipe's
-  and "Control.Proxy" provides the implementation.
-Category: Control, Enumerator
+  I will soon replace "Control.Frame" with a superior resource-management
+  solution, so new users of the library should avoid using it.
+Category: Control, Pipe, Proxies
 Tested-With: GHC ==7.4.1
 Source-Repository head
     Type: git
