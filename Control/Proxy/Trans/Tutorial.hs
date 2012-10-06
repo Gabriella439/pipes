@@ -305,7 +305,7 @@ Caught: Error
 
 {- $compatibility
     Proxy transformers do more than just lift composition.  They automatically
-    provide proxies written in the base monad.  For example, what if I wanted to
+    promote proxies written in the base monad.  For example, what if I wanted to
     use the 'takeB_' proxy from "Control.Proxy.Prelude.Base" to cap the number
     of results?  I can't compose it directly because it uses the 'Proxy' type:
 
