@@ -32,7 +32,11 @@ infixr 8 />/
 >
 > (f >-> g) >-> h = f >-> (g >-> h)
 
-    Minimal complete definition: 'idT' and either ('>->') or ('<-<').
+    Minimal complete definition:
+
+    * 'idT'
+
+    * ('>->') or ('<-<').
 -}
 class Channel p where
     {-| 'idT' acts like a \'T\'ransparent proxy, passing all requests further
