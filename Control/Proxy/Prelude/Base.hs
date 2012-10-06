@@ -14,8 +14,12 @@ module Control.Proxy.Prelude.Base (
     -- * Filters
     takeB,
     takeB_,
+    takeWhileD,
+    takeWhileU,
     dropD,
     dropU,
+    dropWhileD,
+    dropWhileU,
     filterD,
     filterU,
     -- * Lists
@@ -143,6 +147,44 @@ takeB n = replicateK n $ request >=> respond
 takeB_ :: (Monad m) => Int -> a' -> Proxy a' a a' a m ()
 takeB_ n = fmap void (takeB n)
 
+{-| @takeWhileD p@ allows values to pass downstream so long as they satisfy the
+     predicate @p@.
+
+> -- Using the "All" monoid over functions:
+> mempty = \_ -> True
+> (p1 <> p2) a = p1 a && p2 a
+>
+> takeWhileD p1 >-> takeWhileD p2 = takeWhileD (p1 <> p2)
+>
+> takeWhileD mempty = idT
+-}
+takeWhileD :: (Monad m) => (a -> Bool) -> a' -> Proxy a' a a' a m ()
+takeWhileD p = go where
+    go a' = do
+        a <- request a'
+        if (p a)
+        then do
+            a'2 <- respond a
+            go a'2
+        else return ()
+
+{-| @takeWhileU p@ allows values to pass upstream so long as they satisfy the
+    predicate @p@.
+
+> takeWhileU p1 >-> takeWhileU p2 = takeWhileU (p1 <> p2)
+>
+> takeWhileD mempty = idT
+-}
+takeWhileU :: (Monad m) => (a' -> Bool) -> a' -> Proxy a' a a' a m ()
+takeWhileU p = go where
+    go a' =
+        if (p a')
+        then do
+            a <- request a'
+            a'2 <- respond a
+            go a'2
+        else return ()
+
 {-| @(dropD n)@ discards @n@ values going downstream
 
 > dropD n1 >-> dropD n2 = dropD (n1 + n2)  -- n2 >= 0 && n2 >= 0
@@ -168,11 +210,48 @@ dropU n a'
         a'2 <- respond ()
         idT a'2
 
+{-| @(dropWhileD p)@ discards values going upstream until one violates the
+    predicate @p@.
+
+> -- Using the "Any" monoid over functions:
+> mempty = \_ -> False
+> (p1 <> p2) a = p1 a || p2 a
+>
+> dropWhileD p1 >-> dropWhileD p2 = dropWhileD (p1 <> p2)
+>
+> dropWhileD mempty = idT
+-}
+dropWhileD :: (Monad m) => (a -> Bool) -> () -> Proxy () a () a m r
+dropWhileD p () = go where
+    go = do
+        a <- request ()
+        if (p a)
+        then go
+        else do
+            respond a
+            idT ()
+
+{-| @(dropWhileU p)@ discards values going downstream until one violates the
+    predicate @p@.
+
+> dropWhileU p1 >-> dropWhileU p2 = dropWhileU (p1 <> p2)
+>
+> dropWhileU mempty = idT
+-}
+dropWhileU :: (Monad m) => (a' -> Bool) -> a' -> Proxy a' () a' () m r
+dropWhileU p = go where
+    go a' =
+        if (p a')
+        then do
+            a' <- respond ()
+            go a'
+        else idT a'
+
 {-| @(filterD p)@ discards values going downstream if they fail the predicate
     @p@
 
 > -- Using the "All" monoid over functions:
-> mempty = \_ -> False
+> mempty = \_ -> True
 > (p1 <> p2) a = p1 a && p2 a
 >
 > filterD p1 >-> filterD p2 = filterD (p1 <> p2)
