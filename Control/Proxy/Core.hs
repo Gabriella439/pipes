@@ -185,7 +185,7 @@ type Session         = Proxy C   ()   ()  C
 
     Use the \'@K@\' versions of each command if you are running sessions nested
     within sessions.  They provide a Kleisli arrow as their result suitable to
-    be passed to another 'runProxy'/'runSession' command.
+    be passed to another 'runProxy' / 'runSession' command.
 -}
 
 {-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to the base
