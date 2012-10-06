@@ -184,8 +184,11 @@ You shall not pass!
     * 'Pipe's are lazy, so execution begins at the most downstream 'Pipe'
       (@printer@ in our example).
 
-    * Upstream 'Pipe's only run if input is requested from them and they only
-      run as long as necessary to 'yield' back a value.
+    * When a 'Pipe' 'await's, it blocks until it receives input from the next
+      'Pipe' upstream
+
+    * When a 'Pipe' 'yield's, it blocks until it receives a new 'await' request
+      from downstream.
 
     * If a 'Pipe' terminates, it terminates every other 'Pipe' composed with it.
 
