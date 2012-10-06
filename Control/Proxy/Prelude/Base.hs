@@ -143,13 +143,23 @@ takeB n = replicateK n $ request >=> respond
 takeB_ :: (Monad m) => Int -> a' -> Proxy a' a a' a m ()
 takeB_ n = fmap void (takeB n)
 
--- | @(dropD n)@ discards @n@ values going downstream
+{-| @(dropD n)@ discards @n@ values going downstream
+
+> dropD n1 >-> dropD n2 = dropD (n1 + n2)  -- n2 >= 0 && n2 >= 0
+>
+> dropD 0 = idT
+-}
 dropD :: (Monad m) => Int -> () -> Proxy () a () a m r
 dropD n () = do
     replicateM_ n $ request ()
     idT ()
 
--- | @(dropU n)@ discards @n@ values going upstream
+{-| @(dropU n)@ discards @n@ values going upstream
+
+> dropU n1 >-> dropU n2 = dropU (n1 + n2)  -- n2 >= 0 && n2 >= 0
+>
+> dropU 0 = idT
+-}
 dropU :: (Monad m) => Int -> a' -> Proxy a' () a' () m r
 dropU n a'
     | n <= 0    = idT a'
