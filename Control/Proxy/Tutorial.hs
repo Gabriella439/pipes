@@ -87,9 +87,9 @@ import Control.Proxy
 > session = oneTwoThree <-< incrementer
 
     The 'Session' type indicates that we have a self-contained session that we
-    can run in the 'IO' monad.  We run it using the the 'runSession' function:
+    can run in the 'IO' monad.  We run it using the the 'runProxy' function:
 
->>> runSession session :: IO ()
+>>> runProxy session :: IO ()
 Client requested: 1
 Server received : 1
 Server responded: 2
@@ -132,7 +132,7 @@ Client received : 4
 
     We can see if our proxy does its job correctly:
 
->>> runSession $ oneTwoThree <-< malicious <-< incrementer
+>>> runProxy $ oneTwoThree <-< malicious <-< incrementer
 Client requested: 1
 Server received : 1
 Server responded: 2
@@ -152,7 +152,7 @@ Client received : 5
 
     We can also add more proxies as we see fit:
 
->>> runSession $ oneTwoThree <-< malicious <-< malicious <-< incrementer 
+>>> runProxy $ oneTwoThree <-< malicious <-< malicious <-< incrementer 
 Client requested: 1
 Server received : 1
 Server responded: 2
@@ -328,7 +328,7 @@ Client received : 6
 >     lift $ print b
 >     lift $ putStrLn "*"
 
->>> runSession $ inputPrompt <-< incrementer
+>>> runProxy $ inputPrompt <-< incrementer
 42<Enter>
 Server received : 42
 Server responded: 43
@@ -350,7 +350,7 @@ Server responded: 667
 >     lift $ putStrLn $ "Client received : " ++ show b
 >     respond b
 
->>> runSession $ inputPrompt <-< diagnoseClient <-< incrementer
+>>> runProxy $ inputPrompt <-< diagnoseClient <-< incrementer
 42<Enter>
 Client requested: 42
 Server received : 42
@@ -373,7 +373,7 @@ Client received : 667
 > verboseInput :: (Read a, Show b, Show a) => () -> Client a b IO r
 > verboseInput = inputPrompt <-< diagnoseClient
 
->>> runSession $ verboseInput <-< incrementer
+>>> runProxy $ verboseInput <-< incrementer
 <Exactly same behavior>
 
     Or what if I want to cache the results coming out of @incrementer@?  I can
@@ -395,7 +395,7 @@ Client received : 667
 >             a' <- respond b
 >             cache' m a'
 
->>> runSession $ verboseInput <-< cache <-< incrementer 
+>>> runProxy $ verboseInput <-< cache <-< incrementer 
 42<Enter>
 Client requested: 42
 Server received : 42
@@ -438,7 +438,7 @@ Client received : 43
 >
 > -- or: mixedClient = oneTwoThree >=> (inputPrompt <-< cache)
 
->>> runSession $ mixedClient <-< incrementer
+>>> runProxy $ mixedClient <-< incrementer
 Client requested: 1
 Server received : 1
 Server responded: 2
@@ -465,7 +465,7 @@ Used cache!
 *
 
     So feel free to use your imagination!  Up until the moment you call
-    'runSession', you can freely mix composition or @do@ notation within each
+    'runProxy', you can freely mix composition or @do@ notation within each
     other.
 -}
 
