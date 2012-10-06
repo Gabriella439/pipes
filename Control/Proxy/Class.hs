@@ -27,7 +27,9 @@ infixr 8 />/
     * ('>->') and 'idT' form a category:
 
 > idT >-> f = f
+>
 > f >-> idT = f
+>
 > (f >-> g) >-> h = f >-> (g >-> h)
 
     Minimal complete definition: 'idT' and either ('>->') or ('<-<').
