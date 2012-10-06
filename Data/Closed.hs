@@ -1,5 +1,4 @@
-{-| An empty type that does not have a transitive dependency on the @containers@
-    package. -}
+{-| An empty type that gives cleaner type signatures. -}
 
 module Data.Closed (
     -- * Closed
