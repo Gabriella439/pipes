@@ -4,6 +4,12 @@ module Control.Proxy.Trans.Tutorial (
 
     -- * Proxy Transformers
     -- $proxytrans
+
+    -- * Compatibility
+    -- $compatibility
+
+    -- * Proxy Transformer Stacks
+    -- $stacks
     ) where
 
 import Control.Monad.Trans.Class
@@ -12,10 +18,8 @@ import Control.Proxy.Trans.Either
 import Control.Proxy.Trans.State
 
 {- $motivation
-    In a 'Session', all composed proxies share the same base monad, meaning that
-    you cannot use the base monad to sand-box effects to individual proxies.
-
-    To see this, consider the following simple 'Session':
+    In a 'Session', all composed proxies share effects within the base monad.
+    To see how, consider the following simple 'Session':
 
 > client1 :: () -> Client () () (StateT Int IO) r
 > client1 () = forever $ do
@@ -40,9 +44,9 @@ Client: 4
 Server: 5
 ...
 
-    The client and server share state within the base monad, which is sometimes
-    not what we want.  We can keep track of state locally within a 'Proxy' by
-    reversing the order of the monad transformers:
+    The client and server share the same state, which is sometimes not what we
+    want.  We can easily solve this by running each 'Proxy' with its own local
+    state by changing the order of the 'Proxy' and 'StateT' monad transformers:
 
 > client2 :: () -> StateT Int (Client () () IO) r
 > client2 () = forever $ do
@@ -68,8 +72,9 @@ Client: 1
 Server: 1
 Client: 2
 Server: 2
+...
 
-    Similarly, we might want to implement error handling within proxies.  We
+    Here's another example: suppose we want to handle errors within proxies.  We
     could try adding 'EitherT' to the base monad like so:
 
 > import Control.Error
@@ -86,10 +91,11 @@ Server: 2
 1
 Left "ERROR"
 
-    Unfortunately, we can't modify @server2@ to 'catchT' that error because it
-    unrecoverably brings down the entire session.  We'd really prefer that
-    'EitherT' were the outermost monad transformer so that we can catch errors
-    locally:
+    Unfortunately, we can't modify @server2@ to 'catchT' that error because we
+    cannot access the inner 'EitherT' monad transformer until we run the
+    'Session'.  We'd really prefer to place the 'EitherT' monad transformer
+    /outside/ the 'Proxy' monad transformer so that we can catch and handle
+    errors locally within a 'Proxy' without disturbing other proxies:
 
 > client4 :: () -> EitherT String (Client () () IO) ()
 > client4 () = forM_ [1..] $ \i -> do
@@ -99,13 +105,13 @@ Left "ERROR"
 > server4 :: () -> EitherT String (Server () () IO) ()
 > server4 () = (forever $ do
 >     lift $ respond ()
->     left "Error" )
+>     throwT "Error" )
 >   `catchT` (\str -> do
 >         lift $ lift $ putStrLn $ "Caught: " ++ str
 >         server4 () )
 
-    However, this again requires unwrapping them using 'runEitherT' before
-    composing them:
+    However, this solution similarly requires unwrapping the client and server
+    using 'runEitherT' before composing them:
 
 >>> runProxy $ runEitherT . client4 <-< runEitherT . server4
 1
@@ -119,18 +125,38 @@ Caught: Error
 -}
 
 {- $proxytrans
-    We encounter a common pattern: Any monad transformer nested within the base
-    monad of a 'Proxy' is shared across the entire 'Session' and doesn't
-    interfere with composition.  Any monad transformer nested outside the
-    'Proxy' type is local to that specific 'Proxy', but interferes with
-    composition.  Wouldn't it be nice if we could get 'Proxy'-local transformers
-    that didn't interfere with composition?
+    We need some way to layer monad transformers /outside/ the proxy type
+    without interfering with 'Proxy' composition.  To do this, we overload
+    'Proxy' composition using the 'Channel' type class from
+    "Control.Proxy.Class":
 
-    Well, we can!  The "Control.Proxy.Trans" hierarchy provides a series of
-    common monad transformers that correctly lift the ability to be composed.
+> class Channel p where
+>     idT :: (Monad) m => a' -> p a' a a' a m r
+>     (>->)
+>      :: (Monad m)
+>      => (b' -> p a' a b' b m r)
+>      -> (c' -> p b' b c' c m r)
+>      -> c' -> p a' a c' c m r
 
-    For example, if we want to add 'Proxy'-local state, we just import
-    "Control.Proxy.Trans.State":
+    Obviously, 'Proxy' implements this class:
+
+> instance Channel Proxy where ...
+
+    ... but we would also like our monad transformers layered outside the
+    'Proxy' type to also implement the 'Channel' class so that we could compose
+    them directly without unwrapping.  Unfortunately, these monad transformers
+    do not fit the signature of the 'Channel' class.
+
+    Fortunately, the "Control.Proxy.Trans" hierarchy provides several common
+    monad transformers which have been upgraded to fit the 'Channel' type class.
+    I call these \"proxy transformers\".
+
+    For example, "Control.Proxy.Trans.State" provides a proxy transformer
+    equivalent to @Control.Monad.Trans.State@.  Similarly,
+    "Control.Proxy.Trans.Either" provides a proxy transformer equivalent to
+    @Control.Monad.Trans.Either@.
+
+    Let's use a working code example to demonstrate how to use them:
 
 > import Control.Proxy.Trans.State
 > 
@@ -149,32 +175,62 @@ Caught: Error
 >     liftP $ respond ()
 
     You'll see that our type signatures changed.  Now we use 'StateP' instead of
-    'StateT'.  This is because 'StateP' is a proxy transformer and not a monad
-    transformer.  If I were to define the following kind synonym:
+    'StateT'.  However, 'StateP' does not transform monads, but instead
+    transforms proxies.
 
-> kind ProxyKind = * -> * -> * -> (* -> *) -> * -> *
+    To see this, let's first study the kind of 'StateT'.  If we first define:
 
-    .. then the kind of 'StateP' would be:
+> kind MonadKind = * -> *
 
-> StateP :: * -> ProxyKind -> ProxyKind
+    Then @StateT s@ takes a monad, and returns a new monad:
 
-    In other words, it transforms a 'Proxy'-like type constructor into a new
-    'Proxy'-like type constructor, thus the name: proxy transformer.
+> StateT s :: MonadKind -> MonadKind
+
+    Now consider the kind of a 'Proxy'-like type constructor suitable for the
+    'Channel' type class:
+
+> kind ProxyKind = * -> * -> * -> * -> (* -> *) -> * -> *
+
+    Then @StateP s@  takes a 'Proxy'-like and returns a new 'Proxy'-like type:
+
+> StateP s :: ProxyKind -> ProxyKind
+
+    This is why I call these \"proxy transformers\" and not monad transformers.
+    They all take some 'Proxy'-like type that implements 'Channel' and transform
+    it into a new 'Proxy'-like type that also implements 'Channel'.  For
+    example, 'StateP' implement the following instance:
+
+> instance (Channel p) => Channel (StateP s p) where ...
+
+    All proxy transformers guarantee that if the base proxy implements the
+    'Channel' type class, then the transformed proxy also implements the
+    'Channel' type class.  This means that you can build a proxy transformer
+    stack, just like you might build a monad transformer stack.
 
     Unfortunately, in order to use proxy transformers, you must expand out the
     'Client' and 'Server' type synonyms, which are not compatible with proxy
-    transformers.  Sorry!
+    transformers.  Sorry!  This is why there are no 'Server' or 'Client' type
+    synonyms in the types of our new client and server and I had to write out
+    all the inputs and outputs.
 
-    Notice how the outermost 'lift' statements have changed to 'liftP'.  'liftP'
-    belongs to the 'ProxyTrans' class, which all proxy transformers implement.
-    It behaves just like 'lift' and obeys the monad transformer laws:
+    Notice how the outermost 'lift' statements in our client and server have
+    changed to 'liftP'.  'liftP' replaces 'lift' for proxy transformers, and it
+    lifts any action in the base proxy to an action in the transformed proxy.
+    In the previous example, the base proxy was 'Proxy' and the transformed
+    proxy was @StateP s Proxy@, so 'liftP's type got specialized to:
+
+> liftP :: Proxy a' a b' b m r -> StateP s Proxy a' a b' b m r
+
+    The 'ProxyTrans' class defines 'liftP', and all proxy transformers implement
+    the 'ProxyTrans' class.  Since proxies are still monads, 'liftP' must
+    behave just like 'lift' and obey the monad transformer laws:
 
 > (liftP .) return = return
 >
 > (liftP .) (f >=> g) = (liftP .) f >=> (liftP .) g
 
-    But, unlike 'lift', 'liftP' also obeys one extra set of laws that guarantee
-    it lifts composition sensibly:
+    But, unlike 'lift', 'liftP' obeys one extra set of laws that guarantee it 
+    also lifts composition sensibly:
 
 > (liftP .) idT = idT
 >
@@ -185,30 +241,20 @@ Caught: Error
 
 > mapP = (liftP .)
 
-    The 'Channel' type class makes this lifting possible.  This type class
-    defines the ('>->') and 'idT' methods that all 'Proxy'-like types must
-    implement:
+    Proxy transformers automatically derive how to lift composition correctly
+    and also guarantee that the derived composition obeys the category laws if
+    the base composition obeyed the category laws.  Since 'Proxy' composition
+    obeys the category laws, any proxy transformer stack built on top of it
+    automatically derives a composition operation that is correct by
+    construction.
 
-> class Channel p where
->     idT :: (Monad) m => a' -> p a' a a' a m r
->     (>->)
->      :: (Monad m)
->      => (b' -> p a' a b' b m r)
->      -> (c' -> p b' b c' c m r)
->      -> c' -> p a' a c' c m r
-
-    All proxy transformers guarantee that if the base proxy implements the
-    'Channel' type class, then the transformed proxy also implements the
-    'Channel' type class.  Proxy transformers automatically derive how to lift
-    composition correctly.
-
-    This means we can compose our 'StateP'-extended proxies directly without
+    Let's prove this by directly composing our 'StateP'-extended proxies without
     unwrapping them:
 
 > :t client5 <-< server5 :: () -> StateP Int Proxy C () () C IO r
 
-    However, we still have to unwrap the resulting 'StateP' proxy transformer
-    before we can pass it to 'runProxy'.  We use 'runStateK' for this purpose:
+    However, we still have to unwrap the final 'StateP' 'Session' before we can
+    pass it to 'runProxy'.  We use 'runStateK' for this purpose:
 
 >>> runProxy $ runStateK 0 $ client5 <-< server5
 Client: 0
@@ -221,7 +267,138 @@ Client: 3
 Server: 3
 ...
 
-    Keep in mind that 'runStateK' takes the state as the first argument, unlike
-    'runStateT'.  I break from the @transformers@ convention in this regard, for
+    Keep in mind that 'runStateK' takes the initial state as its first argument,
+    unlike 'runStateT'.  I break from the @transformers@ convention for
     syntactic convenience.
+
+    We can similarly fix our 'EitherT' example, using 'EitherP' from
+    "Control.Proxy.Trans.Either":
+
+> import Control.Proxy.Trans.Either as E
+>
+> client6 :: () -> EitherP String Proxy () () () C IO ()
+> client6 () = forM_ [1..] $ \i -> do
+>     liftP $ lift $ print i
+>     liftP $ request ()
+>
+> server6 :: () -> EitherP String Proxy C () () () IO ()
+> server6 () = (forever $ do
+>     liftP $ respond ()
+>     E.throw "Error" )
+>   `E.catch` (\str -> do
+>         liftP $ lift $ putStrLn $ "Caught: " ++ str
+>         server6 () )
+
+>>> runProxy $ runEitherK $ client6 <-< server6
+1
+Caught: Error
+2
+Caught: Error
+3
+Caught: Error
+...
+
+-}
+
+{- $compatibility
+    Proxy transformers do more than just lift composition.  They automatically
+    provide proxies written in the base monad.  For example, what if I wanted to
+    use the 'takeB_' proxy from "Control.Proxy.Prelude.Base" to cap the number
+    of results?  I can't compose it directly because it uses the 'Proxy' type:
+
+> takeB_ :: (Monad m) => Int -> a' -> Proxy a' a a' a m ()
+
+    ... whereas @client6@ and @server6@ use @EitherP String Proxy@.  However,
+    this doesn't matter because we can automatically lift 'takeB_' to be
+    compatible with them using 'mapP':
+
+>>> runProxy $ runEitherK $ client6 <-< mapP (takeB_ 2) <-< server6
+1
+Caught: Error
+2
+Caught:Error
+
+    'mapP' promotes any proxy written using the base proxy type to automatically
+    be compatible with proxies written using the extended proxy type.  This
+    means you can safely write utility proxies using the smallest feature set
+    they require and promote them as necessary to work with more extended
+    feature sets.  This ensures that any proxies you write always remain
+    forwards-compatible as people write new extensions.
+-}
+
+{- $stacks
+    You can stack proxy transformers to combine their effects, such as in the
+    following example, which combines everything we've used so far:
+
+> client7 :: () -> EitherP String (StateP Int Proxy) () Int () C IO r
+> client7 () = do
+>     n <- liftP get
+>     liftP $ liftP $ lift $ print n
+>     n' <- liftP $ liftP $ request ()
+>     liftP $ put n'
+>     E.throw "ERROR"
+
+>>> runProxy $ runStateK 0 $ runEitherK $ client7 <-< mapP (mapP (enumFromS 1))
+0
+(Left "Error", 1)
+
+    But that's still not the full story!  For calls to the base monad (i.e. 'IO'
+    in this case), you don't need to precede them with all those 'liftP's.
+    Every proxy transformer also correctly derives 'MonadTrans', so you can dig
+    straight to the base monad by just calling 'lift' at the outer-most level:
+
+> client7 :: () -> EitherP String (StateP Int Proxy) () Int () C IO r
+> client7 () = do
+>     n <- liftP get
+>     lift $ print n  -- Much better!
+>     n' <- liftP $ liftP $ request ()
+>     liftP $ put n'
+>     E.throw "ERROR"
+
+    Also, you can combine multiple proxy transformers into a single proxy
+    transformer, just like you would with monad transformers:
+
+> newtype BothP e s p a' a b' b m r =
+>     BothP { unBothP :: EitherP e (StateP s p) a' a b' b m r }
+>     deriving (Functor, Applicative, Monad, MonadTrans, Channel)
+> 
+> instance ProxyTrans (BothP e s) where
+>     liftP = BothP . liftP . liftP
+> 
+> runBoth
+>  :: (Monad m)
+>  => s
+>  -> (b' -> BothP e s p a' a b' b m r)
+>  -> (b' -> p a' a b' b m (Either e r, s))
+> runBoth s = runStateK s . runEitherK . fmap unBothP
+> 
+> get' :: (Monad (p a' a b' b m), Channel p)
+>      => BothP e s p a' a b' b m s
+> get' = BothP $ liftP get
+> 
+> put' :: (Monad (p a' a b' b m), Channel p)
+>      => s -> BothP e s p a' a b' b m ()
+> put' x = BothP $ liftP $ put x
+> 
+> throw' :: (Monad (p a' a b' b m), Channel p)
+>        => e -> BothP e s p a' a b' b m r
+> throw' e = BothP $ E.throw e
+
+    Then we can write proxies using this new proxy transformer of ours:
+
+> client8 :: () -> BothP String Int Proxy () Int () C IO r
+> client8 () = do
+>     n <- get'
+>     lift $ print n
+>     n' <- liftP $ request ()
+>     put' n'
+>     throw' "ERROR"
+
+>>> runProxy $ runBoth 0 $ client8 <-< mapP (enumFromS 1)
+0
+(Left "ERROR",1)
+
+    Note that 'request' and 'respond' are not automatically liftable, although
+    that will probably change in a future release once I work out the laws for
+    how that lifting should behave.
 -}
