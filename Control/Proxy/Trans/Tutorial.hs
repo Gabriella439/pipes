@@ -15,6 +15,7 @@ module Control.Proxy.Trans.Tutorial (
     ) where
 
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.State
 import Control.Proxy
 import Control.Proxy.Trans.Either
 import Control.Proxy.Trans.State
