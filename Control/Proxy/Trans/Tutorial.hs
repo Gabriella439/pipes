@@ -38,7 +38,7 @@ import Control.Proxy.Trans.State
 >     lift $ put (s + 1)
 >     respond ()
 
->>> execWriterT $ runProxy $ client1 <-< server1
+>>> (`evalStateT` 0) $ runProxy $ client1 <-< server1
 Client: 0
 Server: 1
 Client: 2
