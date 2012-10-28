@@ -36,7 +36,7 @@ foreverK k = let r = k >=> r in r
 
 -- | Repeat a \'@K@\'leisli arrow multiple times
 replicateK :: (Monad m) => Int -> (a -> m a) -> (a -> m a)
-replicateK n k = go n where
+replicateK n0 k = go n0 where
     go n
         | n < 1     = return
         | n == 1    = k

@@ -41,7 +41,7 @@ instance (Monad (p a' a b' b m)) => Monad (EitherP e p a' a b' b m) where
     m >>= f = EitherP $ do
         e <- runEitherP m
         runEitherP $ case e of
-            Left  e -> left e
+            Left  l -> left l
             Right r -> f    r
 
 instance (MonadPlus (p a' a b' b m))
@@ -112,7 +112,7 @@ catch
 catch m f = EitherP $ do
     e <- runEitherP m
     runEitherP $ case e of
-        Left  e -> f     e
+        Left  l -> f     l
         Right r -> right r
 
 -- | 'catch' with the arguments flipped
@@ -124,5 +124,5 @@ handle
 handle f m = EitherP $ do
     e <- runEitherP m
     runEitherP $ case e of
-        Left  e -> f     e
+        Left  l -> f     l
         Right r -> right r

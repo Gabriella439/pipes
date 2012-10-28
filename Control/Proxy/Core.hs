@@ -57,7 +57,7 @@ data Proxy a' a b' b m r
   | Pure r
 
 instance (Monad m) => Functor (Proxy a' a b' b m) where
-    fmap f p' = go p' where
+    fmap f p0 = go p0 where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
@@ -75,7 +75,7 @@ instance (Monad m) => Applicative (Proxy a' a b' b m) where
 
 instance (Monad m) => Monad (Proxy a' a b' b m) where
     return = Pure
-    p' >>= f = go p' where
+    p0 >>= f = go p0 where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
@@ -90,7 +90,7 @@ instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
 
 instance Channel Proxy where
     idT = \a' -> Request a' $ \a -> Respond a idT
-    k1 <-< k2 = \c' -> k1 c' |-< k2 where
+    k1 <-< k2_0 = \c' -> k1 c' |-< k2_0 where
         p1 |-< k2 = case p1 of
             Request b' fb  -> fb <-| k2 b'
             Respond c  fc' -> Respond c (\c' -> fc' c' |-< k2)
@@ -119,7 +119,7 @@ instance Interact Proxy where
             Pure       a   -> Pure a
 
 instance MFunctor (Proxy a' a b' b) where
-    mapT nat p = go p where
+    mapT nat p0 = go p0 where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))

@@ -56,7 +56,7 @@ instance (MonadPlus (p a' a b' b m))
 
 instance (MonadPlus (p a' a b' b m))
  => MonadPlus (WriterP w p a' a b' b m) where
-    mzero = WriterP $ \w -> mzero
+    mzero = WriterP $ \_ -> mzero
     mplus m1 m2 = WriterP $ \w -> mplus (unWriterP m1 w) (unWriterP m2 w)
 
 instance (MonadTrans (p a' a b' b))

@@ -243,8 +243,8 @@ dropWhileU p = go where
     go a' =
         if (p a')
         then do
-            a' <- respond ()
-            go a'
+            a'2 <- respond ()
+            go a'2
         else idT a'
 
 {-| @(filterD p)@ discards values going downstream if they fail the predicate
@@ -272,7 +272,7 @@ filterD p () = go where
 > filterU mempty = idT
 -}
 filterU :: (Monad m) => (a' -> Bool) -> a' -> Proxy a' () a' () m r
-filterU p a' = go a' where
+filterU p a'0 = go a'0 where
     go a' = do
         when (p a') $ request a'
         a'2 <- respond ()
@@ -298,16 +298,16 @@ fromListC xs _ = mapM_ request xs
 
 -- | 'Server' version of 'enumFrom'
 enumFromS :: (Enum a, Monad m) => a -> y' -> Proxy x' x y' a m r
-enumFromS a _ = go a where
+enumFromS a0 _ = go a0 where
     go a = do
-        respond a
+        _ <- respond a
         go (succ a)
 
 -- | 'Client' version of 'enumFrom'
 enumFromC :: (Enum a, Monad m) => a -> y' -> Proxy a x y' y m r
-enumFromC a _ = go a where
+enumFromC a0 _ = go a0 where
     go a = do
-        request a
+        _ <- request a
         go (succ a)
 
 -- | 'Server' version of 'enumFromTo'

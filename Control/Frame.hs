@@ -344,7 +344,6 @@ p1 <~| p2 = IFreeT $ U $ do
         Wrap (Yield c p1') -> wrap $ Yield c (p1' <~| p2)
         Wrap (Await   f1 ) -> IFreeT $ U $ do
             x2 <- unU $ runIFreeT p2
-            let p1' = IFreeT $ returnI x1
             unU $ runIFreeT $ case x2 of
                 Return r           -> returnI r
                 Wrap (Yield b p2') -> f1 b <~| p2' 

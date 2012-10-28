@@ -62,7 +62,7 @@ type Pipe a b = FreeT (PipeF a b)
 instance (Monad m) => Functor (Pipe a b m) where
     fmap f pr = go pr where
         go p = case p of
-            Await   f  -> Await (\a -> go (f a))
+            Await   k  -> Await (\a -> go (k a))
             Yield b p' -> Yield b (go p')
             M       m  -> M (m >>= \p' -> return (go p'))
             Pure    r  -> Pure (f r)
@@ -71,7 +71,7 @@ instance (Monad m) => Applicative (Pipe a b m) where
     pure = Pure
     pf <*> px = go pf where
         go p = case p of
-            Await   f  -> Await (\a -> go (f a))
+            Await   k  -> Await (\a -> go (k a))
             Yield b p' -> Yield b (go p')
             M       m  -> M (m >>= \p' -> return (go p'))
             Pure    f  -> fmap f px
@@ -80,7 +80,7 @@ instance (Monad m) => Monad (Pipe a b m) where
     return  = Pure
     pm >>= f = go pm where
         go p = case p of
-            Await   f  -> Await (\a -> go (f a))
+            Await   k  -> Await (\a -> go (k a))
             Yield b p' -> Yield b (go p')
             M       m  -> M (m >>= \p' -> return (go p'))
             Pure    r  -> f r
@@ -170,8 +170,8 @@ instance (Monad m) => Category (PipeC m r) where
 (Yield b p1) <+< p2 = Yield b (p1 <+< p2)
 (M       m ) <+< p2 = M (m >>= \p1 -> return (p1 <+< p2))
 (Pure    r ) <+< _  = Pure r
-(Await   f ) <+< (Yield b p2) = f b <+< p2
-p1 <+< (Await f) = Await (\a -> p1 <+< f a)
+(Await   k ) <+< (Yield b p2) = k b <+< p2
+p1 <+< (Await k) = Await (\a -> p1 <+< k a)
 p1 <+< (M     m) = M (m >>= \p2 -> return (p1 <+< p2))
 _  <+< (Pure  r) = Pure r
 
@@ -225,6 +225,6 @@ runPipe :: (Monad m) => Pipeline m r -> m r
 runPipe pl = go pl where
     go p = case p of
        Yield _ p' -> go p' 
-       Await   f  -> go (f ())
+       Await   k  -> go (k ())
        M       m  -> m >>= go
        Pure    r  -> return r

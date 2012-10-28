@@ -49,7 +49,7 @@ Library
     Build-Depends:
         base >= 4 && < 5,
         index-core,
-        transformers
+        transformers >= 0.2.0.0
     Exposed-Modules:
         Control.Frame,
         Control.Frame.Tutorial,
@@ -76,5 +76,4 @@ Library
         Control.Pipe.Core,
         Control.Pipe.Tutorial,
         Data.Closed
-    GHC-Options: -O2
     Default-Language: Haskell2010
