@@ -21,8 +21,6 @@ module Control.Proxy.Pipe (
     runPipe
     ) where
 
-import Control.Monad (forever)
-import Control.Monad.Trans.Free
 import Control.Proxy.Core
 import Control.Proxy.Class
 import Data.Closed (C)
@@ -52,18 +50,19 @@ type Pipeline   = Pipe () C
     'await' blocks until input is available -}
 await :: (Monad m) => Pipe a b m a
 await = request ()
+{-# INLINE await #-}
 
 -- | Convert a pure function into a pipe
 pipe :: (Monad m) => (a -> b) -> Pipe a b m r
-pipe f = forever $ do
-    x <- await
-    yield (f x)
+pipe f = go where
+    go = Request () (\a -> Respond (f a) (\() -> go))
 
 {-| Deliver output downstream
 
     'yield' restores control back downstream and binds the result to 'await'. -}
 yield :: (Monad m) => b -> Pipe a b m ()
 yield = respond
+{-# INLINE yield #-}
 
 infixr 9 <+<
 infixl 9 >+>
@@ -78,15 +77,14 @@ p1 <+< p2 = ((\() -> p1) <-< (\() -> p2)) ()
 
 -- | Corresponds to 'id' from @Control.Category@
 idP :: (Monad m) => Pipe a a m r
-idP = idT ()
+idP = go where
+    go = Request () (\a -> Respond a (\() -> go))
 
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
 runPipe :: (Monad m) => Pipeline m r -> m r
-runPipe = runPipe' . unProxy
-
-runPipe' p = do
-    x <- runFreeT p
-    case x of
-        Pure r -> return r
-        Free (Request _ f) -> runPipe' (f ())
-        Free (Respond _ f) -> runPipe' (f ())
+runPipe p' = go p' where
+    go p = case p of
+        Request _ fa  -> go (fa  ())
+        Respond _ fb' -> go (fb' ())
+        M         m   -> m >>= go
+        Pure      r   -> return r
