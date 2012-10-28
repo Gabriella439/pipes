@@ -44,26 +44,26 @@ import Control.Proxy.Class (request, respond)
 import System.IO (Handle, hGetLine, hPutStr, hPutStrLn, hPrint, stdin, stdout)
 
 -- | Get input from 'stdin' one line at a time and send \'@D@\'ownstream
-getLineS :: () -> Server () String IO r
-getLineS () = forever $ do
+getLineS :: y' -> Proxy x' x y' String IO r
+getLineS _ = forever $ do
     str <- lift getLine
     respond str
 
 -- | Get input from 'stdin' one line at a time and send \'@U@\'pstream
-getLineC :: () -> Client String () IO r
-getLineC () = forever $ do
+getLineC :: y' -> Proxy String x y' y IO r
+getLineC _ = forever $ do
     str <- lift getLine
     request str
 
 -- | 'read' input from 'stdin' one line at a time and send \'@D@\'ownstream
-readLnS :: (Read a) => () -> Server () a IO r
-readLnS () = forever $ do
+readLnS :: (Read a) => y' -> Proxy x' x y' a IO r
+readLnS _ = forever $ do
     a <- lift readLn
     respond a
 
 -- | 'read' input from 'stdin' one line at a time and send \'@U@\'pstream
-readLnC :: (Read a) => () -> Client a () IO r
-readLnC () = forever $ do
+readLnC :: (Read a) => y' -> Proxy a x y' y IO r
+readLnC _ = forever $ do
     a <- lift readLn
     request a
 
@@ -126,7 +126,7 @@ putStrLnU = foreverK $ \a' -> do
     respond x
 
 -- | Convert 'stdin'/'stdout' into a line-based 'Server'
-promptS :: String -> Server String String IO r
+promptS :: String -> Proxy x' x String String IO r
 promptS = foreverK $ \send -> do
     recv <- lift $ do
         putStrLn send
@@ -134,21 +134,21 @@ promptS = foreverK $ \send -> do
     respond recv
 
 -- | Convert 'stdin'/'stdout' into a line-based 'Client'
-promptC :: () -> Client String String IO r
-promptC () = forever $ do
+promptC :: y' -> Proxy String String y' y IO r
+promptC _ = forever $ do
     send <- lift getLine
     recv <- request send
     lift $ putStrLn recv
 
 -- | Get input from a handle one line at a time and send \'@D@\'ownstream
-hGetLineD :: Handle -> () -> Server () String IO r
-hGetLineD h () = forever $ do
+hGetLineD :: Handle -> y' -> Proxy x' x y' String IO r
+hGetLineD h _ = forever $ do
     str <- lift $ hGetLine h
     respond str
 
 -- | Get input from a handle one line at a time and send \'@U@\'pstream
-hGetLineU :: Handle -> () -> Client String () IO r
-hGetLineU h () = forever $ do
+hGetLineU :: Handle -> y' -> Proxy String x y' y IO r
+hGetLineU h _ = forever $ do
     str <- lift $ hGetLine h
     request str
 

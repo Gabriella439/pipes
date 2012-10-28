@@ -284,8 +284,8 @@ filterU p a' = go a' where
 >
 > fromListS [] = return
 -}
-fromListS :: (Monad m) => [a] -> () -> Server () a m ()
-fromListS xs () = mapM_ respond xs
+fromListS :: (Monad m) => [a] -> y' -> Proxy x' x y' a m ()
+fromListS xs _ = mapM_ respond xs
 
 {-| Convert a list into a 'Client'
 
@@ -293,26 +293,26 @@ fromListS xs () = mapM_ respond xs
 >
 > fromListC [] = return
 -}
-fromListC :: (Monad m) => [a] -> () -> Client a () m ()
-fromListC xs () = mapM_ request xs
+fromListC :: (Monad m) => [a] -> y' -> Proxy a x y' y m ()
+fromListC xs _ = mapM_ request xs
 
 -- | 'Server' version of 'enumFrom'
-enumFromS :: (Enum a, Monad m) => a -> () -> Server () a m r
-enumFromS a () = go a where
+enumFromS :: (Enum a, Monad m) => a -> y' -> Proxy x' x y' a m r
+enumFromS a _ = go a where
     go a = do
         respond a
         go (succ a)
 
 -- | 'Client' version of 'enumFrom'
-enumFromC :: (Enum a, Monad m) => a -> () -> Client a () m r
-enumFromC a () = go a where
+enumFromC :: (Enum a, Monad m) => a -> y' -> Proxy a x y' y m r
+enumFromC a _ = go a where
     go a = do
         request a
         go (succ a)
 
 -- | 'Server' version of 'enumFromTo'
-enumFromToS :: (Enum a, Ord a, Monad m) => a -> a -> () -> Server () a m ()
-enumFromToS a1 a2 () = go a1 where
+enumFromToS :: (Enum a, Ord a, Monad m) => a -> a -> y' -> Proxy x' x y' a m ()
+enumFromToS a1 a2 _ = go a1 where
     go n
         | n > a2   = return ()
         | otherwise = do
@@ -320,8 +320,8 @@ enumFromToS a1 a2 () = go a1 where
             go (succ n)
 
 -- | 'Client' version of 'enumFromTo'
-enumFromToC :: (Enum a, Ord a, Monad m) => a -> a -> () -> Client a () m ()
-enumFromToC a1 a2 () = go a1 where
+enumFromToC :: (Enum a, Ord a, Monad m) => a -> a -> y' -> Proxy a x y' y m ()
+enumFromToC a1 a2 _ = go a1 where
     go n
         | n > a2 = return ()
         | otherwise = do
