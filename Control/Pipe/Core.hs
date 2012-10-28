@@ -4,8 +4,7 @@
 module Control.Pipe.Core (
     -- * Types
     -- $types
-    PipeF(..),
-    Pipe,
+    Pipe(..),
     C,
     Producer,
     Consumer,
@@ -29,27 +28,14 @@ module Control.Pipe.Core (
 import Control.Applicative (Applicative(pure, (<*>)))
 import Control.Category (Category((.), id), (<<<), (>>>))
 import Control.Monad (forever)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Free (
-    FreeF(Free, Pure), FreeT(FreeT, runFreeT), wrap)
+import Control.Monad.Trans.Class (MonadTrans(lift))
 import Data.Closed (C)
 import Prelude hiding ((.), id)
 
 {- $types
     The 'Pipe' type is strongly inspired by Mario Blazevic's @Coroutine@ type in
-    his concurrency article from Issue 19 of The Monad Reader and is formulated
-    in the exact same way.
-
-    His @Coroutine@ type is actually a free monad transformer (i.e. 'FreeT')
-    and his @InOrOut@ functor corresponds to 'PipeF'.
+    his concurrency article from Issue 19 of The Monad Reader.
 -}
-
--- | The base functor for the 'Pipe' type
-data PipeF a b x = Await (a -> x) | Yield b x
-
-instance Functor (PipeF a b) where
-    fmap f (Await   g) = Await (f . g)
-    fmap f (Yield b x) = Yield b (f x)
 
 {-|
     The base type for pipes
@@ -62,7 +48,45 @@ instance Functor (PipeF a b) where
 
     * @r@ - The type of the return value
 -}
+data Pipe a b m r
+  = Await (a -> Pipe a b m r)
+  | Yield b    (Pipe a b m r)
+  | M       (m (Pipe a b m r))
+  | Pure r
+{-
+type PipeF a b x = Await (a -> x) | Yield b x deriving (Functor)
+
 type Pipe a b = FreeT (PipeF a b)
+-}
+
+instance (Monad m) => Functor (Pipe a b m) where
+    fmap f pr = go pr where
+        go p = case p of
+            Await   f  -> Await (\a -> go (f a))
+            Yield b p' -> Yield b (go p')
+            M       m  -> M (m >>= \p' -> return (go p'))
+            Pure    r  -> Pure (f r)
+
+instance (Monad m) => Applicative (Pipe a b m) where
+    pure = Pure
+    pf <*> px = go pf where
+        go p = case p of
+            Await   f  -> Await (\a -> go (f a))
+            Yield b p' -> Yield b (go p')
+            M       m  -> M (m >>= \p' -> return (go p'))
+            Pure    f  -> fmap f px
+
+instance (Monad m) => Monad (Pipe a b m) where
+    return  = Pure
+    pm >>= f = go pm where
+        go p = case p of
+            Await   f  -> Await (\a -> go (f a))
+            Yield b p' -> Yield b (go p')
+            M       m  -> M (m >>= \p' -> return (go p'))
+            Pure    r  -> f r
+
+instance MonadTrans (Pipe a b) where
+    lift m = M (m >>= \r -> return (Pure r))
 
 -- | A pipe that produces values
 type Producer b = Pipe () b
@@ -94,16 +118,16 @@ type Pipeline = Pipe () C
 
     'await' blocks until input is available from upstream.
 -}
-await :: (Monad m) => Pipe a b m a
-await = wrap $ Await return
+await :: Pipe a b m a
+await = Await Pure
 
 {-|
     Deliver output downstream.
 
     'yield' restores control back upstream and binds the result to 'await'.
 -}
-yield :: (Monad m) => b -> Pipe a b m ()
-yield b = wrap $ Yield b (return ())
+yield :: b -> Pipe a b m ()
+yield b = Yield b (Pure ())
 
 {-|
     Convert a pure function into a pipe
@@ -113,7 +137,8 @@ yield b = wrap $ Yield b (return ())
 >     yield (f x)
 -}
 pipe :: (Monad m) => (a -> b) -> Pipe a b m r
-pipe f = forever $ await >>= yield . f
+pipe f = go where
+    go = Await (\a -> Yield (f a) go)
 
 {- $category
     'Pipe's form a 'Category', meaning that you can compose 'Pipe's using
@@ -142,22 +167,17 @@ instance (Monad m) => Category (PipeC m r) where
 
 -- | Corresponds to ('<<<')/('.') from @Control.Category@
 (<+<) :: (Monad m) => Pipe b c m r -> Pipe a b m r -> Pipe a c m r
-p1 <+< p2 = FreeT $ do
-    x1 <- runFreeT p1
-    let p1' = FreeT $ return x1
-    runFreeT $ case x1 of
-        Pure r          -> return r
-        Free (Yield b p1') -> wrap $ Yield b $ p1' <+< p2
-        Free (Await f1) -> FreeT $ do
-            x2 <- runFreeT p2
-            runFreeT $ case x2 of
-                Pure r             -> return r
-                Free (Yield b p2') -> f1 b <+< p2'
-                Free (Await   f2 ) -> wrap $ Await $ \a -> p1' <+< f2 a
+(Yield b p1) <+< p2 = Yield b (p1 <+< p2)
+(M       m ) <+< p2 = M (m >>= \p1 -> return (p1 <+< p2))
+(Pure    r ) <+< _  = Pure r
+(Await   f ) <+< (Yield b p2) = f b <+< p2
+p1 <+< (Await f) = Await (\a -> p1 <+< f a)
+p1 <+< (M     m) = M (m >>= \p2 -> return (p1 <+< p2))
+_  <+< (Pure  r) = Pure r
 
 -- | Corresponds to ('>>>') from @Control.Category@
 (>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
-(>+>) = flip (<+<)
+p2 >+> p1 = p1 <+< p2
 
 {- These associativities might help performance since pipe evaluation is
    downstream-biased.  I set them to the same priority as (.). -}
@@ -166,7 +186,8 @@ infixl 9 >+>
 
 -- | Corresponds to 'id' from @Control.Category@
 idP :: (Monad m) => Pipe a a m r
-idP = pipe id
+idP = go where
+    go = Await (\a -> Yield a go)
 
 {- $runpipe
     Note that you can also unwrap a 'Pipe' a single step at a time using
@@ -201,9 +222,9 @@ idP = pipe id
 > runPipe $ forever await <+< p
 -}
 runPipe :: (Monad m) => Pipeline m r -> m r
-runPipe p = do
-    e <- runFreeT p
-    case e of
-        Pure r         -> return r
-        Free (Await   f) -> runPipe $ f ()
-        Free (Yield _ p) -> runPipe p
+runPipe pl = go pl where
+    go p = case p of
+       Yield _ p' -> go p' 
+       Await   f  -> go (f ())
+       M       m  -> m >>= go
+       Pure    r  -> return r

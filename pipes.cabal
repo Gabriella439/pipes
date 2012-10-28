@@ -48,7 +48,6 @@ Source-Repository head
 Library
     Build-Depends:
         base >= 4 && < 5,
-        free >= 3.2,
         index-core,
         transformers
     Exposed-Modules:

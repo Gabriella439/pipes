@@ -35,7 +35,7 @@ module Control.Proxy.Prelude.Base (
 import Control.Monad (replicateM_, void, when, (>=>))
 import Control.Monad.Trans.Class (lift)
 import Control.Proxy.Class (request, respond, idT)
-import Control.Proxy.Core (Proxy, Server, Client)
+import Control.Proxy.Core (Proxy(..), Server, Client)
 import Control.Proxy.Prelude.Kleisli (foreverK, replicateK)
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
@@ -314,16 +314,12 @@ enumFromC a _ = go a where
 enumFromToS :: (Enum a, Ord a, Monad m) => a -> a -> y' -> Proxy x' x y' a m ()
 enumFromToS a1 a2 _ = go a1 where
     go n
-        | n > a2   = return ()
-        | otherwise = do
-            respond n
-            go (succ n)
+        | n > a2    = Pure ()
+        | otherwise = Respond n (\_ -> go (succ n))
 
 -- | 'Client' version of 'enumFromTo'
 enumFromToC :: (Enum a, Ord a, Monad m) => a -> a -> y' -> Proxy a x y' y m ()
 enumFromToC a1 a2 _ = go a1 where
     go n
-        | n > a2 = return ()
-        | otherwise = do
-            request n
-            go (succ n)
+        | n > a2 = Pure ()
+        | otherwise = Request n (\_ -> go (succ n))

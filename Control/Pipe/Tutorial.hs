@@ -35,7 +35,6 @@ module Control.Pipe.Tutorial (
 import Control.Category
 import Control.Frame hiding (await, yield)
 import Control.Monad.Trans.Class
-import Control.Monad.Trans.Free
 import Control.Pipe
 
 {- $type
