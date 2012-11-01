@@ -5,7 +5,6 @@
 
 module Control.Proxy.Core (
     -- * Types
-    -- $types
     Proxy(..),
     C,
     Server,
@@ -32,8 +31,7 @@ import Control.Proxy.Class (
     Channel(idT, (<-<)), Interact(request, (/</), respond, (\<\)) )
 import Data.Closed (C)
 
-{- $types
-    A 'Proxy' communicates with an upstream interface and a downstream
+{-| A 'Proxy' communicates with an upstream interface and a downstream
     interface.
 
     The type variables of @Proxy req_a resp_a req_b resp_b m r@ signify:
@@ -49,7 +47,6 @@ import Data.Closed (C)
     * @m     @ - The base monad
 
     * @r     @ - The final return value -}
-
 data Proxy a' a b' b m r
   = Request a' (a  -> Proxy a' a b' b m r )
   | Respond b  (b' -> Proxy a' a b' b m r )
