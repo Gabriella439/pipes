@@ -84,7 +84,7 @@ import Control.Pipe hiding (await, yield, Await, Yield)
 -}
 
 -- | Index representing an open input end, receiving values of type @a@
-data O a
+data O a = O -- Not exported
 
 -- | Index representing an open input end, receiving values of type @Maybe a@
 type M a = O (Maybe a)
