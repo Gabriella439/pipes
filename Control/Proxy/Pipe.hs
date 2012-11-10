@@ -1,3 +1,5 @@
+{-# LANGUAGE Rank2Types #-}
+
 {-| This module provides an API compatible with "Control.Pipe"
 
     Consult "Control.Pipe.Core" for more extensive documentation and
@@ -34,16 +36,16 @@ import Data.Closed (C)
     * @m@ - The base monad
 
     * @r@ - The type of the return value -}
-type Pipe   a b = Proxy () a () b
+type Pipe   a b m r = Proxy () a () b m r
 
 -- | A pipe that produces values
-type Producer b = Pipe () b
+type Producer b m r = forall a   . Pipe a b m r
 
 -- | A pipe that consumes values
-type Consumer a = Pipe a  C
+type Consumer a m r = forall   b . Pipe a b m r
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline   = Pipe () C
+type Pipeline   m r = forall a b . Pipe a b m r
 
 {-| Wait for input from upstream
 
