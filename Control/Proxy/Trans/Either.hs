@@ -29,59 +29,81 @@ import Prelude hiding (catch)
 newtype EitherP e p a' a b' b (m :: * -> *) r
   = EitherP { runEitherP :: p a' a b' b m (Either e r) }
 
-instance (Monad (p a' a b' b m)) => Functor (EitherP e p a' a b' b m) where
-    fmap = liftM
+instance (Functor           (p a' a b' b m))
+       => Functor (EitherP e p a' a b' b m) where
+    fmap f p = EitherP (fmap (fmap f) (runEitherP p))
+ -- fmap f = EitherP . fmap (fmap f) . runEitherP
 
-instance (Monad (p a' a b' b m)) => Applicative (EitherP e p a' a b' b m) where
-    pure  = return
-    (<*>) = ap
+instance (Applicative           (p a' a b' b m))
+       => Applicative (EitherP e p a' a b' b m) where
+    pure r = EitherP (pure (Right r))
+ -- pure = EitherP . pure . pure
 
-instance (Monad (p a' a b' b m)) => Monad (EitherP e p a' a b' b m) where
+    fp <*> xp = EitherP (fmap (<*>) (runEitherP fp) <*> (runEitherP xp))
+ -- fp <*> xp = EitherP ((<*>) <$> (runEitherP fp) <*> (runEitherP xp))
+
+instance (Monad           (p a' a b' b m))
+       => Monad (EitherP e p a' a b' b m) where
     return = right
-    m >>= f = EitherP $ do
+    m >>= f = EitherP (do
         e <- runEitherP m
         runEitherP $ case e of
             Left  l -> left l
-            Right r -> f    r
+            Right r -> f    r )
 
-instance (MonadPlus (p a' a b' b m))
- => Alternative (EitherP e p a' a b' b m) where
-    empty = mzero
-    (<|>) = mplus
+instance (Alternative           (p a' a b' b m))
+       => Alternative (EitherP e p a' a b' b m) where
+    empty = EitherP empty
+    p1 <|> p2 = EitherP (runEitherP p1 <|> runEitherP p2)
 
-instance (MonadPlus (p a' a b' b m))
- => MonadPlus (EitherP e p a' a b' b m) where
+instance (MonadPlus           (p a' a b' b m))
+       => MonadPlus (EitherP e p a' a b' b m) where
     mzero = EitherP mzero
-    mplus m1 m2 = EitherP $ mplus (runEitherP m1) (runEitherP m2)
+    mplus m1 m2 = EitherP (mplus (runEitherP m1) (runEitherP m2))
 
-instance (MonadTrans (p a' a b' b)) => MonadTrans (EitherP e p a' a b' b) where
-    lift = EitherP . lift . liftM Right
+instance (MonadTrans           (p a' a b' b))
+       => MonadTrans (EitherP e p a' a b' b) where
+    lift m = EitherP (lift (m >>= \x -> return (Right x)))
+ -- lift = EitherP . lift . liftM Right
 
-instance (MonadIO (p a' a b' b m)) => MonadIO (EitherP e p a' a b' b m) where
-    liftIO = EitherP . liftIO . liftM Right
+instance (MonadIO           (p a' a b' b m))
+       => MonadIO (EitherP e p a' a b' b m) where
+    liftIO m = EitherP (liftIO (m >>= \x -> return (Right x)))
+ -- liftIO = EitherP . liftIO . liftM Right
 
-instance (MFunctor (p a' a b' b)) => MFunctor (EitherP e p a' a b' b) where
-    mapT nat = EitherP . mapT nat . runEitherP
+instance (MFunctor           (p a' a b' b))
+       => MFunctor (EitherP e p a' a b' b) where
+    mapT nat p = EitherP (mapT nat (runEitherP p))
+ -- mapT nat = EitherP . mapT nat . runEitherP
 
-instance (Channel p) => Channel (EitherP e p) where
-    idT = EitherP . idT
-    p1 >-> p2 = (EitherP .) $ runEitherP . p1 >-> runEitherP . p2
+instance (Channel            p )
+       => Channel (EitherP e p) where
+    idT a' = EitherP (idT a')
+ -- idT = EitherP . idT
+
+    p1 >-> p2 = \c'1 -> EitherP (
+        ((\b' -> runEitherP (p1 b')) >-> (\c'2 -> runEitherP (p2 c'2))) c'1 )
+ -- p1 >-> p2 = (EitherP .) $ runEitherP . p1 >-> runEitherP . p2
 
 instance ProxyTrans (EitherP e) where
-    liftP = EitherP . liftM Right
+    liftP p = EitherP (p >>= \x -> return (Right x))
+ -- liftP = EitherP . liftM Right
 
 -- | Run an 'EitherP' \'@K@\'leisi arrow, returning either a 'Left' or 'Right'
 runEitherK
  :: (q -> EitherP e p a' a b' b m r) -> (q -> p a' a b' b m (Either e r))
-runEitherK = (runEitherP .)
+runEitherK p q = runEitherP (p q)
+-- runEitherK = (runEitherP .)
 
 -- | Abort the computation and return a 'Left' result
 left :: (Monad (p a' a b' b m)) => e -> EitherP e p a' a b' b m r
-left = EitherP . return . Left
+left e = EitherP (return (Left e))
+-- left = EitherP . return . Left
 
 -- | Synonym for 'return'
 right :: (Monad (p a' a b' b m)) => r -> EitherP e p a' a b' b m r
-right = EitherP . return . Right
+right r = EitherP (return (Right r))
+-- right = EitherP . return . Right
 
 {- $symmetry
     'EitherP' forms a second symmetric monad over the left type variable.
@@ -109,11 +131,11 @@ catch
  => EitherP e p a' a b' b m r        -- ^ Original computation
  -> (e -> EitherP f p a' a b' b m r) -- ^ Handler
  -> EitherP f p a' a b' b m r        -- ^ Handled computation
-catch m f = EitherP $ do
+catch m f = EitherP (do
     e <- runEitherP m
-    runEitherP $ case e of
+    runEitherP (case e of
         Left  l -> f     l
-        Right r -> right r
+        Right r -> right r ))
 
 -- | 'catch' with the arguments flipped
 handle
@@ -121,8 +143,5 @@ handle
  => (e -> EitherP f p a' a b' b m r) -- ^ Handler
  -> EitherP e p a' a b' b m r        -- ^ Original computation
  -> EitherP f p a' a b' b m r        -- ^ Handled computation
-handle f m = EitherP $ do
-    e <- runEitherP m
-    runEitherP $ case e of
-        Left  l -> f     l
-        Right r -> right r
+handle f m = catch m f
+-- handle = flip catch
