@@ -9,34 +9,34 @@ module Control.Proxy.Trans.Identity (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
-import Control.Monad (liftM, ap, MonadPlus(mzero, mplus))
+import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
-    Channel(idT    , (>->)), 
-    Interact(request, (\>\), respond, (/>/)) )
+    Channel(idT, (>->)), Interact(request, (\>\), respond, (/>/)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Identity' proxy transformer
-newtype IdentityP p a' a b' b (m :: * -> *) r
-  = IdentityP { runIdentityP :: p a' a b' b m r }
+newtype IdentityP p a' a b' b (m :: * -> *) r =
+    IdentityP { runIdentityP :: p a' a b' b m r }
 
 instance (Monad (p a' a b' b m)) => Functor (IdentityP p a' a b' b m) where
-    fmap = liftM
+    fmap f p = IdentityP (runIdentityP p >>= \x -> return (f x))
 
 instance (Monad (p a' a b' b m)) => Applicative (IdentityP p a' a b' b m) where
-    pure  = return
-    (<*>) = ap
+    pure r = IdentityP (return r)
+    fp <*> xp = IdentityP (
+        runIdentityP fp >>= \f -> runIdentityP xp >>= \x -> return (f x) )
 
 instance (Monad (p a' a b' b m)) => Monad (IdentityP p a' a b' b m) where
-    return = IdentityP . return
-    m >>= f = IdentityP $ runIdentityP m >>= runIdentityP . f
+    return r = IdentityP (return r)
+    m >>= f = IdentityP (runIdentityP m >>= \x -> runIdentityP (f x))
 
 instance (MonadPlus (p a' a b' b m))
  => Alternative (IdentityP p a' a b' b m) where
-    empty = mzero
-    (<|>) = mplus
+    empty = IdentityP mzero
+    m1 <|> m2 = IdentityP (mplus (runIdentityP m1) (runIdentityP m2))
 
 instance (MonadPlus (p a' a b' b m))
  => MonadPlus (IdentityP p a' a b' b m) where
@@ -44,27 +44,46 @@ instance (MonadPlus (p a' a b' b m))
     mplus m1 m2 = IdentityP $ mplus (runIdentityP m1) (runIdentityP m2)
 
 instance (MonadTrans (p a' a b' b)) => MonadTrans (IdentityP p a' a b' b) where
-    lift = IdentityP . lift
+    lift m = IdentityP (lift m)
+ -- lift = IdentityP . lift
 
 instance (MonadIO (p a' a b' b m)) => MonadIO (IdentityP p a' a b' b m) where
-    liftIO = IdentityP . liftIO
+    liftIO m = IdentityP (liftIO m)
+ -- liftIO = IdentityP . liftIO
 
 instance (MFunctor (p a' a b' b)) => MFunctor (IdentityP p a' a b' b) where
-    mapT nat = IdentityP . mapT nat . runIdentityP
+    mapT nat p = IdentityP (mapT nat (runIdentityP p))
+ -- mapT nat = IdentityP . mapT nat . runIdentityP
 
 instance (Channel p) => Channel (IdentityP p) where
-    idT = IdentityP . idT
-    p1 >-> p2 = (IdentityP .) $ runIdentityP . p1 >-> runIdentityP . p2
+    idT = \a' -> IdentityP (idT a')
+ -- idT = IdentityP . idT
+
+    p1 >-> p2 = \c'1 -> IdentityP (
+        ((\c'2 -> runIdentityP (p1 c'2))
+     >-> (\b'  -> runIdentityP (p2 b' )) ) c'1 )
+ -- p1 >-> p2 = (IdentityP .) $ runIdentityP . p1 >-> runIdentityP . p2
 
 instance (Interact p) => Interact (IdentityP p) where
-    request = IdentityP . request
-    p1 \>\ p2 = (IdentityP .) $ runIdentityP . p1 \>\ runIdentityP . p2
-    respond = IdentityP . respond
-    p1 />/ p2 = (IdentityP .) $ runIdentityP . p1 />/ runIdentityP . p2
+    request a' = IdentityP (request a')
+ -- request = IdentityP . request
+
+    p1 \>\ p2 = \c'1 -> IdentityP (
+        ((\b'  -> runIdentityP (p1 b' ))
+     \>\ (\c'2 -> runIdentityP (p2 c'2)) ) c'1 )
+ -- p1 \>\ p2 = (IdentityP .) $ runIdentityP . p1 \>\ runIdentityP . p2
+
+    respond b = IdentityP (respond b )
+ -- respond = IdentityP . respond
+
+    p1 />/ p2 = \a1 -> IdentityP (
+        ((\a2 -> runIdentityP (p1 a2)) />/ (\b -> runIdentityP (p2 b))) a1 )
+ -- p1 />/ p2 = (IdentityP .) $ runIdentityP . p1 />/ runIdentityP . p2
 
 instance ProxyTrans IdentityP where
     liftP = IdentityP
 
 -- | Run an 'IdentityP' \'@K@\'leisli arrow
 runIdentityK :: (q -> IdentityP p a' a b' b m r) -> (q -> p a' a b' b m r)
-runIdentityK = (runIdentityP .)
+runIdentityK k = \q -> runIdentityP (k q)
+-- runIdentityK = (runIdentityP .)
