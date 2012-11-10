@@ -1,3 +1,5 @@
+{-# LANGUAGE Rank2Types #-}
+
 {-| A 'Proxy' 'request's input from upstream and 'respond's with output to
     downstream.
 
@@ -127,18 +129,18 @@ instance MFunctor (Proxy a' a b' b) where
     type @resp@.
 
     'Server's only 'respond' and never 'request' anything. -}
-type Server req resp = Proxy C   ()   req resp
+type Server req resp m r = forall a' a      . Proxy a'  a    req resp m r
 
 {-| @Client req resp@ sends requests of type @req@ and receives responses of
     type @resp@.
 
     'Client's only 'request' and never 'respond' to anything. -}
-type Client req resp = Proxy req resp ()  C
+type Client req resp m r = forall      b' b . Proxy req resp b'  b    m r
 
 {-| A self-contained 'Session', ready to be run by 'runSession'
 
     'Session's never 'request' anything or 'respond' to anything. -}
-type Session         = Proxy C   ()   ()  C
+type Session         m r = forall a' a b' b . Proxy a'  a    b'  b    m r
 
 {- $run
     I provide two ways to run proxies:
@@ -185,17 +187,17 @@ runProxy k = go (k ()) where
 
 {-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to a Kleisli
     arrow in the base monad -}
-runProxyK :: (Monad m) => (() -> Proxy a () () b m r) -> (() -> m r)
+runProxyK :: (Monad m) => (() -> Proxy a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
 
 {-| Run a self-contained 'Session' Kleisli arrow, converting it back to the base
     monad -}
-runSession :: (Monad m) => (() -> Session m r) -> m r
+runSession :: (Monad m) => (() -> Proxy C () () C m r) -> m r
 runSession = runProxy
 
 {-| Run a self-contained 'Session' Kleisli arrow, converting it back to a
     Kleisli arrow in the base monad -}
-runSessionK :: (Monad m) => (() -> Session m r) -> (() -> m r)
+runSessionK :: (Monad m) => (() -> Proxy C () () C m r) -> (() -> m r)
 runSessionK = runProxyK
 
 {- $utility
