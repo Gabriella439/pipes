@@ -30,6 +30,7 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
     Channel(idT, (<-<)), Interact(request, (/</), respond, (\<\)) )
+import Data.Closed (C)
 
 {-| A 'Proxy' communicates with an upstream interface and a downstream
     interface.
