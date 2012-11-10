@@ -51,8 +51,7 @@ type Pipeline   m r = forall a b . Pipe a b m r
 
     'await' blocks until input is available -}
 await :: (Monad m) => Pipe a b m a
-await = request ()
-{-# INLINE await #-}
+await = Request () Pure
 
 -- | Convert a pure function into a pipe
 pipe :: (Monad m) => (a -> b) -> Pipe a b m r
@@ -63,8 +62,7 @@ pipe f = go where
 
     'yield' restores control back downstream and binds the result to 'await'. -}
 yield :: (Monad m) => b -> Pipe a b m ()
-yield = respond
-{-# INLINE yield #-}
+yield b = Respond b Pure
 
 infixr 9 <+<
 infixl 9 >+>
