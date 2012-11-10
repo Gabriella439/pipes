@@ -25,7 +25,6 @@ module Control.Proxy.Pipe (
 
 import Control.Proxy.Core
 import Control.Proxy.Class
-import Data.Closed (C)
 
 {-| The type variables of @Pipe a b m r@ signify:
 

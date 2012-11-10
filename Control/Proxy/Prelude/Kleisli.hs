@@ -11,7 +11,6 @@ module Control.Proxy.Prelude.Kleisli (
 import Control.Monad (forever, (>=>))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (Interact(request, respond))
-import Data.Closed (C)
 
 {- $utility
     Use 'foreverK' to abstract away the following common pattern:
