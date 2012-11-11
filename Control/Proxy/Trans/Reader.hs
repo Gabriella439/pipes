@@ -15,7 +15,7 @@ module Control.Proxy.Trans.Reader (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
-import Control.Monad (liftM, ap, MonadPlus(mzero, mplus))
+import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
@@ -28,14 +28,19 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype ReaderP i p a' a b' b (m :: * -> *) r
   = ReaderP { unReaderP :: i -> p a' a b' b m r }
 
-instance (Functor           (p a' a b' b m))
+instance (Monad             (p a' a b' b m))
        => Functor (ReaderP i p a' a b' b m) where
-    fmap f p = ReaderP (\i -> fmap f (unReaderP p i))
+    fmap f p = ReaderP (\i -> do
+        x <- unReaderP p i
+        return (f x) )
 
-instance (Applicative           (p a' a b' b m))
+instance (Monad                 (p a' a b' b m))
        => Applicative (ReaderP i p a' a b' b m) where
-    pure r = ReaderP (\_ -> pure r)
-    p1 <*> p2 = ReaderP (\i -> unReaderP p1 i <*> unReaderP p2 i)
+    pure = return
+    p1 <*> p2 = ReaderP (\i -> do
+        f <- unReaderP p1 i
+        x <- unReaderP p2 i
+        return (f x) )
 
 instance (Monad           (p a' a b' b m))
        => Monad (ReaderP i p a' a b' b m) where
@@ -44,10 +49,10 @@ instance (Monad           (p a' a b' b m))
         a <- unReaderP m i
         unReaderP (f a) i )
 
-instance (Alternative           (p a' a b' b m))
+instance (MonadPlus             (p a' a b' b m))
        => Alternative (ReaderP i p a' a b' b m) where
-    empty = ReaderP (\_ -> empty)
-    p1 <|> p2 = ReaderP (\i -> unReaderP p1 i <|> unReaderP p2 i)
+    empty = mzero
+    (<|>) = mplus
 
 instance (MonadPlus           (p a' a b' b m))
        => MonadPlus (ReaderP i p a' a b' b m) where
