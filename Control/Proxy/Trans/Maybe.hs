@@ -79,7 +79,7 @@ instance (MFunctor        (p a' a b' b))
 
 instance (Channel         p )
        => Channel (MaybeP p) where
-    idT a' = MaybeP (idT a')
+    idT = \a' -> MaybeP (idT a')
  -- idT = MaybeP . idT
 
     p1 >-> p2 = \c'1 -> MaybeP (
