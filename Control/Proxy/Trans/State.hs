@@ -32,9 +32,9 @@ newtype StateP s p a' a b' b (m :: * -> *) r
 
 instance (Monad            (p a' a b' b m))
        => Functor (StateP s p a' a b' b m) where
-       fmap f p = StateP (\s -> do
-           (x, s) <- unStateP p s
-           return (f x, s) )
+       fmap f p = StateP (\s0 -> do
+           (x, s1) <- unStateP p s0
+           return (f x, s1) )
 
 {- As far as I can tell, there is no way to write this using an Applicative
    context -}
