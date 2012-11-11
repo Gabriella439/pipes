@@ -74,7 +74,7 @@ instance (MFunctor           (p a' a b' b))
 
 instance (Channel            p  )
        => Channel (ReaderP i p) where
-    idT a = ReaderP (\_ -> idT a)
+    idT = \a' -> ReaderP (\_ -> idT a')
     p1 >-> p2 = \c'1 -> ReaderP (\i ->
         ((\b'  -> unReaderP (p1 b' ) i)
      >-> (\c'2 -> unReaderP (p2 c'2) i) ) c'1 )
@@ -83,13 +83,13 @@ instance (Channel            p  )
 
 instance (Interact            p )
        => Interact (ReaderP i p) where
-    request a = ReaderP (\_ -> request a)
- {- p1 \>\ p2 = \a -> ReaderP $ \i ->
-        ((`unReaderP` i) . p1 \>\ (`unReaderP` i) . p2) a -}
+    request = \a -> ReaderP (\_ -> request a)
+ {- p1 \>\ p2 = \c' -> ReaderP $ \i ->
+        ((`unReaderP` i) . p1 \>\ (`unReaderP` i) . p2) c' -}
     p1 \>\ p2 = \c'1 -> ReaderP (\i ->
         ((\b'  -> unReaderP (p1 b' ) i)
      \>\ (\c'2 -> unReaderP (p2 c'2) i) ) c'1 )
-    respond a = ReaderP (\_ -> respond a)
+    respond = \a -> ReaderP (\_ -> respond a)
  {- p1 />/ p2 = \a -> ReaderP $ \i ->
         ((`unReaderP` i) . p1 />/ (`unReaderP` i) . p2) a -}
     p1 />/ p2 = \a1 -> ReaderP (\i ->
