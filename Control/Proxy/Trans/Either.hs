@@ -17,7 +17,7 @@ module Control.Proxy.Trans.Either (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
-import Control.Monad (liftM, ap, MonadPlus(mzero, mplus))
+import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
@@ -29,17 +29,27 @@ import Prelude hiding (catch)
 newtype EitherP e p a' a b' b (m :: * -> *) r
   = EitherP { runEitherP :: p a' a b' b m (Either e r) }
 
-instance (Functor           (p a' a b' b m))
+instance (Monad             (p a' a b' b m))
        => Functor (EitherP e p a' a b' b m) where
-    fmap f p = EitherP (fmap (fmap f) (runEitherP p))
- -- fmap f = EitherP . fmap (fmap f) . runEitherP
+    fmap f p = EitherP (do
+        e <- runEitherP p
+        return (case e of
+            Left  l -> Left l
+            Right r -> Right (f r) ) )
+ -- fmap f = EitherP . liftM (fmap f) . runEitherP
 
-instance (Applicative           (p a' a b' b m))
+instance (Monad                 (p a' a b' b m))
        => Applicative (EitherP e p a' a b' b m) where
-    pure r = EitherP (pure (Right r))
- -- pure = EitherP . pure . pure
-
-    fp <*> xp = EitherP (fmap (<*>) (runEitherP fp) <*> (runEitherP xp))
+    pure = return
+    fp <*> xp = EitherP (do
+        e1 <- runEitherP fp
+        case e1 of
+            Left  l -> return (Left l)
+            Right f -> do
+                 e2 <- runEitherP xp
+                 case e2 of
+                      Left l  -> return (Left l)
+                      Right x -> return (Right (f x)) )
  -- fp <*> xp = EitherP ((<*>) <$> (runEitherP fp) <*> (runEitherP xp))
 
 instance (Monad           (p a' a b' b m))
@@ -47,14 +57,14 @@ instance (Monad           (p a' a b' b m))
     return = right
     m >>= f = EitherP (do
         e <- runEitherP m
-        runEitherP $ case e of
+        runEitherP (case e of
             Left  l -> left l
-            Right r -> f    r )
+            Right r -> f    r ) )
 
-instance (Alternative           (p a' a b' b m))
+instance (MonadPlus             (p a' a b' b m))
        => Alternative (EitherP e p a' a b' b m) where
-    empty = EitherP empty
-    p1 <|> p2 = EitherP (runEitherP p1 <|> runEitherP p2)
+    empty = mzero
+    (<|>) = mplus
 
 instance (MonadPlus           (p a' a b' b m))
        => MonadPlus (EitherP e p a' a b' b m) where
