@@ -32,14 +32,19 @@ newtype StateP s p a' a b' b (m :: * -> *) r
 
 instance (Monad            (p a' a b' b m))
        => Functor (StateP s p a' a b' b m) where
-       fmap f p = p >>= \x -> return (f x)
+       fmap f p = StateP (\s -> do
+           (x, s) <- unStateP p s
+           return (f x, s) )
 
 {- As far as I can tell, there is no way to write this using an Applicative
    context -}
 instance (Monad                (p a' a b' b m))
        => Applicative (StateP s p a' a b' b m) where
     pure = return
-    p1 <*> p2 = p1 >>= \f -> p2 >>= \x -> return (f x)
+    p1 <*> p2 = StateP (\s0 -> do
+        (f, s1) <- unStateP p1 s0
+        (x, s2) <- unStateP p2 s1
+        return (f x, s2) )
 
 instance (Monad          (p a' a b' b m))
        => Monad (StateP s p a' a b' b m) where
