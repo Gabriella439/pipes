@@ -29,7 +29,10 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
-    Channel(idT, (<-<)), Interact(request, (/</), respond, (\<\)) )
+    Channel(idT, (<-<)),
+    InteractId(request, respond),
+    InteractComp((/</), (\<\)),
+    MonadProxy (returnP, (?>=)) )
 import Data.Closed (C)
 
 {-| A 'Proxy' communicates with an upstream interface and a downstream
@@ -81,10 +84,12 @@ instance (Monad m) => Monad (Proxy a' a b' b m) where
             Pure r         -> f r
 
 instance MonadTrans (Proxy a' a b' b) where
-    lift = M . liftM Pure
+    lift m = M (m >>= \r -> return (Pure r))
+ -- lift = M . liftM Pure
 
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
-    liftIO = M . liftIO . liftM Pure
+    liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
+ -- liftIO = M . liftIO . liftM Pure
 
 instance Channel Proxy where
     idT = \a' -> Request a' $ \a -> Respond a idT
@@ -100,21 +105,27 @@ instance Channel Proxy where
             M          m   -> M (m >>= \p2' -> return (fb <-| p2'))
             Pure       r   -> Pure r
 
-instance Interact Proxy where
-    request a' = Request a' Pure
+instance InteractId Proxy where
+    request = \a' -> Request a' Pure
+    respond = \a  -> Respond a Pure
+
+instance InteractComp Proxy where
     k1 /</ k2 = \a' -> go (k1 a') where
         go p = case p of
             Request b' fb  -> k2 b' >>= \b -> go (fb b)
             Respond x  fx' -> Respond x (\x' -> go (fx' x'))
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       a   -> Pure a
-    respond a = Respond a Pure
     k1 \<\ k2 = \a' -> go (k2 a') where
         go p = case p of
             Request x' fx  -> Request x' (\x -> go (fx x))
             Respond b  fb' -> k1 b >>= \b' -> go (fb' b')
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       a   -> Pure a
+
+instance MonadProxy Proxy where
+    returnP = return
+    (?>=) = (>>=)
 
 instance MFunctor (Proxy a' a b' b) where
     mapT nat p0 = go p0 where

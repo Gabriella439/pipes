@@ -8,9 +8,8 @@ module Control.Proxy.Prelude.Kleisli (
     mapK
     ) where
 
-import Control.Monad (forever, (>=>))
+import Control.Monad ((>=>))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.Proxy.Class (Interact(request, respond))
 
 {- $utility
     Use 'foreverK' to abstract away the following common pattern:
@@ -48,5 +47,5 @@ replicateK n0 k = go n0 where
 > mapK return = return
 -}
 mapK :: (Monad m, MonadTrans t) => (a -> m b) -> (a -> t m b)
-mapK = (lift .)
-{-# INLINABLE mapK #-}
+mapK k a = lift (k a)
+-- mapK = (lift .)

@@ -14,7 +14,10 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
-    Channel(idT, (>->)), Interact(request, (\>\), respond, (/>/)) )
+    Channel(idT, (>->)),
+    InteractId(request, respond),
+    InteractComp((\>\), (/>/)),
+    MonadProxy(returnP, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Identity' proxy transformer
@@ -82,23 +85,32 @@ instance (Channel            p )
      >-> (\b'  -> runIdentityP (p2 b' )) ) c'1 )
  -- p1 >-> p2 = (IdentityP .) $ runIdentityP . p1 >-> runIdentityP . p2
 
-instance (Interact            p )
-       => Interact (IdentityP p) where
+instance (InteractId            p )
+       => InteractId (IdentityP p) where
     request = \a' -> IdentityP (request a')
  -- request = IdentityP . request
 
+    respond = \b -> IdentityP (respond b)
+ -- respond = IdentityP . respond
+
+instance (InteractComp            p )
+      =>  InteractComp (IdentityP p) where
     p1 \>\ p2 = \c'1 -> IdentityP (
         ((\b'  -> runIdentityP (p1 b' ))
      \>\ (\c'2 -> runIdentityP (p2 c'2)) ) c'1 )
  -- p1 \>\ p2 = (IdentityP .) $ runIdentityP . p1 \>\ runIdentityP . p2
 
-    respond = \b -> IdentityP (respond b)
- -- respond = IdentityP . respond
-
     p1 />/ p2 = \a1 -> IdentityP (
         ((\a2 -> runIdentityP (p1 a2))
      />/ (\b  -> runIdentityP (p2 b )) ) a1 )
  -- p1 />/ p2 = (IdentityP .) $ runIdentityP . p1 />/ runIdentityP . p2
+
+instance (MonadProxy            p )
+       => MonadProxy (IdentityP p) where
+    returnP = \r -> IdentityP (returnP r)
+    m ?>= f = IdentityP (
+        runIdentityP m ?>= \r ->
+        runIdentityP (f r) )
 
 instance ProxyTrans IdentityP where
     liftP = IdentityP

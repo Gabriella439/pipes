@@ -16,7 +16,10 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (Channel(idT, (>->)))
+import Control.Proxy.Class (
+    Channel(idT, (>->)),
+    InteractId(request, respond),
+    MonadProxy(returnP, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Maybe' proxy transformer
@@ -56,8 +59,6 @@ instance (Monad        (p a' a b' b m))
             Nothing -> nothing
             Just a  -> f a )
 
-{- I don't use the weaker Applicative context for the Alternative instance,
-   otherwise mplus would need to evaluate both actions. -}
 instance (Monad              (p a' a b' b m))
        => Alternative (MaybeP p a' a b' b m) where
     empty = mzero
@@ -68,9 +69,9 @@ instance (Monad            (p a' a b' b m))
     mzero = nothing
     mplus m1 m2 = MaybeP (do
         ma <- runMaybeP m1
-        runMaybeP $ case ma of
+        runMaybeP (case ma of
             Nothing -> m2
-            Just a  -> just a )
+            Just a  -> just a) )
 
 instance (MonadTrans        (p a' a b' b))
        => MonadTrans (MaybeP p a' a b' b) where
@@ -95,6 +96,20 @@ instance (Channel         p )
     p1 >-> p2 = \c'1 -> MaybeP (
         ((\b' -> runMaybeP (p1 b')) >-> (\c'2 -> runMaybeP (p2 c'2))) c'1 )
  -- p1 >-> p2 = (MaybeP .) $ runMaybeP . p1 >-> runMaybeP . p2
+
+instance (InteractId         p, MonadProxy p)
+       => InteractId (MaybeP p) where
+    request = \a' -> MaybeP (request a' ?>= \a  -> returnP (Just a ))
+    respond = \b  -> MaybeP (respond b  ?>= \b' -> returnP (Just b'))
+
+instance (MonadProxy         p )
+       => MonadProxy (MaybeP p) where
+    returnP = \r -> MaybeP (returnP (Just r))
+    m ?>= f = MaybeP (
+        runMaybeP m ?>= \ma ->
+        case ma of
+            Nothing -> returnP Nothing
+            Just a  -> runMaybeP (f a) )
 
 instance ProxyTrans MaybeP where
     liftP p = MaybeP (p >>= \x -> return (Just x))

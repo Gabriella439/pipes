@@ -25,7 +25,10 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (Channel(idT, (>->)))
+import Control.Proxy.Class (
+    Channel(idT, (>->)),
+    InteractId(request, respond),
+    MonadProxy(returnP, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Data.Monoid (Monoid(mempty, mappend))
 
@@ -50,7 +53,7 @@ instance (Monad                 (p a' a b' b m))
 
 instance (Monad           (p a' a b' b m))
        => Monad (WriterP w p a' a b' b m) where
-    return a = WriterP (\w -> return (a, w))
+    return  = \r -> WriterP (\w -> return (r, w))
     m >>= f = WriterP (\w -> do
         (a, w') <- unWriterP m w
         unWriterP (f a) w' )
@@ -85,6 +88,18 @@ instance (Channel            p )
         ((\b' -> unWriterP (p1 b') w) >-> (\c'2 -> unWriterP (p2 c'2) w)) c'1 )
  {- p1 >-> p2 = \c' -> WriterP $ \w ->
         ((`unWriterP` w) . p1 >-> (`unWriterP` w) . p2) c' -}
+
+instance (InteractId            p, MonadProxy p)
+       => InteractId (WriterP w p) where
+    request = \a' -> WriterP (\w -> request a' ?>= \a  -> returnP (a,  w))
+    respond = \b  -> WriterP (\w -> respond b  ?>= \b' -> returnP (b', w))
+
+instance (MonadProxy            p )
+       => MonadProxy (WriterP w p) where
+    returnP = \r -> WriterP (\w -> returnP (r, w))
+    m ?>= f = WriterP (\w ->
+        unWriterP m w ?>= \(a, w') -> 
+        unWriterP (f a) w' )
 
 instance ProxyTrans (WriterP w) where
     liftP m = WriterP (\w -> m >>= \r -> return (r, w))

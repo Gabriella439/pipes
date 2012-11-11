@@ -21,7 +21,10 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (Channel(idT, (>->))) 
+import Control.Proxy.Class (
+    Channel(idT, (>->)),
+    InteractId(request, respond),
+    MonadProxy(returnP, (?>=)) ) 
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Prelude hiding (catch)
 
@@ -94,6 +97,20 @@ instance (Channel            p )
     p1 >-> p2 = \c'1 -> EitherP (
         ((\b' -> runEitherP (p1 b')) >-> (\c'2 -> runEitherP (p2 c'2))) c'1 )
  -- p1 >-> p2 = (EitherP .) $ runEitherP . p1 >-> runEitherP . p2
+
+instance (InteractId            p, MonadProxy p)
+       => InteractId (EitherP e p) where
+    request = \a' -> EitherP (request a' ?>= \a  -> returnP (Right a ))
+    respond = \b  -> EitherP (respond b  ?>= \b' -> returnP (Right b'))
+
+instance (MonadProxy p)
+       => MonadProxy (EitherP e p) where
+    returnP = \r -> EitherP (returnP (Right r))
+    m ?>= f = EitherP (
+        runEitherP m ?>= \e ->
+        case e of
+            Left  l -> returnP (Left l)
+            Right r -> runEitherP (f r) )
 
 instance ProxyTrans (EitherP e) where
     liftP p = EitherP (p >>= \x -> return (Right x))

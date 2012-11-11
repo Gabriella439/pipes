@@ -23,7 +23,10 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (Channel(idT, (>->)))
+import Control.Proxy.Class (
+    Channel(idT, (>->)),
+    InteractId(request, respond),
+    MonadProxy(returnP, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'State' proxy transformer
@@ -48,8 +51,8 @@ instance (Monad                (p a' a b' b m))
 
 instance (Monad          (p a' a b' b m))
        => Monad (StateP s p a' a b' b m) where
-    return r = StateP (\s -> return (r, s))
-    m >>= f  = StateP (\s -> do
+    return  = \r -> StateP (\s -> return (r, s))
+    m >>= f = StateP (\s -> do
         (a, s') <- unStateP m s
         unStateP (f a) s' )
 
@@ -76,13 +79,26 @@ instance (MFunctor          (p a' a b' b))
     mapT nat p = StateP (\s -> mapT nat (unStateP p s))
  -- mapT nat = StateP . fmap (mapT nat) . unStateP
 
-instance (Channel p) => Channel (StateP s p) where
+instance (Channel           p )
+       => Channel (StateP s p) where
     idT = \a' -> StateP (\_ -> idT a')
 
     p1 >-> p2 = \c'1 -> StateP (\s ->
         ((\b' -> unStateP (p1 b') s) >-> (\c'2 -> unStateP (p2 c'2) s)) c'1 )
  {- (p1 >-> p2) = \c' -> StateP $ \s ->
         ((`unStateP` s) . p1 >-> (`unStateP` s) . p2) c' -}
+
+instance (InteractId           p, MonadProxy p)
+       => InteractId (StateP s p) where
+    request = \a' -> StateP (\s -> request a' ?>= \a  -> returnP (a , s))
+    respond = \b  -> StateP (\s -> respond b  ?>= \b' -> returnP (b', s))
+
+instance (MonadProxy           p)
+       => MonadProxy (StateP s p) where
+    returnP = \r -> StateP (\s -> returnP (r, s))
+    m ?>= f = StateP (\s ->
+        unStateP m s ?>= \(a, s') -> 
+        unStateP (f a) s' )
 
 instance ProxyTrans (StateP s) where
     liftP m = StateP (\s -> m >>= \r -> return (r, s))

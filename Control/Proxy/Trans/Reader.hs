@@ -21,7 +21,9 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
     Channel(idT, (>->)), 
-    Interact(request, (\>\), respond, (/>/)) )
+    InteractId(request, respond),
+    InteractComp((\>\), (/>/)),
+    MonadProxy(returnP, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Reader' proxy transformer
@@ -44,7 +46,7 @@ instance (Monad                 (p a' a b' b m))
 
 instance (Monad           (p a' a b' b m))
        => Monad (ReaderP i p a' a b' b m) where
-    return r = ReaderP (\_ -> return r)
+    return = \r -> ReaderP (\_ -> return r)
     m >>= f  = ReaderP (\i -> do
         a <- unReaderP m i
         unReaderP (f a) i )
@@ -81,20 +83,31 @@ instance (Channel            p  )
  {- p1 >-> p2 = \c' -> ReaderP $ \i ->
         ((`unReaderP` i) . p1 >-> (`unReaderP` i) . p2) c' -}
 
-instance (Interact            p )
-       => Interact (ReaderP i p) where
+instance (InteractId            p )
+       => InteractId (ReaderP i p) where
     request = \a -> ReaderP (\_ -> request a)
- {- p1 \>\ p2 = \c' -> ReaderP $ \i ->
-        ((`unReaderP` i) . p1 \>\ (`unReaderP` i) . p2) c' -}
+    respond = \a -> ReaderP (\_ -> respond a)
+
+instance (InteractComp            p)
+       => InteractComp (ReaderP i p) where
     p1 \>\ p2 = \c'1 -> ReaderP (\i ->
         ((\b'  -> unReaderP (p1 b' ) i)
      \>\ (\c'2 -> unReaderP (p2 c'2) i) ) c'1 )
-    respond = \a -> ReaderP (\_ -> respond a)
- {- p1 />/ p2 = \a -> ReaderP $ \i ->
-        ((`unReaderP` i) . p1 />/ (`unReaderP` i) . p2) a -}
+ {- p1 \>\ p2 = \c' -> ReaderP $ \i ->
+        ((`unReaderP` i) . p1 \>\ (`unReaderP` i) . p2) c' -}
+
     p1 />/ p2 = \a1 -> ReaderP (\i ->
         ((\b  -> unReaderP (p1 b ) i)
      />/ (\a2 -> unReaderP (p2 a2) i) ) a1 )
+ {- p1 />/ p2 = \a -> ReaderP $ \i ->
+        ((`unReaderP` i) . p1 />/ (`unReaderP` i) . p2) a -}
+
+instance (MonadProxy            p )
+       => MonadProxy (ReaderP i p) where
+    returnP = \r -> ReaderP (\_ -> returnP r)
+    m ?>= f  = ReaderP (\i ->
+        unReaderP m i ?>= \a ->
+        unReaderP (f a) i )
 
 instance ProxyTrans (ReaderP i) where
     liftP m = ReaderP (\_ -> m)

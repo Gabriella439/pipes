@@ -6,7 +6,11 @@ module Control.Proxy.Class (
     -- * Proxy composition
     Channel(..),
     -- * Proxy request and respond
-    Interact(..),
+    -- $interact
+    InteractId(..),
+    InteractComp(..),
+    -- * Proxy monad
+    MonadProxy(..)
     ) where
 
 {- * I use educated guesses about which associativy is optimal for each operator
@@ -18,6 +22,7 @@ infixr 8 /</
 infixl 8 \>\
 infixl 8 \<\
 infixr 8 />/
+infixl 1 ?>= -- This should match the fixity of >>=
 
 {-| The 'Channel' class defines an interface to a bidirectional flow of
     information.
@@ -59,7 +64,8 @@ class Channel p where
           -> (c' -> p a' a c' c m r)
     p1 <-< p2 = p2 >-> p1
 
-{-| The 'Interact' class defines the ability to:
+{- $interact
+    The 'InteractId' and 'InteractComp' classes defines the ability to:
 
     * Request input using the 'request' command
 
@@ -87,17 +93,12 @@ class Channel p where
 >
 > (f />/ g) />/ h = f />/ (g />/ h)
 
-    Minimal complete definition:
-
-    * 'request',
-
-    * ('\>\') or ('/</'),
-
-    * 'respond', and
-
-    * ('/>/') or ('\<\').
+    I split them into two separate classes because some proxy transformers lift
+    'InteractId' but not 'InteractComp'.
 -}
-class Interact p where
+
+-- | Identities of the \"request\" and \"respond\" categories
+class InteractId p where
     {-| 'request' input from upstream, passing an argument with the request
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
@@ -105,6 +106,22 @@ class Interact p where
         response to its own return value. -}
     request :: (Monad m) => a' -> p a' a x' x m a
 
+    {-| 'respond' with an output for downstream and bind downstream's next
+        'request'
+          
+        @respond b@ satisfies a downstream 'request' by supplying the value @b@
+        'respond' blocks until downstream 'request's a new value and binds the
+        argument from the next 'request' as its return value. -}
+    respond :: (Monad m) => a -> p x' x a' a m a'
+
+{-| Composition operators of the \"request\" and \"respond\" categories
+
+    Minimal complete definition:
+
+    * ('\>\') or ('/</')
+
+    * ('/>/') or ('\<\') -}
+class InteractComp p where
     -- | @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
     (\>\) :: (Monad m)
           => (b' -> p a' a x' x m b)
@@ -119,14 +136,6 @@ class Interact p where
           -> (c' -> p a' a x' x m c)
     p1 /</ p2 = p2 \>\ p1
 
-    {-| 'respond' with an output for downstream and bind downstream's next
-        'request'
-          
-        @respond b@ satisfies a downstream 'request' by supplying the value @b@
-        'respond' blocks until downstream 'request's a new value and binds the
-        argument from the next 'request' as its return value. -}
-    respond :: (Monad m) => a -> p x' x a' a m a'
-
     -- | @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
     (/>/) :: (Monad m)
           => (a -> p x' x b' b m a')
@@ -140,3 +149,16 @@ class Interact p where
           -> (a -> p x' x b' b m a')
           -> (a -> p x' x c' c m a')
     p1 \<\ p2 = p2 />/ p1
+
+{-| 'MonadProxy' works around the lack of polymorphic constraints in Haskell,
+    forbids constraints of the form:
+
+> @(forall a' a b' b m . (Monad m) => Monad (p a' a b' b m)) => ...@
+
+    Ordinary users should not need to use this class.  This simply enables
+    certain class instances for proxy transformers. -}
+class MonadProxy p where
+    returnP :: (Monad m) => r -> p a' a b' b m r
+    (?>=)
+     :: (Monad m)
+     => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'

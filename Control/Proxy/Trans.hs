@@ -1,3 +1,5 @@
+{-# LANGUAGE KindSignatures #-}
+
 {-| You can define your own extensions to the 'Proxy' type by writing your own
     \"proxy transformers\".  Proxy transformers are monad transformers that
     correctly lift 'Proxy' composition from the base monad.  Stack multiple
@@ -28,11 +30,14 @@ import Control.Proxy.Class
     Minimal complete definition: 'mapP' or 'liftP'.  Defining 'liftP' is more
     efficient.
 -}
-class ProxyTrans t where
-    liftP :: (Monad (p b c d e m), Channel p)
+class ProxyTrans
+      (t :: (* -> * -> * -> * -> (* -> *) -> * -> *)
+         ->  * -> * -> * -> * -> (* -> *) -> * -> * )
+      where
+    liftP :: (Monad (p b c d e m))
           => p b c d e m r -> t p b c d e m r
     liftP f = mapP (\() -> f) ()
 
-    mapP :: (Monad (p b c d e m), Channel p)
+    mapP :: (Monad (p b c d e m))
          => (a -> p b c d e m r) -> (a -> t p b c d e m r)
     mapP = (liftP .)
