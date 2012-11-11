@@ -12,7 +12,7 @@ module Control.Proxy.Trans.Maybe (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
-import Control.Monad (liftM, ap, MonadPlus(mzero, mplus))
+import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
@@ -23,32 +23,42 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype MaybeP p a' a b' b (m :: * -> *) r
   = MaybeP { runMaybeP :: p a' a b' b m (Maybe r) }
 
-instance (Functor        (p a' a b' b m))
+instance (Monad          (p a' a b' b m))
        => Functor (MaybeP p a' a b' b m) where
-    fmap f p = MaybeP (fmap (fmap f) (runMaybeP p))
+    fmap f p = MaybeP (do
+        m <- runMaybeP p
+        return (case m of
+            Nothing -> Nothing
+            Just x  -> Just (f x) ) )
  -- fmap f = MaybeP . fmap (fmap f) . runMaybeP
 
-instance (Applicative        (p a' a b' b m))
+instance (Monad              (p a' a b' b m))
        => Applicative (MaybeP p a' a b' b m) where
-    pure r = MaybeP (pure (Just r))
- -- pure = MaybeP . pure . Just
+    pure = return
 
-    fp <*> xp = MaybeP (fmap (<*>) (runMaybeP fp) <*> (runMaybeP xp))
+    fp <*> xp = MaybeP (do
+        m1 <- runMaybeP fp
+        case m1 of
+            Nothing -> return Nothing
+            Just f  -> do
+                m2 <- runMaybeP xp
+                case m2 of
+                    Nothing -> return Nothing
+                    Just x  -> return (Just (f x)) )
  -- fp <*> xp = MaybeP ((<*>) <$> (runMaybeP fp) <*> (runMaybeP xp))
 
 instance (Monad        (p a' a b' b m))
        => Monad (MaybeP p a' a b' b m) where
     return = just
-    m >>= f = MaybeP $ do
+    m >>= f = MaybeP (do
         ma <- runMaybeP m
         runMaybeP $ case ma of
             Nothing -> nothing
-            Just a  -> f a
+            Just a  -> f a )
 
 {- I don't use the weaker Applicative context for the Alternative instance,
    otherwise mplus would need to evaluate both actions. -}
-instance (Applicative        (p a' a b' b m),
-          Monad              (p a' a b' b m))
+instance (Monad              (p a' a b' b m))
        => Alternative (MaybeP p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
