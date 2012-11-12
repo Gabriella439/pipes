@@ -32,7 +32,7 @@ import Control.Proxy.Class (
     Channel(idT, (<-<)),
     InteractId(request, respond),
     InteractComp((/</), (\<\)),
-    MonadProxy (returnP, (?>=)) )
+    MonadP(return_P, (?>=)) )
 import Data.Closed (C)
 
 {-| A 'Proxy' communicates with an upstream interface and a downstream
@@ -123,8 +123,8 @@ instance InteractComp Proxy where
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       a   -> Pure a
 
-instance MonadProxy Proxy where
-    returnP = return
+instance MonadP Proxy where
+    return_P = return
     (?>=) = (>>=)
 
 instance MFunctor (Proxy a' a b' b) where
