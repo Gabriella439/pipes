@@ -19,7 +19,7 @@ import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
     Channel(idT, (>->)),
     InteractId(request, respond),
-    MonadProxy(returnP, (?>=)) )
+    MonadP(return_P, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Maybe' proxy transformer
@@ -97,22 +97,22 @@ instance (Channel         p )
         ((\b' -> runMaybeP (p1 b')) >-> (\c'2 -> runMaybeP (p2 c'2))) c'1 )
  -- p1 >-> p2 = (MaybeP .) $ runMaybeP . p1 >-> runMaybeP . p2
 
-instance (InteractId         p, MonadProxy p)
+instance (InteractId         p, MonadP p)
        => InteractId (MaybeP p) where
-    request = \a' -> MaybeP (request a' ?>= \a  -> returnP (Just a ))
-    respond = \b  -> MaybeP (respond b  ?>= \b' -> returnP (Just b'))
+    request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
+    respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))
 
-instance (MonadProxy         p )
-       => MonadProxy (MaybeP p) where
-    returnP = \r -> MaybeP (returnP (Just r))
+instance (MonadP         p )
+       => MonadP (MaybeP p) where
+    return_P = \r -> MaybeP (return_P (Just r))
     m ?>= f = MaybeP (
         runMaybeP m ?>= \ma ->
         case ma of
-            Nothing -> returnP Nothing
+            Nothing -> return_P Nothing
             Just a  -> runMaybeP (f a) )
 
 instance ProxyTrans MaybeP where
-    liftP p = MaybeP (p >>= \x -> return (Just x))
+    liftP p = MaybeP (p ?>= \x -> return_P (Just x))
  -- liftP = MaybeP . liftM Just
 
 -- | Run a 'MaybeP' \'@K@\'leisli arrow, returning the result or 'Nothing'

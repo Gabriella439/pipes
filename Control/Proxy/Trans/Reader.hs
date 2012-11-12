@@ -23,7 +23,7 @@ import Control.Proxy.Class (
     Channel(idT, (>->)), 
     InteractId(request, respond),
     InteractComp((\>\), (/>/)),
-    MonadProxy(returnP, (?>=)) )
+    MonadP(return_P, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Reader' proxy transformer
@@ -102,9 +102,9 @@ instance (InteractComp            p)
  {- p1 />/ p2 = \a -> ReaderP $ \i ->
         ((`unReaderP` i) . p1 />/ (`unReaderP` i) . p2) a -}
 
-instance (MonadProxy            p )
-       => MonadProxy (ReaderP i p) where
-    returnP = \r -> ReaderP (\_ -> returnP r)
+instance (MonadP            p )
+       => MonadP (ReaderP i p) where
+    return_P = \r -> ReaderP (\_ -> return_P r)
     m ?>= f  = ReaderP (\i ->
         unReaderP m i ?>= \a ->
         unReaderP (f a) i )

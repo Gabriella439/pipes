@@ -10,7 +10,9 @@ module Control.Proxy.Class (
     InteractId(..),
     InteractComp(..),
     -- * Proxy monad
-    MonadProxy(..)
+    -- $hacks
+    MonadP(..),
+    MonadTransP(..)
     ) where
 
 {- * I use educated guesses about which associativy is optimal for each operator
@@ -150,15 +152,30 @@ class InteractComp p where
           -> (a -> p x' x c' c m a')
     p1 \<\ p2 = p2 />/ p1
 
-{-| 'MonadProxy' works around the lack of polymorphic constraints in Haskell,
-    forbids constraints of the form:
+{- $hacks
+    The following type classes serve two purposes:
 
-> @(forall a' a b' b m . (Monad m) => Monad (p a' a b' b m)) => ...@
+    * They work around the lack of polymorphic constraints in Haskell
 
-    Ordinary users should not need to use this class.  This simply enables
-    certain class instances for proxy transformers. -}
-class MonadProxy p where
-    returnP :: (Monad m) => r -> p a' a b' b m r
+    * They clean up inferred type signatures
+
+    Ordinary users don't need to use these classes, which exist solely for
+    implementing type class instances.
+-}
+
+{-| A @(MonadProxy p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b m . (Monad m) => Monad (p a' a b' b m)) => ...
+-}
+class MonadP p where
+    return_P :: (Monad m) => r -> p a' a b' b m r
     (?>=)
      :: (Monad m)
      => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'
+
+{-| A @(MonadTransP p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b . MonadTrans (p a' a b' b)) => ...
+-}
+class MonadTransP p where
+    lift_P :: (Monad m) => m r -> p a' a b' b m r

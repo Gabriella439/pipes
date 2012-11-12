@@ -28,7 +28,7 @@ import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
     Channel(idT, (>->)),
     InteractId(request, respond),
-    MonadProxy(returnP, (?>=)) )
+    MonadP(return_P, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Data.Monoid (Monoid(mempty, mappend))
 
@@ -89,20 +89,20 @@ instance (Channel            p )
  {- p1 >-> p2 = \c' -> WriterP $ \w ->
         ((`unWriterP` w) . p1 >-> (`unWriterP` w) . p2) c' -}
 
-instance (InteractId            p, MonadProxy p)
+instance (InteractId            p, MonadP p)
        => InteractId (WriterP w p) where
-    request = \a' -> WriterP (\w -> request a' ?>= \a  -> returnP (a,  w))
-    respond = \b  -> WriterP (\w -> respond b  ?>= \b' -> returnP (b', w))
+    request = \a' -> WriterP (\w -> request a' ?>= \a  -> return_P (a,  w))
+    respond = \b  -> WriterP (\w -> respond b  ?>= \b' -> return_P (b', w))
 
-instance (MonadProxy            p )
-       => MonadProxy (WriterP w p) where
-    returnP = \r -> WriterP (\w -> returnP (r, w))
+instance (MonadP            p )
+       => MonadP (WriterP w p) where
+    return_P = \r -> WriterP (\w -> return_P (r, w))
     m ?>= f = WriterP (\w ->
         unWriterP m w ?>= \(a, w') -> 
         unWriterP (f a) w' )
 
 instance ProxyTrans (WriterP w) where
-    liftP m = WriterP (\w -> m >>= \r -> return (r, w))
+    liftP m = WriterP (\w -> m ?>= \r -> return_P (r, w))
 
 -- | Run a 'WriterP' computation, producing the final result and monoid
 runWriterP :: (Monoid w) => WriterP w p a' a b' b m r -> p a' a b' b m (r, w)

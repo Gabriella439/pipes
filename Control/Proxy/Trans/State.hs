@@ -26,7 +26,7 @@ import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class (
     Channel(idT, (>->)),
     InteractId(request, respond),
-    MonadProxy(returnP, (?>=)) )
+    MonadP(return_P, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'State' proxy transformer
@@ -88,20 +88,20 @@ instance (Channel           p )
  {- (p1 >-> p2) = \c' -> StateP $ \s ->
         ((`unStateP` s) . p1 >-> (`unStateP` s) . p2) c' -}
 
-instance (InteractId           p, MonadProxy p)
+instance (InteractId           p, MonadP p)
        => InteractId (StateP s p) where
-    request = \a' -> StateP (\s -> request a' ?>= \a  -> returnP (a , s))
-    respond = \b  -> StateP (\s -> respond b  ?>= \b' -> returnP (b', s))
+    request = \a' -> StateP (\s -> request a' ?>= \a  -> return_P (a , s))
+    respond = \b  -> StateP (\s -> respond b  ?>= \b' -> return_P (b', s))
 
-instance (MonadProxy           p)
-       => MonadProxy (StateP s p) where
-    returnP = \r -> StateP (\s -> returnP (r, s))
+instance (MonadP           p)
+       => MonadP (StateP s p) where
+    return_P = \r -> StateP (\s -> return_P (r, s))
     m ?>= f = StateP (\s ->
         unStateP m s ?>= \(a, s') -> 
         unStateP (f a) s' )
 
 instance ProxyTrans (StateP s) where
-    liftP m = StateP (\s -> m >>= \r -> return (r, s))
+    liftP m = StateP (\s -> m ?>= \r -> return_P (r, s))
 
 -- | Run a 'StateP' computation, producing the final result and state
 runStateP :: s -> StateP s p a' a b' b m r -> p a' a b' b m (r, s)

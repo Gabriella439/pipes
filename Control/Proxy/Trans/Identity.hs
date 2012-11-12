@@ -17,7 +17,7 @@ import Control.Proxy.Class (
     Channel(idT, (>->)),
     InteractId(request, respond),
     InteractComp((\>\), (/>/)),
-    MonadProxy(returnP, (?>=)) )
+    MonadP(return_P, (?>=)) )
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Identity' proxy transformer
@@ -105,9 +105,9 @@ instance (InteractComp            p )
      />/ (\b  -> runIdentityP (p2 b )) ) a1 )
  -- p1 />/ p2 = (IdentityP .) $ runIdentityP . p1 />/ runIdentityP . p2
 
-instance (MonadProxy            p )
-       => MonadProxy (IdentityP p) where
-    returnP = \r -> IdentityP (returnP r)
+instance (MonadP            p )
+       => MonadP (IdentityP p) where
+    return_P = \r -> IdentityP (return_P r)
     m ?>= f = IdentityP (
         runIdentityP m ?>= \r ->
         runIdentityP (f r) )
