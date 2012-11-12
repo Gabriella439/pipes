@@ -28,11 +28,7 @@ import Control.Monad (ap, forever, liftM, (>=>))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (
-    Channel(idT, (<-<)),
-    InteractId(request, respond),
-    InteractComp((/</), (\<\)),
-    MonadP(return_P, (?>=)) )
+import Control.Proxy.Class
 import Data.Closed (C)
 
 {-| A 'Proxy' communicates with an upstream interface and a downstream
@@ -83,13 +79,23 @@ instance (Monad m) => Monad (Proxy a' a b' b m) where
             M m            -> M (m >>= \p' -> return (go p'))
             Pure r         -> f r
 
+instance MonadP Proxy where
+    return_P = return
+    (?>=)   = (>>=)
+
 instance MonadTrans (Proxy a' a b' b) where
     lift m = M (m >>= \r -> return (Pure r))
  -- lift = M . liftM Pure
 
+instance MonadTransP Proxy where
+    lift_P = lift
+
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
  -- liftIO = M . liftIO . liftM Pure
+
+instance MonadIOP Proxy where
+    liftIO_P = liftIO
 
 instance Channel Proxy where
     idT = \a' -> Request a' $ \a -> Respond a idT
@@ -123,10 +129,6 @@ instance InteractComp Proxy where
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       a   -> Pure a
 
-instance MonadP Proxy where
-    return_P = return
-    (?>=) = (>>=)
-
 instance MFunctor (Proxy a' a b' b) where
     mapT nat p0 = go p0 where
         go p = case p of
@@ -134,6 +136,9 @@ instance MFunctor (Proxy a' a b' b) where
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (nat (m >>= \p' -> return (go p')))
             Pure       r   -> Pure r
+
+instance MFunctorP Proxy where
+    mapT_P = mapT
 
 {-| @Server req resp@ receives requests of type @req@ and sends responses of
     type @resp@.
