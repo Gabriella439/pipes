@@ -19,60 +19,78 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (
-    Channel(idT, (>->)), 
-    InteractId(request, respond),
-    InteractComp((\>\), (/>/)),
-    MonadP(return_P, (?>=)) )
+import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Reader' proxy transformer
 newtype ReaderP i p a' a b' b (m :: * -> *) r
   = ReaderP { unReaderP :: i -> p a' a b' b m r }
 
-instance (Monad             (p a' a b' b m))
+instance (MonadP             p, Monad m)
        => Functor (ReaderP i p a' a b' b m) where
-    fmap f p = ReaderP (\i -> do
-        x <- unReaderP p i
-        return (f x) )
+    fmap f p = ReaderP (\i ->
+        unReaderP p i ?>= \x ->
+        return_P (f x) )
 
-instance (Monad                 (p a' a b' b m))
+instance (MonadP                 p, Monad m)
        => Applicative (ReaderP i p a' a b' b m) where
     pure = return
-    p1 <*> p2 = ReaderP (\i -> do
-        f <- unReaderP p1 i
-        x <- unReaderP p2 i
-        return (f x) )
+    p1 <*> p2 = ReaderP (\i ->
+        unReaderP p1 i ?>= \f -> 
+        unReaderP p2 i ?>= \x -> 
+        return_P (f x) )
 
-instance (Monad           (p a' a b' b m))
-       => Monad (ReaderP i p a' a b' b m) where
-    return = \r -> ReaderP (\_ -> return r)
-    m >>= f  = ReaderP (\i -> do
-        a <- unReaderP m i
+instance (MonadP            p )
+       => MonadP (ReaderP i p) where
+    return_P = \r -> ReaderP (\_ -> return_P r)
+    m ?>= f  = ReaderP (\i ->
+        unReaderP m i ?>= \a -> 
         unReaderP (f a) i )
 
-instance (MonadPlus             (p a' a b' b m))
+instance (MonadP           p, Monad m)
+       => Monad (ReaderP i p a' a b' b m) where
+    return = return_P
+    (>>=) = (?>=)
+
+instance (MonadPlusP             p, Monad m)
        => Alternative (ReaderP i p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (MonadPlus           (p a' a b' b m))
+instance (MonadPlusP           p )
+       => MonadPlusP (ReaderP i p) where
+    mzero_P = ReaderP (\_ -> mzero_P)
+    mplus_P m1 m2 = ReaderP (\i -> mplus_P (unReaderP m1 i) (unReaderP m2 i))
+
+instance (MonadPlusP           p, Monad m)
        => MonadPlus (ReaderP i p a' a b' b m) where
-    mzero = ReaderP (\_ -> mzero)
-    mplus m1 m2 = ReaderP (\i -> mplus (unReaderP m1 i) (unReaderP m2 i))
+    mzero = mzero_P
+    mplus = mplus_P
 
-instance (MonadTrans           (p a' a b' b))
+instance (MonadTransP            p )
+       => MonadTransP (ReaderP i p) where
+    lift_P m = ReaderP (\_ -> lift_P m)
+
+instance (MonadTransP           p )
        => MonadTrans (ReaderP i p a' a b' b) where
-    lift m = ReaderP (\_ -> lift m)
+    lift = lift_P
 
-instance (MonadIO           (p a' a b' b m))
+instance (MonadIOP            p )
+       => MonadIOP (ReaderP i p) where
+    liftIO_P m = ReaderP (\_ -> liftIO_P m)
+
+instance (MonadIOP           p, MonadIO m)
        => MonadIO (ReaderP i p a' a b' b m) where
-    liftIO m = ReaderP (\_ -> liftIO m)
+    liftIO = liftIO_P
 
-instance (MFunctor           (p a' a b' b))
-       => MFunctor (ReaderP i p a' a b' b) where
-    mapT nat p = ReaderP (\i -> mapT nat (unReaderP p i))
+instance (MFunctorP            p )
+       => MFunctorP (ReaderP i p) where
+    mapT_P nat p = ReaderP (\i -> mapT_P nat (unReaderP p i))
  -- mapT nat = ReaderP . fmap (mapT nat) . unReaderP
+
+instance (MFunctorP           p )
+       => MFunctor (ReaderP i p a' a b' b) where
+    mapT = mapT_P
 
 instance (Channel            p  )
        => Channel (ReaderP i p) where
@@ -102,13 +120,6 @@ instance (InteractComp            p)
  {- p1 />/ p2 = \a -> ReaderP $ \i ->
         ((`unReaderP` i) . p1 />/ (`unReaderP` i) . p2) a -}
 
-instance (MonadP            p )
-       => MonadP (ReaderP i p) where
-    return_P = \r -> ReaderP (\_ -> return_P r)
-    m ?>= f  = ReaderP (\i ->
-        unReaderP m i ?>= \a ->
-        unReaderP (f a) i )
-
 instance ProxyTrans (ReaderP i) where
     liftP m = ReaderP (\_ -> m)
 
@@ -123,21 +134,19 @@ runReaderK i p q = runReaderP i (p q)
 
 -- | Modify a computation's environment (a more general version of 'local')
 withReaderP
- :: (Monad (p a' a b' b m))
- => (j -> i) -> ReaderP i p a' a b' b m r -> ReaderP j p a' a b' b m r
+ :: (j -> i) -> ReaderP i p a' a b' b m r -> ReaderP j p a' a b' b m r
 withReaderP f p = ReaderP (\i -> unReaderP p (f i))
 -- withReaderP f p = ReaderP $ unReaderP p . f
 
 -- | Get the environment
-ask :: (Monad (p a' a b' b m)) => ReaderP i p a' a b' b m i
-ask = ReaderP return
+ask :: (MonadP p, Monad m) => ReaderP i p a' a b' b m i
+ask = ReaderP return_P
 
 -- | Get a function of the environment
-asks :: (Monad (p a' a b' b m)) => (i -> r) -> ReaderP i p a' a b' b m r
-asks f = ReaderP (\i -> return (f i))
+asks :: (MonadP p, Monad m) => (i -> r) -> ReaderP i p a' a b' b m r
+asks f = ReaderP (\i -> return_P (f i))
 
 -- | Modify a computation's environment (a specialization of 'withReaderP')
 local
- :: (Monad (p a' a b' b m))
- => (i -> i) -> ReaderP i p a' a b' b m r -> ReaderP i p a' a b' b m r
+ :: (i -> i) -> ReaderP i p a' a b' b m r -> ReaderP i p a' a b' b m r
 local = withReaderP
