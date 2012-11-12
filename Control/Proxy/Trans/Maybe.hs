@@ -1,6 +1,6 @@
 -- | This module provides the proxy transformer equivalent of 'MaybeT'.
 
-{-# LANGUAGE FlexibleContexts, KindSignatures #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Control.Proxy.Trans.Maybe (
     -- * MaybeP
@@ -16,77 +16,96 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (
-    Channel(idT, (>->)),
-    InteractId(request, respond),
-    MonadP(return_P, (?>=)) )
+import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Maybe' proxy transformer
 newtype MaybeP p a' a b' b (m :: * -> *) r
   = MaybeP { runMaybeP :: p a' a b' b m (Maybe r) }
 
-instance (Monad          (p a' a b' b m))
+instance (MonadP          p, Monad m)
        => Functor (MaybeP p a' a b' b m) where
-    fmap f p = MaybeP (do
-        m <- runMaybeP p
-        return (case m of
+    fmap f p = MaybeP (
+        runMaybeP p ?>= \m ->
+        return_P (case m of
             Nothing -> Nothing
             Just x  -> Just (f x) ) )
  -- fmap f = MaybeP . fmap (fmap f) . runMaybeP
 
-instance (Monad              (p a' a b' b m))
+instance (MonadP              p, Monad m)
        => Applicative (MaybeP p a' a b' b m) where
     pure = return
 
-    fp <*> xp = MaybeP (do
-        m1 <- runMaybeP fp
+    fp <*> xp = MaybeP (
+        runMaybeP fp ?>= \m1 ->
         case m1 of
-            Nothing -> return Nothing
-            Just f  -> do
-                m2 <- runMaybeP xp
+            Nothing -> return_P Nothing
+            Just f  ->
+                runMaybeP xp ?>= \m2 ->
                 case m2 of
-                    Nothing -> return Nothing
-                    Just x  -> return (Just (f x)) )
+                    Nothing -> return_P Nothing
+                    Just x  -> return_P (Just (f x)) )
  -- fp <*> xp = MaybeP ((<*>) <$> (runMaybeP fp) <*> (runMaybeP xp))
 
-instance (Monad        (p a' a b' b m))
-       => Monad (MaybeP p a' a b' b m) where
-    return = just
-    m >>= f = MaybeP (do
-        ma <- runMaybeP m
-        runMaybeP $ case ma of
+instance (MonadP         p )
+       => MonadP (MaybeP p) where
+    return_P = just
+    m ?>= f = MaybeP (
+        runMaybeP m ?>= \ma ->
+        runMaybeP (case ma of
             Nothing -> nothing
-            Just a  -> f a )
+            Just a  -> f a ) )
 
-instance (Monad              (p a' a b' b m))
+instance (MonadP        p, Monad m)
+       => Monad (MaybeP p a' a b' b m) where
+    return = return_P
+    (>>=) = (?>=)
+
+instance (MonadP              p, Monad m)
        => Alternative (MaybeP p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (Monad            (p a' a b' b m))
-       => MonadPlus (MaybeP p a' a b' b m) where
-    mzero = nothing
-    mplus m1 m2 = MaybeP (do
-        ma <- runMaybeP m1
+instance (MonadP             p )
+       => MonadPlusP (MaybeP p) where
+    mzero_P = nothing
+    mplus_P m1 m2 = MaybeP (
+        runMaybeP m1 ?>= \ma ->
         runMaybeP (case ma of
             Nothing -> m2
             Just a  -> just a) )
 
-instance (MonadTrans        (p a' a b' b))
-       => MonadTrans (MaybeP p a' a b' b) where
-    lift m = MaybeP (lift (m >>= \x -> return (Just x)))
+instance (MonadP            p, Monad m)
+       => MonadPlus (MaybeP p a' a b' b m) where
+    mzero = mzero_P
+    mplus = mplus_P
+
+instance (MonadTransP         p )
+       => MonadTransP (MaybeP p) where
+    lift_P m = MaybeP (lift_P (m >>= \x -> return (Just x)))
  -- lift = MaybeP . lift . liftM Just
 
-instance (MonadIO        (p a' a b' b m))
-       => MonadIO (MaybeP p a' a b' b m) where
-    liftIO m = MaybeP (liftIO (m >>= \x -> return (Just x)))
+instance (MonadTransP        p )
+       => MonadTrans (MaybeP p a' a b' b) where
+    lift = lift_P
+
+instance (MonadIOP         p )
+       => MonadIOP (MaybeP p) where
+    liftIO_P m = MaybeP (liftIO_P (m >>= \x -> return (Just x)))
  -- liftIO = MaybeP . liftIO . liftM Just
 
-instance (MFunctor        (p a' a b' b))
-       => MFunctor (MaybeP p a' a b' b) where
-    mapT nat p = MaybeP (mapT nat (runMaybeP p))
+instance (MonadIOP        p, MonadIO m)
+       => MonadIO (MaybeP p a' a b' b m) where
+    liftIO = liftIO_P
+
+instance (MFunctorP         p )
+       => MFunctorP (MaybeP p) where
+    mapT_P nat p = MaybeP (mapT_P nat (runMaybeP p))
  -- mapT nat = MaybeP . mapT nat . runMaybeP
+
+instance (MFunctorP        p )
+       => MFunctor (MaybeP p a' a b' b) where
+    mapT = mapT_P
 
 instance (Channel         p )
        => Channel (MaybeP p) where
@@ -102,15 +121,6 @@ instance (InteractId         p, MonadP p)
     request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
     respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))
 
-instance (MonadP         p )
-       => MonadP (MaybeP p) where
-    return_P = \r -> MaybeP (return_P (Just r))
-    m ?>= f = MaybeP (
-        runMaybeP m ?>= \ma ->
-        case ma of
-            Nothing -> return_P Nothing
-            Just a  -> runMaybeP (f a) )
-
 instance ProxyTrans MaybeP where
     liftP p = MaybeP (p ?>= \x -> return_P (Just x))
  -- liftP = MaybeP . liftM Just
@@ -121,9 +131,9 @@ runMaybeK p q = runMaybeP (p q)
 -- runMaybeK = (runMaybeP .)
 
 -- | A synonym for 'mzero'
-nothing :: (Monad (p a' a b' b m)) => MaybeP p a' a b' b m r
-nothing = MaybeP (return Nothing)
+nothing :: (Monad m, MonadP p) => MaybeP p a' a b' b m r
+nothing = MaybeP (return_P Nothing)
 
 -- | A synonym for 'return'
-just :: (Monad (p a' a b' b m)) => r -> MaybeP p a' a b' b m r
-just r = MaybeP (return (Just r))
+just :: (Monad m, MonadP p) => r -> MaybeP p a' a b' b m r
+just r = MaybeP (return_P (Just r))
