@@ -1,6 +1,6 @@
 -- | This module provides the proxy transformer equivalent of 'IdentityT'.
 
-{-# LANGUAGE FlexibleContexts, KindSignatures #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Control.Proxy.Trans.Identity (
     -- * IdentityP
@@ -13,67 +13,85 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (
-    Channel(idT, (>->)),
-    InteractId(request, respond),
-    InteractComp((\>\), (/>/)),
-    MonadP(return_P, (?>=)) )
+import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Identity' proxy transformer
 newtype IdentityP p a' a b' b (m :: * -> *) r =
     IdentityP { runIdentityP :: p a' a b' b m r }
 
-instance (Monad             (p a' a b' b m))
+instance (MonadP             p, Monad m)
        => Functor (IdentityP p a' a b' b m) where
-    fmap f p = IdentityP (do
-        x <- runIdentityP p
-        return (f x) )
+    fmap f p = IdentityP (
+        runIdentityP p ?>= \x ->
+        return_P (f x) )
  -- fmap = liftM
 
-instance (Monad                 (p a' a b' b m))
+instance (MonadP                 p, Monad m)
        => Applicative (IdentityP p a' a b' b m) where
     pure = return
 
-    fp <*> xp = IdentityP (do
-        f <- runIdentityP fp
-        x <- runIdentityP xp
-        return (f x) )
+    fp <*> xp = IdentityP (
+        runIdentityP fp ?>= \f ->
+        runIdentityP xp ?>= \x ->
+        return_P (f x) )
  -- fp <*> xp = ap
 
-instance (Monad           (p a' a b' b m))
-       => Monad (IdentityP p a' a b' b m) where
-    return r = IdentityP (return r)
+instance (MonadP            p )
+       => MonadP (IdentityP p) where
+    return_P = \r -> IdentityP (return_P r)
  -- return = IdentityP . return
 
-    m >>= f = IdentityP (do
-        x <- runIdentityP m
+    m ?>= f = IdentityP (
+        runIdentityP m ?>= \x ->
         runIdentityP (f x) )
 
-instance (MonadPlus             (p a' a b' b m))
+instance (MonadP           p, Monad m)
+       => Monad (IdentityP p a' a b' b m) where
+    return = return_P
+    (>>=) = (?>=)
+
+instance (MonadPlusP             p, Monad m)
        => Alternative (IdentityP p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (MonadPlus           (p a' a b' b m))
-       => MonadPlus (IdentityP p a' a b' b m) where
-    mzero = IdentityP mzero
-    mplus m1 m2 = IdentityP (mplus (runIdentityP m1) (runIdentityP m2))
+instance (MonadPlusP            p )
+       => MonadPlusP (IdentityP p) where
+    mzero_P = IdentityP mzero_P
+    mplus_P m1 m2 = IdentityP (mplus_P (runIdentityP m1) (runIdentityP m2))
 
-instance (MonadTrans           (p a' a b' b))
-       => MonadTrans (IdentityP p a' a b' b) where
-    lift m = IdentityP (lift m)
+instance (MonadPlusP           p, Monad m)
+       => MonadPlus (IdentityP p a' a b' b m) where
+    mzero = mzero_P
+    mplus = mplus_P
+
+instance (MonadTransP            p )
+       => MonadTransP (IdentityP p) where
+    lift_P m = IdentityP (lift_P m)
  -- lift = IdentityP . lift
 
-instance (MonadIO           (p a' a b' b m))
-       => MonadIO (IdentityP p a' a b' b m) where
-    liftIO m = IdentityP (liftIO m)
+instance (MonadTransP           p )
+       => MonadTrans (IdentityP p a' a b' b) where
+    lift = lift_P
+
+instance (MonadIOP            p )
+       => MonadIOP (IdentityP p) where
+    liftIO_P m = IdentityP (liftIO_P m)
  -- liftIO = IdentityP . liftIO
 
-instance (MFunctor           (p a' a b' b))
-       => MFunctor (IdentityP p a' a b' b) where
-    mapT nat p = IdentityP (mapT nat (runIdentityP p))
+instance (MonadIOP           p, MonadIO m)
+       => MonadIO (IdentityP p a' a b' b m) where
+    liftIO = liftIO_P
+
+instance (MFunctorP            p )
+       => MFunctorP (IdentityP p) where
+    mapT_P nat p = IdentityP (mapT_P nat (runIdentityP p))
  -- mapT nat = IdentityP . mapT nat . runIdentityP
+
+instance (MFunctorP           p )
+       => MFunctor (IdentityP p a' a b' b) where
+    mapT = mapT_P
 
 instance (Channel            p )
        => Channel (IdentityP p) where
@@ -104,13 +122,6 @@ instance (InteractComp            p )
         ((\a2 -> runIdentityP (p1 a2))
      />/ (\b  -> runIdentityP (p2 b )) ) a1 )
  -- p1 />/ p2 = (IdentityP .) $ runIdentityP . p1 />/ runIdentityP . p2
-
-instance (MonadP            p )
-       => MonadP (IdentityP p) where
-    return_P = \r -> IdentityP (return_P r)
-    m ?>= f = IdentityP (
-        runIdentityP m ?>= \r ->
-        runIdentityP (f r) )
 
 instance ProxyTrans IdentityP where
     liftP = IdentityP
