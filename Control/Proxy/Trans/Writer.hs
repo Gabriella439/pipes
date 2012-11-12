@@ -6,7 +6,7 @@
     The underlying implementation uses the state monad to avoid quadratic blowup
     from left-associative binds. -}
 
-{-# LANGUAGE FlexibleContexts, KindSignatures #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Control.Proxy.Trans.Writer (
     -- * WriterP
@@ -25,10 +25,7 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
-import Control.Proxy.Class (
-    Channel(idT, (>->)),
-    InteractId(request, respond),
-    MonadP(return_P, (?>=)) )
+import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Data.Monoid (Monoid(mempty, mappend))
 
@@ -36,50 +33,72 @@ import Data.Monoid (Monoid(mempty, mappend))
 newtype WriterP w p a' a b' b (m :: * -> *) r
   = WriterP { unWriterP :: w -> p a' a b' b m (r, w) }
 
-instance (Monad             (p a' a b' b m))
+instance (MonadP             p, Monad m)
        => Functor (WriterP w p a' a b' b m) where
-    fmap f p = WriterP (\w0 -> do
-        (x, w1) <- unWriterP p w0
-        return (f x, w1) )
+    fmap f p = WriterP (\w0 ->
+        unWriterP p w0 ?>= \(x, w1) ->
+        return_P (f x, w1) )
 
-instance (Monad                 (p a' a b' b m))
+instance (MonadP                 p, Monad m)
        => Applicative (WriterP w p a' a b' b m) where
     pure = return
-    fp <*> xp = WriterP (\w0 -> do
-        (f, w1) <- unWriterP fp w0
-        (x, w2) <- unWriterP xp w1
-        return (f x, w2) )
+    fp <*> xp = WriterP (\w0 ->
+        unWriterP fp w0 ?>= \(f, w1) ->
+        unWriterP xp w1 ?>= \(x, w2) ->
+        return_P (f x, w2) )
  -- (<*>) = ap
 
-instance (Monad           (p a' a b' b m))
-       => Monad (WriterP w p a' a b' b m) where
-    return  = \r -> WriterP (\w -> return (r, w))
-    m >>= f = WriterP (\w -> do
-        (a, w') <- unWriterP m w
+instance (MonadP            p )
+       => MonadP (WriterP w p) where
+    return_P = \r -> WriterP (\w -> return_P (r, w))
+    m ?>= f  = WriterP (\w ->
+        unWriterP m w ?>= \(a, w') ->
         unWriterP (f a) w' )
 
-instance (MonadPlus             (p a' a b' b m))
+instance (MonadP           p, Monad m)
+       => Monad (WriterP w p a' a b' b m) where
+    return = return_P
+    (>>=) = (?>=)
+
+instance (MonadPlusP             p, Monad m)
        => Alternative (WriterP w p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (MonadPlus           (p a' a b' b m))
+instance (MonadPlusP            p )
+       => MonadPlusP (WriterP w p) where
+    mzero_P       = WriterP (\_ -> mzero_P)
+    mplus_P m1 m2 = WriterP (\w -> mplus_P (unWriterP m1 w) (unWriterP m2 w))
+
+instance (MonadPlusP           p, Monad m)
        => MonadPlus (WriterP w p a' a b' b m) where
-    mzero = WriterP (\_ -> mzero)
-    mplus m1 m2 = WriterP (\w -> mplus (unWriterP m1 w) (unWriterP m2 w))
+    mzero = mzero_P
+    mplus = mplus_P
 
-instance (MonadTrans           (p a' a b' b))
+instance (MonadTransP            p )
+       => MonadTransP (WriterP w p) where
+    lift_P m = WriterP (\w -> lift_P (m >>= \r -> return (r, w)))
+
+instance (MonadTransP           p )
        => MonadTrans (WriterP w p a' a b' b) where
-    lift m = WriterP (\w -> lift (m >>= \r -> return (r, w)))
+    lift = lift_P
 
-instance (MonadIO           (p a' a b' b m))
+instance (MonadIOP            p )
+       => MonadIOP (WriterP w p) where
+    liftIO_P m = WriterP (\w -> liftIO_P (m >>= \r -> return (r, w)))
+
+instance (MonadIOP           p, MonadIO m)
        => MonadIO (WriterP w p a' a b' b m) where
-    liftIO m = WriterP (\w -> liftIO (m >>= \r -> return (r, w)))
+    liftIO = liftIO_P
 
-instance (MFunctor           (p a' a b' b))
-       => MFunctor (WriterP w p a' a b' b) where
-    mapT nat p = WriterP (\w -> mapT nat (unWriterP p w))
+instance (MFunctorP            p )
+       => MFunctorP (WriterP w p) where
+    mapT_P nat p = WriterP (\w -> mapT_P nat (unWriterP p w))
  -- mapT nat = WriterP . fmap (mapT nat) . unWriterP
+
+instance (MFunctorP           p )
+       => MFunctor (WriterP w p a' a b' b) where
+    mapT = mapT_P
 
 instance (Channel            p )
        => Channel (WriterP w p) where
@@ -93,13 +112,6 @@ instance (InteractId            p, MonadP p)
        => InteractId (WriterP w p) where
     request = \a' -> WriterP (\w -> request a' ?>= \a  -> return_P (a,  w))
     respond = \b  -> WriterP (\w -> respond b  ?>= \b' -> return_P (b', w))
-
-instance (MonadP            p )
-       => MonadP (WriterP w p) where
-    return_P = \r -> WriterP (\w -> return_P (r, w))
-    m ?>= f = WriterP (\w ->
-        unWriterP m w ?>= \(a, w') -> 
-        unWriterP (f a) w' )
 
 instance ProxyTrans (WriterP w) where
     liftP m = WriterP (\w -> m ?>= \r -> return_P (r, w))
@@ -117,26 +129,26 @@ runWriterK k q = runWriterP (k q)
 
 -- | Evaluate a 'WriterP' computation, but discard the final result
 execWriterP
- :: (Monad (p a' a b' b m), Monoid w)
+ :: (MonadP p, Monad m, Monoid w)
  => WriterP w p a' a b' b m r -> p a' a b' b m w
-execWriterP m = runWriterP m >>= \(_, w) -> return w
+execWriterP m = runWriterP m ?>= \(_, w) -> return_P w
 -- execWriterP m = liftM snd $ runWriterP m
 
 -- | Evaluate a 'WriterP' \'@K@\'leisli arrow, but discard the final result
 execWriterK
- :: (Monad (p a' a b' b m), Monoid w)
+ :: (MonadP p, Monad m, Monoid w)
  => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m w)
 execWriterK k q= execWriterP (k q)
 
 -- | Add a value to the monoid
-tell :: (Monad (p a' a b' b m), Monoid w) => w -> WriterP w p a' a b' b m ()
-tell w' = WriterP (\w -> let w'' = mappend w w' in w'' `seq` return ((), w''))
+tell :: (MonadP p, Monad m, Monoid w) => w -> WriterP w p a' a b' b m ()
+tell w' = WriterP (\w -> let w'' = mappend w w' in w'' `seq` return_P ((), w''))
 
 -- | Modify the result of a writer computation
 censor
- :: (Monad (p a' a b' b m), Monoid w)
+ :: (MonadP p, Monad m, Monoid w)
  => (w -> w) -> WriterP w p a' a b' b m r -> WriterP w p a' a b' b m r
-censor f p = WriterP (\w0 -> do
-    (r, w1) <- unWriterP p w0
-    return (r, f w1) )
+censor f p = WriterP (\w0 ->
+    unWriterP p w0 ?>= \(r, w1) ->
+    return_P (r, f w1) )
 -- censor f = WriterP . fmap (liftM (\(r, w) -> (r, f w))) . unWriterP
