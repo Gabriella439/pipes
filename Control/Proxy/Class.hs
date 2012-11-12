@@ -1,3 +1,5 @@
+{-# LANGUAGE Rank2Types #-}
+
 {-| This module provides an abstract interface to 'Proxy'-like behavior, so that
     multiple proxy implementations can share the same library of utility
     proxies. -}
@@ -9,11 +11,16 @@ module Control.Proxy.Class (
     -- $interact
     InteractId(..),
     InteractComp(..),
-    -- * Proxy monad
+    -- * Proxy-specialized classes
     -- $hacks
     MonadP(..),
-    MonadTransP(..)
+    MonadTransP(..),
+    MonadPlusP(..),
+    MonadIOP(..),
+    MFunctorP(..),
     ) where
+
+import Control.Monad.IO.Class (MonadIO)
 
 {- * I use educated guesses about which associativy is optimal for each operator
    * Keep precedence lower than function composition, which is 9 at the time of
@@ -153,19 +160,28 @@ class InteractComp p where
     p1 \<\ p2 = p2 />/ p1
 
 {- $hacks
-    The following type classes serve two purposes:
+    The following type classes serve three purposes:
 
     * They work around the lack of polymorphic constraints in Haskell
 
-    * They clean up inferred type signatures
+    * They remove the need for the @FlexibleContexts@ extension
 
-    Ordinary users don't need to use these classes, which exist solely for
-    implementing type class instances.
+    * They substantially clean up inferred type signatures
+
+    You don't need to use the methods from these type-classes.  Every type that
+    implements one of these \'@P@\'-suffixed class also implements the
+    corresponding non-\'@P@\'-suffixed class.  For example, 'Proxy' implements
+    both 'MonadP' and 'Monad':
+
+> instance MonadP Proxy where ...
+> instance (Monad m) => Monad (Proxy a' a b' b m) where ...
+
+    You would always use the 'Monad' class and ignore the 'MonadP' class.
 -}
 
 {-| A @(MonadProxy p)@ constraint is equivalent to the following constraint:
 
-> (forall a' a b' b m . (Monad m) => Monad (p a' a b' b m)) => ...
+> (forall a' a b' b m . Monad (p a' a b' b m)) => ...
 -}
 class MonadP p where
     return_P :: (Monad m) => r -> p a' a b' b m r
@@ -173,9 +189,35 @@ class MonadP p where
      :: (Monad m)
      => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'
 
-{-| A @(MonadTransP p)@ constraint is equivalent to the following constraint:
+{-| The @(MonadTransP p)@ constraint is equivalent to the following constraint:
 
 > (forall a' a b' b . MonadTrans (p a' a b' b)) => ...
 -}
 class MonadTransP p where
     lift_P :: (Monad m) => m r -> p a' a b' b m r
+
+{-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b m . MonadPlus (p a' a b' b m) => ...
+-}
+class (MonadP p) => MonadPlusP p where
+    mzero_P :: (Monad m) => p a' a b' b m r
+    mplus_P
+     :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r
+
+{-| The @(MonadIOP p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b m . MonadIO (p a' a b' b m) => ...
+-}
+class (MonadP p) => MonadIOP p where
+    liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r
+
+{-| The @(MFunctorP p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b . MFunctor (p a' a b' b)) => ...
+-}
+class MFunctorP p where
+    mapT_P
+     :: (Monad m, Monad n)
+     => (forall r . m r  -> n r)
+     -> (p a' a b' b m r' -> p a' a b' b n r')
