@@ -1,6 +1,6 @@
 -- | This module provides the proxy transformer equivalent of 'ReaderT'.
 
-{-# LANGUAGE FlexibleContexts, KindSignatures #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Control.Proxy.Trans.Reader (
     -- * ReaderP
