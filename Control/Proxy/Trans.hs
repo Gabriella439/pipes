@@ -34,10 +34,10 @@ class ProxyTrans
       (t :: (* -> * -> * -> * -> (* -> *) -> * -> *)
          ->  * -> * -> * -> * -> (* -> *) -> * -> * )
       where
-    liftP :: (Monad m, MonadP p, Channel p)
+    liftP :: (Monad m, MonadP p, Channel p, MFunctorP p)
           => p b c d e m r -> t p b c d e m r
     liftP f = mapP (\() -> f) ()
 
-    mapP :: (Monad m, MonadP p, Channel p)
+    mapP :: (Monad m, MonadP p, Channel p, MFunctorP p)
          => (a -> p b c d e m r) -> (a -> t p b c d e m r)
     mapP = (liftP .)
