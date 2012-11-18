@@ -84,11 +84,19 @@ instance MonadP Proxy where
     (?>=)   = (>>=)
 
 instance MonadTrans (Proxy a' a b' b) where
-    lift m = M (m >>= \r -> return (Pure r))
- -- lift = M . liftM Pure
+    lift = _lift
 
 instance MonadTransP Proxy where
-    lift_P = lift
+    lift_P = _lift
+
+_lift :: (Monad m) => m r -> Proxy a' a b' b m r
+_lift m = M (m >>= \r -> return (Pure r))
+-- _lift = M . liftM Pure
+
+{-# RULES
+    "_lift m >>= f" forall m f . _lift m >>= f = M (m >>= \r -> return (f r))
+  ; "_lift m ?>= f" forall m f . _lift m ?>= f = M (m >>= \r -> return (f r))
+  #-}
 
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
@@ -98,7 +106,7 @@ instance MonadIOP Proxy where
     liftIO_P = liftIO
 
 instance Channel Proxy where
-    idT = \a' -> Request a' $ \a -> Respond a idT
+    idT = \a' -> Request a' (\a -> Respond a idT)
     k1 <-< k2_0 = \c' -> k1 c' |-< k2_0 where
         p1 |-< k2 = case p1 of
             Request b' fb  -> fb <-| k2 b'
@@ -112,8 +120,21 @@ instance Channel Proxy where
             Pure       r   -> Pure r
 
 instance InteractId Proxy where
-    request = \a' -> Request a' Pure
-    respond = \a  -> Respond a Pure
+    request = _request
+    respond = _respond
+
+_request :: (Monad m) => a' -> Proxy a' a b' b m a
+_request = \a' -> Request a' Pure
+
+_respond :: (Monad m) => b -> Proxy a' a b' b m b'
+_respond = \b  -> Respond b  Pure
+
+{-# RULES
+    "_request a' >>= f" forall a' f . _request a' >>= f = Request a' f
+  ; "_respond b  >>= f" forall b  f . _respond b  >>= f = Respond b  f
+  ; "_request a' ?>= f" forall a' f . _request a' ?>= f = Request a' f
+  ; "_respond b  ?>= f" forall b  f . _respond b  ?>= f = Respond b  f
+  #-}
 
 instance InteractComp Proxy where
     k1 /</ k2 = \a' -> go (k1 a') where
