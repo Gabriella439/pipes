@@ -20,24 +20,39 @@ import Control.Proxy.Class
     * Functor between 'Proxy' categories
 
 > mapP (f <-< g) = mapP f <-< mapP g
+>
 > mapP idT = idT
 
     * Functor between Kleisli categories
 
 > mapP (f <=< g) = mapP f <=< mapP g
+>
 > mapP return = return
 
-    Minimal complete definition: 'mapP' or 'liftP'.  Defining 'liftP' is more
-    efficient.
+    * Functor between 'request' and 'respond' categories
+
+> mapP (f /</ g) = mapP f /</ mapP g
+>
+> mapP request = request
+
+> mapP (f \<\ g) = mapP f \<\ mapP g
+>
+> mapP respond = respond
+
+    Minimal complete definition:
+
+    * 'mapP' or 'liftP'
+
+    Defining 'liftP' is more efficient.
 -}
 class ProxyTrans
       (t :: (* -> * -> * -> * -> (* -> *) -> * -> *)
          ->  * -> * -> * -> * -> (* -> *) -> * -> * )
       where
-    liftP :: (Monad m, MonadP p, Channel p, MFunctorP p)
+    liftP :: (Monad m, ProxyP p)
           => p b c d e m r -> t p b c d e m r
     liftP f = mapP (\() -> f) ()
 
-    mapP :: (Monad m, MonadP p, Channel p, MFunctorP p)
+    mapP :: (Monad m, ProxyP p)
          => (a -> p b c d e m r) -> (a -> t p b c d e m r)
     mapP = (liftP .)

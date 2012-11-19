@@ -79,20 +79,15 @@ instance (Monad m) => Monad (Proxy a' a b' b m) where
             M m            -> M (m >>= \p' -> return (go p'))
             Pure r         -> f r
 
-instance MonadP Proxy where
-    return_P = return
-    (?>=)   = (>>=)
-
 instance MonadTrans (Proxy a' a b' b) where
     lift = _lift
-
-instance MonadTransP Proxy where
-    lift_P = _lift
 
 _lift :: (Monad m) => m r -> Proxy a' a b' b m r
 _lift m = M (m >>= \r -> return (Pure r))
 -- _lift = M . liftM Pure
 
+{- These never fire, for some reason, but keep them until I figure out how to
+   get them to work. -}
 {-# RULES
     "_lift m >>= f" forall m f . _lift m >>= f = M (m >>= \r -> return (f r))
   ; "_lift m ?>= f" forall m f . _lift m ?>= f = M (m >>= \r -> return (f r))
@@ -105,7 +100,7 @@ instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
 instance MonadIOP Proxy where
     liftIO_P = liftIO
 
-instance Channel Proxy where
+instance ProxyP Proxy where
     idT = \a' -> Request a' (\a -> Respond a idT)
     k1 <-< k2_0 = \c' -> k1 c' |-< k2_0 where
         p1 |-< k2 = case p1 of
@@ -119,9 +114,15 @@ instance Channel Proxy where
             M          m   -> M (m >>= \p2' -> return (fb <-| p2'))
             Pure       r   -> Pure r
 
-instance InteractId Proxy where
+    {- For some reason, these must be defined in separate functions for the
+       RULES to fire. -}
     request = _request
     respond = _respond
+
+    return_P = return
+    (?>=)   = (>>=)
+
+    lift_P = _lift
 
 _request :: (Monad m) => a' -> Proxy a' a b' b m a
 _request = \a' -> Request a' Pure
@@ -136,7 +137,7 @@ _respond = \b  -> Respond b  Pure
   ; "_respond b  ?>= f" forall b  f . _respond b  ?>= f = Respond b  f
   #-}
 
-instance InteractComp Proxy where
+instance InteractP Proxy where
     k1 /</ k2 = \a' -> go (k1 a') where
         go p = case p of
             Request b' fb  -> k2 b' >>= \b -> go (fb b)

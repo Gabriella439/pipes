@@ -20,14 +20,14 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype IdentityP p a' a b' b (m :: * -> *) r =
     IdentityP { runIdentityP :: p a' a b' b m r }
 
-instance (MonadP             p, Monad m)
+instance (ProxyP             p, Monad m)
        => Functor (IdentityP p a' a b' b m) where
     fmap f p = IdentityP (
         runIdentityP p ?>= \x ->
         return_P (f x) )
  -- fmap = liftM
 
-instance (MonadP                 p, Monad m)
+instance (ProxyP                 p, Monad m)
        => Applicative (IdentityP p a' a b' b m) where
     pure = return
 
@@ -37,16 +37,7 @@ instance (MonadP                 p, Monad m)
         return_P (f x) )
  -- fp <*> xp = ap
 
-instance (MonadP            p )
-       => MonadP (IdentityP p) where
-    return_P = \r -> IdentityP (return_P r)
- -- return = IdentityP . return
-
-    m ?>= f = IdentityP (
-        runIdentityP m ?>= \x ->
-        runIdentityP (f x) )
-
-instance (MonadP           p, Monad m)
+instance (ProxyP           p, Monad m)
        => Monad (IdentityP p a' a b' b m) where
     return = return_P
     (>>=) = (?>=)
@@ -66,12 +57,7 @@ instance (MonadPlusP           p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
-instance (MonadTransP            p )
-       => MonadTransP (IdentityP p) where
-    lift_P m = IdentityP (lift_P m)
- -- lift = IdentityP . lift
-
-instance (MonadTransP           p )
+instance (ProxyP                p )
        => MonadTrans (IdentityP p a' a b' b) where
     lift = lift_P
 
@@ -93,8 +79,8 @@ instance (MFunctorP           p )
        => MFunctor (IdentityP p a' a b' b) where
     mapT = mapT_P
 
-instance (Channel            p )
-       => Channel (IdentityP p) where
+instance (ProxyP            p )
+       => ProxyP (IdentityP p) where
     idT = \a' -> IdentityP (idT a')
  -- idT = IdentityP . idT
 
@@ -103,16 +89,24 @@ instance (Channel            p )
      >-> (\b'  -> runIdentityP (p2 b' )) ) c'1 )
  -- p1 >-> p2 = (IdentityP .) $ runIdentityP . p1 >-> runIdentityP . p2
 
-instance (InteractId            p )
-       => InteractId (IdentityP p) where
     request = \a' -> IdentityP (request a')
  -- request = IdentityP . request
 
     respond = \b -> IdentityP (respond b)
  -- respond = IdentityP . respond
 
-instance (InteractComp            p )
-      =>  InteractComp (IdentityP p) where
+    return_P = \r -> IdentityP (return_P r)
+ -- return = IdentityP . return
+
+    m ?>= f = IdentityP (
+        runIdentityP m ?>= \x ->
+        runIdentityP (f x) )
+
+    lift_P m = IdentityP (lift_P m)
+ -- lift = IdentityP . lift
+
+instance (InteractP            p )
+      =>  InteractP (IdentityP p) where
     p1 \>\ p2 = \c'1 -> IdentityP (
         ((\b'  -> runIdentityP (p1 b' ))
      \>\ (\c'2 -> runIdentityP (p2 c'2)) ) c'1 )
