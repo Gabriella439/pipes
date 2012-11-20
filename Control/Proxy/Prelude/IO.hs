@@ -40,30 +40,35 @@ import Control.Monad (forever)
 import Control.Monad.Trans.Class (lift)
 import Control.Proxy.Prelude.Kleisli (foreverK)
 import Control.Proxy.Core (Proxy, Client, Server)
-import Control.Proxy.Class (request, respond)
+import Control.Proxy.Class (ProxyP(request, respond))
+import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
 import System.IO (Handle, hGetLine, hPutStr, hPutStrLn, hPrint, stdin, stdout)
 
 -- | Get input from 'stdin' one line at a time and send \'@D@\'ownstream
-getLineS :: y' -> Proxy x' x y' String IO r
-getLineS _ = forever $ do
+getLineS
+ :: (ProxyP p) => y' -> p x' x y' String IO r
+getLineS _ = runIdentityP $ forever $ do
     str <- lift getLine
     respond str
 
 -- | Get input from 'stdin' one line at a time and send \'@U@\'pstream
-getLineC :: y' -> Proxy String x y' y IO r
-getLineC _ = forever $ do
+getLineC
+ :: (ProxyP p) => y' -> p String x y' y IO r
+getLineC _ = runIdentityP $ forever $ do
     str <- lift getLine
     request str
 
 -- | 'read' input from 'stdin' one line at a time and send \'@D@\'ownstream
-readLnS :: (Read a) => y' -> Proxy x' x y' a IO r
-readLnS _ = forever $ do
+readLnS
+ :: (Read a, ProxyP p) => y' -> p x' x y' a IO r
+readLnS _ = runIdentityP $ forever $ do
     a <- lift readLn
     respond a
 
 -- | 'read' input from 'stdin' one line at a time and send \'@U@\'pstream
-readLnC :: (Read a) => y' -> Proxy a x y' y IO r
-readLnC _ = forever $ do
+readLnC
+ :: (Read a, ProxyP p) => y' -> p a x y' y IO r
+readLnC _ = runIdentityP $ forever $ do
     a <- lift readLn
     request a
 
@@ -71,8 +76,9 @@ readLnC _ = forever $ do
 
     Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
 -}
-printB :: (Show a, Show a') => a' -> Proxy a' a a' a IO r
-printB = foreverK $ \a' -> do
+printB
+ :: (Show a, Show a', ProxyP p) => a' -> p a' a a' a IO r
+printB = runIdentityK $ foreverK $ \a' -> do
     lift $ do
         putStr "U: "
         print a'
@@ -83,15 +89,17 @@ printB = foreverK $ \a' -> do
     respond a
 
 -- | 'print's all values flowing \'@D@\'ownstream to 'stdout'
-printD :: (Show a) => x -> Proxy x a x a IO r
-printD = foreverK $ \x -> do
+printD
+ :: (Show a, ProxyP p) => x -> p x a x a IO r
+printD = runIdentityK $ foreverK $ \x -> do
     a <- request x
     lift $ print a
     respond a
 
 -- | 'print's all values flowing \'@U@\'pstream to 'stdout'
-printU :: (Show a') => a' -> Proxy a' x a' x IO r
-printU = foreverK $ \a' -> do
+printU
+ :: (Show a', ProxyP p) => a' -> p a' x a' x IO r
+printU = runIdentityK $ foreverK $ \a' -> do
     lift $ print a'
     x <- request a'
     respond x
@@ -100,8 +108,9 @@ printU = foreverK $ \a' -> do
 
     Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
 -}
-putStrLnB :: String -> Proxy String String String String IO r
-putStrLnB = foreverK $ \a' -> do
+putStrLnB
+ :: (ProxyP p) => String -> p String String String String IO r
+putStrLnB = runIdentityK $ foreverK $ \a' -> do
     lift $ do
         putStr "U: "
         putStrLn a'
@@ -112,43 +121,49 @@ putStrLnB = foreverK $ \a' -> do
     respond a
 
 -- | 'putStrLn's all values flowing \'@D@\'ownstream to 'stdout'
-putStrLnD :: x -> Proxy x String x String IO r
-putStrLnD = foreverK $ \x -> do
+putStrLnD
+ :: (ProxyP p) => x -> p x String x String IO r
+putStrLnD = runIdentityK $ foreverK $ \x -> do
     a <- request x
     lift $ putStrLn a
     respond a
 
 -- | 'putStrLn's all values flowing \'@U@\'pstream to 'stdout'
-putStrLnU :: String -> Proxy String x String x IO r
-putStrLnU = foreverK $ \a' -> do
+putStrLnU
+ :: (ProxyP p) => String -> p String x String x IO r
+putStrLnU = runIdentityK $ foreverK $ \a' -> do
     lift $ putStrLn a'
     x <- request a'
     respond x
 
 -- | Convert 'stdin'/'stdout' into a line-based 'Server'
-promptS :: String -> Proxy x' x String String IO r
-promptS = foreverK $ \send -> do
+promptS
+ :: (ProxyP p) => String -> p x' x String String IO r
+promptS = runIdentityK $ foreverK $ \send -> do
     recv <- lift $ do
         putStrLn send
         getLine
     respond recv
 
 -- | Convert 'stdin'/'stdout' into a line-based 'Client'
-promptC :: y' -> Proxy String String y' y IO r
-promptC _ = forever $ do
+promptC
+ :: (ProxyP p) => y' -> p String String y' y IO r
+promptC _ = runIdentityP $ forever $ do
     send <- lift getLine
     recv <- request send
     lift $ putStrLn recv
 
 -- | Get input from a handle one line at a time and send \'@D@\'ownstream
-hGetLineD :: Handle -> y' -> Proxy x' x y' String IO r
-hGetLineD h _ = forever $ do
+hGetLineD
+ :: (ProxyP p) => Handle -> y' -> p x' x y' String IO r
+hGetLineD h _ = runIdentityP $ forever $ do
     str <- lift $ hGetLine h
     respond str
 
 -- | Get input from a handle one line at a time and send \'@U@\'pstream
-hGetLineU :: Handle -> y' -> Proxy String x y' y IO r
-hGetLineU h _ = forever $ do
+hGetLineU
+ :: (ProxyP p) => Handle -> y' -> p String x y' y IO r
+hGetLineU h _ = runIdentityP $ forever $ do
     str <- lift $ hGetLine h
     request str
 
@@ -156,8 +171,9 @@ hGetLineU h _ = forever $ do
 
     Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
 -}
-hPrintB :: (Show a, Show a') => Handle -> a' -> Proxy a' a a' a IO r
-hPrintB h = foreverK $ \a' -> do
+hPrintB
+ :: (Show a, Show a', ProxyP p) => Handle -> a' -> p a' a a' a IO r
+hPrintB h = runIdentityK $ foreverK $ \a' -> do
     lift $ do
         hPutStr h "U: "
         hPrint h a'
@@ -168,15 +184,17 @@ hPrintB h = foreverK $ \a' -> do
     respond a
 
 -- | 'print's all values flowing \'@D@\'ownstream to a 'Handle'
-hPrintD :: (Show a) => Handle -> x -> Proxy x a x a IO r
-hPrintD h = foreverK $ \x -> do
+hPrintD
+ :: (Show a, ProxyP p) => Handle -> x -> p x a x a IO r
+hPrintD h = runIdentityK $ foreverK $ \x -> do
     a <- request x
     lift $ hPrint h a
     respond a
 
 -- | 'print's all values flowing \'@U@\'pstream to a 'Handle'
-hPrintU :: (Show a') => Handle -> a' -> Proxy a' x a' x IO r
-hPrintU h = foreverK $ \a' -> do
+hPrintU
+ :: (Show a', ProxyP p) => Handle -> a' -> p a' x a' x IO r
+hPrintU h = runIdentityK $ foreverK $ \a' -> do
     lift $ hPrint h a'
     x <- request a'
     respond x
@@ -185,8 +203,9 @@ hPrintU h = foreverK $ \a' -> do
 
     Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
 -}
-hPutStrLnB :: Handle -> String -> Proxy String String String String IO r
-hPutStrLnB h = foreverK $ \a' -> do
+hPutStrLnB
+ :: (ProxyP p) => Handle -> String -> p String String String String IO r
+hPutStrLnB h = runIdentityK $ foreverK $ \a' -> do
     lift $ do
         hPutStr h "U: "
         hPutStrLn h a'
@@ -197,15 +216,17 @@ hPutStrLnB h = foreverK $ \a' -> do
     respond a
 
 -- | 'putStrLn's all values flowing \'@D@\'ownstream to a 'Handle'
-hPutStrLnD :: Handle -> x -> Proxy x String x String IO r
-hPutStrLnD h = foreverK $ \x -> do
+hPutStrLnD
+ :: (ProxyP p) => Handle -> x -> p x String x String IO r
+hPutStrLnD h = runIdentityK $ foreverK $ \x -> do
     a <- request x
     lift $ hPutStrLn h a
     respond a
 
 -- | 'putStrLn's all values flowing \'@U@\'pstream to a 'Handle'
-hPutStrLnU :: Handle -> String -> Proxy String x String x IO r
-hPutStrLnU h = foreverK $ \a' -> do
+hPutStrLnU
+ :: (ProxyP p) => Handle -> String -> p String x String x IO r
+hPutStrLnU h = runIdentityK $ foreverK $ \a' -> do
     lift $ hPutStrLn h a'
     x <- request a'
     respond x
