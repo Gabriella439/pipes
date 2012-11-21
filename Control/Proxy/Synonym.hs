@@ -1,5 +1,8 @@
 {-# LANGUAGE Rank2Types, KindSignatures #-}
 
+{-| These type synonyms simplify type signatures when proxies do not use all
+    their type variables. -}
+
 module Control.Proxy.Synonym (
     Pipe,
     Producer,
@@ -8,6 +11,8 @@ module Control.Proxy.Synonym (
     Client,
     Server
     ) where
+
+import Control.Proxy.Class
 
 {-| The type variables of @Pipe a b m r@ signify:
 
@@ -27,7 +32,7 @@ type Producer p b m r = forall a   . Pipe p a b m r
 type Consumer p a m r = forall   b . Pipe p a b m r
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline   p m r = forall a b . Pipe p a b m r
+type Pipeline p   m r = forall a b . Pipe p a b m r
 
 {-| @Server req resp@ receives requests of type @req@ and sends responses of
     type @resp@.

@@ -57,6 +57,8 @@ Library
         Control.IMonad.Trans.Free,
         Control.MFunctor,
         Control.Proxy,
+        Control.Proxy.Correct,
+        Control.Proxy.Fast,
         Control.Proxy.Core.Fast,
         Control.Proxy.Core.Correct,
         Control.Proxy.Class,

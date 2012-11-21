@@ -78,7 +78,7 @@ idP = go where
     the only non-polymorphic 'Pipe' function and the compiler uses it to
     select which underlying 'Proxy' implementation to use. -}
 
-{- $compatibility
+{- $upgrade
     You can upgrade code written to 'Control.Pipe' to work with the 'Proxy'
     ecosystem in stages.  Each change enables greater interoperability with
     proxy utilities and transformers and if time permits you should implement

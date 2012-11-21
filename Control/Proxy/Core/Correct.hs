@@ -8,15 +8,14 @@
 module Control.Proxy.Core.Correct (
     -- * Types
     Proxy(..),
-    Server,
-    Client,
-    Session,
+
     -- * Run Sessions 
     -- $run
     runProxy,
     runProxyK,
     runSession,
     runSessionK,
+
     -- * Utility Proxies
     -- $utility
     discard,
@@ -47,13 +46,14 @@ import Data.Closed (C)
     * @m     @ - The base monad
 
     * @r     @ - The final return value -}
+data Proxy a' a b' b m  r =
+    Proxy { unProxy :: m (ProxyF a' a b' b r (Proxy a' a b' b m r)) }
+
+-- | The base functor for the 'Proxy' type
 data ProxyF a' a b' b r x
   = Request a' (a  -> x)
   | Respond b  (b' -> x)
   | Pure    r
-
-data Proxy a' a b' b m  r =
-    Proxy { unProxy :: m (ProxyF a' a b' b r (Proxy a' a b' b m r)) }
 
 instance (Monad m) => Functor (Proxy a' a b' b m) where
     fmap f p0 = go p0 where
