@@ -1,19 +1,25 @@
-{-# LANGUAGE KindSignatures #-}
-
 {-| You can define your own extensions to the 'Proxy' type by writing your own
     \"proxy transformers\".  Proxy transformers are monad transformers that
-    correctly lift 'Proxy' composition from the base monad.  Stack multiple
-    proxy transformers to chain features together. -}
+    correctly lift all proxy operations from the base proxy type to the extended
+    proxy type.  Stack multiple proxy transformers to chain features together.
+-}
     
 module Control.Proxy.Trans (
     -- * Proxy Transformers
     ProxyTrans(..)
-    )where
+    ) where
 
 import Control.Proxy.Class
 
-{-| 'mapP' defines a functor that preserves 'Proxy' composition and Kleisli
-    composition.
+{-| 'mapP' defines a functor that preserves four categories:
+
+    * Proxy category
+
+    * Kleisli category
+
+    * \"request\" category
+
+    * \"respond\" category
 
     Laws:
 
@@ -29,13 +35,15 @@ import Control.Proxy.Class
 >
 > mapP return = return
 
-    * Functor between 'request' and 'respond' categories
+    * Functor between \"request\" categories
 
-> mapP (f /</ g) = mapP f /</ mapP g
+> mapP (f /</ g) = mapP f /</ mapP g -- when /</ is defined
 >
 > mapP request = request
 
-> mapP (f \<\ g) = mapP f \<\ mapP g
+    * Functor between \"respond\" categories
+
+> mapP (f \<\ g) = mapP f \<\ mapP g -- when \<\ is defined
 >
 > mapP respond = respond
 
@@ -45,10 +53,7 @@ import Control.Proxy.Class
 
     Defining 'liftP' is more efficient.
 -}
-class ProxyTrans
-      (t :: (* -> * -> * -> * -> (* -> *) -> * -> *)
-         ->  * -> * -> * -> * -> (* -> *) -> * -> * )
-      where
+class ProxyTrans t where
     liftP :: (Monad m, ProxyP p)
           => p b c d e m r -> t p b c d e m r
     liftP f = mapP (\() -> f) ()

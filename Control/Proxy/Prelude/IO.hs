@@ -39,7 +39,7 @@ module Control.Proxy.Prelude.IO (
 import Control.Monad (forever)
 import Control.Monad.Trans.Class (lift)
 import Control.Proxy.Prelude.Kleisli (foreverK)
-import Control.Proxy.Core (Proxy, Client, Server)
+import Control.Proxy.Synonym (Client, Server)
 import Control.Proxy.Class (ProxyP(request, respond))
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
 import System.IO (Handle, hGetLine, hPutStr, hPutStrLn, hPrint, stdin, stdout)

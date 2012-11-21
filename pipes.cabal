@@ -57,7 +57,8 @@ Library
         Control.IMonad.Trans.Free,
         Control.MFunctor,
         Control.Proxy,
-        Control.Proxy.Core,
+        Control.Proxy.Core.Fast,
+        Control.Proxy.Core.Correct,
         Control.Proxy.Class,
         Control.Proxy.Pipe,
         Control.Proxy.Trans,
@@ -78,4 +79,4 @@ Library
         Control.Pipe.Tutorial,
         Data.Closed
     Default-Language: Haskell98
-    GHC-Options: -O
+    GHC-Options: -O2

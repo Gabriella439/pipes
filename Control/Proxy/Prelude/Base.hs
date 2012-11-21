@@ -33,7 +33,8 @@ module Control.Proxy.Prelude.Base (
     ) where
 
 import Control.Proxy.Class
-import Control.Proxy.Core (Proxy(..), Server, Client)
+import Control.Proxy.Core.Fast (Proxy(..))
+import Control.Proxy.Synonym (Pipe, Client, Server)
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
     values going upstream.
@@ -275,7 +276,7 @@ takeWhileU p = go where
 > dropD 0 = idT
 -}
 dropD
- :: (Monad m, ProxyP p) => Int -> () -> p () a () a m r
+ :: (Monad m, ProxyP p) => Int -> () -> Pipe p a a m r
 dropD n0 = \() -> go n0 where
     go n
         | n <= 0    = idT ()
@@ -322,23 +323,14 @@ dropU n0
 >
 > dropWhileD mempty = idT
 -}
--- dropWhileD :: (Monad m) => (a -> Bool) -> () -> Proxy () a () a m r
 dropWhileD
- :: (Monad m, ProxyP p) => (a -> Bool) -> () -> p () a () a m r
+ :: (Monad m, ProxyP p) => (a -> Bool) -> () -> Pipe p a a m r
 dropWhileD p () = go where
     go =
         request () ?>= \a ->
         if (p a)
         then go
         else respond a ?>= idT
---  go = Request () (\a -> if (p a) then go else Respond a idT)
-{-  go = do
-        a <- request ()
-        if (p a)
-        then go
-        else do
-            respond a
-            idT () -}
 {-# SPECIALIZE dropWhileD
  :: (Monad m) => (a -> Bool) -> () -> Proxy () a () a m r #-}
 
@@ -368,7 +360,7 @@ dropWhileU p = go where
 > filterD mempty = idT
 -}
 filterD
- :: (Monad m, ProxyP p) => (a -> Bool) -> () -> p () a () a m r
+ :: (Monad m, ProxyP p) => (a -> Bool) -> () -> Pipe p a a m r
 filterD p = \() ->  go where
     go = request () ?>= \a ->
          if (p a)

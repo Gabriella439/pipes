@@ -5,7 +5,7 @@
 
     For an extended tutorial, consult "Control.Proxy.Tutorial". -}
 
-module Control.Proxy.Core (
+module Control.Proxy.Core.Correct (
     -- * Types
     Proxy(..),
     Server,
@@ -47,72 +47,80 @@ import Data.Closed (C)
     * @m     @ - The base monad
 
     * @r     @ - The final return value -}
-data Proxy a' a b' b m r
-  = Request a' (a  -> Proxy a' a b' b m r )
-  | Respond b  (b' -> Proxy a' a b' b m r )
-  | M          (m    (Proxy a' a b' b m r))
-  | Pure r
+data ProxyF a' a b' b r x
+  = Request a' (a  -> x)
+  | Respond b  (b' -> x)
+  | Pure    r
+
+data Proxy a' a b' b m  r =
+    Proxy { unProxy :: m (ProxyF a' a b' b r (Proxy a' a b' b m r)) }
 
 instance (Monad m) => Functor (Proxy a' a b' b m) where
     fmap f p0 = go p0 where
-        go p = case p of
-            Request a' fa  -> Request a' (\a  -> go (fa  a ))
-            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (m >>= \p' -> return (go p'))
-            Pure       r   -> Pure (f r)
+        go p = Proxy (do
+            x <- unProxy p
+            return (case x of
+                Request a' fa  -> Request a' (\a  -> go (fa  a ))
+                Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+                Pure       r   -> Pure (f r) ) )
 
 instance (Monad m) => Applicative (Proxy a' a b' b m) where
-    pure  = Pure
+    pure r = Proxy (return (Pure r))
     pf <*> px = go pf where
-        go p = case p of
-            Request a' fa  -> Request a' (\a  -> go (fa  a ))
-            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (m >>= \p' -> return (go p'))
-            Pure       f   -> fmap f px
+        go p = Proxy (do
+            x <- unProxy p
+            case x of
+                Request a' fa  -> return (Request a' (\a  -> go (fa  a )))
+                Respond b  fb' -> return (Respond b  (\b' -> go (fb' b')))
+                Pure       f   -> unProxy (fmap f px) )
 
 instance (Monad m) => Monad (Proxy a' a b' b m) where
-    return = Pure
+    return = \r -> Proxy (return (Pure r))
     p0 >>= f = go p0 where
-        go p = case p of
-            Request a' fa  -> Request a' (\a  -> go (fa  a))
-            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M m            -> M (m >>= \p' -> return (go p'))
-            Pure r         -> f r
+        go p = Proxy (do
+            x <- unProxy p
+            case x of
+                Request a' fa  -> return (Request a' (\a  -> go (fa  a )))
+                Respond b  fb' -> return (Respond b  (\b' -> go (fb' b')))
+                Pure       r   -> unProxy (f r) )
 
 instance MonadTrans (Proxy a' a b' b) where
     lift = _lift
 
 _lift :: (Monad m) => m r -> Proxy a' a b' b m r
-_lift m = M (m >>= \r -> return (Pure r))
--- _lift = M . liftM Pure
+_lift m = Proxy (m >>= \r -> return (Pure r))
 
-{- These never fire, for some reason, but keep them until I figure out how to
-   get them to work. -}
 {-# RULES
-    "_lift m >>= f" forall m f . _lift m >>= f = M (m >>= \r -> return (f r))
-  ; "_lift m ?>= f" forall m f . _lift m ?>= f = M (m >>= \r -> return (f r))
+    "_lift m >>= f" forall m f .
+        _lift m >>= f = Proxy (m >>= \r -> unProxy (f r))
+  ; "_lift m ?>= f" forall m f .
+        _lift m ?>= f = Proxy (m >>= \r -> unProxy (f r))
   #-}
 
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
-    liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
- -- liftIO = M . liftIO . liftM Pure
+    liftIO m = Proxy (liftIO (m >>= \r -> return (Pure r)))
+ -- liftIO = Proxy . liftIO . liftM Pure
 
 instance MonadIOP Proxy where
     liftIO_P = liftIO
 
 instance ProxyP Proxy where
-    idT = \a' -> Request a' (\a -> Respond a idT)
+    idT = \a' ->
+        Proxy (return (Request a' (\a ->
+        Proxy (return (Respond a idT)) )))
     k1 <-< k2_0 = \c' -> k1 c' |-< k2_0 where
-        p1 |-< k2 = case p1 of
-            Request b' fb  -> fb <-| k2 b'
-            Respond c  fc' -> Respond c (\c' -> fc' c' |-< k2)
-            M          m   -> M (m >>= \p1' -> return (p1' |-< k2))
-            Pure       r   -> Pure r
-        fb <-| p2 = case p2 of
-            Request a' fa  -> Request a' (\a -> fb <-| fa a) 
-            Respond b  fb' -> fb b |-< fb'
-            M          m   -> M (m >>= \p2' -> return (fb <-| p2'))
-            Pure       r   -> Pure r
+        p1 |-< k2 = Proxy (do
+            x <- unProxy p1
+            case x of
+                Request b' fb  -> unProxy (fb <-| k2 b')
+                Respond c  fc' -> return (Respond c (\c' -> fc' c' |-< k2))
+                Pure       r   -> return (Pure r) )
+        fb <-| p2 = Proxy (do
+            x <- unProxy p2
+            case x of
+                Request a' fa  -> return (Request a' (\a -> fb <-| fa a))
+                Respond b  fb' -> unProxy (fb b |-< fb')
+                Pure       r   -> return (Pure r) )
 
     {- For some reason, these must be defined in separate functions for the
        RULES to fire. -}
@@ -125,39 +133,46 @@ instance ProxyP Proxy where
     lift_P = _lift
 
 _request :: (Monad m) => a' -> Proxy a' a b' b m a
-_request = \a' -> Request a' Pure
+_request = \a' -> Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
 
 _respond :: (Monad m) => b -> Proxy a' a b' b m b'
-_respond = \b  -> Respond b  Pure
+_respond = \b  -> Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
 
 {-# RULES
-    "_request a' >>= f" forall a' f . _request a' >>= f = Request a' f
-  ; "_respond b  >>= f" forall b  f . _respond b  >>= f = Respond b  f
-  ; "_request a' ?>= f" forall a' f . _request a' ?>= f = Request a' f
-  ; "_respond b  ?>= f" forall b  f . _respond b  ?>= f = Respond b  f
+    "_request a' >>= f" forall a' f .
+        _request a' >>= f = Proxy (return (Request a' f))
+  ; "_respond b  >>= f" forall b  f .
+        _respond b  >>= f = Proxy (return (Respond b  f))
+  ; "_request a' ?>= f" forall a' f .
+        _request a' ?>= f = Proxy (return (Request a' f))
+  ; "_respond b  ?>= f" forall b  f .
+        _respond b  ?>= f = Proxy (return (Respond b  f))
   #-}
 
 instance InteractP Proxy where
     k1 /</ k2 = \a' -> go (k1 a') where
-        go p = case p of
-            Request b' fb  -> k2 b' >>= \b -> go (fb b)
-            Respond x  fx' -> Respond x (\x' -> go (fx' x'))
-            M          m   -> M (m >>= \p' -> return (go p'))
-            Pure       a   -> Pure a
+        go p = Proxy (do
+            x <- unProxy p
+            case x of
+                Request b' fb  -> unProxy (k2 b' >>= \b -> go (fb b))
+                Respond x  fx' -> return (Respond x (\x' -> go (fx' x')))
+                Pure       a   -> return (Pure a) )
     k1 \<\ k2 = \a' -> go (k2 a') where
-        go p = case p of
-            Request x' fx  -> Request x' (\x -> go (fx x))
-            Respond b  fb' -> k1 b >>= \b' -> go (fb' b')
-            M          m   -> M (m >>= \p' -> return (go p'))
-            Pure       a   -> Pure a
+        go p = Proxy (do
+            x <- unProxy p
+            case x of
+                Request x' fx  -> return (Request x' (\x -> go (fx x)))
+                Respond b  fb' -> unProxy (k1 b >>= \b' -> go (fb' b'))
+                Pure       a   -> return (Pure a) )
 
 instance MFunctor (Proxy a' a b' b) where
     mapT nat p0 = go p0 where
-        go p = case p of
-            Request a' fa  -> Request a' (\a  -> go (fa  a ))
-            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (nat (m >>= \p' -> return (go p')))
-            Pure       r   -> Pure r
+        go p = Proxy (nat (do
+            x <- unProxy p
+            return (case x of
+                Request a' fa  -> Request a' (\a  -> go (fa  a ))
+                Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+                Pure       r   -> Pure r )))
 
 instance MFunctorP Proxy where
     mapT_P = mapT
@@ -216,12 +231,12 @@ type Session         m r = forall a' a b' b . Proxy a'  a    b'  b    m r
     monad -}
 runProxy :: (Monad m) => (() -> Proxy a' () () b m r) -> m r
 runProxy k = go (k ()) where
-    go p = case p of
-        Request _ fa  -> go (fa  ())
-        Respond _ fb' -> go (fb' ())
-        M         m   -> m >>= go
-        Pure      r   -> return r
-
+    go p = do
+        x <- unProxy p
+        case x of
+            Request _ fa  -> go (fa  ())
+            Respond _ fb' -> go (fb' ())
+            Pure      r   -> return r
 {-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to a Kleisli
     arrow in the base monad -}
 runProxyK :: (Monad m) => (() -> Proxy a' () () b m r) -> (() -> m r)
@@ -248,9 +263,9 @@ runSessionK = runProxyK
 -- | Discard all responses
 discard :: (Monad m) => () -> Proxy () a () C m r
 discard _ = go where
-    go = Request () (\_ -> go)
+    go = Proxy (return (Request () (\_ -> go)))
 
 -- | Ignore all requests
 ignore  :: (Monad m) => a -> Proxy C () a () m r
 ignore _ = go where
-    go = Respond () (\_ -> go)
+    go = Proxy (return (Respond () (\_ -> go)))

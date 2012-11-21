@@ -4,27 +4,29 @@ module Control.Proxy (
     -- * Modules
     -- $modules
     module Control.Proxy.Class,
-    module Control.Proxy.Core,
-    module Control.Proxy.Pipe,
+    module Control.Proxy.Core.Fast,
+    module Control.Proxy.Synonym,
     module Control.Proxy.Trans,
+    module Control.Proxy.Trans.Identity,
     module Control.Proxy.Prelude
     ) where
 
 import Control.Proxy.Class
-import Control.Proxy.Core
-import Control.Proxy.Pipe
+import Control.Proxy.Core.Fast
+import Control.Proxy.Synonym
 import Control.Proxy.Trans
+import Control.Proxy.Trans.Identity
 import Control.Proxy.Prelude
 
 {- $modules
-    "Control.Proxy.Core" provides the core 'Proxy' type.
+    "Control.Proxy.Core.Fast" provides a fast 'Proxy' implementation.
 
-    "Control.Proxy.Class" provides the abstract interface to 'Proxy' operations.
+    "Control.Proxy.Class" type-classes proxy operations.
 
-    "Control.Proxy.Trans" provides proxy transformers.
+    "Control.Proxy.Synonym" defines type synonyms for proxies that don't use all
+    of their inputs or outputs.
 
-    "Control.Proxy.Pipe" provides a backwards-compatible re-implementation of
-    'Pipe's.
+    "Control.Proxy.Trans" defines the proxy transformer type class.
 
     "Control.Proxy.Prelude" provides a standard library of proxies.
 
