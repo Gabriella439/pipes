@@ -39,10 +39,9 @@ module Control.Proxy.Prelude.IO (
 import Control.Monad (forever)
 import Control.Monad.Trans.Class (lift)
 import Control.Proxy.Prelude.Kleisli (foreverK)
-import Control.Proxy.Synonym (Client, Server)
 import Control.Proxy.Class (ProxyP(request, respond))
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
-import Control.Proxy.Synonym (Producer, CoProducer)
+import Control.Proxy.Synonym (Client, Server, Producer, CoProducer)
 import System.IO (Handle, hGetLine, hPutStr, hPutStrLn, hPrint, stdin, stdout)
 
 -- | Get input from 'stdin' one line at a time and send \'@D@\'ownstream

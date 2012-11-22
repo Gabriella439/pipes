@@ -33,7 +33,7 @@ module Control.Proxy.Prelude.Base (
     ) where
 
 import Control.Proxy.Class
-import Control.Proxy.Core.Fast (Proxy(..))
+import Control.Proxy.Core.Fast (Proxy)
 import Control.Proxy.Synonym
 import Data.Closed (C)
 

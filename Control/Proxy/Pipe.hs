@@ -23,7 +23,7 @@ module Control.Proxy.Pipe (
     ) where
 
 import Control.Proxy.Class (ProxyP(request, respond, (<-<), (?>=)))
-import Control.Proxy.Synonym (Pipe)
+import Control.Proxy.Synonym (Pipe, Consumer, Producer)
 import Control.Proxy.Trans.Identity (runIdentityP)
 
 {-| Wait for input from upstream
@@ -78,7 +78,7 @@ idP = go where
     provide their corresponding 'runPipe' functions, specialized to their own
     'Proxy' implementations.
 
-    Each implementation must supply its own 'runPipe' functions since it is
+    Each implementation must supply its own 'runPipe' function since it is
     the only non-polymorphic 'Pipe' function and the compiler uses it to
     select which underlying 'Proxy' implementation to use. -}
 

@@ -2,7 +2,6 @@
 
 module Control.Proxy.Prelude.Kleisli (
     -- * Core utility functions
-    -- $utility
     foreverK,
     replicateK,
     mapK
@@ -11,22 +10,21 @@ module Control.Proxy.Prelude.Kleisli (
 import Control.Monad ((>=>))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 
-{- $utility
-    Use 'foreverK' to abstract away the following common pattern:
+{-| Compose a \'@K@\'leisli arrow with itself forever
+
+    Use 'foreverK' to abstract away the following common recursion pattern:
 
 > p a = do
 >     ...
 >     a' <- respond b
 >     p a'
 
-    Using 'foreverK', you can avoid the manual recursion:
+    Using 'foreverK', you can instead write:
 
 > p = foreverK $ \a -> do
 >     ...
 >     respond b
 -}
-
--- | Compose a \'@K@\'leisli arrow with itself forever
 foreverK :: (Monad m) => (a -> m a) -> (a -> m b)
 foreverK k = let r = k >=> r in r
 {- foreverK uses 'let' to avoid a space leak.
