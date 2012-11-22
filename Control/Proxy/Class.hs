@@ -132,7 +132,7 @@ class ProxyP p where
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
         use to decide what response to return.  'request' binds the upstream's
-        response to its own return value. -}
+        response of type @a@ to its own return value. -}
     request :: (Monad m) => a' -> p a' a x' x m a
 
     {-| 'respond' with an output for downstream and bind downstream's next
@@ -140,8 +140,8 @@ class ProxyP p where
           
         @respond b@ satisfies a downstream 'request' by supplying the value @b@
         'respond' blocks until downstream 'request's a new value and binds the
-        argument from the next 'request' as its return value. -}
-    respond :: (Monad m) => a -> p x' x a' a m a'
+        argument of type @b'@ from the next 'request' as its return value. -}
+    respond :: (Monad m) => b -> p x' x b' b m b'
 
     {-| 'return_P' is identical to 'return', except with a more polymorphic
         constraint. -}
