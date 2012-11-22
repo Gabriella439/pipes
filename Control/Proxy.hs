@@ -3,38 +3,33 @@
 module Control.Proxy (
     -- * Modules
     -- $default
-    module Control.Proxy.Fast
+    module Control.Proxy.Core,
+    module Control.Proxy.Core.Fast
     ) where
 
-import Control.Proxy.Fast
+import Control.Proxy.Core
+import Control.Proxy.Core.Fast
 
 {- $default
-    This library defines two 'Proxy' implementations:
+    "Control.Proxy.Core" exports everything except 'runProxy'.
 
-    * "Control.Proxy.Core.Fast": This module runs faster for code that is not
-      'IO' bound, but it only obeys the monad transformer laws modulo safe
-      observation functions (like 'runProxy').
+    This library provides two base 'Proxy' implementations, each of which export
+    their own 'runProxy' function:
 
-    * "Control.Proxy.Core.Correct": This module sacrifices speed on pure code
-      segments, but in return strictly preserves the monad transformer laws.
+    * "Control.Proxy.Core.Fast": This runs faster for code that is not
+      'IO'-bound, but it only obeys the monad transformer laws modulo safe
+      observation functions.
 
-    These two modules only export the 'runProxy' family of functions which
-    select which 'Proxy' implementation to use.  All other code in this library
-    is completely polymorphic over the 'ProxyP' class and will work
-    transparently with either implementation (or any transformers thereof).
+    * "Control.Proxy.Core.Correct": This trades speed on pure code segments, but
+       strictly preserves the monad transformer laws.
 
-    This module exports the current recommended implementation for users that
-    seek guidance and choose to defer to my judgement on which underlying
-    implementation to use.  You can safely import this and not worry that the
-    API will break if I switch the default recommended implementation.
+    This module selects the currently recommended implementation (Fast).
 
-    Also, if you are just defining proxy utilities that are polymorphic over
-    'ProxyP' and you don't use 'runProxy', then just use this module since
-    neither implementation import will affect your code at all.
+    You can switch to the correct implementation by importing
+    "Control.Proxy.Core" and "Control.Proxy.Core.Correct".
 
-    If you do use 'runProxy' and you want to explicitly specify which
-    implementation to use, then import "Control.Proxy.Fast" or
-    "Control.Proxy.Correct" to lock in that particular implementation.
+    You can lock in the fast implementation (in case I change the recommended
+    default) by importing "Control.Proxy.Core" and "Control.Proxy.Core.Fast".
 
-    I currently recommend "Control.Proxy.Fast", since most users do not require
-    anything beyond the safe and polymorphic API. -}
+    Other than 'runProxy', the rest of the library is polymorphic over 'ProxyP'.
+-}

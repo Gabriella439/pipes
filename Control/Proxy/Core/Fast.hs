@@ -1,5 +1,3 @@
-{-# LANGUAGE Rank2Types #-}
-
 {-| A 'Proxy' 'request's input from upstream and 'respond's with output to
     downstream.
 
@@ -13,16 +11,12 @@ module Control.Proxy.Core.Fast (
     -- $run
     runProxy,
     runProxyK,
-    runSession,
-    runSessionK,
+    runPipe,
 
     -- * Utility Proxies
     -- $utility
     discard,
-    ignore,
-
-    -- * Pipe compatibility
-    runPipe
+    ignore
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
@@ -31,7 +25,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class
-import Control.Proxy.Synonym (Pipeline, Server, Client)
+import Control.Proxy.Synonym (Pipe)
 import Data.Closed (C)
 
 {-| A 'Proxy' communicates with an upstream interface and a downstream
@@ -54,7 +48,7 @@ data Proxy a' a b' b m r
   = Request a' (a  -> Proxy a' a b' b m r )
   | Respond b  (b' -> Proxy a' a b' b m r )
   | M          (m    (Proxy a' a b' b m r))
-  | Pure r
+  | Pure    r
 
 instance (Monad m) => Functor (Proxy a' a b' b m) where
     fmap f p0 = go p0 where
@@ -166,37 +160,15 @@ instance MFunctorP Proxy where
     mapT_P = mapT
 
 {- $run
-    I provide two ways to run proxies:
+    The following commands run self-sufficient proxies, converting them back to
+    the base monad.
 
-    * 'runProxy', which discards unhandled output from either end
+    These are the only functions specific to the 'Proxy' type.  Everything else
+    programs generically over the 'ProxyP' type class.
 
-    * 'runSession', which type restricts its argument to ensure no loose ends
-
-    Both functions require that the input to each end is trivially satisfiable,
-    (i.e. @()@).
-
-    I recommend 'runProxy' for most use cases since it is more convenient.
-
-    'runSession' only accepts sessions that do not send unhandled data flying
-    off each end, which provides the following benefits:
-
-    * It prevents against accidental data loss.
-
-    * It protects against silent failures
-
-    * It prevents wastefully draining a scarce resource by gratuitously
-      driving it to completion
-
-    However, this restriction means that you must either duplicate every utility
-    function to specialize them to the end-point positions (which I do not do),
-    or explicitly close loose ends using the 'discard' and 'ignore' proxies:
-
-> runSession $ discard <-< p <-< ignore
-
-    Use the \'@K@\' versions of each command if you are running sessions nested
-    within sessions.  They provide a Kleisli arrow as their result suitable to
-    be passed to another 'runProxy' / 'runSession' command.
--}
+    Use 'runProxyK' if you are running proxies nested within proxies.  It
+    provides a Kleisli arrow as its result that you can pass to another
+    'runProxy' / 'runProxyK' command. -}
 
 {-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to the base
     monad -}
@@ -212,16 +184,6 @@ runProxy k = go (k ()) where
     arrow in the base monad -}
 runProxyK :: (Monad m) => (() -> Proxy a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
-
-{-| Run a self-contained 'Session' Kleisli arrow, converting it back to the base
-    monad -}
-runSession :: (Monad m) => (() -> Proxy C () () C m r) -> m r
-runSession = runProxy
-
-{-| Run a self-contained 'Session' Kleisli arrow, converting it back to a
-    Kleisli arrow in the base monad -}
-runSessionK :: (Monad m) => (() -> Proxy C () () C m r) -> (() -> m r)
-runSessionK = runProxyK
 
 {- $utility
     'discard' provides a fallback client that gratuitously 'request's input
@@ -242,10 +204,5 @@ ignore _ = go where
     go = Respond () (\_ -> go)
 
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
-runPipe :: (Monad m) => Pipeline Proxy m r -> m r
-runPipe p' = go p' where
-    go p = case p of
-        Request _ fa  -> go (fa  ())
-        Respond _ fb' -> go (fb' ())
-        M         m   -> m >>= go
-        Pure      r   -> return r
+runPipe :: (Monad m) => Pipe Proxy () b m r -> m r
+runPipe p = runProxy (\_ -> p)

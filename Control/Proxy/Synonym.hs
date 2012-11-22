@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, KindSignatures #-}
+{-# LANGUAGE KindSignatures #-}
 
 {-| These type synonyms simplify type signatures when proxies do not use all
     their type variables. -}
@@ -12,7 +12,7 @@ module Control.Proxy.Synonym (
     Server
     ) where
 
-import Control.Proxy.Class
+import Data.Closed (C)
 
 {-| The type variables of @Pipe a b m r@ signify:
 
@@ -26,27 +26,27 @@ import Control.Proxy.Class
 type Pipe   p a b (m :: * -> *) r = p () a () b m r
 
 -- | A pipe that produces values
-type Producer p b m r = forall a   . Pipe p a b m r
+type Producer p b m r = Pipe p () b m r
 
 -- | A pipe that consumes values
-type Consumer p a m r = forall   b . Pipe p a b m r
+type Consumer p a m r = Pipe p a C m r
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline p   m r = forall a b . Pipe p a b m r
+type Pipeline p   m r = Pipe p () C m r
 
 {-| @Server req resp@ receives requests of type @req@ and sends responses of
     type @resp@.
 
     'Server's only 'respond' and never 'request' anything. -}
-type Server p req resp m r = forall a' a      . p a'  a    req resp m r
+type Server p req resp m r = p C   ()   req resp m r
 
 {-| @Client req resp@ sends requests of type @req@ and receives responses of
     type @resp@.
 
     'Client's only 'request' and never 'respond' to anything. -}
-type Client p req resp m r = forall      b' b . p req resp b'  b    m r
+type Client p req resp m r = p req resp ()  C    m r
 
 {-| A self-contained 'Session', ready to be run by 'runSession'
 
     'Session's never 'request' anything or 'respond' to anything. -}
-type Session p         m r = forall a' a b' b . p a'  a    b'  b    m r
+type Session p         m r = p C   ()   ()  C    m r

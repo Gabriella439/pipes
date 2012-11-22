@@ -1,5 +1,3 @@
-{-# LANGUAGE Rank2Types #-}
-
 {-| A 'Proxy' 'request's input from upstream and 'respond's with output to
     downstream.
 
@@ -8,13 +6,13 @@
 module Control.Proxy.Core.Correct (
     -- * Types
     Proxy(..),
+    ProxyF(..),
 
     -- * Run Sessions 
     -- $run
     runProxy,
     runProxyK,
-    runSession,
-    runSessionK,
+    runPipe,
 
     -- * Utility Proxies
     -- $utility
@@ -28,6 +26,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class
+import Control.Proxy.Synonym (Pipe)
 import Data.Closed (C)
 
 {-| A 'Proxy' communicates with an upstream interface and a downstream
@@ -177,55 +176,16 @@ instance MFunctor (Proxy a' a b' b) where
 instance MFunctorP Proxy where
     mapT_P = mapT
 
-{-| @Server req resp@ receives requests of type @req@ and sends responses of
-    type @resp@.
-
-    'Server's only 'respond' and never 'request' anything. -}
-type Server req resp m r = forall a' a      . Proxy a'  a    req resp m r
-
-{-| @Client req resp@ sends requests of type @req@ and receives responses of
-    type @resp@.
-
-    'Client's only 'request' and never 'respond' to anything. -}
-type Client req resp m r = forall      b' b . Proxy req resp b'  b    m r
-
-{-| A self-contained 'Session', ready to be run by 'runSession'
-
-    'Session's never 'request' anything or 'respond' to anything. -}
-type Session         m r = forall a' a b' b . Proxy a'  a    b'  b    m r
-
 {- $run
-    I provide two ways to run proxies:
+    The following commands run self-sufficient proxies, converting them back to
+    the base monad.
 
-    * 'runProxy', which discards unhandled output from either end
+    These are the only functions specific to the 'Proxy' type.  Everything else
+    programs generically over the 'ProxyP' type class.
 
-    * 'runSession', which type restricts its argument to ensure no loose ends
-
-    Both functions require that the input to each end is trivially satisfiable,
-    (i.e. @()@).
-
-    I recommend 'runProxy' for most use cases since it is more convenient.
-
-    'runSession' only accepts sessions that do not send unhandled data flying
-    off each end, which provides the following benefits:
-
-    * It prevents against accidental data loss.
-
-    * It protects against silent failures
-
-    * It prevents wastefully draining a scarce resource by gratuitously
-      driving it to completion
-
-    However, this restriction means that you must either duplicate every utility
-    function to specialize them to the end-point positions (which I do not do),
-    or explicitly close loose ends using the 'discard' and 'ignore' proxies:
-
-> runSession $ discard <-< p <-< ignore
-
-    Use the \'@K@\' versions of each command if you are running sessions nested
-    within sessions.  They provide a Kleisli arrow as their result suitable to
-    be passed to another 'runProxy' / 'runSession' command.
--}
+    Use 'runProxyK' if you are running proxies nested within proxies.  It
+    provides a Kleisli arrow as its result that you can pass to another
+    'runProxy' / 'runProxyK' command. -}
 
 {-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to the base
     monad -}
@@ -241,16 +201,6 @@ runProxy k = go (k ()) where
     arrow in the base monad -}
 runProxyK :: (Monad m) => (() -> Proxy a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
-
-{-| Run a self-contained 'Session' Kleisli arrow, converting it back to the base
-    monad -}
-runSession :: (Monad m) => (() -> Proxy C () () C m r) -> m r
-runSession = runProxy
-
-{-| Run a self-contained 'Session' Kleisli arrow, converting it back to a
-    Kleisli arrow in the base monad -}
-runSessionK :: (Monad m) => (() -> Proxy C () () C m r) -> (() -> m r)
-runSessionK = runProxyK
 
 {- $utility
     'discard' provides a fallback client that gratuitously 'request's input
@@ -269,3 +219,7 @@ discard _ = go where
 ignore  :: (Monad m) => a -> Proxy C () a () m r
 ignore _ = go where
     go = Proxy (return (Respond () (\_ -> go)))
+
+-- | Run the 'Pipe' monad transformer, converting it back to the base monad
+runPipe :: (Monad m) => Pipe Proxy () b m r -> m r
+runPipe p = runProxy (\_ -> p)

@@ -1,12 +1,9 @@
-{-| This module provides an API similar to "Control.Pipe".
+{-| This module provides an API similar to "Control.Pipe" for those who prefer
+    the classic 'Pipe' API.
 
-    "Control.Pipe.Core" provides the central, more extensive, documentation and
-    "Control.Pipe.Tutorial" describes how to use pipes fluently.
-
-    This module differs from "Control.Pipe" in important ways in order to
-    encourage seamless interoperability between unidirectional 'Pipe' code and
-    bidirectional 'Proxy' code.  See the \"Upgrade Pipes to Proxies\" section
-    for details. -}
+    This module differs slightly from "Control.Pipe" in order to promote
+    seamless interoperability with both pipes and proxies.  See the \"Upgrade
+    Pipes to Proxies\" section for details. -}
 module Control.Proxy.Pipe (
     -- * Create Pipes
     await,
@@ -25,8 +22,9 @@ module Control.Proxy.Pipe (
     -- $upgrade
     ) where
 
-import Control.Proxy.Class
+import Control.Proxy.Class (ProxyP(request, respond, (<-<), (?>=)))
 import Control.Proxy.Synonym (Pipe)
+import Control.Proxy.Trans.Identity (runIdentityP)
 
 {-| Wait for input from upstream
 
@@ -38,9 +36,12 @@ await = request ()
 pipe :: (Monad m, ProxyP p) => (a -> b) -> Pipe p a b m r
 pipe f = go where
     go =
-        request ()    ?>= \a  ->
+        request ()    ?>= \a ->
         respond (f a) ?>= \_ ->
         go
+{- pipe f = runIdentityP $ forever $ do
+      a <- await
+      yield (f a) -}
 
 {-| Deliver output downstream
 
@@ -68,6 +69,9 @@ idP = go where
         request () ?>= \a  ->
         respond a  ?>= \() ->
         go
+{- idP = runIdentityP $ forever $ do
+      a <- await
+      yield a -}
 
 {- $run
     The "Control.Proxy.Core.Fast" and "Control.Proxy.Core.Correct" modules
@@ -80,18 +84,19 @@ idP = go where
 
 {- $upgrade
     You can upgrade code written to 'Control.Pipe' to work with the 'Proxy'
-    ecosystem in stages.  Each change enables greater interoperability with
+    ecosystem in steps.  Each change enables greater interoperability with
     proxy utilities and transformers and if time permits you should implement
     the entire upgrade for your libraries if you want to take advantage of
     proxy standard libraries.
 
     First, import "Control.Proxy" and "Control.Proxy.Pipe" instead of
-    "Control.Pipe" and add 'Proxy' after every 'Pipe', 'Producer', or 'Consumer'
-    in any type signature.  For example, you would convert this:
+    "Control.Pipe".  Then, add 'Proxy' after every 'Pipe', 'Producer', or
+    'Consumer' in any type signature.  For example, you would convert this:
 
 > import Control.Pipe
 >
 > fromList :: (Monad m) => [b] -> Producer b m r
+> fromList xs = mapM_ yield xs
 
     ... to this:
 
@@ -99,6 +104,7 @@ idP = go where
 > import Control.Proxy.Pipe -- transition import
 >
 > fromList :: (Monad m) => [b] -> Producer Proxy b m r
+> fromList xs = mapM_ yield xs
 
     The change ensures that all your code now works in the 'Proxy' monad.
 
@@ -132,19 +138,18 @@ idP = go where
 >     fromList [1..a] ()
 
     This change lets you switch from pipe composition, ('<+<'), to proxy
-    composition, ('<-<').
+    composition, ('<-<'), so that you can mix proxy utilities with pipes.
 
     Third, wrap your pipe's implementation in 'runIdentityP' (which
-    "Control.Proxy" exports) and you can now drop the "Control.Proxy.Pipe"
-    import:
+    "Control.Proxy" exports):
 
 > import Control.Proxy
 > import Control.Proxy.Pipe
 >
 > fromList xs () = runIdentityP $ mapM_ yield xs
 
-    The inferred type signature will now be polymorphic in the first type
-    parameter:
+    Then replace the 'Proxy' in the type signature with a type variable @p@
+    constrained by the 'ProxyP' type class:
 
 > fromList :: (Monad m, ProxyP p) => [b] -> () -> Producer p b m r
 
@@ -162,7 +167,7 @@ idP = go where
 
     Also, continue to use the 'Pipe', 'Consumer' and 'Producer' type synonyms to
     simplify type signatures.  I encourage using them for unidirectional proxy
-    code.  Here are some examples:
+    code.  Here are some examples of how they mix with proxy transformers:
 
 > import Control.Proxy
 > import Control.Proxy.Trans.Either as E

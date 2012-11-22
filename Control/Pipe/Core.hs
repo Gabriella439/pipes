@@ -1,5 +1,3 @@
-{-# LANGUAGE Rank2Types #-}
-
 {-| The 'Pipe' type is a monad transformer that enriches the base monad with the
     ability to 'await' or 'yield' data to and from other 'Pipe's. -}
 
@@ -30,6 +28,7 @@ import Control.Applicative (Applicative(pure, (<*>)))
 import Control.Category (Category((.), id), (<<<), (>>>))
 import Control.Monad (forever)
 import Control.Monad.Trans.Class (MonadTrans(lift))
+import Data.Closed (C)
 import Prelude hiding ((.), id)
 
 {- $types
@@ -89,13 +88,13 @@ instance MonadTrans (Pipe a b) where
     lift m = M (m >>= \r -> return (Pure r))
 
 -- | A pipe that produces values
-type Producer b m r = forall a . Pipe a b m r
+type Producer b m r = Pipe () b m r
 
 -- | A pipe that consumes values
-type Consumer a m r = forall b . Pipe a b m r
+type Consumer a m r = Pipe a C m r
 
 -- | A self-contained pipeline that is ready to be run
-type Pipeline m r = forall a b . Pipe a b m r
+type Pipeline m r = Pipe () C m r
 
 {- $create
     'yield' and 'await' are the only two primitives you need to create pipes.
