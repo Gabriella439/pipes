@@ -12,12 +12,7 @@ module Control.Proxy.Core.Correct (
     -- $run
     runProxy,
     runProxyK,
-    runPipe,
-
-    -- * Utility Proxies
-    -- $utility
-    discard,
-    ignore
+    runPipe
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
@@ -202,24 +197,6 @@ runProxy k = go (k ()) where
 runProxyK :: (Monad m) => (() -> Proxy a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
 
-{- $utility
-    'discard' provides a fallback client that gratuitously 'request's input
-    from a server, but discards all responses.
-
-    'ignore' provides a fallback server that trivially 'respond's with output
-    to a client, but ignores all request parameters.
--}
-
--- | Discard all responses
-discard :: (Monad m) => () -> Proxy () a () C m r
-discard _ = go where
-    go = Proxy (return (Request () (\_ -> go)))
-
--- | Ignore all requests
-ignore  :: (Monad m) => a -> Proxy C () a () m r
-ignore _ = go where
-    go = Proxy (return (Respond () (\_ -> go)))
-
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
-runPipe :: (Monad m) => Pipe Proxy () b m r -> m r
+runPipe :: (Monad m) => Proxy a' () () b m r -> m r
 runPipe p = runProxy (\_ -> p)
