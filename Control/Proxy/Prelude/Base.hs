@@ -29,7 +29,11 @@ module Control.Proxy.Prelude.Base (
     enumFromS,
     enumFromC,
     enumFromToS,
-    enumFromToC
+    enumFromToC,
+    -- * Closed Adapters
+    -- $open
+    openU,
+    openD
     ) where
 
 import Control.Proxy.Class
@@ -427,3 +431,30 @@ enumFromToC a1 a2 _ = go a1 where
             go (succ n)
 {-# SPECIALIZE enumFromToC
  :: (Enum a', Ord a', Monad m) => a' -> a' -> () -> Proxy a' () () C m () #-}
+
+{- $open
+    Use the @open@ functions when you need to embed a proxy with a closed end
+    within an open proxy.  For example, the following code will not type-check
+    because @fromListS [1..]@  is a 'Server' and has a closed upstream end,
+    which conflicts with the 'request' statement before it:
+
+> p () = do
+>     request ()
+>     fromList [1..] ()
+
+    You fix this by composing 'openU' upstream of it, which turns its closed
+    upstream end into an open polymorphic end:
+
+> p () = do
+>     request ()
+>     (fromList [1..] <-< openU) ()
+
+-}
+
+openU :: (Monad m, ProxyP p) => C -> p a' a C () m r
+openU _ = go where
+    go = respond () ?>= \_ -> go
+
+openD :: (Monad m, ProxyP p) => b' -> p () C b' b m r
+openD _ = go where
+    go = request () ?>= \_ -> go
