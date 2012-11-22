@@ -6,4 +6,4 @@ module Data.Closed (
     ) where
 
 -- | The empty type, denoting a \'@C@\'losed end
-data C = C -- Not exported, but I write it to keep the library Haskell98
+data C = C -- Not exported, but I include it to avoid EmptyDataDecls

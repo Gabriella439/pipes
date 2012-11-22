@@ -34,7 +34,8 @@ module Control.Proxy.Prelude.Base (
 
 import Control.Proxy.Class
 import Control.Proxy.Core.Fast (Proxy(..))
-import Control.Proxy.Synonym (Pipe, Client, Server)
+import Control.Proxy.Synonym
+import Data.Closed (C)
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
     values going upstream.
@@ -45,8 +46,7 @@ import Control.Proxy.Synonym (Pipe, Client, Server)
 >
 > mapB id id = idT
 -}
-mapB
- :: (Monad m, ProxyP p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
+mapB :: (Monad m, ProxyP p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
 mapB f g = go where
     go b' = request (g b') ?>= \a -> respond (f a) ?>= go
 -- mapB f g = foreverK $ request . g >=> respond . f
@@ -59,13 +59,11 @@ mapB f g = go where
 >
 > mapD id = idT
 -}
-mapD
- :: (Monad m, ProxyP p) => (a -> b) -> x -> p x a x b m r
+mapD :: (Monad m, ProxyP p) => (a -> b) -> x -> p x a x b m r
 mapD f = go where
     go x = request x ?>= \a -> respond (f a) ?>= go
 -- mapD f = foreverK $ request >=> respond . f
-{-# SPECIALIZE mapD
- :: (Monad m) => (a -> b) -> x -> Proxy x a x b m r #-}
+{-# SPECIALIZE mapD :: (Monad m) => (a -> b) -> x -> Proxy x a x b m r #-}
 
 {-| @(mapU g)@ applies @g@ to all values going \'@U@\'pstream.
 
@@ -73,13 +71,11 @@ mapD f = go where
 >
 > mapU id = idT
 -}
-mapU
- :: (Monad m, ProxyP p) => (b' -> a') -> b' -> p a' x b' x m r
+mapU :: (Monad m, ProxyP p) => (b' -> a') -> b' -> p a' x b' x m r
 mapU g = go where
     go b' = request (g b') ?>= \x -> respond x ?>= go
 -- mapU g = foreverK $ (request . g) >=> respond
-{-# SPECIALIZE mapU
- :: (Monad m) => (b' -> a') -> b' -> Proxy a' x b' x m r #-}
+{-# SPECIALIZE mapU :: (Monad m) => (b' -> a') -> b' -> Proxy a' x b' x m r #-}
 
 {-| @(mapMB f g)@ applies the monadic function @f@ to all values going
     downstream and the monadic function @g@ to all values going upstream.
@@ -106,16 +102,14 @@ mapMB f g = go where
 >
 > mapMD return = idT
 -}
-mapMD
- :: (Monad m, ProxyP p) => (a -> m b) -> x -> p x a x b m r
+mapMD :: (Monad m, ProxyP p) => (a -> m b) -> x -> p x a x b m r
 mapMD f = go where
     go x =
         request x ?>= \a ->
         lift_P (f a) ?>= \b ->
         respond b ?>= go
 -- mapMD f = foreverK $ request >=> lift . f >=> respond
-{-# SPECIALIZE mapMD
- :: (Monad m) => (a -> m b) -> x -> Proxy x a x b m r #-}
+{-# SPECIALIZE mapMD :: (Monad m) => (a -> m b) -> x -> Proxy x a x b m r #-}
 
 {-| @(mapMU g)@ applies the monadic function @g@ to all values going upstream
 
@@ -123,8 +117,7 @@ mapMD f = go where
 >
 > mapMU return = idT
 -}
-mapMU
- :: (Monad m, ProxyP p) => (b' -> m a') -> b' -> p a' x b' x m r
+mapMU :: (Monad m, ProxyP p) => (b' -> m a') -> b' -> p a' x b' x m r
 mapMU g = go where
     go b' =
         lift_P (g b') ?>= \a' ->
@@ -141,8 +134,7 @@ mapMU g = go where
 >
 > execB (return ()) = idT
 -}
-execB
- :: (Monad m, ProxyP p) => m () -> m () -> a' -> p a' a a' a m r
+execB :: (Monad m, ProxyP p) => m () -> m () -> a' -> p a' a a' a m r
 execB md mu = go where
     go a' =
         lift_P mu  ?>= \_ ->
@@ -163,8 +155,7 @@ execB md mu = go where
 >
 > execD (return ()) = idT
 -}
-execD
- :: (Monad m, ProxyP p) => m () -> a' -> p a' a a' a m r
+execD :: (Monad m, ProxyP p) => m () -> a' -> p a' a a' a m r
 execD md = go where
     go a' =
         request a' ?>= \a ->
@@ -174,8 +165,7 @@ execD md = go where
     a <- request a'
     lift md
     respond a -}
-{-# SPECIALIZE execD
- :: (Monad m) => m () -> a' -> Proxy a' a a' a m r #-}
+{-# SPECIALIZE execD :: (Monad m) => m () -> a' -> Proxy a' a a' a m r #-}
 
 {-| @execU mu)@ executes @mu@ every time values flow upstream through it.
 
@@ -183,8 +173,7 @@ execD md = go where
 >
 > execU (return ()) = idT
 -}
-execU
- :: (Monad m, ProxyP p) => m () -> a' -> p a' a a' a m r
+execU :: (Monad m, ProxyP p) => m () -> a' -> p a' a a' a m r
 execU mu = go where
     go a' =
         lift_P mu  ?>= \_ ->
@@ -194,8 +183,7 @@ execU mu = go where
     lift mu
     a <- request a'
     respond a -}
-{-# SPECIALIZE execU
- :: (Monad m) => m () -> a' -> Proxy a' a a' a m r #-}
+{-# SPECIALIZE execU :: (Monad m) => m () -> a' -> Proxy a' a a' a m r #-}
 
 {-| @(takeB n)@ allows @n@ upstream/downstream roundtrips to pass through
 
@@ -203,8 +191,7 @@ execU mu = go where
 >
 > takeB 0 = return
 -}
-takeB
- :: (Monad m, ProxyP p) => Int -> a' -> p a' a a' a m a'
+takeB :: (Monad m, ProxyP p) => Int -> a' -> p a' a a' a m a'
 takeB n0 = go n0 where
     go n
         | n <= 0    = return_P
@@ -212,12 +199,10 @@ takeB n0 = go n0 where
              request a' ?>= \a ->
              respond a  ?>= go (n - 1)
 -- takeB n = replicateK n $ request >=> respond
-{-# SPECIALIZE takeB
- :: (Monad m) => Int -> a' -> Proxy a' a a' a m a' #-}
+{-# SPECIALIZE takeB :: (Monad m) => Int -> a' -> Proxy a' a a' a m a' #-}
 
 -- | 'takeB_' is 'takeB' with a @()@ return value, convenient for composing
-takeB_
- :: (Monad m, ProxyP p) => Int -> a' -> p a' a a' a m ()
+takeB_ :: (Monad m, ProxyP p) => Int -> a' -> p a' a a' a m ()
 takeB_ n0 = go n0 where
     go n
         | n <= 0    = \_ -> return_P ()
@@ -225,8 +210,7 @@ takeB_ n0 = go n0 where
             request a' ?>= \a ->
             respond a  ?>= go (n - 1)
 -- takeB_ n = fmap void (takeB n)
-{-# SPECIALIZE takeB_
- :: (Monad m) => Int -> a' -> Proxy a' a a' a m () #-}
+{-# SPECIALIZE takeB_ :: (Monad m) => Int -> a' -> Proxy a' a a' a m () #-}
 
 {-| @takeWhileD p@ allows values to pass downstream so long as they satisfy the
      predicate @p@.
@@ -239,8 +223,7 @@ takeB_ n0 = go n0 where
 >
 > takeWhileD mempty = idT
 -}
-takeWhileD
- :: (Monad m, ProxyP p) => (a -> Bool) -> a' -> p a' a a' a m ()
+takeWhileD :: (Monad m, ProxyP p) => (a -> Bool) -> a' -> p a' a a' a m ()
 takeWhileD p = go where
     go a' =
         request a' ?>= \a ->
@@ -257,8 +240,7 @@ takeWhileD p = go where
 >
 > takeWhileD mempty = idT
 -}
-takeWhileU
- :: (Monad m, ProxyP p) => (a' -> Bool) -> a' -> p a' a a' a m ()
+takeWhileU :: (Monad m, ProxyP p) => (a' -> Bool) -> a' -> p a' a a' a m ()
 takeWhileU p = go where
     go a' =
         if (p a')
@@ -275,8 +257,7 @@ takeWhileU p = go where
 >
 > dropD 0 = idT
 -}
-dropD
- :: (Monad m, ProxyP p) => Int -> () -> Pipe p a a m r
+dropD :: (Monad m, ProxyP p) => Int -> () -> Pipe p a a m r
 dropD n0 = \() -> go n0 where
     go n
         | n <= 0    = idT ()
@@ -286,8 +267,7 @@ dropD n0 = \() -> go n0 where
 {- dropD n () = do
     replicateM_ n $ request ()
     idT () -}
-{-# SPECIALIZE dropD
- :: (Monad m) => Int -> () -> Proxy () a () a m r #-}
+{-# SPECIALIZE dropD :: (Monad m) => Int -> () -> Proxy () a () a m r #-}
 
 {-| @(dropU n)@ discards @n@ values going upstream
 
@@ -295,8 +275,7 @@ dropD n0 = \() -> go n0 where
 >
 > dropU 0 = idT
 -}
-dropU
- :: (Monad m, ProxyP p) => Int -> a' -> p a' () a' () m r
+dropU :: (Monad m, ProxyP p) => Int -> a' -> CoPipe p a' a' m r
 dropU n0
     | n0 <= 0   = idT
     | otherwise = go (n0 - 1) where
@@ -309,8 +288,7 @@ dropU n0
         replicateM_ (n - 1) $ respond ()
         a'2 <- respond ()
         idT a'2 -}
-{-# SPECIALIZE dropU
- :: (Monad m) => Int -> a' -> Proxy a' () a' () m r #-}
+{-# SPECIALIZE dropU :: (Monad m) => Int -> a' -> Proxy a' () a' () m r #-}
 
 {-| @(dropWhileD p)@ discards values going upstream until one violates the
     predicate @p@.
@@ -323,8 +301,7 @@ dropU n0
 >
 > dropWhileD mempty = idT
 -}
-dropWhileD
- :: (Monad m, ProxyP p) => (a -> Bool) -> () -> Pipe p a a m r
+dropWhileD :: (Monad m, ProxyP p) => (a -> Bool) -> () -> Pipe p a a m r
 dropWhileD p () = go where
     go =
         request () ?>= \a ->
@@ -341,8 +318,7 @@ dropWhileD p () = go where
 >
 > dropWhileU mempty = idT
 -}
-dropWhileU
- :: (Monad m, ProxyP p) => (a' -> Bool) -> a' -> p a' () a' () m r
+dropWhileU :: (Monad m, ProxyP p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
 dropWhileU p = go where
     go a' = if (p a') then respond () ?>= go else idT a'
 {-# SPECIALIZE dropWhileU
@@ -359,8 +335,7 @@ dropWhileU p = go where
 >
 > filterD mempty = idT
 -}
-filterD
- :: (Monad m, ProxyP p) => (a -> Bool) -> () -> Pipe p a a m r
+filterD :: (Monad m, ProxyP p) => (a -> Bool) -> () -> Pipe p a a m r
 filterD p = \() ->  go where
     go = request () ?>= \a ->
          if (p a)
@@ -377,8 +352,7 @@ filterD p = \() ->  go where
 >
 > filterU mempty = idT
 -}
-filterU
- :: (Monad m, ProxyP p) => (a' -> Bool) -> a' -> p a' () a' () m r
+filterU :: (Monad m, ProxyP p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
 filterU p a'0 = go a'0 where
     go a' =
         if (p a')
@@ -395,13 +369,11 @@ filterU p a'0 = go a'0 where
 >
 > fromListS [] = return
 -}
-fromListS
- :: (Monad m, ProxyP p) => [a] -> () -> p x' x () a m ()
+fromListS :: (Monad m, ProxyP p) => [b] -> () -> Producer p b m ()
 fromListS xs = \_ -> foldr (\e a -> respond e ?>= \_ -> a) (return_P ()) xs
 -- fromListS xs _ = mapM_ respond xs
 {-# INLINE fromListS #-} -- So that foldr/build fusion occurs
-{-# SPECIALIZE fromListS
- :: (Monad m) => [a] -> () -> Proxy x' x () a m () #-}
+{-# SPECIALIZE fromListS :: (Monad m) => [b] -> () -> Proxy C () () b m () #-}
 
 {-| Convert a list into a 'Client'
 
@@ -409,47 +381,44 @@ fromListS xs = \_ -> foldr (\e a -> respond e ?>= \_ -> a) (return_P ()) xs
 >
 > fromListC [] = return
 -}
-fromListC
- :: (Monad m, ProxyP p) => [a] -> () -> p a x () y m ()
+fromListC :: (Monad m, ProxyP p) => [a'] -> () -> CoProducer p a' m ()
 fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 -- fromListC xs _ = mapM_ request xs
 {-# INLINE fromListC #-} -- So that foldr/build fusion occurs
-{-# SPECIALIZE fromListC
- :: (Monad m) => [a] -> () -> Proxy a x () y m () #-}
+{-# SPECIALIZE fromListC :: (Monad m) => [a'] -> () -> Proxy a' () () C m () #-}
 
 -- | 'Server' version of 'enumFrom'
-enumFromS
- :: (Enum a, Monad m, ProxyP p) => a -> y' -> p x' x y' a m r
-enumFromS a0 = \_ -> go a0 where
-    go a =
-        respond a ?>= \_ ->
-        go (succ a)
+enumFromS :: (Enum b, Monad m, ProxyP p) => b -> () -> Producer p b m r
+enumFromS b0 = \_ -> go b0 where
+    go b =
+        respond b ?>= \_ ->
+        go (succ b)
 {-# SPECIALIZE enumFromS
- :: (Enum a, Monad m) => a -> y' -> Proxy x' x y' a m r #-}
+ :: (Enum b, Monad m) => b -> () -> Proxy C () () b m r #-}
 
 -- | 'Client' version of 'enumFrom'
-enumFromC
- :: (Enum a, Monad m, ProxyP p) => a -> y' -> p a x y' y m r
-enumFromC a0 = \_ -> go a0 where
-    go a =
-        request a ?>= \_ ->
-        go (succ a)
+enumFromC :: (Enum a', Monad m, ProxyP p) => a' -> () -> CoProducer p a' m r
+enumFromC a'0 = \_ -> go a'0 where
+    go a' =
+        request a' ?>= \_ ->
+        go (succ a')
 {-# SPECIALIZE enumFromC
- :: (Enum a, Monad m) => a -> y' -> Proxy a x y' y m r #-}
+ :: (Enum a', Monad m) => a' -> () -> Proxy a' () () C m r #-}
 
 -- | 'Server' version of 'enumFromTo'
 enumFromToS
- :: (Enum a, Ord a, Monad m, ProxyP p) => a -> a -> y' -> p x' x y' a m ()
-enumFromToS a1 a2 _ = go a1 where
-    go n
-        | n > a2    = return_P ()
-        | otherwise = respond n ?>= \_ -> go (succ n)
+ :: (Enum b, Ord b, Monad m, ProxyP p) => b -> b -> () -> Producer p b m ()
+enumFromToS b1 b2 _ = go b1 where
+    go b
+        | b > b2    = return_P ()
+        | otherwise = respond b ?>= \_ -> go (succ b)
 {-# SPECIALIZE enumFromToS
- :: (Enum a, Ord a, Monad m) => a -> a -> y' -> Proxy x' x y' a m () #-}
+ :: (Enum b, Ord b, Monad m) => b -> b -> () -> Proxy C () () b m () #-}
 
 -- | 'Client' version of 'enumFromTo'
 enumFromToC
- :: (Enum a, Ord a, Monad m, ProxyP p) => a -> a -> y' -> p a x y' y m ()
+ :: (Enum a', Ord a', Monad m, ProxyP p)
+ => a' -> a' -> () -> CoProducer p a' m ()
 enumFromToC a1 a2 _ = go a1 where
     go n
         | n > a2 = return_P ()
@@ -457,4 +426,4 @@ enumFromToC a1 a2 _ = go a1 where
             request n ?>= \_ ->
             go (succ n)
 {-# SPECIALIZE enumFromToC
- :: (Enum a, Ord a, Monad m) => a -> a -> y' -> Proxy a x y' y m () #-}
+ :: (Enum a', Ord a', Monad m) => a' -> a' -> () -> Proxy a' () () C m () #-}

@@ -7,6 +7,9 @@ module Control.Proxy.Synonym (
     Pipe,
     Producer,
     Consumer,
+    CoPipe,
+    CoProducer,
+    CoConsumer,
     Pipeline,
     Client,
     Server
@@ -14,39 +17,50 @@ module Control.Proxy.Synonym (
 
 import Data.Closed (C)
 
-{-| The type variables of @Pipe a b m r@ signify:
+-- | A unidirectional 'Proxy'.
+type Pipe p a b (m :: * -> *) r = p () a () b m r
 
-    * @a@ - The type of input received from upstream pipes
+{-| A 'Pipe' that produces values
 
-    * @b@ - The type of output delivered to downstream pipes
+    'Producer's never 'request'. -}
+type Producer p b (m :: * -> *) r = p C () () b m r
 
-    * @m@ - The base monad
+{-| A 'Pipe' that consumes values
 
-    * @r@ - The type of the return value -}
-type Pipe   p a b (m :: * -> *) r = p () a () b m r
+    'Consumer's never 'respond'. -}
+type Consumer p a (m :: * -> *) r = p () a () C m r
 
--- | A pipe that produces values
-type Producer p b m r = Pipe p () b m r
+{-| A self-contained 'Pipeline' that is ready to be run
 
--- | A pipe that consumes values
-type Consumer p a m r = Pipe p a C m r
+    'Pipeline's never 'request' or 'respond'. -}
+type Pipeline p (m :: * -> *) r = p C () () C m r
 
--- | A self-contained pipeline that is ready to be run
-type Pipeline p   m r = Pipe p () C m r
+-- | A 'Pipe' where everything flows upstream
+type CoPipe p a' b' (m :: * -> *) r = p a' () b' () m r
 
-{-| @Server req resp@ receives requests of type @req@ and sends responses of
-    type @resp@.
+{-| A 'CoPipe' that produces values flowing upstream
 
-    'Server's only 'respond' and never 'request' anything. -}
-type Server p req resp m r = p C   ()   req resp m r
+    'CoProducer's never 'respond'. -}
+type CoProducer p a' (m :: * -> *) r = p a' () () C m r
 
-{-| @Client req resp@ sends requests of type @req@ and receives responses of
-    type @resp@.
+{-| A 'CoConsumer' that consumes values flowing upstream
 
-    'Client's only 'request' and never 'respond' to anything. -}
-type Client p req resp m r = p req resp ()  C    m r
+    'CoConsumer's never 'request'. -}
+type CoConsumer p b' (m :: * -> *) r = p C () b' () m r
+
+{-| @Server b' b@ receives requests of type @b'@ and sends responses of type
+    @b@.
+
+    'Server's never 'request'. -}
+type Server p b' b (m :: * -> *) r = p C () b' b m r
+
+{-| @Client a' a@ sends requests of type @a'@ and receives responses of
+    type @a@.
+
+    'Client's never 'respond'. -}
+type Client p a' a (m :: * -> *) r = p a' a () C m r
 
 {-| A self-contained 'Session', ready to be run by 'runSession'
 
-    'Session's never 'request' anything or 'respond' to anything. -}
-type Session p         m r = p C   ()   ()  C    m r
+    'Session's never 'request' or 'respond'. -}
+type Session p (m :: * -> *) r = p C () () C m r
