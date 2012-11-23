@@ -4,15 +4,12 @@
     multiple proxy implementations and proxy transformers can share the same
     library of utility proxies.
 
-    Type classes ending with a \'@P@\' suffix constrain values of the following
-    kind:
-
-> ProxyKind :: * -> * -> * -> * -> (* -> *) -> * -> *
-> Proxy        a'   a    b    b'    m          r
-
-    All base proxies and transformed proxies minimally implement the 'ProxyP'
-    type class.
--}
+    Several of these type classes, including 'ProxyP', duplicate methods from
+    other type-classes (such as ('?>=') duplicating ('>>=')) in order to work
+    around Haskell's lack of polymorphic constraints.  You do NOT need
+    to use these duplicate methods, which exist solely to plumb internal
+    type class machinery and clean up type signatures.  Instead, read the
+    \"Polymorphic proxies\" section to learn how to write clean proxy code. -}
 
 module Control.Proxy.Class (
     -- * Core proxy class
@@ -20,10 +17,11 @@ module Control.Proxy.Class (
     -- * request/respond substitution
     InteractP(..),
     -- * Proxy-specialized classes
-    -- $hacks
     MonadPlusP(..),
     MonadIOP(..),
     MFunctorP(..),
+    -- * Polymorphic proxies
+    -- $poly
     ) where
 
 import Control.Monad.IO.Class (MonadIO)
@@ -215,35 +213,6 @@ class InteractP p where
           -> (a -> p x' x b' b m a')
           -> (a -> p x' x c' c m a')
     p1 \<\ p2 = p2 />/ p1
-
-{- $hacks
-    The following type classes serve three purposes:
-
-    * They work around the lack of polymorphic constraints in Haskell
-
-    * They remove the need for the @FlexibleContexts@ extension
-
-    * They substantially clean up inferred type signatures
-
-    You don't need to use the methods from these type-classes.  Every type that
-    implements one of these \'@P@\'-suffixed class also implements the
-    corresponding non-\'@P@\'-suffixed class.  For example, 'Proxy' implements
-    both 'MonadP' and 'Monad':
-
-> instance MonadP Proxy where ...
-> instance (Monad m) => Monad (Proxy a' a b' b m) where ...
-
-    If you use a proxy transformer then you can use the 'Monad' class directly
-    (i.e. use @do@ notation) and the compiler will infer the cleaner and more
-    polymorphic 'MonadP' constraint.  You can also always use the 'IdentityP'
-    proxy transformer to get the same type-class inference on a fully
-    polymorphic proxy, like so:
-
-> idT' = runIdentityP $ foreverK $ \a' -> do
->     a <- request a'
->     respond a
--}
-
 {-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
 
 > (forall a' a b' b m . MonadPlus (p a' a b' b m) => ...
@@ -269,3 +238,78 @@ class MFunctorP p where
      :: (Monad m, Monad n)
      => (forall r . m r  -> n r)
      -> (p a' a b' b m r' -> p a' a b' b n r')
+
+{- $poly
+    All of these type classes contain methods which copy methods from more
+    familiar type classes.  These duplicate methods serve two purposes.
+
+    First, this library requires type class instances that would otherwise be
+    impossible to define without providing higher-kinded constraints.  Rather
+    than use the following illegal polymorphic constraint:
+
+> instance (forall a' a b' b . MonadTrans (p a' a b' b)) => ...
+
+      ... the instance can instead use the following Haskell98 constraint:
+
+> instance (MonadTransP p) => ...
+
+    Second, these type classes don't require the @FlexibleContexts@ extension
+    to use and substantially clean up constraints type signatures.  They convert
+    messy constraints like this:
+
+> p :: (MonadP (p a' a b' b m), MonadTrans (p a' a b' b)) => ...
+
+      .. into cleaner and more general constraints like this:
+
+> P :: (ProxyP p) => ...
+
+    These type classes exist solely for internal plumbing and you should never
+    directly use the duplicate methods from them.  Instead, you can use all the
+    original type classes as long as you embed your proxy code within at least
+    one proxy transformer (or 'IdentityP' if don't use any extensions).  The
+    type-class machinery will then automatically convert the messier and less
+    polymorphic constraints to the smaller and more general constraints.
+
+    For example, consider the following definition for @mapMD@:
+
+> import Control.Monad.Trans.Class
+> import Control.Proxy
+>
+> mapMD f = foreverK $ \a' -> do
+>     a <- request a'
+>     b <- lift (f a)
+>     respond b
+
+    The compiler infers the following messy signature:
+
+> mapMD
+>  :: (Monad m, Monad (p x a x b m), MonadTrans (p x a x b), ProxyP p)
+>  => (a -> m b) -> x -> p x a x b m r
+
+    Instead, you can cast the code to 'IdentityP p' by wrapping it in
+    'runIdentityK':
+
+> --        |difference|  
+> mapMD f = runIdentityK $ foreverK $ \a' -> do
+>     a <- request a'
+>     b <- lift (f a)
+>     respond b
+
+    ... and now the compiler collapses all the constraints into 'ProxyP':
+
+> mapMD :: (Monad m, ProxyP p) => (a -> m b) -> x -> p x a x b m r
+
+    The compiler also automatically infers the correct 'ProxyP' constraint for
+    any code that uses extensions:
+
+> import Control.Monad
+> import Control.Proxy
+> import qualified Control.Proxy.Trans.Either as E
+>
+> example :: (Monad m, ProxyP p) => () -> Producer (EitherP p) String m ()
+> example () = do
+>     c <- request ()
+>     when (c == ' ') $ E.throw "Error: received space"
+>     respond c
+
+-}

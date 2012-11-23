@@ -451,10 +451,12 @@ enumFromToC a1 a2 _ = go a1 where
 
 -}
 
+-- | Compose 'openU' with a closed upstream end to create a polymorphic end
 openU :: (Monad m, ProxyP p) => C -> p a' a C () m r
 openU _ = go where
     go = respond () ?>= \_ -> go
 
+-- | Compose 'openD' with a closed downstream end to create a polymorphic end
 openD :: (Monad m, ProxyP p) => b' -> p () C b' b m r
 openD _ = go where
     go = request () ?>= \_ -> go
