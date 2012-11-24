@@ -35,5 +35,5 @@ import Data.Closed
 
     "Data.Closed" exports the 'C'losed data type for cleaner type signatures.
 
-    Consult "Control.Proxy.Tutorial" for an extended tutorial.
+    "Control.Proxy.Tutorial" introduces proxies through an extended tutorial.
 -}
