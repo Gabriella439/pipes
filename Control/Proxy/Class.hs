@@ -9,7 +9,8 @@
     around Haskell's lack of polymorphic constraints.  You do NOT need
     to use these duplicate methods, which exist solely to plumb internal
     type class machinery and clean up type signatures.  Instead, read the
-    \"Polymorphic proxies\" section to learn how to write clean proxy code. -}
+    \"Polymorphic proxies\" section below to learn how to write clean proxy
+    code. -}
 
 module Control.Proxy.Class (
     -- * Core proxy class
@@ -83,15 +84,15 @@ infixl 1 ?>= -- This should match the fixity of >>=
 
 > idT = request >=> respond >=> idT
 >
-> (respond >=> f) >-> g = respond >=> (f >-> g)
+> f >-> (respond >=> g) = respond >=> (f >-> g)
 >
-> (request >=> f) >-> (respond >=> g) = f >-> g
+> (respond >=> f) >-> (request >=> g) = f >-> g
 >
-> (request >=> f) >-> (request >=> g) = request >=> ((request >=> f) >-> g)
+> (request >=> f) >-> (request >=> g) = request >=> (f >-> (request >=> g))
 >
-> return >-> f = return
+> f >-> return = return
 >
-> (request >=> f) >-> return = return
+> return >-> (request >=> f) = return
 
     Third, all proxies are monad transformers.  Minimal definition:
 
@@ -101,9 +102,9 @@ infixl 1 ?>= -- This should match the fixity of >>=
 
     Additionally:
 
-> (lift . k >=> f) >-> g = lift . k >=> (f >-> g)
+> f >=> (lift . k >=> g) = lift . k >=> (f >-> g)
 >
-> (request >=> f) >-> (lift . k >=> g) = lift . k >=> ((request >=> f) >-> g)
+> (lift . k >=> f) >-> (request >=> g) = lift . k >=> (f >-> (request >=> g))
 -}
 class ProxyP p where
     {-| 'idT' acts like a \'T\'ransparent proxy, passing all requests further
@@ -311,5 +312,4 @@ class MFunctorP p where
 >     c <- request ()
 >     when (c == ' ') $ E.throw "Error: received space"
 >     respond c
-
 -}
