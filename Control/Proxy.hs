@@ -8,7 +8,7 @@ module Control.Proxy (
     ) where
 
 import Control.Proxy.Core
-import Control.Proxy.Core.Fast
+import Control.Proxy.Core.Fast hiding (Request, Respond, M, Pure)
 
 {- $default
     "Control.Proxy.Core" exports everything except 'runProxy'.
