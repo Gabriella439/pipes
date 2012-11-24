@@ -22,9 +22,10 @@ module Control.Proxy.Pipe (
     -- $upgrade
     ) where
 
+import Control.Monad (forever)
 import Control.Proxy.Class (ProxyP(request, respond, (<-<), (?>=)))
 import Control.Proxy.Synonym (Pipe, Consumer, Producer)
-import Control.Proxy.Trans.Identity (runIdentityP)
+import Control.Proxy.Trans.Identity (P)
 
 {-| Wait for input from upstream
 
@@ -33,15 +34,10 @@ await :: (Monad m, ProxyP p) => Pipe p a b m a
 await = request ()
 
 -- | Convert a pure function into a pipe
-pipe :: (Monad m, ProxyP p) => (a -> b) -> Pipe p a b m r
-pipe f = go where
-    go =
-        request ()    ?>= \a ->
-        respond (f a) ?>= \_ ->
-        go
-{- pipe f = runIdentityP $ forever $ do
-      a <- await
-      yield (f a) -}
+pipe :: (Monad m, ProxyP p) => (a -> b) -> Pipe (P p) a b m r
+pipe f = forever $ do
+    a <- request ()
+    respond (f a)
 
 {-| Deliver output downstream
 
@@ -63,15 +59,10 @@ p1 <+< p2 = ((\() -> p1) <-< (\() -> p2)) ()
 (>+>) = flip (<+<)
 
 -- | Corresponds to 'id' from @Control.Category@
-idP :: (Monad m, ProxyP p) => Pipe p a a m r
-idP = go where
-    go =
-        request () ?>= \a  ->
-        respond a  ?>= \() ->
-        go
-{- idP = runIdentityP $ forever $ do
-      a <- await
-      yield a -}
+idP :: (Monad m, ProxyP p) => Pipe (P p) a a m r
+idP = forever $ do
+    a <- request ()
+    respond a
 
 {- $run
     The "Control.Proxy.Core.Fast" and "Control.Proxy.Core.Correct" modules

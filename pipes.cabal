@@ -81,4 +81,3 @@ Library
         Control.Pipe.Tutorial,
         Data.Closed
     Default-Language: Haskell98
-    GHC-Options: -O2

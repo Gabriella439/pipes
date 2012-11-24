@@ -63,13 +63,18 @@ instance (Monad m) => Applicative (Proxy a' a b' b m) where
             Pure       f   -> fmap f px
 
 instance (Monad m) => Monad (Proxy a' a b' b m) where
-    return   = Pure
-    p0 >>= f = go p0 where
-        go p = case p of
-            Request a' fa  -> Request a' (\a  -> go (fa  a))
-            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (m >>= \p' -> return (go p'))
-            Pure       r   -> f r
+    return = Pure
+    (>>=)  = _bind
+
+_bind
+ :: (Monad m)
+ => Proxy a' a b' b m r -> (r -> Proxy a' a b' b m r') -> Proxy a' a b' b m r'
+p0 `_bind` f = go p0 where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        M          m   -> M (m >>= \p' -> return (go p'))
+        Pure       r   -> f r
 
 instance MonadTrans (Proxy a' a b' b) where
     lift = _lift
@@ -81,8 +86,8 @@ _lift m = M (m >>= \r -> return (Pure r))
 {- These never fire, for some reason, but keep them until I figure out how to
    get them to work. -}
 {-# RULES
-    "_lift m >>= f" forall m f . _lift m >>= f = M (m >>= \r -> return (f r))
-  ; "_lift m ?>= f" forall m f . _lift m ?>= f = M (m >>= \r -> return (f r))
+    "_lift m ?>= f" forall m f .
+        _bind (_lift m) f = M (m >>= \r -> return (f r))
   #-}
 
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
@@ -106,27 +111,19 @@ instance ProxyP Proxy where
             M          m   -> M (m >>= \p2' -> return (fb <-| p2'))
             Pure       r   -> Pure r
 
-    {- For some reason, these must be defined in separate functions for the
-       RULES to fire. -}
-    request = _request
-    respond = _respond
+    request a' = Request a' Pure
+    respond b  = Respond b  Pure
 
     return_P = return
-    (?>=)   = (>>=)
+    (?>=)   = _bind
 
     lift_P = _lift
 
-_request :: (Monad m) => a' -> Proxy a' a b' b m a
-_request = \a' -> Request a' Pure
-
-_respond :: (Monad m) => b -> Proxy a' a b' b m b'
-_respond = \b  -> Respond b  Pure
-
 {-# RULES
-    "_request a' >>= f" forall a' f . _request a' >>= f = Request a' f
-  ; "_respond b  >>= f" forall b  f . _respond b  >>= f = Respond b  f
-  ; "_request a' ?>= f" forall a' f . _request a' ?>= f = Request a' f
-  ; "_respond b  ?>= f" forall b  f . _respond b  ?>= f = Respond b  f
+    "_bind (Request a' Pure) f" forall a' f .
+        _bind (Request a' Pure) f = Request a' f;
+    "_bind (Respond b  Pure) f" forall b  f .
+        _bind (Respond b  Pure) f = Respond b  f
   #-}
 
 instance InteractP Proxy where
