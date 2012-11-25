@@ -1,5 +1,5 @@
 Name: pipes
-Version: 2.6.0
+Version: 3.0.0
 Cabal-Version: >=1.14.0
 Build-Type: Simple
 License: BSD3
@@ -11,11 +11,11 @@ Stability: Experimental
 Bug-Reports: https://github.com/Gabriel439/Haskell-Pipes-Library/issues
 Synopsis: Compositional pipelines
 Description:
-  \"Iteratees done right\".  This library implements
+  \"Coroutines done right\".  This library generalizes
   iteratees\/enumerators\/enumeratees simply and elegantly, using different
   naming conventions.
   .
-  Advantages over traditional iteratee implementations:
+  Advantages over traditional iteratee\/coroutine implementations:
   .
   * /Concise API/: This library uses a few simple abstractions with a very high
     power-to-weight ratio to reduce adoption time.
@@ -28,7 +28,7 @@ Description:
     leads to intuitive behavior (and fewer bugs, if any!).
   .
   * /Extension Framework/: You can elegantly mix and match extensions to the
-    base type and easily create your own!
+    base type and easily create your own.
   .
   * /Extensive Documentation/: Second to none!
   .
@@ -37,9 +37,6 @@ Description:
   "Control.Proxy.Tutorial", which introduces the 'Proxy' type which forms the
   core abstraction of this library.  To use extensions or define your own, check
   out "Control.Proxy.Trans.Tutorial".
-  .
-  I will soon replace "Control.Frame" with a superior resource-management
-  solution, so new users of the library should avoid using it.
 Category: Control, Pipe, Proxies
 Tested-With: GHC ==7.4.1
 Source-Repository head
@@ -49,12 +46,8 @@ Source-Repository head
 Library
     Build-Depends:
         base >= 4 && < 5,
-        index-core,
         transformers >= 0.2.0.0
     Exposed-Modules:
-        Control.Frame,
-        Control.Frame.Tutorial,
-        Control.IMonad.Trans.Free,
         Control.MFunctor,
         Control.Proxy,
         Control.Proxy.Core,

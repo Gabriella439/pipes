@@ -33,7 +33,6 @@ module Control.Pipe.Tutorial (
 
 -- For documentation
 import Control.Category
-import Control.Frame hiding (await, yield)
 import Control.Monad.Trans.Class
 import Control.Pipe
 
