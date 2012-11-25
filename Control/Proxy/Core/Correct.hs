@@ -79,17 +79,7 @@ instance (Monad m) => Monad (Proxy a' a b' b m) where
                 Pure       r   -> unProxy (f r) )
 
 instance MonadTrans (Proxy a' a b' b) where
-    lift = _lift
-
-_lift :: (Monad m) => m r -> Proxy a' a b' b m r
-_lift m = Proxy (m >>= \r -> return (Pure r))
-
-{-# RULES
-    "_lift m >>= f" forall m f .
-        _lift m >>= f = Proxy (m >>= \r -> unProxy (f r))
-  ; "_lift m ?>= f" forall m f .
-        _lift m ?>= f = Proxy (m >>= \r -> unProxy (f r))
-  #-}
+    lift = lift_P
 
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
     liftIO m = Proxy (liftIO (m >>= \r -> return (Pure r)))
@@ -118,30 +108,13 @@ instance ProxyP Proxy where
 
     {- For some reason, these must be defined in separate functions for the
        RULES to fire. -}
-    request = _request
-    respond = _respond
+    request a' = Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
+    respond b  = Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
 
     return_P = return
     (?>=)   = (>>=)
 
-    lift_P = _lift
-
-_request :: (Monad m) => a' -> Proxy a' a b' b m a
-_request = \a' -> Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
-
-_respond :: (Monad m) => b -> Proxy a' a b' b m b'
-_respond = \b  -> Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
-
-{-# RULES
-    "_request a' >>= f" forall a' f .
-        _request a' >>= f = Proxy (return (Request a' f))
-  ; "_respond b  >>= f" forall b  f .
-        _respond b  >>= f = Proxy (return (Respond b  f))
-  ; "_request a' ?>= f" forall a' f .
-        _request a' ?>= f = Proxy (return (Request a' f))
-  ; "_respond b  ?>= f" forall b  f .
-        _respond b  ?>= f = Proxy (return (Respond b  f))
-  #-}
+    lift_P m = Proxy (m >>= \r -> return (Pure r))
 
 instance InteractP Proxy where
     k1 /</ k2 = \a' -> go (k1 a') where
@@ -192,6 +165,7 @@ runProxy k = go (k ()) where
             Request _ fa  -> go (fa  ())
             Respond _ fb' -> go (fb' ())
             Pure      r   -> return r
+
 {-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to a Kleisli
     arrow in the base monad -}
 runProxyK :: (Monad m) => (() -> Proxy a' () () b m r) -> (() -> m r)

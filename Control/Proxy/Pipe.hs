@@ -25,7 +25,7 @@ module Control.Proxy.Pipe (
 import Control.Monad (forever)
 import Control.Proxy.Class (ProxyP(request, respond, (<-<), (?>=)))
 import Control.Proxy.Synonym (Pipe, Consumer, Producer)
-import Control.Proxy.Trans.Identity (P)
+import Control.Proxy.Trans.Identity (runIdentityP)
 
 {-| Wait for input from upstream
 
@@ -34,8 +34,8 @@ await :: (Monad m, ProxyP p) => Pipe p a b m a
 await = request ()
 
 -- | Convert a pure function into a pipe
-pipe :: (Monad m, ProxyP p) => (a -> b) -> Pipe (P p) a b m r
-pipe f = forever $ do
+pipe :: (Monad m, ProxyP p) => (a -> b) -> Pipe p a b m r
+pipe f = runIdentityP $ forever $ do
     a <- request ()
     respond (f a)
 
@@ -59,8 +59,8 @@ p1 <+< p2 = ((\() -> p1) <-< (\() -> p2)) ()
 (>+>) = flip (<+<)
 
 -- | Corresponds to 'id' from @Control.Category@
-idP :: (Monad m, ProxyP p) => Pipe (P p) a a m r
-idP = forever $ do
+idP :: (Monad m, ProxyP p) => Pipe p a a m r
+idP = runIdentityP $ forever $ do
     a <- request ()
     respond a
 
