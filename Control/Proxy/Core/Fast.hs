@@ -13,9 +13,7 @@
 > lift . return /= return
 
     These laws only hold when viewed through certain safe observation functions,
-    like 'runProxy', which cannot distinguish the above two alternatives:
-
-> runProxy (lift (return r)) = runProxy (return r)
+    like 'runProxy' and 'observe'.
 
     Also, you really should not use the constructors anyway and instead you
     should stick to the 'ProxyP' API.  This not only ensures that your code does
@@ -31,6 +29,9 @@ module Control.Proxy.Core.Fast (
     runProxy,
     runProxyK,
     runPipe,
+
+    -- * Safety
+    observe
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
@@ -159,7 +160,7 @@ instance InteractP Proxy where
             Pure       a   -> Pure a
 
 instance MFunctor (Proxy a' a b' b) where
-    mapT nat p0 = go p0 where
+    mapT nat p0 = go (observe p0) where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
@@ -198,3 +199,22 @@ runProxyK p = \() -> runProxy p
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
 runPipe :: (Monad m) => Proxy a' () () b m r -> m r
 runPipe p = runProxy (\_ -> p)
+
+{-| The monad transformer laws are correct when viewed through the 'observe'
+    function:
+
+> observe (lift (return r)) = observe (return r)
+>
+> observe (lift (m >>= f)) = observe (lift m >>= lift . f)
+
+    This correctness comes at the price of performance, so use this function
+    sparingly or else you would be better off using
+    "Control.Proxy.Core.Correct".
+-}
+observe :: (Monad m) => Proxy a' a b' b m r -> Proxy a' a b' b m r
+observe p = M (go p) where
+    go p = case p of
+        M          m'  -> m' >>= go
+        Pure       r   -> return (Pure r)
+        Request a' fa  -> return (Request a' (\a  -> observe (fa  a )))
+        Respond b  fb' -> return (Respond b  (\b' -> observe (fb' b')))
