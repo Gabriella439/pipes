@@ -1,7 +1,10 @@
-{-| A 'Proxy' 'request's input from upstream and 'respond's with output to
-    downstream.
+{-| This module provides the correct proxy implementation which strictly
+    enforces the monad transformer laws.  You can safely import this module
+    without violating any laws or invariants.
 
-    For an extended tutorial, consult "Control.Proxy.Tutorial". -}
+    However, I advise you stick to the 'ProxyP' API rather than import this
+    module so that your code works with both 'Proxy' implementations and also
+    with all proxy transformers. -}
 
 module Control.Proxy.Core.Correct (
     -- * Types
@@ -16,12 +19,10 @@ module Control.Proxy.Core.Correct (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
-import Control.Monad (ap, forever, liftM, (>=>))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class
-import Control.Proxy.Synonym (Pipe)
 import Data.Closed (C)
 
 {-| A 'Proxy' communicates with an upstream interface and a downstream

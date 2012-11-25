@@ -30,6 +30,4 @@ import Control.Proxy.Core.Fast hiding (Request, Respond, M, Pure)
 
     You can lock in the fast implementation (in case I change the recommended
     default) by importing "Control.Proxy.Core" and "Control.Proxy.Core.Fast".
-
-    Other than 'runProxy', the rest of the library is polymorphic over 'ProxyP'.
 -}

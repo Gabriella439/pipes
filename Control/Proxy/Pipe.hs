@@ -122,7 +122,8 @@ idP = runIdentityP $ forever $ do
 > fromList :: (Monad m) => [b] -> () -> Producer Proxy b IO r
 > fromList xs () = mapM_ yield xs
 
-    You then call these within a @do@ block by supplying the '()' parameter:
+    Now, when you call these within a @do@ block  you must supplying an
+    additional @()@ argument:
 
 > example = do
 >     a <- request ()
@@ -156,9 +157,9 @@ idP = runIdentityP $ forever $ do
 > fromList :: (Monad m, ProxyP p) => [b] -> () -> Producer p b m r
 > fromList xs () = runIdentityP $ mapM_ respond xs
 
-    Also, continue to use the 'Pipe', 'Consumer' and 'Producer' type synonyms to
-    simplify type signatures.  I encourage using them for unidirectional proxy
-    code.  Here are some examples of how they mix with proxy transformers:
+    Also, I encourage you to continue using the 'Pipe', 'Consumer' and
+    'Producer' type synonyms to simplify type signatures.  The following
+    examples show how they cleanly mix with proxies and their extensions:
 
 > import Control.Proxy
 > import Control.Proxy.Trans.Either as E

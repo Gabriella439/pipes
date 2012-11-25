@@ -255,8 +255,8 @@ class MFunctorP p where
 > instance (MonadTransP p) => ...
 
     Second, these type classes don't require the @FlexibleContexts@ extension
-    to use and substantially clean up constraints type signatures.  They convert
-    messy constraints like this:
+    to use and substantially clean up constraints in type signatures.  They
+    convert messy constraints like this:
 
 > p :: (MonadP (p a' a b' b m), MonadTrans (p a' a b' b)) => ...
 
@@ -287,7 +287,7 @@ class MFunctorP p where
 >  :: (Monad m, Monad (p x a x b m), MonadTrans (p x a x b), ProxyP p)
 >  => (a -> m b) -> x -> p x a x b m r
 
-    Instead, you can cast the code to 'IdentityP p' by wrapping it in
+    Instead, you can cast the code to @IdentityP p@ by wrapping it in
     'runIdentityK':
 
 > --        |difference|  
@@ -300,8 +300,9 @@ class MFunctorP p where
 
 > mapMD :: (Monad m, ProxyP p) => (a -> m b) -> x -> p x a x b m r
 
-    The compiler also automatically infers the correct 'ProxyP' constraint for
-    any code that uses extensions:
+    You don't need to use 'runIdentityP' \/ 'runIdentityK' if you use any other
+    extensions.  The compiler already infers the correct 'ProxyP' constraint for
+    any code that uses extensions, such as the following code example:
 
 > import Control.Monad
 > import Control.Proxy

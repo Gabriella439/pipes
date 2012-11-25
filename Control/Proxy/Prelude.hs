@@ -17,5 +17,4 @@ import Control.Proxy.Prelude.Kleisli
     "Control.Proxy.Prelude.IO" provides proxies for simple 'IO'.
 
     "Control.Proxy.Prelude.Kleisli" provides convenience functions for working
-    with Kleisli arrows.
--}
+    with Kleisli arrows. -}

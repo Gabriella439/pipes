@@ -429,8 +429,8 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
 >     request ()
 >     fromList [1..] ()
 
-    You fix this by composing 'openU' upstream of it, which turns its closed
-    upstream end into an open polymorphic end:
+    You fix this by composing 'unitD' upstream of it, which replaces its closed
+    upstream end with an open polymorphic end:
 
 > p () = do
 >     request ()

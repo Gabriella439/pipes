@@ -1,7 +1,26 @@
-{-| A 'Proxy' 'request's input from upstream and 'respond's with output to
-    downstream.
+{-| This is an internal module, meaning that it is unsafe to import unless you
+    understand the risks.
 
-    For an extended tutorial, consult "Control.Proxy.Tutorial". -}
+    This module provides the fast proxy implementation, which achieves its speed
+    by weakening the monad transformer laws.  These laws do not hold if you can
+    pattern match on the constructors, as the following counter-example
+    illustrates:
+
+> lift . return = M . return . Pure
+>
+> return = Pure
+>
+> lift . return /= return
+
+    These laws only hold when viewed through certain safe observation functions,
+    like 'runProxy', which cannot distinguish the above two alternatives:
+
+> runProxy (lift (return r)) = runProxy (return r)
+
+    Also, you really should not use the constructors anyway and instead you
+    should stick to the 'ProxyP' API.  This not only ensures that your code does
+    not violate the monad transformer laws, but also guarantees that it works
+    with the other 'Proxy' implementation and with any proxy transformers. -}
 
 module Control.Proxy.Core.Fast (
     -- * Types
@@ -15,12 +34,11 @@ module Control.Proxy.Core.Fast (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
-import Control.Monad (ap, forever, liftM, (>=>))
+-- import Control.Monad (ap, forever, liftM, (>=>))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class
-import Control.Proxy.Synonym (Pipe)
 import Data.Closed (C)
 
 {-| A 'Proxy' communicates with an upstream interface and a downstream

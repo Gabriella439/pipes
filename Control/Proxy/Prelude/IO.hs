@@ -3,8 +3,7 @@
     Note that 'String's are very inefficient, and I will release future separate
     packages with 'ByteString' and 'Text' operations.  I only provide these to
     allow users to test simple I/O without requiring additional library
-    dependencies.
--}
+    dependencies. -}
 
 module Control.Proxy.Prelude.IO (
     -- * Standard I/O
