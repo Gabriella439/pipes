@@ -29,7 +29,7 @@ import Prelude hiding (catch)
 newtype EitherP e p a' a b' b (m :: * -> *) r
   = EitherP { runEitherP :: p a' a b' b m (Either e r) }
 
-instance (ProxyP             p, Monad m)
+instance (Proxy              p, Monad m)
        => Functor (EitherP e p a' a b' b m) where
     fmap f p = EitherP (
         runEitherP p ?>= \e ->
@@ -38,7 +38,7 @@ instance (ProxyP             p, Monad m)
             Right r -> Right (f r) ) )
  -- fmap f = EitherP . liftM (fmap f) . runEitherP
 
-instance (ProxyP                 p, Monad m)
+instance (Proxy                  p, Monad m)
        => Applicative (EitherP e p a' a b' b m) where
     pure = return
     fp <*> xp = EitherP (
@@ -52,7 +52,7 @@ instance (ProxyP                 p, Monad m)
                       Right x -> Right (f x) ) )
  -- fp <*> xp = EitherP ((<*>) <$> (runEitherP fp) <*> (runEitherP xp))
 
-instance (ProxyP           p, Monad m)
+instance (Proxy            p, Monad m)
        => Monad (EitherP e p a' a b' b m) where
     return = return_P
     (>>=) = (?>=)
@@ -72,7 +72,7 @@ instance (MonadPlusP           p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
-instance (ProxyP                p )
+instance (Proxy                 p )
        => MonadTrans (EitherP e p a' a b' b) where
     lift = lift_P
 
@@ -94,8 +94,8 @@ instance (MFunctorP           p )
        => MFunctor (EitherP e p a' a b' b) where
     mapT = mapT_P
 
-instance (ProxyP            p )
-       => ProxyP (EitherP e p) where
+instance (Proxy            p )
+       => Proxy (EitherP e p) where
     idT a' = EitherP (idT a')
  -- idT = EitherP . idT
 
@@ -127,12 +127,12 @@ runEitherK p q = runEitherP (p q)
 -- runEitherK = (runEitherP .)
 
 -- | Abort the computation and return a 'Left' result
-left :: (Monad m, ProxyP p) => e -> EitherP e p a' a b' b m r
+left :: (Monad m, Proxy p) => e -> EitherP e p a' a b' b m r
 left e = EitherP (return_P (Left e))
 -- left = EitherP . return . Left
 
 -- | Synonym for 'return'
-right :: (Monad m, ProxyP p) => r -> EitherP e p a' a b' b m r
+right :: (Monad m, Proxy p) => r -> EitherP e p a' a b' b m r
 right r = EitherP (return_P (Right r))
 -- right = EitherP . return . Right
 
@@ -153,12 +153,12 @@ right r = EitherP (return_P (Right r))
 -}
 
 -- | Synonym for 'left'
-throw :: (Monad m, ProxyP p) => e -> EitherP e p a' a b' b m r
+throw :: (Monad m, Proxy p) => e -> EitherP e p a' a b' b m r
 throw = left
 
 -- | Resume from an aborted operation
 catch
- :: (Monad m, ProxyP p)
+ :: (Monad m, Proxy p)
  => EitherP e p a' a b' b m r        -- ^ Original computation
  -> (e -> EitherP f p a' a b' b m r) -- ^ Handler
  -> EitherP f p a' a b' b m r        -- ^ Handled computation
@@ -170,7 +170,7 @@ catch m f = EitherP (
 
 -- | 'catch' with the arguments flipped
 handle
- :: (Monad m, ProxyP p)
+ :: (Monad m, Proxy p)
  => (e -> EitherP f p a' a b' b m r) -- ^ Handler
  -> EitherP e p a' a b' b m r        -- ^ Original computation
  -> EitherP f p a' a b' b m r        -- ^ Handled computation

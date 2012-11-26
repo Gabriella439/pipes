@@ -15,14 +15,15 @@
     These laws only hold when viewed through certain safe observation functions,
     like 'runProxy' and 'observe'.
 
-    Also, you really should not use the constructors anyway and instead you
-    should stick to the 'ProxyP' API.  This not only ensures that your code does
-    not violate the monad transformer laws, but also guarantees that it works
-    with the other 'Proxy' implementation and with any proxy transformers. -}
+    Also, you really should not use the constructors anyway, let alone the
+    concrete type and instead you should stick to the 'Proxy' type class API.
+    This not only ensures that your code does not violate the monad transformer
+    laws, but also guarantees that it works with the other proxy implementations
+    and with any proxy transformers. -}
 
 module Control.Proxy.Core.Fast (
     -- * Types
-    Proxy(..),
+    ProxyFast(..),
 
     -- * Run Sessions 
     -- $run
@@ -42,10 +43,10 @@ import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class
 import Data.Closed (C)
 
-{-| A 'Proxy' communicates with an upstream interface and a downstream
+{-| A 'ProxyFast' communicates with an upstream interface and a downstream
     interface.
 
-    The type variables of @Proxy req_a resp_a req_b resp_b m r@ signify:
+    The type variables of @ProxyFast req_a resp_a req_b resp_b m r@ signify:
 
     * @req_a @ - The request supplied to the upstream interface
 
@@ -58,13 +59,13 @@ import Data.Closed (C)
     * @m     @ - The base monad
 
     * @r     @ - The final return value -}
-data Proxy a' a b' b m r
-  = Request a' (a  -> Proxy a' a b' b m r )
-  | Respond b  (b' -> Proxy a' a b' b m r )
-  | M          (m    (Proxy a' a b' b m r))
+data ProxyFast a' a b' b m r
+  = Request a' (a  -> ProxyFast a' a b' b m r )
+  | Respond b  (b' -> ProxyFast a' a b' b m r )
+  | M          (m    (ProxyFast a' a b' b m r))
   | Pure    r
 
-instance (Monad m) => Functor (Proxy a' a b' b m) where
+instance (Monad m) => Functor (ProxyFast a' a b' b m) where
     fmap f p0 = go p0 where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
@@ -72,7 +73,7 @@ instance (Monad m) => Functor (Proxy a' a b' b m) where
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       r   -> Pure (f r)
 
-instance (Monad m) => Applicative (Proxy a' a b' b m) where
+instance (Monad m) => Applicative (ProxyFast a' a b' b m) where
     pure      = Pure
     pf <*> px = go pf where
         go p = case p of
@@ -81,13 +82,15 @@ instance (Monad m) => Applicative (Proxy a' a b' b m) where
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       f   -> fmap f px
 
-instance (Monad m) => Monad (Proxy a' a b' b m) where
+instance (Monad m) => Monad (ProxyFast a' a b' b m) where
     return = Pure
     (>>=)  = _bind
 
 _bind
  :: (Monad m)
- => Proxy a' a b' b m r -> (r -> Proxy a' a b' b m r') -> Proxy a' a b' b m r'
+ => ProxyFast a' a b' b m r
+ -> (r -> ProxyFast a' a b' b m r')
+ -> ProxyFast a' a b' b m r'
 p0 `_bind` f = go p0 where
     go p = case p of
         Request a' fa  -> Request a' (\a  -> go (fa  a))
@@ -95,10 +98,10 @@ p0 `_bind` f = go p0 where
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       r   -> f r
 
-instance MonadTrans (Proxy a' a b' b) where
+instance MonadTrans (ProxyFast a' a b' b) where
     lift = _lift
 
-_lift :: (Monad m) => m r -> Proxy a' a b' b m r
+_lift :: (Monad m) => m r -> ProxyFast a' a b' b m r
 _lift m = M (m >>= \r -> return (Pure r))
 -- _lift = M . liftM Pure
 
@@ -109,14 +112,14 @@ _lift m = M (m >>= \r -> return (Pure r))
         _bind (_lift m) f = M (m >>= \r -> return (f r))
   #-}
 
-instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
+instance (MonadIO m) => MonadIO (ProxyFast a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
  -- liftIO = M . liftIO . liftM Pure
 
-instance MonadIOP Proxy where
+instance MonadIOP ProxyFast where
     liftIO_P = liftIO
 
-instance ProxyP Proxy where
+instance Proxy ProxyFast where
     idT = \a' -> Request a' (\a -> Respond a idT)
     k1 <-< k2_0 = \c' -> k1 c' |-< k2_0 where
         p1 |-< k2 = case p1 of
@@ -145,7 +148,7 @@ instance ProxyP Proxy where
         _bind (Respond b  Pure) f = Respond b  f
   #-}
 
-instance InteractP Proxy where
+instance Interact ProxyFast where
     k1 /</ k2 = \a' -> go (k1 a') where
         go p = case p of
             Request b' fb  -> k2 b' >>= \b -> go (fb b)
@@ -159,7 +162,7 @@ instance InteractP Proxy where
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       a   -> Pure a
 
-instance MFunctor (Proxy a' a b' b) where
+instance MFunctor (ProxyFast a' a b' b) where
     mapT nat p0 = go (observe p0) where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
@@ -167,23 +170,23 @@ instance MFunctor (Proxy a' a b' b) where
             M          m   -> M (nat (m >>= \p' -> return (go p')))
             Pure       r   -> Pure r
 
-instance MFunctorP Proxy where
+instance MFunctorP ProxyFast where
     mapT_P = mapT
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to
     the base monad.
 
-    These are the only functions specific to the 'Proxy' type.  Everything else
-    programs generically over the 'ProxyP' type class.
+    These are the only functions specific to the 'ProxyFast' type.  Everything
+    else programs generically over the 'Proxy' type class.
 
     Use 'runProxyK' if you are running proxies nested within proxies.  It
     provides a Kleisli arrow as its result that you can pass to another
     'runProxy' / 'runProxyK' command. -}
 
-{-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to the base
-    monad -}
-runProxy :: (Monad m) => (() -> Proxy a' () () b m r) -> m r
+{-| Run a self-sufficient 'ProxyFast' Kleisli arrow, converting it back to the
+    base monad -}
+runProxy :: (Monad m) => (() -> ProxyFast a' () () b m r) -> m r
 runProxy k = go (k ()) where
     go p = case p of
         Request _ fa  -> go (fa  ())
@@ -191,13 +194,13 @@ runProxy k = go (k ()) where
         M         m   -> m >>= go
         Pure      r   -> return r
 
-{-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to a Kleisli
-    arrow in the base monad -}
-runProxyK :: (Monad m) => (() -> Proxy a' () () b m r) -> (() -> m r)
+{-| Run a self-sufficient 'ProxyFast' Kleisli arrow, converting it back to a
+    Kleisli arrow in the base monad -}
+runProxyK :: (Monad m) => (() -> ProxyFast a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
 
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
-runPipe :: (Monad m) => Proxy a' () () b m r -> m r
+runPipe :: (Monad m) => ProxyFast a' () () b m r -> m r
 runPipe p = runProxy (\_ -> p)
 
 {-| The monad transformer laws are correct when viewed through the 'observe'
@@ -211,7 +214,7 @@ runPipe p = runProxy (\_ -> p)
     sparingly or else you would be better off using
     "Control.Proxy.Core.Correct".
 -}
-observe :: (Monad m) => Proxy a' a b' b m r -> Proxy a' a b' b m r
+observe :: (Monad m) => ProxyFast a' a b' b m r -> ProxyFast a' a b' b m r
 observe p = M (go p) where
     go p = case p of
         M          m'  -> m' >>= go

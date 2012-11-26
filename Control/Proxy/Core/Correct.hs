@@ -2,13 +2,13 @@
     enforces the monad transformer laws.  You can safely import this module
     without violating any laws or invariants.
 
-    However, I advise you stick to the 'ProxyP' API rather than import this
-    module so that your code works with both 'Proxy' implementations and also
-    with all proxy transformers. -}
+    However, I advise you stick to the 'Proxy' type class API rather than import
+    this module so that your code works with both 'Proxy' implementations and
+    also works with all proxy transformers. -}
 
 module Control.Proxy.Core.Correct (
     -- * Types
-    Proxy(..),
+    ProxyCorrect(..),
     ProxyF(..),
 
     -- * Run Sessions 
@@ -25,10 +25,10 @@ import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class
 import Data.Closed (C)
 
-{-| A 'Proxy' communicates with an upstream interface and a downstream
+{-| A 'ProxyCorrect' communicates with an upstream interface and a downstream
     interface.
 
-    The type variables of @Proxy req_a resp_a req_b resp_b m r@ signify:
+    The type variables of @ProxyCorrect req_a resp_a req_b resp_b m r@ signify:
 
     * @req_a @ - The request supplied to the upstream interface
 
@@ -41,16 +41,16 @@ import Data.Closed (C)
     * @m     @ - The base monad
 
     * @r     @ - The final return value -}
-data Proxy a' a b' b m  r =
-    Proxy { unProxy :: m (ProxyF a' a b' b r (Proxy a' a b' b m r)) }
+data ProxyCorrect a' a b' b m  r =
+    Proxy { unProxy :: m (ProxyF a' a b' b r (ProxyCorrect a' a b' b m r)) }
 
--- | The base functor for the 'Proxy' type
+-- | The base functor for the 'ProxyCorrect' type
 data ProxyF a' a b' b r x
   = Request a' (a  -> x)
   | Respond b  (b' -> x)
   | Pure    r
 
-instance (Monad m) => Functor (Proxy a' a b' b m) where
+instance (Monad m) => Functor (ProxyCorrect a' a b' b m) where
     fmap f p0 = go p0 where
         go p = Proxy (do
             x <- unProxy p
@@ -59,7 +59,7 @@ instance (Monad m) => Functor (Proxy a' a b' b m) where
                 Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
                 Pure       r   -> Pure (f r) ) )
 
-instance (Monad m) => Applicative (Proxy a' a b' b m) where
+instance (Monad m) => Applicative (ProxyCorrect a' a b' b m) where
     pure r = Proxy (return (Pure r))
     pf <*> px = go pf where
         go p = Proxy (do
@@ -69,7 +69,7 @@ instance (Monad m) => Applicative (Proxy a' a b' b m) where
                 Respond b  fb' -> return (Respond b  (\b' -> go (fb' b')))
                 Pure       f   -> unProxy (fmap f px) )
 
-instance (Monad m) => Monad (Proxy a' a b' b m) where
+instance (Monad m) => Monad (ProxyCorrect a' a b' b m) where
     return = \r -> Proxy (return (Pure r))
     p0 >>= f = go p0 where
         go p = Proxy (do
@@ -79,17 +79,17 @@ instance (Monad m) => Monad (Proxy a' a b' b m) where
                 Respond b  fb' -> return (Respond b  (\b' -> go (fb' b')))
                 Pure       r   -> unProxy (f r) )
 
-instance MonadTrans (Proxy a' a b' b) where
+instance MonadTrans (ProxyCorrect a' a b' b) where
     lift = lift_P
 
-instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
+instance (MonadIO m) => MonadIO (ProxyCorrect a' a b' b m) where
     liftIO m = Proxy (liftIO (m >>= \r -> return (Pure r)))
  -- liftIO = Proxy . liftIO . liftM Pure
 
-instance MonadIOP Proxy where
+instance MonadIOP ProxyCorrect where
     liftIO_P = liftIO
 
-instance ProxyP Proxy where
+instance Proxy ProxyCorrect where
     idT = \a' ->
         Proxy (return (Request a' (\a ->
         Proxy (return (Respond a idT)) )))
@@ -107,8 +107,6 @@ instance ProxyP Proxy where
                 Respond b  fb' -> unProxy (fb b |-< fb')
                 Pure       r   -> return (Pure r) )
 
-    {- For some reason, these must be defined in separate functions for the
-       RULES to fire. -}
     request a' = Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
     respond b  = Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
 
@@ -117,7 +115,7 @@ instance ProxyP Proxy where
 
     lift_P m = Proxy (m >>= \r -> return (Pure r))
 
-instance InteractP Proxy where
+instance Interact ProxyCorrect where
     k1 /</ k2 = \a' -> go (k1 a') where
         go p = Proxy (do
             x <- unProxy p
@@ -133,7 +131,7 @@ instance InteractP Proxy where
                 Respond b  fb' -> unProxy (k1 b >>= \b' -> go (fb' b'))
                 Pure       a   -> return (Pure a) )
 
-instance MFunctor (Proxy a' a b' b) where
+instance MFunctor (ProxyCorrect a' a b' b) where
     mapT nat p0 = go p0 where
         go p = Proxy (nat (do
             x <- unProxy p
@@ -142,23 +140,23 @@ instance MFunctor (Proxy a' a b' b) where
                 Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
                 Pure       r   -> Pure r )))
 
-instance MFunctorP Proxy where
+instance MFunctorP ProxyCorrect where
     mapT_P = mapT
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to
     the base monad.
 
-    These are the only functions specific to the 'Proxy' type.  Everything else
-    programs generically over the 'ProxyP' type class.
+    These are the only functions specific to the 'ProxyCorrect' type.
+    Everything else programs generically over the 'Proxy' type class.
 
     Use 'runProxyK' if you are running proxies nested within proxies.  It
     provides a Kleisli arrow as its result that you can pass to another
     'runProxy' / 'runProxyK' command. -}
 
-{-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to the base
-    monad -}
-runProxy :: (Monad m) => (() -> Proxy a' () () b m r) -> m r
+{-| Run a self-sufficient 'ProxyCorrect' Kleisli arrow, converting it back to
+    the base monad -}
+runProxy :: (Monad m) => (() -> ProxyCorrect a' () () b m r) -> m r
 runProxy k = go (k ()) where
     go p = do
         x <- unProxy p
@@ -167,11 +165,11 @@ runProxy k = go (k ()) where
             Respond _ fb' -> go (fb' ())
             Pure      r   -> return r
 
-{-| Run a self-sufficient 'Proxy' Kleisli arrow, converting it back to a Kleisli
-    arrow in the base monad -}
-runProxyK :: (Monad m) => (() -> Proxy a' () () b m r) -> (() -> m r)
+{-| Run a self-sufficient 'ProxyCorrect' Kleisli arrow, converting it back to a
+    Kleisli arrow in the base monad -}
+runProxyK :: (Monad m) => (() -> ProxyCorrect a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
 
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
-runPipe :: (Monad m) => Proxy a' () () b m r -> m r
+runPipe :: (Monad m) => ProxyCorrect a' () () b m r -> m r
 runPipe p = runProxy (\_ -> p)

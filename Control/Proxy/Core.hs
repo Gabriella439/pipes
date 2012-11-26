@@ -19,13 +19,13 @@ import Control.Proxy.Prelude
 import Data.Closed
 
 {- $modules
-    "Control.Proxy.Class" defines the 'ProxyP' type class so that you can
-    program generically over proxy implementations and their transformers.
+    "Control.Proxy.Class" defines the 'Proxy' type class that lets you program
+    generically over proxy implementations and their transformers.
 
     "Control.Proxy.Synonym" defines type synonyms for proxies that don't use all
     of their inputs or outputs, such as 'Pipe's, 'Producer's, and 'Server's.
 
-    "Control.Proxy.Trans" defines the proxy transformer type class that lets you
+    "Control.Proxy.Trans" defines the 'ProxyTrans' type class that lets you
     write your own proxy extensions.
 
     "Control.Proxy.Trans.Identity" exports 'runIdentityP', which substantially
@@ -34,6 +34,4 @@ import Data.Closed
     "Control.Proxy.Prelude" provides a standard library of proxies.
 
     "Data.Closed" exports the 'C'losed data type for cleaner type signatures.
-
-    "Control.Proxy.Tutorial" introduces proxies through an extended tutorial.
 -}

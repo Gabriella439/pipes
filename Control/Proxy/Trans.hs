@@ -1,7 +1,7 @@
-{-| You can define your own extensions to the 'Proxy' type by writing your own
-    \"proxy transformers\".  Proxy transformers are monad transformers that
-    correctly lift all proxy operations from the base proxy type to the extended
-    proxy type.  Stack multiple proxy transformers to chain features together.
+{-| You can define your own proxy extensions by writing your own \"proxy
+    transformers\".  Proxy transformers are monad transformers that correctly
+    lift all proxy operations from the base proxy type to the extended proxy
+    type.  Stack multiple proxy transformers to chain features together.
 -}
     
 module Control.Proxy.Trans (
@@ -54,10 +54,10 @@ import Control.Proxy.Class
     Defining 'liftP' is more efficient.
 -}
 class ProxyTrans t where
-    liftP :: (Monad m, ProxyP p)
+    liftP :: (Monad m, Proxy p)
           => p b c d e m r -> t p b c d e m r
     liftP f = mapP (\() -> f) ()
 
-    mapP :: (Monad m, ProxyP p)
+    mapP :: (Monad m, Proxy p)
          => (a -> p b c d e m r) -> (a -> t p b c d e m r)
     mapP = (liftP .)

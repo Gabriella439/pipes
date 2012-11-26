@@ -5,6 +5,7 @@
 module Control.Proxy.Trans.Identity (
     -- * Identity Proxy Transformer
     IdentityP(..),
+    identityK,
     runIdentityK
     ) where
 
@@ -20,14 +21,14 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype IdentityP p a' a b' b (m :: * -> *) r =
     IdentityP { runIdentityP :: p a' a b' b m r }
 
-instance (ProxyP             p, Monad m)
+instance (Proxy              p, Monad m)
        => Functor (IdentityP p a' a b' b m) where
     fmap f p = IdentityP (
         runIdentityP p ?>= \x ->
         return_P (f x) )
  -- fmap = liftM
 
-instance (ProxyP                 p, Monad m)
+instance (Proxy                  p, Monad m)
        => Applicative (IdentityP p a' a b' b m) where
     pure = return
 
@@ -37,7 +38,7 @@ instance (ProxyP                 p, Monad m)
         return_P (f x) )
  -- fp <*> xp = ap
 
-instance (ProxyP           p, Monad m)
+instance (Proxy            p, Monad m)
        => Monad (IdentityP p a' a b' b m) where
     return = return_P
     (>>=) = (?>=)
@@ -57,7 +58,7 @@ instance (MonadPlusP           p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
-instance (ProxyP                p )
+instance (Proxy                 p )
        => MonadTrans (IdentityP p a' a b' b) where
     lift = lift_P
 
@@ -79,8 +80,8 @@ instance (MFunctorP           p )
        => MFunctor (IdentityP p a' a b' b) where
     mapT = mapT_P
 
-instance (ProxyP            p )
-       => ProxyP (IdentityP p) where
+instance (Proxy            p )
+       => Proxy (IdentityP p) where
     idT = \a' -> IdentityP (idT a')
  -- idT = IdentityP . idT
 
@@ -105,8 +106,8 @@ instance (ProxyP            p )
     lift_P m = IdentityP (lift_P m)
  -- lift = P . lift
 
-instance (InteractP            p )
-      =>  InteractP (IdentityP p) where
+instance (Interact            p )
+      =>  Interact (IdentityP p) where
     p1 \>\ p2 = \c'1 -> IdentityP (
         ((\b'  -> runIdentityP (p1 b' ))
      \>\ (\c'2 -> runIdentityP (p2 c'2)) ) c'1 )
@@ -119,6 +120,11 @@ instance (InteractP            p )
 
 instance ProxyTrans IdentityP where
     liftP = IdentityP
+
+-- | Wrap a '\'@K@\'leisli arrow in 'IdentityP'
+identityK :: (q -> p a' a b' b m r) -> (q -> IdentityP p a' a b' b m r)
+identityK k q = IdentityP (k q)
+-- identityK = (IdentityP .)
 
 -- | Run an 'P' \'@K@\'leisli arrow
 runIdentityK :: (q -> IdentityP p a' a b' b m r) -> (q -> p a' a b' b m r)

@@ -23,18 +23,18 @@ module Control.Proxy.Pipe (
     ) where
 
 import Control.Monad (forever)
-import Control.Proxy.Class (ProxyP(request, respond, (<-<), (?>=)))
+import Control.Proxy.Class (Proxy(request, respond, (<-<), (?>=)))
 import Control.Proxy.Synonym (Pipe, Consumer, Producer)
 import Control.Proxy.Trans.Identity (runIdentityP)
 
 {-| Wait for input from upstream
 
     'await' blocks until input is available -}
-await :: (Monad m, ProxyP p) => Pipe p a b m a
+await :: (Monad m, Proxy p) => Pipe p a b m a
 await = request ()
 
 -- | Convert a pure function into a pipe
-pipe :: (Monad m, ProxyP p) => (a -> b) -> Pipe p a b m r
+pipe :: (Monad m, Proxy p) => (a -> b) -> Pipe p a b m r
 pipe f = runIdentityP $ forever $ do
     a <- request ()
     respond (f a)
@@ -42,7 +42,7 @@ pipe f = runIdentityP $ forever $ do
 {-| Deliver output downstream
 
     'yield' restores control back downstream and binds the result to 'await'. -}
-yield :: (Monad m, ProxyP p) => b -> Pipe p a b m ()
+yield :: (Monad m, Proxy p) => b -> Pipe p a b m ()
 yield = respond
 
 infixr 9 <+<
@@ -50,16 +50,16 @@ infixl 9 >+>
 
 -- | Corresponds to ('<<<')/('.') from @Control.Category@
 (<+<)
- :: (Monad m, ProxyP p) => Pipe p b c m r -> Pipe p a b m r -> Pipe p a c m r
+ :: (Monad m, Proxy p) => Pipe p b c m r -> Pipe p a b m r -> Pipe p a c m r
 p1 <+< p2 = ((\() -> p1) <-< (\() -> p2)) ()
 
 -- | Corresponds to ('>>>') from @Control.Category@
 (>+>)
- :: (Monad m, ProxyP p) => Pipe p a b m r -> Pipe p b c m r -> Pipe p a c m r
+ :: (Monad m, Proxy p) => Pipe p a b m r -> Pipe p b c m r -> Pipe p a c m r
 (>+>) = flip (<+<)
 
 -- | Corresponds to 'id' from @Control.Category@
-idP :: (Monad m, ProxyP p) => Pipe p a a m r
+idP :: (Monad m, Proxy p) => Pipe p a a m r
 idP = runIdentityP $ forever $ do
     a <- request ()
     respond a
@@ -71,17 +71,17 @@ idP = runIdentityP $ forever $ do
 
     Each implementation must supply its own 'runPipe' function since it is
     the only non-polymorphic 'Pipe' function and the compiler uses it to
-    select which underlying 'Proxy' implementation to use. -}
+    select which underlying proxy implementation to use. -}
 
 {- $upgrade
-    You can upgrade code written to 'Control.Pipe' to work with the 'Proxy'
+    You can upgrade code written to 'Control.Pipe' to work with the proxy
     ecosystem in steps.  Each change enables greater interoperability with
     proxy utilities and transformers and if time permits you should implement
     the entire upgrade for your libraries if you want to take advantage of
     proxy standard libraries.
 
     First, import "Control.Proxy" and "Control.Proxy.Pipe" instead of
-    "Control.Pipe".  Then, add 'Proxy' after every 'Pipe', 'Producer', or
+    "Control.Pipe".  Then, add 'ProxyFast' after every 'Pipe', 'Producer', or
     'Consumer' in any type signature.  For example, you would convert this:
 
 > import Control.Pipe
@@ -94,10 +94,11 @@ idP = runIdentityP $ forever $ do
 > import Control.Proxy
 > import Control.Proxy.Pipe -- transition import
 >
-> fromList :: (Monad m) => [b] -> Producer Proxy b m r
+> fromList :: (Monad m) => [b] -> Producer ProxyFast b m r
 > fromList xs = mapM_ yield xs
 
-    The change ensures that all your code now works in the 'Proxy' monad.
+    The change ensures that all your code now works in the 'ProxyFast' monad,
+    which is the faster of the two proxy implementations.
 
     Second, modify all your 'Pipe's to take an empty '()' as their final
     argument, and translate the following functions:
@@ -111,7 +112,7 @@ idP = runIdentityP $ forever $ do
 > import Control.Proxy
 > import Control.Proxy.Pipe
 >
-> fromList :: (Monad m) => [b] -> Producer Proxy b IO r
+> fromList :: (Monad m) => [b] -> Producer ProxyFast b IO r
 > fromList xs = mapM_ yield xs
 
     ... to this:
@@ -119,13 +120,13 @@ idP = runIdentityP $ forever $ do
 > import Control.Proxy
 > import Control.Proxy.Pipe
 >
-> fromList :: (Monad m) => [b] -> () -> Producer Proxy b IO r
+> fromList :: (Monad m) => [b] -> () -> Producer ProxyFast b IO r
 > fromList xs () = mapM_ yield xs
 
     Now, when you call these within a @do@ block  you must supplying an
     additional @()@ argument:
 
-> example = do
+> examplePipe () = do
 >     a <- request ()
 >     fromList [1..a] ()
 
@@ -140,10 +141,10 @@ idP = runIdentityP $ forever $ do
 >
 > fromList xs () = runIdentityP $ mapM_ yield xs
 
-    Then replace the 'Proxy' in the type signature with a type variable @p@
-    constrained by the 'ProxyP' type class:
+    Then replace the 'ProxyFast' in the type signature with a type variable @p@
+    constrained by the 'Proxy' type class:
 
-> fromList :: (Monad m, ProxyP p) => [b] -> () -> Producer p b m r
+> fromList :: (Monad m, Proxy p) => [b] -> () -> Producer p b m r
 
     This change upgrades your 'Pipe' to work natively within proxies and proxy
     transformers, without any manual conversion or lifting.  You can now compose
@@ -154,7 +155,7 @@ idP = runIdentityP $ forever $ do
 
 > import Control.Proxy
 >
-> fromList :: (Monad m, ProxyP p) => [b] -> () -> Producer p b m r
+> fromList :: (Monad m, Proxy p) => [b] -> () -> Producer p b m r
 > fromList xs () = runIdentityP $ mapM_ respond xs
 
     Also, I encourage you to continue using the 'Pipe', 'Consumer' and
@@ -166,14 +167,14 @@ idP = runIdentityP $ forever $ do
 > import Control.Proxy.Trans.State
 >
 > -- A Producer enriched with pipe-local state
-> example1 :: (Monad m, ProxyP p) => () -> Producer (StateP Int p) Int m r
+> example1 :: (Monad m, Proxy p) => () -> Producer (StateP Int p) Int m r
 > example1 () = forever $ do
 >     n <- get
 >     respond n
 >     put (n + 1)
 >
 > -- A Consumer enriched with error-handling
-> example2 :: (ProxyP p) => () -> Consumer (EitherP String p) Int IO ()
+> example2 :: (Proxy p) => () -> Consumer (EitherP String p) Int IO ()
 > example2 () = do
 >     n <- request ()
 >     if (n == 0)

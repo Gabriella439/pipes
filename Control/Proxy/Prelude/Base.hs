@@ -51,7 +51,7 @@ import Data.Closed (C)
 >
 > mapB id id = idT
 -}
-mapB :: (Monad m, ProxyP p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
+mapB :: (Monad m, Proxy p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
 mapB f g = runIdentityK go where
     go b' = do
         a   <- request (g b')
@@ -65,7 +65,7 @@ mapB f g = runIdentityK go where
 >
 > mapD id = idT
 -}
-mapD :: (Monad m, ProxyP p) => (a -> b) -> x -> p x a x b m r
+mapD :: (Monad m, Proxy p) => (a -> b) -> x -> p x a x b m r
 mapD f = runIdentityK go where
     go x = do
         a  <- request x
@@ -79,7 +79,7 @@ mapD f = runIdentityK go where
 >
 > mapU id = idT
 -}
-mapU :: (Monad m, ProxyP p) => (b' -> a') -> b' -> p a' x b' x m r
+mapU :: (Monad m, Proxy p) => (b' -> a') -> b' -> p a' x b' x m r
 mapU g = runIdentityK go where
     go b' = do
         x   <- request (g b')
@@ -95,7 +95,7 @@ mapU g = runIdentityK go where
 > mapMB return return = idT
 -}
 mapMB
- :: (Monad m, ProxyP p) => (a -> m b) -> (b' -> m a') -> b' -> p a' a b' b m r
+ :: (Monad m, Proxy p) => (a -> m b) -> (b' -> m a') -> b' -> p a' a b' b m r
 mapMB f g = runIdentityK go where
     go b' = do
         a'  <- lift (g b')
@@ -111,7 +111,7 @@ mapMB f g = runIdentityK go where
 >
 > mapMD return = idT
 -}
-mapMD :: (Monad m, ProxyP p) => (a -> m b) -> x -> p x a x b m r
+mapMD :: (Monad m, Proxy p) => (a -> m b) -> x -> p x a x b m r
 mapMD f = runIdentityK go where
     go x = do
         a  <- request x
@@ -126,7 +126,7 @@ mapMD f = runIdentityK go where
 >
 > mapMU return = idT
 -}
-mapMU :: (Monad m, ProxyP p) => (b' -> m a') -> b' -> p a' x b' x m r
+mapMU :: (Monad m, Proxy p) => (b' -> m a') -> b' -> p a' x b' x m r
 mapMU g = runIdentityK go where
     go b' = do
         a'  <- lift (g b')
@@ -142,7 +142,7 @@ mapMU g = runIdentityK go where
 >
 > execB (return ()) = idT
 -}
-execB :: (Monad m, ProxyP p) => m () -> m () -> a' -> p a' a a' a m r
+execB :: (Monad m, Proxy p) => m () -> m () -> a' -> p a' a a' a m r
 execB md mu = runIdentityK go where
     go a' = do
         lift mu
@@ -162,7 +162,7 @@ execB md mu = runIdentityK go where
 >
 > execD (return ()) = idT
 -}
-execD :: (Monad m, ProxyP p) => m () -> a' -> p a' a a' a m r
+execD :: (Monad m, Proxy p) => m () -> a' -> p a' a a' a m r
 execD md = runIdentityK go where
     go a' = do
         a   <- request a'
@@ -180,7 +180,7 @@ execD md = runIdentityK go where
 >
 > execU (return ()) = idT
 -}
-execU :: (Monad m, ProxyP p) => m () -> a' -> p a' a a' a m r
+execU :: (Monad m, Proxy p) => m () -> a' -> p a' a a' a m r
 execU mu = runIdentityK go where
     go a' = do
         lift mu
@@ -198,7 +198,7 @@ execU mu = runIdentityK go where
 >
 > takeB 0 = return
 -}
-takeB :: (Monad m, ProxyP p) => Int -> a' -> p a' a a' a m a'
+takeB :: (Monad m, Proxy p) => Int -> a' -> p a' a a' a m a'
 takeB n0 = runIdentityK (go n0) where
     go n
         | n <= 0    = return
@@ -209,7 +209,7 @@ takeB n0 = runIdentityK (go n0) where
 -- takeB n = replicateK n $ request >=> respond
 
 -- | 'takeB_' is 'takeB' with a @()@ return value, convenient for composing
-takeB_ :: (Monad m, ProxyP p) => Int -> a' -> p a' a a' a m ()
+takeB_ :: (Monad m, Proxy p) => Int -> a' -> p a' a a' a m ()
 takeB_ n0 = runIdentityK (go n0) where
     go n
         | n <= 0    = \_ -> return ()
@@ -230,7 +230,7 @@ takeB_ n0 = runIdentityK (go n0) where
 >
 > takeWhileD mempty = idT
 -}
-takeWhileD :: (Monad m, ProxyP p) => (a -> Bool) -> a' -> p a' a a' a m ()
+takeWhileD :: (Monad m, Proxy p) => (a -> Bool) -> a' -> p a' a a' a m ()
 takeWhileD p = runIdentityK go where
     go a' = do
         a <- request a'
@@ -247,7 +247,7 @@ takeWhileD p = runIdentityK go where
 >
 > takeWhileD mempty = idT
 -}
-takeWhileU :: (Monad m, ProxyP p) => (a' -> Bool) -> a' -> p a' a a' a m ()
+takeWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' a a' a m ()
 takeWhileU p = runIdentityK go where
     go a' =
         if (p a')
@@ -263,7 +263,7 @@ takeWhileU p = runIdentityK go where
 >
 > dropD 0 = idT
 -}
-dropD :: (Monad m, ProxyP p) => Int -> () -> Pipe p a a m r
+dropD :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m r
 dropD n0 = \() -> runIdentityP (go n0) where
     go n
         | n <= 0    = idT ()
@@ -280,7 +280,7 @@ dropD n0 = \() -> runIdentityP (go n0) where
 >
 > dropU 0 = idT
 -}
-dropU :: (Monad m, ProxyP p) => Int -> a' -> CoPipe p a' a' m r
+dropU :: (Monad m, Proxy p) => Int -> a' -> CoPipe p a' a' m r
 dropU n0 = runIdentityK (go n0) where
     go n
         | n <= 0    = idT
@@ -299,7 +299,7 @@ dropU n0 = runIdentityK (go n0) where
 >
 > dropWhileD mempty = idT
 -}
-dropWhileD :: (Monad m, ProxyP p) => (a -> Bool) -> () -> Pipe p a a m r
+dropWhileD :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m r
 dropWhileD p () = runIdentityP go where
     go = do
         a <- request ()
@@ -316,7 +316,7 @@ dropWhileD p () = runIdentityP go where
 >
 > dropWhileU mempty = idT
 -}
-dropWhileU :: (Monad m, ProxyP p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
+dropWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
 dropWhileU p = runIdentityK go where
     go a' =
         if (p a')
@@ -336,7 +336,7 @@ dropWhileU p = runIdentityK go where
 >
 > filterD mempty = idT
 -}
-filterD :: (Monad m, ProxyP p) => (a -> Bool) -> () -> Pipe p a a m r
+filterD :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m r
 filterD p = \() -> runIdentityP go where
     go = do
         a <- request ()
@@ -352,7 +352,7 @@ filterD p = \() -> runIdentityP go where
 >
 > filterU mempty = idT
 -}
-filterU :: (Monad m, ProxyP p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
+filterU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
 filterU p = runIdentityK go where
     go a' =
         if (p a')
@@ -370,7 +370,7 @@ filterU p = runIdentityK go where
 >
 > fromListS [] = return
 -}
-fromListS :: (Monad m, ProxyP p) => [b] -> () -> Producer p b m ()
+fromListS :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
 fromListS xs = \_ -> foldr (\e a -> respond e ?>= \_ -> a) (return_P ()) xs
 -- fromListS xs _ = mapM_ respond xs
 
@@ -380,19 +380,19 @@ fromListS xs = \_ -> foldr (\e a -> respond e ?>= \_ -> a) (return_P ()) xs
 >
 > fromListC [] = return
 -}
-fromListC :: (Monad m, ProxyP p) => [a'] -> () -> CoProducer p a' m ()
+fromListC :: (Monad m, Proxy p) => [a'] -> () -> CoProducer p a' m ()
 fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 -- fromListC xs _ = mapM_ request xs
 
 -- | 'Server' version of 'enumFrom'
-enumFromS :: (Enum b, Monad m, ProxyP p) => b -> () -> Producer p b m r
+enumFromS :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
 enumFromS b0 = \_ -> runIdentityP (go b0) where
     go b = do
         respond b
         go (succ b)
 
 -- | 'Client' version of 'enumFrom'
-enumFromC :: (Enum a', Monad m, ProxyP p) => a' -> () -> CoProducer p a' m r
+enumFromC :: (Enum a', Monad m, Proxy p) => a' -> () -> CoProducer p a' m r
 enumFromC a'0 = \_ -> runIdentityP (go a'0) where
     go a' = do
         request a'
@@ -400,7 +400,7 @@ enumFromC a'0 = \_ -> runIdentityP (go a'0) where
 
 -- | 'Server' version of 'enumFromTo'
 enumFromToS
- :: (Enum b, Ord b, Monad m, ProxyP p) => b -> b -> () -> Producer p b m ()
+ :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> () -> Producer p b m ()
 enumFromToS b1 b2 _ = runIdentityP (go b1) where
     go b
         | b > b2    = return ()
@@ -410,7 +410,7 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
 
 -- | 'Client' version of 'enumFromTo'
 enumFromToC
- :: (Enum a', Ord a', Monad m, ProxyP p)
+ :: (Enum a', Ord a', Monad m, Proxy p)
  => a' -> a' -> () -> CoProducer p a' m ()
 enumFromToC a1 a2 _ = runIdentityP (go a1) where
     go n
@@ -439,14 +439,14 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
 -}
 
 -- | Compose 'unitD' with a closed upstream end to create a polymorphic end
-unitD :: (Monad m, ProxyP p) => y' -> p x' x y' () m r
+unitD :: (Monad m, Proxy p) => y' -> p x' x y' () m r
 unitD _ = runIdentityP go where
     go = do
         respond ()
         go
 
 -- | Compose 'unitU' with a closed downstream end to create a polymorphic end
-unitU :: (Monad m, ProxyP p) => b' -> p () x y' y m r
+unitU :: (Monad m, Proxy p) => b' -> p () x y' y m r
 unitU _ = runIdentityP go where
     go = do
         request ()

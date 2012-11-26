@@ -4,7 +4,7 @@
     multiple proxy implementations and proxy transformers can share the same
     library of utility proxies.
 
-    Several of these type classes, including 'ProxyP', duplicate methods from
+    Several of these type classes, including 'Proxy', duplicate methods from
     other type-classes (such as ('?>=') duplicating ('>>=')) in order to work
     around Haskell's lack of polymorphic constraints.  You do NOT need
     to use these duplicate methods, which exist solely to plumb internal
@@ -14,9 +14,9 @@
 
 module Control.Proxy.Class (
     -- * Core proxy class
-    ProxyP(..),
+    Proxy(..),
     -- * request/respond substitution
-    InteractP(..),
+    Interact(..),
     -- * Proxy-specialized classes
     MonadPlusP(..),
     MonadIOP(..),
@@ -27,14 +27,14 @@ module Control.Proxy.Class (
 
 import Control.Monad.IO.Class (MonadIO)
 
-{- * I use educated guesses about which associativy is most efficient for each
+{- * I make educated guesses about which associativy is most efficient for each
      operator.
    * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
 
 > lift . k >-> p
 >
-> mapT . k >-> p
+> mapT f . k >-> p
 -}
 infixr 7 <-<
 infixl 7 >->
@@ -44,8 +44,8 @@ infixl 8 \<\
 infixr 8 />/
 infixl 1 ?>= -- This should match the fixity of >>=
 
-{-| The 'ProxyP' class defines an interface to all core proxy capabilities that
-    all 'Proxy'-like types must implement.
+{-| The 'Proxy' class defines an interface to all core proxy capabilities that
+    all proxy-like types must implement.
 
     First, all proxies are monads.  Minimal definition:
 
@@ -106,7 +106,7 @@ infixl 1 ?>= -- This should match the fixity of >>=
 >
 > (lift . k >=> f) >-> (request >=> g) = lift . k >=> (f >-> (request >=> g))
 -}
-class ProxyP p where
+class Proxy p where
     {-| 'idT' acts like a \'T\'ransparent proxy, passing all requests further
         upstream, and passing all responses further downstream. -}
     idT :: (Monad m) => a' -> p a' a a' a m r
@@ -137,7 +137,7 @@ class ProxyP p where
     {-| 'respond' with an output for downstream and bind downstream's next
         'request'
           
-        @respond b@ satisfies a downstream 'request' by supplying the value @b@
+        @respond b@ satisfies a downstream 'request' by supplying the value @b@.
         'respond' blocks until downstream 'request's a new value and binds the
         argument of type @b'@ from the next 'request' as its return value. -}
     respond :: (Monad m) => b -> p x' x b' b m b'
@@ -156,7 +156,7 @@ class ProxyP p where
         constraint. -}
     lift_P :: (Monad m) => m r -> p a' a b' b m r
 
-{-| The 'InteractP' class defines the ability to:
+{-| The 'Interact' class defines the ability to:
 
     * Replace existing 'request' commands using ('\>\')
 
@@ -186,7 +186,7 @@ class ProxyP p where
 >
 > (f />/ g) />/ h = f />/ (g />/ h)
 -}
-class InteractP p where
+class Interact p where
     -- | @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
     (\>\) :: (Monad m)
           => (b' -> p a' a x' x m b)
@@ -214,20 +214,21 @@ class InteractP p where
           -> (a -> p x' x b' b m a')
           -> (a -> p x' x c' c m a')
     p1 \<\ p2 = p2 />/ p1
+
 {-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
 
-> (forall a' a b' b m . MonadPlus (p a' a b' b m) => ...
+> (forall a' a b' b m . (Monad m) => MonadPlus (p a' a b' b m) => ...
 -}
-class (ProxyP p) => MonadPlusP p where
+class (Proxy p) => MonadPlusP p where
     mzero_P :: (Monad m) => p a' a b' b m r
     mplus_P
      :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r
 
 {-| The @(MonadIOP p)@ constraint is equivalent to the following constraint:
 
-> (forall a' a b' b m . MonadIO (p a' a b' b m) => ...
+> (forall a' a b' b m . (MonadIO m) => MonadIO (p a' a b' b m) => ...
 -}
-class (ProxyP p) => MonadIOP p where
+class (Proxy p) => MonadIOP p where
     liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r
 
 {-| The @(MFunctorP p)@ constraint is equivalent to the following constraint:
@@ -262,7 +263,7 @@ class MFunctorP p where
 
       .. into cleaner and more general constraints like this:
 
-> P :: (ProxyP p) => ...
+> P :: (Proxy p) => ...
 
     These type classes exist solely for internal plumbing and you should never
     directly use the duplicate methods from them.  Instead, you can use all the
@@ -271,7 +272,8 @@ class MFunctorP p where
     type-class machinery will then automatically convert the messier and less
     polymorphic constraints to the smaller and more general constraints.
 
-    For example, consider the following definition for @mapMD@:
+    For example, consider the following definition for @mapMD@ (from
+    "Control.Proxy.Prelude.Base"):
 
 > import Control.Monad.Trans.Class
 > import Control.Proxy
@@ -284,7 +286,7 @@ class MFunctorP p where
     The compiler infers the following messy signature:
 
 > mapMD
->  :: (Monad m, Monad (p x a x b m), MonadTrans (p x a x b), ProxyP p)
+>  :: (Monad m, Monad (p x a x b m), MonadTrans (p x a x b), Proxy p)
 >  => (a -> m b) -> x -> p x a x b m r
 
     Instead, you can cast the code to @IdentityP p@ by wrapping it in
@@ -296,19 +298,19 @@ class MFunctorP p where
 >     b <- lift (f a)
 >     respond b
 
-    ... and now the compiler collapses all the constraints into 'ProxyP':
+    ... and now the compiler collapses all the constraints into 'Proxy':
 
-> mapMD :: (Monad m, ProxyP p) => (a -> m b) -> x -> p x a x b m r
+> mapMD :: (Monad m, Proxy p) => (a -> m b) -> x -> p x a x b m r
 
     You don't need to use 'runIdentityP' \/ 'runIdentityK' if you use any other
-    extensions.  The compiler already infers the correct 'ProxyP' constraint for
+    extensions.  The compiler already infers the correct 'Proxy' constraint for
     any code that uses extensions, such as the following code example:
 
 > import Control.Monad
 > import Control.Proxy
 > import qualified Control.Proxy.Trans.Either as E
 >
-> example :: (Monad m, ProxyP p) => () -> Producer (EitherP p) String m ()
+> example :: (Monad m, Proxy p) => () -> Producer (EitherP String p) Char m ()
 > example () = do
 >     c <- request ()
 >     when (c == ' ') $ E.throw "Error: received space"

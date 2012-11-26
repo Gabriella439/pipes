@@ -11,9 +11,11 @@ import Control.Proxy.Core
 import Control.Proxy.Core.Fast hiding (Request, Respond, M, Pure)
 
 {- $default
+    Read "Control.Proxy.Tutorial" for an extended proxy tutorial.
+
     "Control.Proxy.Core" exports everything except 'runProxy'.
 
-    This library provides two base 'Proxy' implementations, each of which export
+    This library provides two base proxy implementations, each of which export
     their own 'runProxy' function:
 
     * "Control.Proxy.Core.Fast": This runs faster for code that is not

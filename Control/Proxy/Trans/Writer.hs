@@ -33,13 +33,13 @@ import Data.Monoid (Monoid(mempty, mappend))
 newtype WriterP w p a' a b' b (m :: * -> *) r
   = WriterP { unWriterP :: w -> p a' a b' b m (r, w) }
 
-instance (ProxyP             p, Monad m)
+instance (Proxy              p, Monad m)
        => Functor (WriterP w p a' a b' b m) where
     fmap f p = WriterP (\w0 ->
         unWriterP p w0 ?>= \(x, w1) ->
         return_P (f x, w1) )
 
-instance (ProxyP                 p, Monad m)
+instance (Proxy                  p, Monad m)
        => Applicative (WriterP w p a' a b' b m) where
     pure = return
     fp <*> xp = WriterP (\w0 ->
@@ -48,7 +48,7 @@ instance (ProxyP                 p, Monad m)
         return_P (f x, w2) )
  -- (<*>) = ap
 
-instance (ProxyP           p, Monad m)
+instance (Proxy            p, Monad m)
        => Monad (WriterP w p a' a b' b m) where
     return = return_P
     (>>=) = (?>=)
@@ -68,7 +68,7 @@ instance (MonadPlusP           p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
-instance (ProxyP                p )
+instance (Proxy                 p )
        => MonadTrans (WriterP w p a' a b' b) where
     lift = lift_P
 
@@ -89,8 +89,8 @@ instance (MFunctorP           p )
        => MFunctor (WriterP w p a' a b' b) where
     mapT = mapT_P
 
-instance (ProxyP            p )
-       => ProxyP (WriterP w p) where
+instance (Proxy            p )
+       => Proxy (WriterP w p) where
     idT = \a' -> WriterP (\_ -> idT a')
     p1 >-> p2 = \c'1 -> WriterP (\w ->
         ((\b' -> unWriterP (p1 b') w) >-> (\c'2 -> unWriterP (p2 c'2) w)) c'1 )
@@ -123,24 +123,24 @@ runWriterK k q = runWriterP (k q)
 
 -- | Evaluate a 'WriterP' computation, but discard the final result
 execWriterP
- :: (ProxyP p, Monad m, Monoid w)
+ :: (Proxy p, Monad m, Monoid w)
  => WriterP w p a' a b' b m r -> p a' a b' b m w
 execWriterP m = runWriterP m ?>= \(_, w) -> return_P w
 -- execWriterP m = liftM snd $ runWriterP m
 
 -- | Evaluate a 'WriterP' \'@K@\'leisli arrow, but discard the final result
 execWriterK
- :: (ProxyP p, Monad m, Monoid w)
+ :: (Proxy p, Monad m, Monoid w)
  => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m w)
 execWriterK k q= execWriterP (k q)
 
 -- | Add a value to the monoid
-tell :: (ProxyP p, Monad m, Monoid w) => w -> WriterP w p a' a b' b m ()
+tell :: (Proxy p, Monad m, Monoid w) => w -> WriterP w p a' a b' b m ()
 tell w' = WriterP (\w -> let w'' = mappend w w' in w'' `seq` return_P ((), w''))
 
 -- | Modify the result of a writer computation
 censor
- :: (ProxyP p, Monad m, Monoid w)
+ :: (Proxy p, Monad m, Monoid w)
  => (w -> w) -> WriterP w p a' a b' b m r -> WriterP w p a' a b' b m r
 censor f p = WriterP (\w0 ->
     unWriterP p w0 ?>= \(r, w1) ->
