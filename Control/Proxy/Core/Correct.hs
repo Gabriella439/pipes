@@ -2,9 +2,9 @@
     enforces the monad transformer laws.  You can safely import this module
     without violating any laws or invariants.
 
-    However, I advise you stick to the 'Proxy' type class API rather than import
-    this module so that your code works with both 'Proxy' implementations and
-    also works with all proxy transformers. -}
+    However, I advise that you stick to the 'Proxy' type class API rather than
+    import this module so that your code works with both 'Proxy' implementations
+    and also works with all proxy transformers. -}
 
 module Control.Proxy.Core.Correct (
     -- * Types
@@ -28,13 +28,14 @@ import Data.Closed (C)
 {-| A 'ProxyCorrect' communicates with an upstream interface and a downstream
     interface.
 
-    The type variables of @ProxyCorrect req_a resp_a req_b resp_b m r@ signify:
+    The type variables of @ProxyCorrect req_a' resp_a req_b' resp_b m r@
+    signify:
 
-    * @req_a @ - The request supplied to the upstream interface
+    * @req_a'@ - The request supplied to the upstream interface
 
     * @resp_a@ - The response provided by the upstream interface
 
-    * @req_b @ - The request supplied by the downstream interface
+    * @req_b'@ - The request supplied by the downstream interface
 
     * @resp_b@ - The response provided to the downstream interface
 

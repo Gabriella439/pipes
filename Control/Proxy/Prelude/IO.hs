@@ -43,13 +43,13 @@ import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
 import Control.Proxy.Synonym (Client, Server, Producer, CoProducer)
 import System.IO (Handle, hGetLine, hPutStr, hPutStrLn, hPrint, stdin, stdout)
 
--- | A \'@S@\'erver that sends lines from 'stdin' downstream
+-- | A 'Producer' that sends lines from 'stdin' downstream
 getLineS :: (Proxy p) => () -> Producer p String IO r
 getLineS _ = runIdentityP $ forever $ do
     str <- lift getLine
     respond str
 
--- | A \'@C@\'lient that sends lines from 'stdin' upstream
+-- | A 'CoProducer' that sends lines from 'stdin' upstream
 getLineC :: (Proxy p) => () -> CoProducer p String IO r
 getLineC _ = runIdentityP $ forever $ do
     str <- lift getLine
@@ -140,13 +140,13 @@ promptC _ = runIdentityP $ forever $ do
     recv <- request send
     lift $ putStrLn recv
 
--- | A \'@S@\'erver that sends lines from a handle downstream
+-- | A 'Producer' that sends lines from a handle downstream
 hGetLineS :: (Proxy p) => Handle -> () -> Producer p String IO r
 hGetLineS h _ = runIdentityP $ forever $ do
     str <- lift $ hGetLine h
     respond str
 
--- | A \'@C@\'lient that sends lines from a handle upstream
+-- | A 'CoProducer' that sends lines from a handle upstream
 hGetLineC :: (Proxy p) => Handle -> () -> CoProducer p String IO r
 hGetLineC h _ = runIdentityP $ forever $ do
     str <- lift $ hGetLine h

@@ -46,13 +46,13 @@ import Data.Closed (C)
 {-| A 'ProxyFast' communicates with an upstream interface and a downstream
     interface.
 
-    The type variables of @ProxyFast req_a resp_a req_b resp_b m r@ signify:
+    The type variables of @ProxyFast req_a' resp_a req_b' resp_b m r@ signify:
 
-    * @req_a @ - The request supplied to the upstream interface
+    * @req_a'@ - The request supplied to the upstream interface
 
     * @resp_a@ - The response provided by the upstream interface
 
-    * @req_b @ - The request supplied by the downstream interface
+    * @req_b'@ - The request supplied by the downstream interface
 
     * @resp_b@ - The response provided to the downstream interface
 
@@ -98,6 +98,7 @@ p0 `_bind` f = go p0 where
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       r   -> f r
 
+-- | Only satisfies laws modulo 'observe'
 instance MonadTrans (ProxyFast a' a b' b) where
     lift = _lift
 
@@ -210,9 +211,13 @@ runPipe p = runProxy (\_ -> p)
 >
 > observe (lift (m >>= f)) = observe (lift m >>= lift . f)
 
-    This correctness comes at the price of performance, so use this function
-    sparingly or else you would be better off using
+    This correctness comes at a moderate cost to performance, so use this
+    function sparingly or else you would be better off using
     "Control.Proxy.Core.Correct".
+
+    You do not need to use this function if you use the safe API exported from
+    "Control.Proxy", which does not export any functions or constructors that
+    can violate the monad transformer laws.
 -}
 observe :: (Monad m) => ProxyFast a' a b' b m r -> ProxyFast a' a b' b m r
 observe p = M (go p) where

@@ -3,7 +3,7 @@
 
     This module differs slightly from "Control.Pipe" in order to promote
     seamless interoperability with both pipes and proxies.  See the \"Upgrade
-    Pipes to Proxies\" section for details. -}
+    Pipes to Proxies\" section below for details. -}
 module Control.Proxy.Pipe (
     -- * Create Pipes
     await,
@@ -74,11 +74,11 @@ idP = runIdentityP $ forever $ do
     select which underlying proxy implementation to use. -}
 
 {- $upgrade
-    You can upgrade code written to 'Control.Pipe' to work with the proxy
-    ecosystem in steps.  Each change enables greater interoperability with
-    proxy utilities and transformers and if time permits you should implement
-    the entire upgrade for your libraries if you want to take advantage of
-    proxy standard libraries.
+    You can upgrade classic 'Pipe' code to work with the proxy ecosystem in
+    steps.  Each change enables greater interoperability with proxy utilities
+    and transformers and if time permits you should implement the entire upgrade
+    for your libraries if you want to take advantage of proxy standard
+    libraries.
 
     First, import "Control.Proxy" and "Control.Proxy.Pipe" instead of
     "Control.Pipe".  Then, add 'ProxyFast' after every 'Pipe', 'Producer', or

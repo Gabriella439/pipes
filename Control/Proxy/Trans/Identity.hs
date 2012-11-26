@@ -121,7 +121,7 @@ instance (Interact            p )
 instance ProxyTrans IdentityP where
     liftP = IdentityP
 
--- | Wrap a '\'@K@\'leisli arrow in 'IdentityP'
+-- | Wrap a \'@K@\'leisli arrow in 'IdentityP'
 identityK :: (q -> p a' a b' b m r) -> (q -> IdentityP p a' a b' b m r)
 identityK k q = IdentityP (k q)
 -- identityK = (IdentityP .)

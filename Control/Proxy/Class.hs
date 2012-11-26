@@ -54,7 +54,7 @@ infixl 1 ?>= -- This should match the fixity of >>=
     * ('?>=')
 
     These must satify the monad laws using @(>>=) = (?>=)@ and
-    @return_P = return@.
+    @return = return_P@.
 
     Second, all proxies must support a bidirectional flow of information.
     Minimal definition:
@@ -302,9 +302,16 @@ class MFunctorP p where
 
 > mapMD :: (Monad m, Proxy p) => (a -> m b) -> x -> p x a x b m r
 
-    You don't need to use 'runIdentityP' \/ 'runIdentityK' if you use any other
-    extensions.  The compiler already infers the correct 'Proxy' constraint for
-    any code that uses extensions, such as the following code example:
+    There is no performance penalty for writing polymorphic code or embedding it
+    in 'IdentityP'.  All the rewrite @RULES@ will fire and transform your
+    polymorphic code into the equivalent type-specialized hand-tuned code.
+    These rewrite rules fire very robustly and they do not require any
+    assistance from compiler pragmas like @INLINE@, @NOINLINE@ or @SPECIALIZE@.
+
+    You also don't need to use 'runIdentityP' \/ 'runIdentityK' if you use any
+    other extensions.  The compiler already infers the correct 'Proxy'
+    constraint for any code that uses extensions, such as the following code
+    example:
 
 > import Control.Monad
 > import Control.Proxy

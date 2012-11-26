@@ -32,7 +32,7 @@ type Consumer p a (m :: * -> *) r = p () a () C m r
 
 {-| A self-contained 'Pipeline' that is ready to be run
 
-    'Pipeline's never 'request' or 'respond'. -}
+    'Pipeline's never 'request' nor 'respond'. -}
 type Pipeline p (m :: * -> *) r = p C () () C m r
 
 -- | A 'Pipe' where everything flows upstream

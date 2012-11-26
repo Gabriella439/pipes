@@ -1,4 +1,6 @@
--- | Recommended entry import for this library
+{-| Recommended entry import for this library
+
+    Read "Control.Proxy.Tutorial" for an extended proxy tutorial. -}
 
 module Control.Proxy (
     -- * Modules
@@ -11,8 +13,6 @@ import Control.Proxy.Core
 import Control.Proxy.Core.Fast hiding (Request, Respond, M, Pure)
 
 {- $default
-    Read "Control.Proxy.Tutorial" for an extended proxy tutorial.
-
     "Control.Proxy.Core" exports everything except 'runProxy'.
 
     This library provides two base proxy implementations, each of which export

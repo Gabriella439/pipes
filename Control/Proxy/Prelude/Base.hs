@@ -156,7 +156,7 @@ execB md mu = runIdentityK go where
     lift md
     respond a -}
 
-{-| @execD md)@ executes @md@ every time values flow downstream through it.
+{-| @(execD md)@ executes @md@ every time values flow downstream through it.
 
 > execD md1 >-> execD md2 = execD (md1 >> md2)
 >
@@ -174,7 +174,7 @@ execD md = runIdentityK go where
     lift md
     respond a -}
 
-{-| @execU mu)@ executes @mu@ every time values flow upstream through it.
+{-| @(execU mu)@ executes @mu@ every time values flow upstream through it.
 
 > execU mu1 >-> execU mu2 = execU (mu2 >> mu1)
 >
@@ -219,8 +219,8 @@ takeB_ n0 = runIdentityK (go n0) where
             go (n - 1) a'2
 -- takeB_ n = fmap void (takeB n)
 
-{-| @takeWhileD p@ allows values to pass downstream so long as they satisfy the
-     predicate @p@.
+{-| @(takeWhileD p)@ allows values to pass downstream so long as they satisfy
+    the predicate @p@.
 
 > -- Using the "All" monoid over functions:
 > mempty = \_ -> True
@@ -240,7 +240,7 @@ takeWhileD p = runIdentityK go where
                 go a'2
             else return ()
 
-{-| @takeWhileU p@ allows values to pass upstream so long as they satisfy the
+{-| @(takeWhileU p)@ allows values to pass upstream so long as they satisfy the
     predicate @p@.
 
 > takeWhileU p1 >-> takeWhileU p2 = takeWhileU (p1 <> p2)
@@ -288,7 +288,7 @@ dropU n0 = runIdentityK (go n0) where
             a' <- respond ()
             go (n - 1) a'
 
-{-| @(dropWhileD p)@ discards values going upstream until one violates the
+{-| @(dropWhileD p)@ discards values going downstream until one violates the
     predicate @p@.
 
 > -- Using the "Any" monoid over functions:
@@ -309,7 +309,7 @@ dropWhileD p () = runIdentityP go where
                 x <- respond a
                 idT x
 
-{-| @(dropWhileU p)@ discards values going downstream until one violates the
+{-| @(dropWhileU p)@ discards values going upstream until one violates the
     predicate @p@.
 
 > dropWhileU p1 >-> dropWhileU p2 = dropWhileU (p1 <> p2)
@@ -364,7 +364,7 @@ filterU p = runIdentityK go where
             a'2 <- respond ()
             go a'2
 
-{-| Convert a list into a 'Server'
+{-| Convert a list into a 'Producer'
 
 > fromListS xs >=> fromListS ys = fromListS (xs ++ ys)
 >
@@ -374,7 +374,7 @@ fromListS :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
 fromListS xs = \_ -> foldr (\e a -> respond e ?>= \_ -> a) (return_P ()) xs
 -- fromListS xs _ = mapM_ respond xs
 
-{-| Convert a list into a 'Client'
+{-| Convert a list into a 'CoProducer'
 
 > fromListC xs >=> fromListC ys = fromListC (xs ++ ys)
 >
@@ -384,21 +384,21 @@ fromListC :: (Monad m, Proxy p) => [a'] -> () -> CoProducer p a' m ()
 fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 -- fromListC xs _ = mapM_ request xs
 
--- | 'Server' version of 'enumFrom'
+-- | 'Producer' version of 'enumFrom'
 enumFromS :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
 enumFromS b0 = \_ -> runIdentityP (go b0) where
     go b = do
         respond b
         go (succ b)
 
--- | 'Client' version of 'enumFrom'
+-- | 'CoProducer' version of 'enumFrom'
 enumFromC :: (Enum a', Monad m, Proxy p) => a' -> () -> CoProducer p a' m r
 enumFromC a'0 = \_ -> runIdentityP (go a'0) where
     go a' = do
         request a'
         go (succ a')
 
--- | 'Server' version of 'enumFromTo'
+-- | 'Producer' version of 'enumFromTo'
 enumFromToS
  :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> () -> Producer p b m ()
 enumFromToS b1 b2 _ = runIdentityP (go b1) where
@@ -408,7 +408,7 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
             respond b
             go (succ b)
 
--- | 'Client' version of 'enumFromTo'
+-- | 'CoProducer' version of 'enumFromTo'
 enumFromToC
  :: (Enum a', Ord a', Monad m, Proxy p)
  => a' -> a' -> () -> CoProducer p a' m ()
@@ -422,8 +422,8 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
 {- $open
     Use the @unit@ functions when you need to embed a proxy with a closed end
     within an open proxy.  For example, the following code will not type-check
-    because @fromListS [1..]@  is a 'Server' and has a closed upstream end,
-    which conflicts with the 'request' statement before it:
+    because @fromListS [1..]@  is a 'Producer' and has a closed upstream end,
+    which conflicts with the 'request' statement preceding it:
 
 > p () = do
 >     request ()
