@@ -228,7 +228,7 @@ Client received : 6
 -}
 
 {- $composition
-    'Proxy' composition posseses an identity 'Proxy' that is completely
+    'Proxy' composition possesses an identity 'Proxy' that is completely
     transparent to anything upstream or downstream of it:
 
 > idT :: (Monad m) => req -> Proxy req resp req resp m r
@@ -340,8 +340,8 @@ Server responded: 667
 667
 *
 
-    Oh no, we lost our useful client diagnostic messages!  No worries, we can
-    abstract that functionality away into its own component:
+    Oh no, we lost our useful client diagnostic messages!  Not to worry, since
+    we can abstract that functionality away into its own component:
 
 > diagnoseClient :: (Show a, Show b) => a -> Proxy a b a b IO r
 > diagnoseClient = foreverK $ \a -> do
