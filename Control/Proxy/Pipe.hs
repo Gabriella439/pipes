@@ -23,7 +23,7 @@ module Control.Proxy.Pipe (
     ) where
 
 import Control.Monad (forever)
-import Control.Proxy.Class (Proxy(request, respond, (<-<), (?>=)))
+import Control.Proxy.Class (Proxy(request, respond, (>->), (?>=)))
 import Control.Proxy.Synonym (Pipe, Consumer, Producer)
 import Control.Proxy.Trans.Identity (runIdentityP)
 
@@ -51,12 +51,12 @@ infixl 9 >+>
 -- | Corresponds to ('<<<')/('.') from @Control.Category@
 (<+<)
  :: (Monad m, Proxy p) => Pipe p b c m r -> Pipe p a b m r -> Pipe p a c m r
-p1 <+< p2 = ((\() -> p1) <-< (\() -> p2)) ()
+p1 <+< p2 = p2 >+> p1
 
 -- | Corresponds to ('>>>') from @Control.Category@
 (>+>)
  :: (Monad m, Proxy p) => Pipe p a b m r -> Pipe p b c m r -> Pipe p a c m r
-(>+>) = flip (<+<)
+p1 >+> p2 = ((\() -> p1) >-> (\() -> p2)) ()
 
 -- | Corresponds to 'id' from @Control.Category@
 idP :: (Monad m, Proxy p) => Pipe p a a m r

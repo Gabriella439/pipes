@@ -94,7 +94,8 @@ instance Proxy ProxyCorrect where
     idT = \a' ->
         Proxy (return (Request a' (\a ->
         Proxy (return (Respond a idT)) )))
-    k1 <-< k2_0 = \c' -> k1 c' |-< k2_0 where
+--  k1 <-< k2_0 = ...
+    k2_0 >-> k1 = \c' -> k1 c' |-< k2_0 where
         p1 |-< k2 = Proxy (do
             x <- unProxy p1
             case x of
@@ -117,14 +118,14 @@ instance Proxy ProxyCorrect where
     lift_P m = Proxy (m >>= \r -> return (Pure r))
 
 instance Interact ProxyCorrect where
-    k1 /</ k2 = \a' -> go (k1 a') where
+    k2 \>\ k1 = \a' -> go (k1 a') where
         go p = Proxy (do
             x <- unProxy p
             case x of
                 Request b' fb  -> unProxy (k2 b' >>= \b -> go (fb b))
                 Respond x  fx' -> return (Respond x (\x' -> go (fx' x')))
                 Pure       a   -> return (Pure a) )
-    k1 \<\ k2 = \a' -> go (k2 a') where
+    k2 />/ k1 = \a' -> go (k2 a') where
         go p = Proxy (do
             x <- unProxy p
             case x of

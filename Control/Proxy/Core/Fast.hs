@@ -122,7 +122,8 @@ instance MonadIOP ProxyFast where
 
 instance Proxy ProxyFast where
     idT = \a' -> Request a' (\a -> Respond a idT)
-    k1 <-< k2_0 = \c' -> k1 c' |-< k2_0 where
+ -- k1 <-< k2_0 = ...
+    k2_0 >-> k1 = \c' -> k1 c' |-< k2_0 where
         p1 |-< k2 = case p1 of
             Request b' fb  -> fb <-| k2 b'
             Respond c  fc' -> Respond c (\c' -> fc' c' |-< k2)
@@ -150,13 +151,13 @@ instance Proxy ProxyFast where
   #-}
 
 instance Interact ProxyFast where
-    k1 /</ k2 = \a' -> go (k1 a') where
+    k2 \>\ k1 = \a' -> go (k1 a') where
         go p = case p of
             Request b' fb  -> k2 b' >>= \b -> go (fb b)
             Respond x  fx' -> Respond x (\x' -> go (fx' x'))
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       a   -> Pure a
-    k1 \<\ k2 = \a' -> go (k2 a') where
+    k2 />/ k1 = \a' -> go (k2 a') where
         go p = case p of
             Request x' fx  -> Request x' (\x -> go (fx x))
             Respond b  fb' -> k1 b >>= \b' -> go (fb' b')

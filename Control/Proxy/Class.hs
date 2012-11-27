@@ -15,8 +15,11 @@
 module Control.Proxy.Class (
     -- * Core proxy class
     Proxy(..),
+    (<-<),
     -- * request/respond substitution
     Interact(..),
+    (/</),
+    (\<\),
     -- * Proxy-specialized classes
     MonadPlusP(..),
     MonadIOP(..),
@@ -61,14 +64,14 @@ infixl 1 ?>= -- This should match the fixity of >>=
 
     * 'idT'
 
-    * ('>->') or ('<-<').
+    * ('>->')
 
     * 'request'
 
     * 'respond'
 
-    Intuitively, @p1 <-< p2@ satisfies all 'request's in @p1@ with 'respond's in
-    @p2@.
+    Intuitively, @p1 >-> p2@ satisfies all 'request's in @p2@ with 'respond's in
+    @p1@.
 
     These must satisfy the following laws:
 
@@ -117,22 +120,13 @@ class Proxy p where
           => (b' -> p a' a b' b m r)
           -> (c' -> p b' b c' c m r)
           -> (c' -> p a' a c' c m r)
-    p1 >-> p2 = p2 <-< p1
-
-    {-| Compose two proxies, satisfying all requests from downstream with
-        responses from upstream. -}
-    (<-<) :: (Monad m)
-          => (c' -> p b' b c' c m r)
-          -> (b' -> p a' a b' b m r)
-          -> (c' -> p a' a c' c m r)
-    p1 <-< p2 = p2 >-> p1
 
     {-| 'request' input from upstream, passing an argument with the request
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
         use to decide what response to return.  'request' binds the upstream's
         response of type @a@ to its own return value. -}
-    request :: (Monad m) => a' -> p a' a x' x m a
+    request :: (Monad m) => a' -> p a' a b' b m a
 
     {-| 'respond' with an output for downstream and bind downstream's next
         'request'
@@ -140,7 +134,7 @@ class Proxy p where
         @respond b@ satisfies a downstream 'request' by supplying the value @b@.
         'respond' blocks until downstream 'request's a new value and binds the
         argument of type @b'@ from the next 'request' as its return value. -}
-    respond :: (Monad m) => b -> p x' x b' b m b'
+    respond :: (Monad m) => b -> p a' a b' b m b'
 
     {-| 'return_P' is identical to 'return', except with a more polymorphic
         constraint. -}
@@ -156,17 +150,25 @@ class Proxy p where
         constraint. -}
     lift_P :: (Monad m) => m r -> p a' a b' b m r
 
+{-| Compose two proxies, satisfying all requests from downstream with
+    responses from upstream. -}
+(<-<) :: (Monad m, Proxy p)
+      => (c' -> p b' b c' c m r)
+      -> (b' -> p a' a b' b m r)
+      -> (c' -> p a' a c' c m r)
+p1 <-< p2 = p2 >-> p1
+
 {-| The 'Interact' class defines the ability to:
 
     * Replace existing 'request' commands using ('\>\')
 
     * Replace existing 'respond' commands using ('/>/')
     
-    Minimal complete definition:
+    Minimal definition:
 
-    * ('\>\') or ('/</')
+    * ('\>\')
 
-    * ('/>/') or ('\<\')
+    * ('/>/')
 
     Laws:
 
@@ -192,28 +194,26 @@ class Interact p where
           => (b' -> p a' a x' x m b)
           -> (c' -> p b' b x' x m c)
           -> (c' -> p a' a x' x m c)
-    p1 \>\ p2 = p2 /</ p1
-
-    -- | @f \/<\/ g@ replaces all 'request's in 'f' with 'g'.
-    (/</) :: (Monad m)
-          => (c' -> p b' b x' x m c)
-          -> (b' -> p a' a x' x m b)
-          -> (c' -> p a' a x' x m c)
-    p1 /</ p2 = p2 \>\ p1
 
     -- | @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
     (/>/) :: (Monad m)
           => (a -> p x' x b' b m a')
           -> (b -> p x' x c' c m b')
           -> (a -> p x' x c' c m a')
-    p1 />/ p2 = p2 \<\ p1
 
-    -- | @f \\<\\ g@ replaces all 'respond's in 'g' with 'f'.
-    (\<\) :: (Monad m)
-          => (b -> p x' x c' c m b')
-          -> (a -> p x' x b' b m a')
-          -> (a -> p x' x c' c m a')
-    p1 \<\ p2 = p2 />/ p1
+-- | @f \/<\/ g@ replaces all 'request's in 'f' with 'g'.
+(/</) :: (Monad m, Interact p)
+      => (c' -> p b' b x' x m c)
+      -> (b' -> p a' a x' x m b)
+      -> (c' -> p a' a x' x m c)
+p1 /</ p2 = p2 \>\ p1
+
+-- | @f \\<\\ g@ replaces all 'respond's in 'g' with 'f'.
+(\<\) :: (Monad m, Interact p)
+      => (b -> p x' x c' c m b')
+      -> (a -> p x' x b' b m a')
+      -> (a -> p x' x c' c m a')
+p1 \<\ p2 = p2 />/ p1
 
 {-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
 
