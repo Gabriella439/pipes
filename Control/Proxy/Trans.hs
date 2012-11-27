@@ -55,9 +55,9 @@ import Control.Proxy.Class
 -}
 class ProxyTrans t where
     liftP :: (Monad m, Proxy p)
-          => p b c d e m r -> t p b c d e m r
+          => p a' a b' b m r -> t p a' a b' b m r
     liftP f = mapP (\() -> f) ()
 
     mapP :: (Monad m, Proxy p)
-         => (a -> p b c d e m r) -> (a -> t p b c d e m r)
+         => (q -> p a' a b' b m r) -> (q -> t p a' a b' b m r)
     mapP = (liftP .)
