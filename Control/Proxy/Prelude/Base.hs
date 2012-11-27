@@ -30,6 +30,15 @@ module Control.Proxy.Prelude.Base (
     enumFromC,
     enumFromToS,
     enumFromToC,
+    -- * Folds
+    allD,
+    allD_,
+    anyD,
+    anyD_,
+    sumD,
+    productD,
+    lengthD,
+    foldD,
     -- * Closed Adapters
     -- $open
     unitD,
@@ -37,10 +46,12 @@ module Control.Proxy.Prelude.Base (
     ) where
 
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Writer.Strict (WriterT, tell)
 import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
 import Data.Closed (C)
+import Data.Monoid (All(All), Any(Any), Sum(Sum), Product(Product), Endo(Endo))
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
     values going upstream.
@@ -418,6 +429,93 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
         | otherwise = do
             request n
             go (succ n)
+
+-- | Fold that returns whether 'All' received values satisfy the predicate
+allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) r
+allD pred = runIdentityK go where
+    go x = do
+        a <- request x
+        lift $ tell $ All $ pred a
+        x2 <- respond a
+        go x2
+
+{-| Fold that returns whether 'All' received values satisfy the predicate
+
+    'allD_' terminates on the first value that fails the predicate -}
+allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) ()
+allD_ pred = runIdentityK go where
+    go x = do
+        a <- request x
+        if (pred a)
+            then do
+                x2 <- respond a
+                go x2
+            else lift $ tell $ All False
+
+-- | Fold that returns whether 'Any' received value satisfies the predicate
+anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
+anyD pred = runIdentityK go where
+    go x = do
+        a <- request x
+        lift $ tell $ Any $ pred a
+        x2 <- respond a
+        go x2
+
+{-| Fold that returns whether 'Any' received value satisfies the predicate
+
+    'anyD_' terminates on the first value that satisfies the predicate -}
+anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) ()
+anyD_ pred = runIdentityK go where
+    go x = do
+        a <- request x
+        if (pred a)
+            then lift $ tell $ Any True
+            else do
+                x2 <- respond a
+                go x2
+
+-- | Compute the 'Sum' of all values that flow \'@D@\'ownstream
+sumD :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Sum a) m) r
+sumD = runIdentityK go where
+    go x = do
+        a <- request x
+        lift $ tell $ Sum a
+        x2 <- respond a
+        go x2
+
+-- | Compute the 'Product' of all values that flow \'@D@\'ownstream
+productD
+ :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Product a) m) r
+productD = runIdentityK go where
+    go x = do
+        a <- request x
+        lift $ tell $ Product a
+        x2 <- respond a
+        go x2
+
+-- | Count how many values flow \'@D@\'ownstream
+lengthD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Sum Int) m) r
+lengthD = runIdentityK go where
+    go x = do
+        a <- request x
+        lift $ tell $ Sum 1
+        x2 <- respond a
+        go x2
+
+{-| Fold equivalent to 'foldr'
+
+    To see why, meditate on this alternative signature for foldr:
+
+> foldr :: (a -> b -> b) -> [a] -> Endo b
+-}
+foldD
+ :: (Monad m, Proxy p) => (a -> b -> b) -> x -> p x a x a (WriterT (Endo b) m) r
+foldD step = runIdentityK go where
+    go x = do
+        a <- request x
+        lift $ tell $ Endo $ step a
+        x2 <- respond a
+        go x2
 
 {- $open
     Use the @unit@ functions when you need to embed a proxy with a closed end
