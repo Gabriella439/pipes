@@ -29,21 +29,23 @@ import Control.Proxy.Trans.Identity (runIdentityP)
 
 {-| Wait for input from upstream
 
-    'await' blocks until input is available -}
+    'await' blocks until input is available from upstream. -}
 await :: (Monad m, Proxy p) => Pipe p a b m a
 await = request ()
+
+{-| Deliver output downstream
+
+    'yield' restores control back downstream and binds its value to 'await'. -}
+yield :: (Monad m, Proxy p) => b -> p a' a b' b m ()
+yield b = runIdentityP $ do
+    respond b
+    return ()
 
 -- | Convert a pure function into a pipe
 pipe :: (Monad m, Proxy p) => (a -> b) -> Pipe p a b m r
 pipe f = runIdentityP $ forever $ do
     a <- request ()
     respond (f a)
-
-{-| Deliver output downstream
-
-    'yield' restores control back downstream and binds the result to 'await'. -}
-yield :: (Monad m, Proxy p) => b -> Pipe p a b m ()
-yield = respond
 
 infixr 9 <+<
 infixl 9 >+>
@@ -86,7 +88,7 @@ idP = runIdentityP $ forever $ do
 
 > import Control.Pipe
 >
-> fromList :: (Monad m) => [b] -> Producer b m r
+> fromList :: (Monad m) => [b] -> Producer b m ()
 > fromList xs = mapM_ yield xs
 
     ... to this:
@@ -94,7 +96,7 @@ idP = runIdentityP $ forever $ do
 > import Control.Proxy
 > import Control.Proxy.Pipe -- transition import
 >
-> fromList :: (Monad m) => [b] -> Producer ProxyFast b m r
+> fromList :: (Monad m) => [b] -> Producer ProxyFast b m ()
 > fromList xs = mapM_ yield xs
 
     The change ensures that all your code now works in the 'ProxyFast' monad,
@@ -112,7 +114,7 @@ idP = runIdentityP $ forever $ do
 > import Control.Proxy
 > import Control.Proxy.Pipe
 >
-> fromList :: (Monad m) => [b] -> Producer ProxyFast b IO r
+> fromList :: (Monad m) => [b] -> Producer ProxyFast b m ()
 > fromList xs = mapM_ yield xs
 
     ... to this:
@@ -120,10 +122,10 @@ idP = runIdentityP $ forever $ do
 > import Control.Proxy
 > import Control.Proxy.Pipe
 >
-> fromList :: (Monad m) => [b] -> () -> Producer ProxyFast b IO r
+> fromList :: (Monad m) => [b] -> () -> Producer ProxyFast b m ()
 > fromList xs () = mapM_ yield xs
 
-    Now, when you call these within a @do@ block  you must supplying an
+    Now when you call these within a @do@ block  you must supplying an
     additional @()@ argument:
 
 > examplePipe () = do
@@ -144,7 +146,7 @@ idP = runIdentityP $ forever $ do
     Then replace the 'ProxyFast' in the type signature with a type variable @p@
     constrained by the 'Proxy' type class:
 
-> fromList :: (Monad m, Proxy p) => [b] -> () -> Producer p b m r
+> fromList :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
 
     This change upgrades your 'Pipe' to work natively within proxies and proxy
     transformers, without any manual conversion or lifting.  You can now compose
@@ -155,7 +157,7 @@ idP = runIdentityP $ forever $ do
 
 > import Control.Proxy
 >
-> fromList :: (Monad m, Proxy p) => [b] -> () -> Producer p b m r
+> fromList :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
 > fromList xs () = runIdentityP $ mapM_ respond xs
 
     Also, I encourage you to continue using the 'Pipe', 'Consumer' and

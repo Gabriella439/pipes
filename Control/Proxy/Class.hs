@@ -307,7 +307,7 @@ p1 \<\ p2 = p2 />/ p1
 
 {-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
 
-> (forall a' a b' b m . (Monad m) => MonadPlus (p a' a b' b m) => ...
+> (forall a' a b' b m . (Monad m) => MonadPlus (p a' a b' b m)) => ...
 -}
 class (Proxy p) => MonadPlusP p where
     mzero_P :: (Monad m) => p a' a b' b m r
@@ -316,7 +316,7 @@ class (Proxy p) => MonadPlusP p where
 
 {-| The @(MonadIOP p)@ constraint is equivalent to the following constraint:
 
-> (forall a' a b' b m . (MonadIO m) => MonadIO (p a' a b' b m) => ...
+> (forall a' a b' b m . (MonadIO m) => MonadIO (p a' a b' b m)) => ...
 -}
 class (Proxy p) => MonadIOP p where
     liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r
