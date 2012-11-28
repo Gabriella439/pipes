@@ -38,6 +38,7 @@ module Control.Proxy.Prelude.Base (
     sumD,
     productD,
     lengthD,
+    foldrD,
     foldD,
     -- * Closed Adapters
     -- $open
@@ -51,7 +52,7 @@ import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
 import Data.Closed (C)
-import Data.Monoid (All(All), Any(Any), Sum(Sum), Product(Product), Endo(Endo))
+import Data.Monoid
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
     values going upstream.
@@ -432,12 +433,7 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
 
 -- | Fold that returns whether 'All' received values satisfy the predicate
 allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) r
-allD pred = runIdentityK go where
-    go x = do
-        a <- request x
-        lift $ tell $ All $ pred a
-        x2 <- respond a
-        go x2
+allD pred = foldD (All . pred)
 
 {-| Fold that returns whether 'All' received values satisfy the predicate
 
@@ -454,12 +450,7 @@ allD_ pred = runIdentityK go where
 
 -- | Fold that returns whether 'Any' received value satisfies the predicate
 anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
-anyD pred = runIdentityK go where
-    go x = do
-        a <- request x
-        lift $ tell $ Any $ pred a
-        x2 <- respond a
-        go x2
+anyD pred = foldD (Any . pred)
 
 {-| Fold that returns whether 'Any' received value satisfies the predicate
 
@@ -476,44 +467,39 @@ anyD_ pred = runIdentityK go where
 
 -- | Compute the 'Sum' of all values that flow \'@D@\'ownstream
 sumD :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Sum a) m) r
-sumD = runIdentityK go where
-    go x = do
-        a <- request x
-        lift $ tell $ Sum a
-        x2 <- respond a
-        go x2
+sumD = foldD Sum
 
 -- | Compute the 'Product' of all values that flow \'@D@\'ownstream
 productD
  :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Product a) m) r
-productD = runIdentityK go where
-    go x = do
-        a <- request x
-        lift $ tell $ Product a
-        x2 <- respond a
-        go x2
+productD = foldD Product
 
 -- | Count how many values flow \'@D@\'ownstream
 lengthD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Sum Int) m) r
-lengthD = runIdentityK go where
-    go x = do
-        a <- request x
-        lift $ tell $ Sum 1
-        x2 <- respond a
-        go x2
+lengthD = foldD (\_ -> Sum 1)
 
 {-| Fold equivalent to 'foldr'
 
-    To see why, meditate on this alternative signature for foldr:
+    To see why, consider this isomorphic type for 'foldr':
 
 > foldr :: (a -> b -> b) -> [a] -> Endo b
 -}
-foldD
+foldrD
  :: (Monad m, Proxy p) => (a -> b -> b) -> x -> p x a x a (WriterT (Endo b) m) r
-foldD step = runIdentityK go where
+foldrD step = foldD (Endo . step)
+
+{-| Fold values flowing \'@D@\'ownstream
+
+> foldD f >-> foldD g = foldD (f <> g)
+>
+> foldD mempty = idT
+-}
+foldD
+ :: (Monad m, Proxy p, Monoid w) => (a -> w) -> x -> p x a x a (WriterT w m) r
+foldD f = runIdentityK go where
     go x = do
         a <- request x
-        lift $ tell $ Endo $ step a
+        lift $ tell $ f a
         x2 <- respond a
         go x2
 
@@ -544,7 +530,7 @@ unitD _ = runIdentityP go where
         go
 
 -- | Compose 'unitU' with a closed downstream end to create a polymorphic end
-unitU :: (Monad m, Proxy p) => b' -> p () x y' y m r
+unitU :: (Monad m, Proxy p) => y' -> p () x y' y m r
 unitU _ = runIdentityP go where
     go = do
         request ()
