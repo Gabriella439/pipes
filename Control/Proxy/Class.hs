@@ -20,12 +20,11 @@ module Control.Proxy.Class (
     Interact(..),
     (/</),
     (\<\),
-    -- * Proxy-specialized classes
+    -- * Polymorphic proxies
+    -- $poly
     MonadPlusP(..),
     MonadIOP(..),
     MFunctorP(..),
-    -- * Polymorphic proxies
-    -- $poly
     ) where
 
 import Control.Monad.IO.Class (MonadIO)
@@ -50,16 +49,7 @@ infixl 1 ?>= -- This should match the fixity of >>=
 {-| The 'Proxy' class defines an interface to all core proxy capabilities that
     all proxy-like types must implement.
 
-    First, all proxies are monads.  Minimal definition:
-
-    * 'return_P'
-
-    * ('?>=')
-
-    These must satify the monad laws using @(>>=) = (?>=)@ and
-    @return = return_P@.
-
-    Second, all proxies must support a bidirectional flow of information.
+    First, all proxies must support a bidirectional flow of information.
     Minimal definition:
 
     * 'idT'
@@ -83,7 +73,17 @@ infixl 1 ?>= -- This should match the fixity of >>=
 >
 > (f >-> g) >-> h = f >-> (g >-> h)
 
-    Additionally:
+    Second, all proxies are monads.  Minimal definition:
+
+    * 'return_P'
+
+    * ('?>=')
+
+    These must satify the monad laws using @(>>=) = (?>=)@ and
+    @return = return_P@.
+
+    Additionally, the following laws govern how proxy composition interacts with
+    the proxy monad:
 
 > idT = request >=> respond >=> idT
 >
@@ -103,7 +103,8 @@ infixl 1 ?>= -- This should match the fixity of >>=
 
     This must satisfy the monad transformer laws, using @lift = lift_P@.
 
-    Additionally:
+    Additionally, the following laws govern how proxy composition interacts with
+    the base monad:
 
 > f >=> (lift . k >=> g) = lift . k >=> (f >-> g)
 >
@@ -158,8 +159,12 @@ class Proxy p where
       -> (c' -> p a' a c' c m r)
 p1 <-< p2 = p2 >-> p1
 
-{-| The 'Interact' class defines the ability to:
+{-| This class exists primarily for theoretical interest and to justify some of
+    the functor laws for the 'ProxyTrans' type class.  You probably do not need
+    to use these operators.
 
+    The 'Interact' class defines the ability to:
+    
     * Replace existing 'request' commands using ('\>\')
 
     * Replace existing 'respond' commands using ('/>/')
@@ -215,34 +220,8 @@ p1 /</ p2 = p2 \>\ p1
       -> (a -> p x' x c' c m a')
 p1 \<\ p2 = p2 />/ p1
 
-{-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
-
-> (forall a' a b' b m . (Monad m) => MonadPlus (p a' a b' b m) => ...
--}
-class (Proxy p) => MonadPlusP p where
-    mzero_P :: (Monad m) => p a' a b' b m r
-    mplus_P
-     :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r
-
-{-| The @(MonadIOP p)@ constraint is equivalent to the following constraint:
-
-> (forall a' a b' b m . (MonadIO m) => MonadIO (p a' a b' b m) => ...
--}
-class (Proxy p) => MonadIOP p where
-    liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r
-
-{-| The @(MFunctorP p)@ constraint is equivalent to the following constraint:
-
-> (forall a' a b' b . MFunctor (p a' a b' b)) => ...
--}
-class MFunctorP p where
-    mapT_P
-     :: (Monad m, Monad n)
-     => (forall r . m r  -> n r)
-     -> (p a' a b' b m r' -> p a' a b' b n r')
-
 {- $poly
-    All of these type classes contain methods which copy methods from more
+    All of the below type classes contain methods which copy methods from more
     familiar type classes.  These duplicate methods serve two purposes.
 
     First, this library requires type class instances that would otherwise be
@@ -268,12 +247,12 @@ class MFunctorP p where
     These type classes exist solely for internal plumbing and you should never
     directly use the duplicate methods from them.  Instead, you can use all the
     original type classes as long as you embed your proxy code within at least
-    one proxy transformer (or 'IdentityP' if don't use any extensions).  The
+    one proxy transformer (or 'IdentityP' if don't use any transformers).  The
     type-class machinery will then automatically convert the messier and less
     polymorphic constraints to the smaller and more general constraints.
 
-    For example, consider the following definition for @mapMD@ (from
-    "Control.Proxy.Prelude.Base"):
+    For example, consider the following almost-correct definition for
+    @mapMD@ (from "Control.Proxy.Prelude.Base"):
 
 > import Control.Monad.Trans.Class
 > import Control.Proxy
@@ -289,8 +268,8 @@ class MFunctorP p where
 >  :: (Monad m, Monad (p x a x b m), MonadTrans (p x a x b), Proxy p)
 >  => (a -> m b) -> x -> p x a x b m r
 
-    Instead, you can cast the code to @IdentityP p@ by wrapping it in
-    'runIdentityK':
+    Instead, you can embed the code in the @IdentityP@ proxy transformer by
+    wrapping it in 'runIdentityK':
 
 > --        |difference|  
 > mapMD f = runIdentityK $ foreverK $ \a' -> do
@@ -298,20 +277,22 @@ class MFunctorP p where
 >     b <- lift (f a)
 >     respond b
 
-    ... and now the compiler collapses all the constraints into 'Proxy':
+    ... and now the compiler infers the following cleaner type:
 
 > mapMD :: (Monad m, Proxy p) => (a -> m b) -> x -> p x a x b m r
 
-    There is no performance penalty for writing polymorphic code or embedding it
-    in 'IdentityP'.  All the rewrite @RULES@ will fire and transform your
-    polymorphic code into the equivalent type-specialized hand-tuned code.
-    These rewrite rules fire very robustly and they do not require any
-    assistance from compiler pragmas like @INLINE@, @NOINLINE@ or @SPECIALIZE@.
+    You do not incur any performance penalty for writing polymorphic code or
+    embedding it in 'IdentityP'.  This library employs several rewrite @RULES@
+    which transform your polymorphic code into the equivalent type-specialized
+    hand-tuned code.  These rewrite rules fire very robustly and they do not
+    require any assistance on your part from compiler pragmas like @INLINE@,
+    @NOINLINE@ or @SPECIALIZE@.
 
-    You also don't need to use 'runIdentityP' \/ 'runIdentityK' if you use any
-    other extensions.  The compiler already infers the correct 'Proxy'
-    constraint for any code that uses extensions, such as the following code
-    example:
+    You don't need to use 'runIdentityP' \/ 'runIdentityK' if you use any other
+    proxy transformers (In fact you can't, it's a type error).  The following
+    code example illustrates this, where the 'throw' command (from the 'EitherP'
+    proxy transformer) suffices to guide the compiler to the cleaner type
+    signature:
 
 > import Control.Monad
 > import Control.Proxy
@@ -323,3 +304,29 @@ class MFunctorP p where
 >     when (c == ' ') $ E.throw "Error: received space"
 >     respond c
 -}
+
+{-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b m . (Monad m) => MonadPlus (p a' a b' b m) => ...
+-}
+class (Proxy p) => MonadPlusP p where
+    mzero_P :: (Monad m) => p a' a b' b m r
+    mplus_P
+     :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r
+
+{-| The @(MonadIOP p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b m . (MonadIO m) => MonadIO (p a' a b' b m) => ...
+-}
+class (Proxy p) => MonadIOP p where
+    liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r
+
+{-| The @(MFunctorP p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b . MFunctor (p a' a b' b)) => ...
+-}
+class MFunctorP p where
+    mapT_P
+     :: (Monad m, Monad n)
+     => (forall r . m r  -> n r)
+     -> (p a' a b' b m r' -> p a' a b' b n r')
