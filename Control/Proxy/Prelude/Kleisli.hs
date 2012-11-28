@@ -3,7 +3,6 @@
 module Control.Proxy.Prelude.Kleisli (
     -- * Core utility functions
     foreverK,
-    sequenceK,
     replicateK,
     mapK
     ) where
@@ -29,10 +28,6 @@ foreverK :: (Monad m) => (a -> m a) -> (a -> m b)
 foreverK k = let r = \a -> k a >>= r in r
 {- foreverK uses 'let' to avoid a space leak.
    See: http://hackage.haskell.org/trac/ghc/ticket/5205 -}
-
--- | Sequence a list of \'@K@\'leisli arrows
-sequenceK :: (Monad m) => [a -> m a] -> (a -> m a)
-sequenceK = foldr (\f g r -> f r >>= g) return
 
 -- | Repeat a \'@K@\'leisli arrow multiple times
 replicateK :: (Monad m) => Int -> (a -> m a) -> (a -> m a)
