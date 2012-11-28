@@ -31,15 +31,26 @@ module Control.Proxy.Prelude.Base (
     enumFromToS,
     enumFromToC,
     -- * Folds
-    allD,
-    allD_,
-    anyD,
-    anyD_,
-    sumD,
-    productD,
-    lengthD,
-    foldrD,
     foldD,
+    foldU,
+    allD,
+    allU,
+    allD_,
+    allU_,
+    anyD,
+    anyU,
+    anyD_,
+    anyU_,
+    sumD,
+    sumU,
+    productD,
+    productU,
+    lengthD,
+    lengthU,
+    toListD,
+    toListU,
+    foldrD,
+    foldrU,
     -- * Closed Adapters
     -- $open
     unitD,
@@ -431,63 +442,6 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
             request n
             go (succ n)
 
--- | Fold that returns whether 'All' received values satisfy the predicate
-allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) r
-allD pred = foldD (All . pred)
-
-{-| Fold that returns whether 'All' received values satisfy the predicate
-
-    'allD_' terminates on the first value that fails the predicate -}
-allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) ()
-allD_ pred = runIdentityK go where
-    go x = do
-        a <- request x
-        if (pred a)
-            then do
-                x2 <- respond a
-                go x2
-            else lift $ tell $ All False
-
--- | Fold that returns whether 'Any' received value satisfies the predicate
-anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
-anyD pred = foldD (Any . pred)
-
-{-| Fold that returns whether 'Any' received value satisfies the predicate
-
-    'anyD_' terminates on the first value that satisfies the predicate -}
-anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) ()
-anyD_ pred = runIdentityK go where
-    go x = do
-        a <- request x
-        if (pred a)
-            then lift $ tell $ Any True
-            else do
-                x2 <- respond a
-                go x2
-
--- | Compute the 'Sum' of all values that flow \'@D@\'ownstream
-sumD :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Sum a) m) r
-sumD = foldD Sum
-
--- | Compute the 'Product' of all values that flow \'@D@\'ownstream
-productD
- :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Product a) m) r
-productD = foldD Product
-
--- | Count how many values flow \'@D@\'ownstream
-lengthD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Sum Int) m) r
-lengthD = foldD (\_ -> Sum 1)
-
-{-| Fold equivalent to 'foldr'
-
-    To see why, consider this isomorphic type for 'foldr':
-
-> foldr :: (a -> b -> b) -> [a] -> Endo b
--}
-foldrD
- :: (Monad m, Proxy p) => (a -> b -> b) -> x -> p x a x a (WriterT (Endo b) m) r
-foldrD step = foldD (Endo . step)
-
 {-| Fold values flowing \'@D@\'ownstream
 
 > foldD f >-> foldD g = foldD (f <> g)
@@ -502,6 +456,152 @@ foldD f = runIdentityK go where
         lift $ tell $ f a
         x2 <- respond a
         go x2
+
+{-| Fold values flowing \'@U@\'pstream
+
+> foldU f >-> foldU g = foldU (g <> f)
+>
+> foldU mempty = idT
+-}
+foldU
+ :: (Monad m, Proxy p, Monoid w)
+ => (a' -> w) -> a' -> p a' x a' x (WriterT w m) r
+foldU f = runIdentityK go where
+    go a' = do
+        lift $ tell $ f a'
+        x <- request a'
+        a'2 <- respond x
+        go a'2
+
+{-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
+    predicate -}
+allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) r
+allD pred = foldD (All . pred)
+
+{-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
+    predicate -}
+allU
+ :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) r
+allU pred = foldU (All . pred)
+
+{-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
+    predicate
+
+    'allD_' terminates on the first value that fails the predicate -}
+allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) ()
+allD_ pred = runIdentityK go where
+    go x = do
+        a <- request x
+        if (pred a)
+            then do
+                x2 <- respond a
+                go x2
+            else lift $ tell $ All False
+
+{-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
+    predicate
+
+    'allU_' terminates on the first value that fails the predicate -}
+allU_
+ :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) ()
+allU_ pred = runIdentityK go where
+    go a' =
+        if (pred a')
+            then do
+                x   <- request a'
+                a'2 <- respond x
+                go a'2
+            else lift $ tell $ All False
+
+{-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies
+    the predicate -}
+anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
+anyD pred = foldD (Any . pred)
+
+{-| Fold that returns whether 'Any' value flowing \'@U@\'pstream satisfies
+    the predicate -}
+anyU
+ :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) r
+anyU pred = foldU (Any . pred)
+
+{-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies the
+    predicate
+
+    'anyD_' terminates on the first value that satisfies the predicate -}
+anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) ()
+anyD_ pred = runIdentityK go where
+    go x = do
+        a <- request x
+        if (pred a)
+            then lift $ tell $ Any True
+            else do
+                x2 <- respond a
+                go x2
+
+{-| Fold that returns whether 'Any' value flowing \'@U@\'pstream satisfies the
+    predicate
+
+    'anyU_' terminates on the first value that satisfies the predicate -}
+anyU_
+ :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) ()
+anyU_ pred = runIdentityK go where
+    go a' =
+        if (pred a')
+            then lift $ tell $ Any True
+            else do
+                x   <- request a'
+                a'2 <- respond x
+                go a'2
+
+-- | Compute the 'Sum' of all values that flow \'@D@\'ownstream
+sumD :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Sum a) m) r
+sumD = foldD Sum
+
+-- | Compute the 'Sum' of all values that flow \'@U@\'pstream
+sumU :: (Monad m, Proxy p, Num a') => a' -> p a' x a' x (WriterT (Sum a') m) r
+sumU = foldU Sum
+
+-- | Compute the 'Product' of all values that flow \'@D@\'ownstream
+productD
+ :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Product a) m) r
+productD = foldD Product
+
+-- | Compute the 'Product' of all values that flow \'@U@\'pstream
+productU
+ :: (Monad m, Proxy p, Num a') => a' -> p a' x a' x (WriterT (Product a') m) r
+productU = foldU Product
+
+-- | Count how many values flow \'@D@\'ownstream
+lengthD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Sum Int) m) r
+lengthD = foldD (\_ -> Sum 1)
+
+-- | Count how many values flow \'@U@\'pstream
+lengthU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (Sum Int) m) r
+lengthU = foldU (\_ -> Sum 1)
+
+-- | Fold the values flowing \'@D@\'ownstream into a list
+toListD :: (Monad m, Proxy p) => x -> p x a x a (WriterT [a] m) r
+toListD = foldD (\x -> [x])
+
+-- | Fold the values flowing \'@U@\'pstream into a list
+toListU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT [a'] m) r
+toListU = foldU (\x -> [x])
+
+{-| Fold equivalent to 'foldr'
+
+    To see why, consider this isomorphic type for 'foldr':
+
+> foldr :: (a -> b -> b) -> [a] -> Endo b
+-}
+foldrD
+ :: (Monad m, Proxy p) => (a -> b -> b) -> x -> p x a x a (WriterT (Endo b) m) r
+foldrD step = foldD (Endo . step)
+
+-- | Fold equivalent to 'foldr'
+foldrU
+ :: (Monad m, Proxy p)
+ => (a' -> b -> b) -> a' -> p a' x a' x (WriterT (Endo b) m) r
+foldrU step = foldU (Endo . step)
 
 {- $open
     Use the @unit@ functions when you need to embed a proxy with a closed end
