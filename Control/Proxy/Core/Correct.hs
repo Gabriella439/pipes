@@ -23,7 +23,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(mapT))
 import Control.Proxy.Class
-import Data.Closed (C)
+import Control.Proxy.Synonym (C)
 
 {-| A 'ProxyCorrect' communicates with an upstream interface and a downstream
     interface.

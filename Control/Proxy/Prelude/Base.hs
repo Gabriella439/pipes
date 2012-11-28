@@ -62,7 +62,6 @@ import Control.Monad.Trans.Writer.Strict (WriterT, tell)
 import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
-import Data.Closed (C)
 import Data.Monoid
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all

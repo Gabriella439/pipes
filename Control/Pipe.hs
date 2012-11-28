@@ -20,7 +20,6 @@ module Control.Pipe (
     idP,
     PipeC(..),
     -- * Run Pipes
-    -- $runpipe
     runPipe
     ) where
 
@@ -28,7 +27,7 @@ import Control.Applicative (Applicative(pure, (<*>)))
 import Control.Category (Category((.), id), (<<<), (>>>))
 import Control.Monad (forever)
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Data.Closed (C)
+import Control.Proxy.Synonym (C)
 import Prelude hiding ((.), id)
 
 {- $types
@@ -53,6 +52,9 @@ data Pipe a b m r
   | M       (m (Pipe a b m r))
   | Pure r
 {-
+Technically, the correct implementation that satisfies the monad transformer
+laws is:
+
 type PipeF a b x = Await (a -> x) | Yield b x deriving (Functor)
 
 type Pipe a b = FreeT (PipeF a b)
@@ -123,7 +125,7 @@ await = Await Pure
 {-|
     Deliver output downstream.
 
-    'yield' restores control back upstream and binds the result to 'await'.
+    'yield' restores control back upstream and binds its value to 'await'.
 -}
 yield :: b -> Pipe a b m ()
 yield b = Yield b (Pure ())
@@ -141,20 +143,17 @@ pipe f = go where
 
 {- $category
     'Pipe's form a 'Category', meaning that you can compose 'Pipe's using
-    ('<+<') and also define an identity 'Pipe': 'idP'.  These satisfy the
+    ('>+>') and also define an identity 'Pipe': 'idP'.  These satisfy the
     category laws:
 
-> idP <+< p = p
+> idP >+> p = p
 >
-> p <+< idP = p
+> p >+> idP = p
 >
-> (p1 <+< p2) <+< p3 = p1 <+< (p2 <+< p3)
+> (p1 >+> p2) >+> p3 = p1 >+> (p2 >+> p3)
 
-    'Pipe' composition binds the output of the upstream 'Pipe' to the input of
-    the downstream 'Pipe'.  Like Haskell functions, 'Pipe's are lazy, meaning
-    that upstream 'Pipe's are only evaluated as far as necessary to generate
-    enough input for downstream 'Pipe's.  If any 'Pipe' terminates, it also
-    terminates every 'Pipe' composed with it.
+    @(p1 >+> p2)@ satisfies all 'await's in @p2@ with 'yield's in @p1@.  If any
+    'Pipe' terminates the entire 'Pipeline' terminates.
 -}
 
 -- | 'Pipe's form a 'Category' instance when you rearrange the type variables
@@ -178,48 +177,15 @@ _  <+< (Pure  r) = Pure r
 (>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
 p2 >+> p1 = p1 <+< p2
 
-{- These associativities might help performance since pipe evaluation is
-   downstream-biased.  I set them to the same priority as (.). -}
-infixr 9 <+<
-infixl 9 >+>
+infixr 8 <+<
+infixl 8 >+>
 
 -- | Corresponds to 'id' from @Control.Category@
 idP :: (Monad m) => Pipe a a m r
 idP = go where
     go = Await (\a -> Yield a go)
 
-{- $runpipe
-    Note that you can also unwrap a 'Pipe' a single step at a time using
-    'runFreeT' (since 'Pipe' is just a type synonym for a free monad
-    transformer).  This will take you to the next /external/ 'await' or 'yield'
-    statement.  This means that a closed 'Pipeline' will unwrap to a single
-    step, in which case you would have been better served by 'runPipe'.
--}
-{-|
-    Run the 'Pipe' monad transformer, converting it back into the base monad.
-
-    'runPipe' imposes two conditions:
-
-    * The pipe's input, if any, is trivially satisfiable (i.e. @()@)
-
-    * The pipe does not 'yield' any output
-
-    The latter restriction makes 'runPipe' less polymorphic than it could be,
-    and I settled on the restriction for three reasons:
-
-    * It prevents against accidental data loss.
-
-    * It protects against silent failures
-
-    * It prevents wastefully draining a scarce resource by gratuitously
-      driving it to completion
-
-    If you believe that discarding output is the appropriate behavior, you can
-    specify this by explicitly feeding your output to a pipe that gratuitously
-    discards it:
-
-> runPipe $ forever await <+< p
--}
+-- | Run the 'Pipe' monad transformer, converting it back into the base monad
 runPipe :: (Monad m) => Pipe () b m r -> m r
 runPipe pl = go pl where
     go p = case p of

@@ -4,6 +4,7 @@
     their type variables. -}
 
 module Control.Proxy.Synonym (
+    -- * Synonyms
     Pipe,
     Producer,
     Consumer,
@@ -12,10 +13,11 @@ module Control.Proxy.Synonym (
     CoConsumer,
     Pipeline,
     Client,
-    Server
-    ) where
+    Server,
 
-import Data.Closed (C)
+    -- * Closed
+    C
+    ) where
 
 -- | A unidirectional 'Proxy'.
 type Pipe p a b (m :: * -> *) r = p () a () b m r
@@ -64,3 +66,6 @@ type Client p a' a (m :: * -> *) r = p a' a () C m r
 
     'Session's never 'request' or 'respond'. -}
 type Session p (m :: * -> *) r = p C () () C m r
+
+-- | The empty type, denoting a \'@C@\'losed end
+data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls

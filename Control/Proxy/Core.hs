@@ -8,7 +8,6 @@ module Control.Proxy.Core (
     module Control.Proxy.Trans,
     module Control.Proxy.Trans.Identity,
     module Control.Proxy.Prelude,
-    module Data.Closed
     ) where
 
 import Control.Proxy.Class
@@ -16,7 +15,6 @@ import Control.Proxy.Synonym
 import Control.Proxy.Trans
 import Control.Proxy.Trans.Identity
 import Control.Proxy.Prelude
-import Data.Closed
 
 {- $modules
     "Control.Proxy.Class" defines the 'Proxy' type class that lets you program
@@ -32,6 +30,4 @@ import Data.Closed
 
     "Control.Proxy.Trans.Identity" exports 'runIdentityP', which substantially
     eases writing completely polymorphic proxies.
-
-    "Data.Closed" exports the 'C'losed data type for cleaner type signatures.
 -}
