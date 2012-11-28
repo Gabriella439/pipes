@@ -54,10 +54,11 @@ Library
     Exposed-Modules:
         Control.MFunctor,
         Control.Proxy,
+        Control.Proxy.Class,
         Control.Proxy.Core,
         Control.Proxy.Core.Fast,
         Control.Proxy.Core.Correct,
-        Control.Proxy.Class,
+        Control.Proxy.Extra,
         Control.Proxy.Pipe,
         Control.Proxy.Synonym,
         Control.Proxy.Trans,
