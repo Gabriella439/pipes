@@ -41,29 +41,29 @@ import Control.Proxy.Prelude.Kleisli (foreverK)
 import Control.Proxy.Class (Proxy(request, respond))
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
 import Control.Proxy.Synonym (Client, Server, Producer, CoProducer)
-import System.IO (Handle, hGetLine, hPutStr, hPutStrLn, hPrint, stdin, stdout)
+import System.IO
 
 -- | A 'Producer' that sends lines from 'stdin' downstream
 getLineS :: (Proxy p) => () -> Producer p String IO r
-getLineS _ = runIdentityP $ forever $ do
+getLineS () = runIdentityP $ forever $ do
     str <- lift getLine
     respond str
 
 -- | A 'CoProducer' that sends lines from 'stdin' upstream
 getLineC :: (Proxy p) => () -> CoProducer p String IO r
-getLineC _ = runIdentityP $ forever $ do
+getLineC () = runIdentityP $ forever $ do
     str <- lift getLine
     request str
 
 -- | 'read' input from 'stdin' one line at a time and send \'@D@\'ownstream
 readLnS :: (Read b, Proxy p) => () -> Producer p b IO r
-readLnS _ = runIdentityP $ forever $ do
+readLnS () = runIdentityP $ forever $ do
     a <- lift readLn
     respond a
 
 -- | 'read' input from 'stdin' one line at a time and send \'@U@\'pstream
 readLnC :: (Read a', Proxy p) => () -> CoProducer p a' IO r
-readLnC _ = runIdentityP $ forever $ do
+readLnC () = runIdentityP $ forever $ do
     a <- lift readLn
     request a
 
@@ -134,23 +134,35 @@ promptS = runIdentityK $ foreverK $ \send -> do
     respond recv
 
 -- | Convert 'stdin'/'stdout' into a line-based 'Client'
-promptC :: (Proxy p) => y' -> Client p String String IO r
-promptC _ = runIdentityP $ forever $ do
+promptC :: (Proxy p) => () -> Client p String String IO r
+promptC () = runIdentityP $ forever $ do
     send <- lift getLine
     recv <- request send
     lift $ putStrLn recv
 
 -- | A 'Producer' that sends lines from a handle downstream
-hGetLineS :: (Proxy p) => Handle -> () -> Producer p String IO r
-hGetLineS h _ = runIdentityP $ forever $ do
-    str <- lift $ hGetLine h
-    respond str
+hGetLineS :: (Proxy p) => Handle -> () -> Producer p String IO ()
+hGetLineS h () = runIdentityP go where
+    go = do
+        eof <- lift $ hIsEOF h
+        if eof
+            then return ()
+            else do
+                str <- lift $ hGetLine h
+                respond str
+                go
 
 -- | A 'CoProducer' that sends lines from a handle upstream
-hGetLineC :: (Proxy p) => Handle -> () -> CoProducer p String IO r
-hGetLineC h _ = runIdentityP $ forever $ do
-    str <- lift $ hGetLine h
-    request str
+hGetLineC :: (Proxy p) => Handle -> () -> CoProducer p String IO ()
+hGetLineC h () = runIdentityP go where
+    go = do
+        eof <- lift $ hIsEOF h
+        if eof
+            then return ()
+            else do
+                str <- lift $ hGetLine h
+                request str
+                go
 
 {-| 'print's all values flowing through it to a 'Handle'
 
