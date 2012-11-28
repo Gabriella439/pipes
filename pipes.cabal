@@ -75,7 +75,6 @@ Library
         Control.Proxy.Prelude.IO,
         Control.Proxy.Prelude.Kleisli,
         Control.Pipe,
-        Control.Pipe.Core,
         Control.Pipe.Tutorial,
         Data.Closed
     Default-Language: Haskell98
