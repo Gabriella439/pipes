@@ -28,10 +28,10 @@ import Data.Closed
     "Control.Proxy.Trans" defines the 'ProxyTrans' type class that lets you
     write your own proxy extensions.
 
+    "Control.Proxy.Prelude" provides a standard library of proxies.
+
     "Control.Proxy.Trans.Identity" exports 'runIdentityP', which substantially
     eases writing completely polymorphic proxies.
-
-    "Control.Proxy.Prelude" provides a standard library of proxies.
 
     "Data.Closed" exports the 'C'losed data type for cleaner type signatures.
 -}
