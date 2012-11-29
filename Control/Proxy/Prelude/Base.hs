@@ -51,6 +51,8 @@ module Control.Proxy.Prelude.Base (
     toListU,
     foldrD,
     foldrU,
+    foldlD',
+    foldlU',
     -- * Closed Adapters
     -- $open
     unitD,
@@ -59,6 +61,7 @@ module Control.Proxy.Prelude.Base (
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
+import Control.Monad.Trans.State.Strict (StateT, get, put)
 import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
@@ -601,6 +604,30 @@ foldrU
  :: (Monad m, Proxy p)
  => (a' -> b -> b) -> a' -> p a' x a' x (WriterT (Endo b) m) r
 foldrU step = foldU (Endo . step)
+
+-- | Left strict fold over \'@D@\'ownstream values
+foldlD'
+ :: (Monad m, Proxy p) => (b -> a -> b) -> x -> p x a x a (StateT b m) r
+foldlD' f = runIdentityK go where
+    go x = do
+        a  <- request x
+        lift $ do
+            b <- get
+            put $! f b a
+        x2 <- respond a
+        go x2
+
+-- | Left strict fold over \'@U@\'pstream values
+foldlU'
+ :: (Monad m, Proxy p) => (b -> a' -> b) -> a' -> p a' x a' x (StateT b m) r
+foldlU' f = runIdentityK go where
+    go a' = do
+        lift $ do
+            b <- get
+            put $! f b a'
+        x   <- request a'
+        a'2 <- respond x
+        go a'2
 
 {- $open
     Use the @unit@ functions when you need to embed a proxy with a closed end
