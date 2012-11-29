@@ -21,7 +21,7 @@
     code.  This convenience module is not very stable and may grow or shrink in
     exports depending on user feedback.  This module is primarily for rapid
     prototyping and demonstrations. -}
-module Control.Proxy.Extra (
+module Control.Proxy.Go (
     -- $modules
     module Control.MFunctor,
     module Control.Monad,
