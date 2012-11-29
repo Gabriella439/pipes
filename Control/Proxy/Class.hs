@@ -288,6 +288,20 @@ p1 \<\ p2 = p2 />/ p1
     require any assistance on your part from compiler pragmas like @INLINE@,
     @NOINLINE@ or @SPECIALIZE@.
 
+    If you nest proxies within proxies:
+
+> example () = do
+>     request ()
+>     lift $ request ()
+>     lift $ lift $ request ()
+
+    ... then you can still keep the nice constraints using:
+
+> example () = runIdentityP . mapT (runIdentityP . mapT runIdentityP) $ do
+>     request ()
+>     lift $ request ()
+>     lift $ lift $ request ()
+
     You don't need to use 'runIdentityP' \/ 'runIdentityK' if you use any other
     proxy transformers (In fact you can't, it's a type error).  The following
     code example illustrates this, where the 'throw' command (from the 'EitherP'
@@ -327,6 +341,5 @@ class (Proxy p) => MonadIOP p where
 -}
 class MFunctorP p where
     mapT_P
-     :: (Monad m, Monad n)
-     => (forall r . m r  -> n r)
-     -> (p a' a b' b m r' -> p a' a b' b n r')
+     :: (Monad m)
+     => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')
