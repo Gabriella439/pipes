@@ -2,15 +2,18 @@
 
 module Control.Proxy.Prelude.Base (
     -- * Maps
-    mapB,
     mapD,
     mapU,
-    mapMB,
+    mapB,
     mapMD,
     mapMU,
-    execB,
+    mapMB,
+    useD,
+    useU,
+    useB,
     execD,
     execU,
+    execB,
     -- * Filters
     takeB,
     takeB_,
@@ -67,23 +70,6 @@ import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
 import Data.Monoid
 
-{-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
-    values going upstream.
-
-    Mnemonic: map \'@B@\'idirectional
-
-> mapB f1 g1 >-> mapB f2 g2 = mapB (f2 . f1) (g1 . g2)
->
-> mapB id id = idT
--}
-mapB :: (Monad m, Proxy p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
-mapB f g = runIdentityK go where
-    go b' = do
-        a   <- request (g b')
-        b'2 <- respond (f a )
-        go b'2
--- mapB f g = foreverK $ request . g >=> respond . f
-
 {-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
 
 > mapD f1 >-> mapD f2 = mapD (f2 . f1)
@@ -112,23 +98,22 @@ mapU g = runIdentityK go where
         go b'2
 -- mapU g = foreverK $ (request . g) >=> respond
 
-{-| @(mapMB f g)@ applies the monadic function @f@ to all values going
-    downstream and the monadic function @g@ to all values going upstream.
+{-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
+    values going upstream.
 
-> mapMB f1 g1 >-> mapMB f2 g2 = mapMB (f1 >=> f2) (g2 >=> g1)
+    Mnemonic: map \'@B@\'idirectional
+
+> mapB f1 g1 >-> mapB f2 g2 = mapB (f2 . f1) (g1 . g2)
 >
-> mapMB return return = idT
+> mapB id id = idT
 -}
-mapMB
- :: (Monad m, Proxy p) => (a -> m b) -> (b' -> m a') -> b' -> p a' a b' b m r
-mapMB f g = runIdentityK go where
+mapB :: (Monad m, Proxy p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
+mapB f g = runIdentityK go where
     go b' = do
-        a'  <- lift (g b')
-        a   <- request a'
-        b   <- lift (f a )
-        b'2 <- respond b
+        a   <- request (g b')
+        b'2 <- respond (f a )
         go b'2
--- mapMB f g = foreverK $ lift . g >=> request >=> lift . f >=> respond
+-- mapB f g = foreverK $ request . g >=> respond . f
 
 {-| @(mapMD f)@ applies the monadic function @f@ to all values going downstream
 
@@ -160,26 +145,70 @@ mapMU g = runIdentityK go where
         go b'2
 -- mapMU g = foreverK $ lift . g >=> request >=> respond
 
-{-| @(execB md mu)@ executes @mu@ every time values flow upstream through it,
-    and executes @md@ every time values flow downstream through it.
+{-| @(mapMB f g)@ applies the monadic function @f@ to all values going
+    downstream and the monadic function @g@ to all values going upstream.
 
-> execB md1 mu1 >-> execB md2 mu2 = execB (md1 >> md2) (mu2 >> mu1)
+> mapMB f1 g1 >-> mapMB f2 g2 = mapMB (f1 >=> f2) (g2 >=> g1)
 >
-> execB (return ()) = idT
+> mapMB return return = idT
 -}
-execB :: (Monad m, Proxy p) => m () -> m () -> a' -> p a' a a' a m r
-execB md mu = runIdentityK go where
-    go a' = do
-        lift mu
+mapMB
+ :: (Monad m, Proxy p) => (a -> m b) -> (b' -> m a') -> b' -> p a' a b' b m r
+mapMB f g = runIdentityK go where
+    go b' = do
+        a'  <- lift (g b')
         a   <- request a'
-        lift md
+        b   <- lift (f a )
+        b'2 <- respond b
+        go b'2
+-- mapMB f g = foreverK $ lift . g >=> request >=> lift . f >=> respond
+
+{-| @(useD f)@ executes the monadic function @f@ on all values flowing
+    \'@D@\'ownstream
+
+> useD f1 >-> useD f2 = useD (\a -> f1 a >> f2 a)
+>
+> useD (\_ -> return ()) = idT
+-}
+useD :: (Monad m, Proxy p) => (a -> m r1) -> x -> p x a x a m r
+useD f = runIdentityK go where
+    go x = do
+        a  <- request x
+        lift $ f a
+        x2 <- respond a
+        go x2
+
+{-| @(useU g)@ executes the monadic function @g@ on all values flowing
+    \'@U@\'pstream
+
+> useU g1 >-> useU g2 = useU (\a' -> g2 a' >> g1 a')
+>
+> useU (\_ -> return ()) = idT
+-}
+useU :: (Monad m, Proxy p) => (a' -> m r2) -> a' -> p a' x a' x m r
+useU g = runIdentityK go where
+    go a' = do
+        lift $ g a'
+        x   <- request a'
+        a'2 <- respond x
+        go a'2
+
+{-| @(useB f g)@ executes the monadic function @f@ on all values flowing
+    downstream and the monadic function @g@ on all values flowing upstream
+
+> useB f1 g1 >-> useB f2 g2 = useB (\a -> f1 a >> f2 a) (\a' -> g2 a' >> g1 a')
+>
+> useB (\_ -> return ()) (\_ -> return ()) = idT
+-}
+useB
+ :: (Monad m, Proxy p) => (a -> m r1) -> (a' -> m r2) -> a' -> p a' a a' a m r
+useB f g = runIdentityK go where
+    go a' = do
+        lift $ g a'
+        a   <- request a'
+        lift $ f a
         a'2 <- respond a
         go a'2
-{- execB md mu = foreverK $ \a' -> do
-    lift mu
-    a <- request a'
-    lift md
-    respond a -}
 
 {-| @(execD md)@ executes @md@ every time values flow downstream through it.
 
@@ -187,7 +216,7 @@ execB md mu = runIdentityK go where
 >
 > execD (return ()) = idT
 -}
-execD :: (Monad m, Proxy p) => m () -> a' -> p a' a a' a m r
+execD :: (Monad m, Proxy p) => m r1 -> a' -> p a' a a' a m r
 execD md = runIdentityK go where
     go a' = do
         a   <- request a'
@@ -205,7 +234,7 @@ execD md = runIdentityK go where
 >
 > execU (return ()) = idT
 -}
-execU :: (Monad m, Proxy p) => m () -> a' -> p a' a a' a m r
+execU :: (Monad m, Proxy p) => m r2 -> a' -> p a' a a' a m r
 execU mu = runIdentityK go where
     go a' = do
         lift mu
@@ -215,6 +244,27 @@ execU mu = runIdentityK go where
 {- execU mu = foreverK $ \a' -> do
     lift mu
     a <- request a'
+    respond a -}
+
+{-| @(execB md mu)@ executes @mu@ every time values flow upstream through it,
+    and executes @md@ every time values flow downstream through it.
+
+> execB md1 mu1 >-> execB md2 mu2 = execB (md1 >> md2) (mu2 >> mu1)
+>
+> execB (return ()) = idT
+-}
+execB :: (Monad m, Proxy p) => m r1 -> m r2 -> a' -> p a' a a' a m r
+execB md mu = runIdentityK go where
+    go a' = do
+        lift mu
+        a   <- request a'
+        lift md
+        a'2 <- respond a
+        go a'2
+{- execB md mu = foreverK $ \a' -> do
+    lift mu
+    a <- request a'
+    lift md
     respond a -}
 
 {-| @(takeB n)@ allows @n@ upstream/downstream roundtrips to pass through
