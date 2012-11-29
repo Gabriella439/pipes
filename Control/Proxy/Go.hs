@@ -22,6 +22,7 @@
     exports depending on user feedback.  This module is primarily for rapid
     prototyping and demonstrations. -}
 module Control.Proxy.Go (
+    -- * Modules
     -- $modules
     module Control.MFunctor,
     module Control.Monad,

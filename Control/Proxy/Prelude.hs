@@ -1,6 +1,7 @@
 -- | Entry point for the Control.Proxy.Prelude hierarchy
 
 module Control.Proxy.Prelude (
+    -- * Modules
     -- $modules
     module Control.Proxy.Prelude.Base,
     module Control.Proxy.Prelude.IO,
