@@ -7,7 +7,6 @@ License-File: LICENSE
 Copyright: 2012 Gabriel Gonzalez
 Author: Gabriel Gonzalez
 Maintainer: Gabriel439@gmail.com
-Stability: Experimental
 Bug-Reports: https://github.com/Gabriel439/Haskell-Pipes-Library/issues
 Synopsis: Compositional pipelines
 Description:
@@ -41,7 +40,7 @@ Description:
   .
   * "Control.Proxy.Trans.Tutorial": This introduces proxy extensions which let
     you extend the base proxy type with new features.
-Category: Control, Pipe, Proxies
+Category: Control, Pipes, Proxies
 Tested-With: GHC ==7.4.1
 Source-Repository head
     Type: git
