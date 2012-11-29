@@ -20,52 +20,52 @@ module Control.Proxy.Synonym (
     ) where
 
 -- | A unidirectional 'Proxy'.
-type Pipe p a b (m :: * -> *) r = p () a () b m r
+type Pipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b = p () a () b
 
 {-| A 'Pipe' that produces values
 
     'Producer's never 'request'. -}
-type Producer p b (m :: * -> *) r = p C () () b m r
+type Producer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b = p C () () b
 
 {-| A 'Pipe' that consumes values
 
     'Consumer's never 'respond'. -}
-type Consumer p a (m :: * -> *) r = p () a () C m r
+type Consumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a = p () a () C
 
 {-| A self-contained 'Pipeline' that is ready to be run
 
     'Pipeline's never 'request' nor 'respond'. -}
-type Pipeline p (m :: * -> *) r = p C () () C m r
+type Pipeline (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
 -- | A 'Pipe' where everything flows upstream
-type CoPipe p a' b' (m :: * -> *) r = p a' () b' () m r
+type CoPipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' b' = p a' () b' ()
 
 {-| A 'CoPipe' that produces values flowing upstream
 
     'CoProducer's never 'respond'. -}
-type CoProducer p a' (m :: * -> *) r = p a' () () C m r
+type CoProducer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' = p a' () () C
 
 {-| A 'CoConsumer' that consumes values flowing upstream
 
     'CoConsumer's never 'request'. -}
-type CoConsumer p b' (m :: * -> *) r = p C () b' () m r
+type CoConsumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' = p C () b' ()
 
 {-| @Server b' b@ receives requests of type @b'@ and sends responses of type
     @b@.
 
     'Server's never 'request'. -}
-type Server p b' b (m :: * -> *) r = p C () b' b m r
+type Server (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b = p C () b' b
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
     'Client's never 'respond'. -}
-type Client p a' a (m :: * -> *) r = p a' a () C m r
+type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
 
 {-| A self-contained 'Session', ready to be run by 'runSession'
 
     'Session's never 'request' or 'respond'. -}
-type Session p (m :: * -> *) r = p C () () C m r
+type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
 -- | The empty type, denoting a \'@C@\'losed end
 data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
