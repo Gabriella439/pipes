@@ -58,7 +58,6 @@ Library
         Control.Proxy.Core,
         Control.Proxy.Core.Fast,
         Control.Proxy.Core.Correct,
-        Control.Proxy.Go
         Control.Proxy.Pipe,
         Control.Proxy.Synonym,
         Control.Proxy.Trans,
