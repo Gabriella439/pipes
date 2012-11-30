@@ -22,7 +22,7 @@ import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.MFunctor (MFunctor(mapT))
+import Control.MFunctor (MFunctor(hoist))
 import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -80,12 +80,12 @@ instance (MonadIOP          p, MonadIO m)
 
 instance (MFunctorP           p )
        => MFunctorP (StateP s p) where
-    mapT_P nat p = StateP (\s -> mapT_P nat (unStateP p s))
- -- mapT nat = StateP . fmap (mapT nat) . unStateP
+    hoist_P nat p = StateP (\s -> hoist_P nat (unStateP p s))
+ -- hoist nat = StateP . fmap (hoist nat) . unStateP
 
 instance (MFunctorP          p )
        => MFunctor (StateP s p a' a b' b) where
-    mapT = mapT_P
+    hoist = hoist_P
 
 instance (Proxy           p )
        => Proxy (StateP s p) where

@@ -36,7 +36,7 @@ import Control.Monad.IO.Class (MonadIO)
 
 > lift . k >-> p
 >
-> mapT f . k >-> p
+> hoist f . k >-> p
 -}
 infixr 7 <-<
 infixl 7 >->
@@ -297,7 +297,7 @@ p1 \<\ p2 = p2 />/ p1
 
     ... then you can still keep the nice constraints using:
 
-> example () = runIdentityP . mapT (runIdentityP . mapT runIdentityP) $ do
+> example () = runIdentityP . hoist (runIdentityP . hoist runIdentityP) $ do
 >     request ()
 >     lift $ request ()
 >     lift $ lift $ request ()
@@ -340,6 +340,6 @@ class (Proxy p) => MonadIOP p where
 > (forall a' a b' b . MFunctor (p a' a b' b)) => ...
 -}
 class MFunctorP p where
-    mapT_P
+    hoist_P
      :: (Monad m)
      => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')

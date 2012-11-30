@@ -20,7 +20,7 @@ import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.MFunctor (MFunctor(mapT))
+import Control.MFunctor (MFunctor(hoist))
 import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Prelude hiding (catch)
@@ -87,12 +87,12 @@ instance (MonadIOP           p, MonadIO m)
 
 instance (MFunctorP            p )
        => MFunctorP (EitherP e p) where
-    mapT_P nat p = EitherP (mapT_P nat (runEitherP p))
- -- mapT nat = EitherP . mapT nat . runEitherP
+    hoist_P nat p = EitherP (hoist_P nat (runEitherP p))
+ -- hoist nat = EitherP . hoist nat . runEitherP
 
 instance (MFunctorP           p )
        => MFunctor (EitherP e p a' a b' b) where
-    mapT = mapT_P
+    hoist = hoist_P
 
 instance (Proxy            p )
        => Proxy (EitherP e p) where

@@ -21,7 +21,7 @@ module Control.Proxy.Core.Correct (
 import Control.Applicative (Applicative(pure, (<*>)))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.MFunctor (MFunctor(mapT))
+import Control.MFunctor (MFunctor(hoist))
 import Control.Proxy.Class
 import Control.Proxy.Synonym (C)
 
@@ -134,7 +134,7 @@ instance Interact ProxyCorrect where
                 Pure       a   -> return (Pure a) )
 
 instance MFunctor (ProxyCorrect a' a b' b) where
-    mapT nat p0 = go p0 where
+    hoist nat p0 = go p0 where
         go p = Proxy (nat (do
             x <- unProxy p
             return (case x of
@@ -143,7 +143,7 @@ instance MFunctor (ProxyCorrect a' a b' b) where
                 Pure       r   -> Pure r )))
 
 instance MFunctorP ProxyCorrect where
-    mapT_P = mapT
+    hoist_P = hoist
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to

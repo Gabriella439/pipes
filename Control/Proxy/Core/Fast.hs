@@ -39,7 +39,7 @@ import Control.Applicative (Applicative(pure, (<*>)))
 -- import Control.Monad (ap, forever, liftM, (>=>))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.MFunctor (MFunctor(mapT))
+import Control.MFunctor (MFunctor(hoist))
 import Control.Proxy.Class
 import Control.Proxy.Synonym (C)
 
@@ -165,7 +165,7 @@ instance Interact ProxyFast where
             Pure       a   -> Pure a
 
 instance MFunctor (ProxyFast a' a b' b) where
-    mapT nat p0 = go (observe p0) where
+    hoist nat p0 = go (observe p0) where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
@@ -173,7 +173,7 @@ instance MFunctor (ProxyFast a' a b' b) where
             Pure       r   -> Pure r
 
 instance MFunctorP ProxyFast where
-    mapT_P = mapT
+    hoist_P = hoist
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to
