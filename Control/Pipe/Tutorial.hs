@@ -34,25 +34,75 @@ module Control.Pipe.Tutorial (
 -- For documentation
 import Control.Category
 import Control.Monad.Trans.Class
-import Control.Pipe
+import Control.Proxy
 
 {- $type
-    This library represents unidirectional streaming computations using  the
-    'Pipe' type.
+    The @pipes@ library simplifies writing streaming computations layered on top
+    of \"proxies\".
 
-    'Pipe' is a monad transformer that extends the base monad with the ability
-    to 'await' input from or 'yield' output to other 'Pipe's.  'Pipe's resemble
-    enumeratees in other libraries because they receive an input stream and
-    transform it into a new output stream.
+    Let's begin with the simplest proxy, a 'Producer':
+
+> import Control.Monad
+> import Control.Monad.Trans.Class (lift)
+> import Control.Proxy
+> 
+> promptInt :: (Proxy p) => () -> Producer p Integer IO r
+> promptInt () = runIdentityP $ forever $ do
+>     lift $ putStrLn "Enter an Integer:"
+>     n <- lift readLn
+>     respond n
+
+    The above 'Producer' prompts for 'Integer's from the user and then sends the
+    integers downstream using 'respond'.
+
+    The next simplest proxy is a 'Consumer':
+
+> printer :: (Show a, Proxy p) => () -> Consumer a IO r
+> printer () = runIdentityP $ forever $ do
+>     a <- request ()
+>     lift $ putStrLn "Received a value:"
+>     lift $ print a
+
+    The above 'Consumer' 'request's 'Show'able values from upstream, and then
+    'print's them.
+
+    We connect a 'Consumer' and a 'Producer' using '(<-<)', and run the result
+    using 'runProxy':
+
+> runProxy $ printer <-< promptInt
+Enter an Integer:
+1<Enter>
+Received a value:
+1
+Enter an Integer:
+5<Enter>
+Received a value:
+5
+...
+
+    This proceeds endlessly until we hit @Ctrl-C@ to interrupt it.  We would
+    like to limit the number of iterations, so lets define an intermediate
+    'Pipe' which behaves like a verbose 'take':
+
+> take' :: (Monad m, Proxy p) => Int -> () -> Pipe a a m ()
+> take' n () = runIdentityP $ replicateM_ n $ do
+>     a <- request ()
+>     respond a
+
+    The simplest proxy type this library provides is a 'Pipe', which is a
+    unidirectional proxy.  A 'Pipe' is a monad transformer that extends the base
+    monad with the ability to 'request' input from upstream 'Pipe's or
+    'respond' with output to downstream 'Pipe's.
 
     I'll introduce our first 'Pipe', which is a verbose version of the Prelude's
     'take' function:
 
-> take' :: Int -> Pipe a a IO ()
-> take' n = do
+> -- Ignore the 'runIdentityP' and extra ()'s for now
+> take' :: (Proxy p) => Int -> () -> Pipe p a a IO ()
+> take' n () = runIdentityP $ do
 >     replicateM_ n $ do
->         x <- await
->         yield x
+>         x <- request ()
+>         respond x
 >     lift $ putStrLn "You shall not pass!"
 
     This 'Pipe' forwards the first @n@ values it receives undisturbed, then it
@@ -60,69 +110,68 @@ import Control.Pipe
 
     Let's dissect the above 'Pipe''s type to learn a bit about how 'Pipe's work:
 
->      | Input Type | Output Type | Base monad | Return value
-> Pipe   a            a             IO           ()
+>      | Underlying     | Input | Output | Base  | Return
+>      | Implementation | Type  | Type   | Monad | Value
+> Pipe   p                a       a        IO      ()
 
-    So @take'@ 'await's input values of type \'@a@\' from upstream 'Pipe's and
-    'yield's output values of type \'@a@\' to downstream 'Pipe's.  @take'@ uses
-    'IO' as its base monad because it invokes the 'putStrLn' function.  If we
-    were to remove the call to 'putStrLn', the compiler would infer the
-    following type instead, which is polymorphic in the base monad:
+    So @take'@ 'request's input values of type \'@a@\' from upstream 'Pipe's and
+    'respond's with output values of type \'@a@\' to downstream 'Pipe's.
+    @take'@ uses 'IO' as its base monad because it invokes the 'putStrLn'
+    function.  If we remove the call to 'putStrLn', the type would be
+    polymorphic in the base monad:
 
-> take' :: (Monad m) => Int -> Pipe a a m ()
+> take' :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m ()
 
     Now let's create a function that converts a list into a 'Pipe' by 'yield'ing
     each element of the list:
 
-> fromList :: (Monad m) => [b] -> Pipe a b m ()
-> fromList = mapM_ yield
+> fromList :: (Monad m, Proxy p) => [b] -> () -> Pipe p a b m ()
+> fromList bs () = runIdentityP $ mapM_ respond bs
 
-    Note that @fromList xs@ is polymorphic in its input.  This is because it
-    does not 'await' any input.  If we wanted, we could type-restrict it to:
+    Note that @fromList xs@ is polymorphic in its input because it does not
+    'request' anything, so we could type restrict it to not 'request' any
+    useful input:
 
-> fromList :: (Monad m) => [b] -> Pipe () b m ()
+> fromList :: (Monad m, Proxy p) => [b] -> () -> Pipe () b m ()
 
-    There is no type that forbids a 'Pipe' from 'await'ing, but you can
-    guarantee that if it does 'await', the request is trivially satisfiable by
-    supplying it with @()@.
-
-    A 'Pipe' that doesn't 'await' (any useful input) can serve as the first
+    A 'Pipe' that doesn't 'request' (any useful input) can serve as the first
     stage in a 'Pipeline'.  I provide a type synonym for this common case:
 
-> type Producer b m r = Pipe () b m r
+> -- The true Producer type synonym differs slightly
+> type Producer p b m r = Pipe p () b m r
 
-    'Producer's resemble enumerators in other libraries because they function as
-    data sources.
+    A 'Producer' is just a data source that can use the base monad to generate
+    more data.
 
     You can then use the 'Producer' type synonym to rewrite the type signature
     for @fromList@ as:
 
-> fromList :: (Monad m) => [b] -> Producer b m ()
+> fromList :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
 
     Now let's create a 'Pipe' that prints every value delivered to it:
 
-> printer :: (Show b) => Pipe b c IO r
-> printer = forever $ do
->     x <- await
+> printer :: (Show b, Proxy p) => () -> Pipe p b c IO r
+> printer () = runIdentityP $ forever $ do
+>     x <- request ()
 >     lift $ print x
 
     Here, @printer@ is polymorphic in its output.  We could type-restrict it to
-    guarantee it will never 'yield' by setting the output to 'C', an unhabited
+    guarantee it will never 'respond' by setting the output to 'C', an unhabited
     type that \'@C@\'loses the output end:
 
-> printer :: (Show b) => Pipe b C IO r
+> printer :: (Show b, Proxy p) => () -> Pipe p b C IO r
 
-    A 'Pipe' that never 'yield's can be the final stage in a 'Pipeline'.  Again,
-    I provide a type synonym for this common case:
+    A 'Pipe' that never 'respond's can be the final stage in a 'Pipeline'.
+    Again, I provide a type synonym for this common case:
 
-> type Consumer b m r = Pipe b C m r
+> type Consumer p b m r = Pipe p b C m r
 
     So we could instead write @printer@'s type as:
 
-> printer :: (Show b) => Consumer b IO r
+> printer :: (Show b, Proxy p) => () -> Consumer p b IO r
 
-    'Consumer's resemble iteratees in other libraries because they function as
-    data sinks.
+    A 'Consumer' is a data sink that can run actions in the base monad depending
+    on what kind of data it receives.
 -}
 
 {- $compose
