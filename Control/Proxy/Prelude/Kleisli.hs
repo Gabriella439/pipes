@@ -1,12 +1,16 @@
+{-# LANGUAGE Rank2Types #-}
+
 -- | Utility functions for Kleisli arrows
 
 module Control.Proxy.Prelude.Kleisli (
     -- * Core utility functions
     foreverK,
     replicateK,
-    mapK
+    liftK,
+    hoistK,
     ) where
 
+import Control.MFunctor (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 
 {-| Compose a \'@K@\'leisli arrow with itself forever
@@ -39,10 +43,22 @@ replicateK n0 k = go n0 where
 
 {-| Convenience function equivalent to @(lift .)@
 
-> mapK f >=> mapK g = mapK (f >=> g)
+> liftK f >=> liftK g = liftK (f >=> g)
 >
-> mapK return = return
+> liftK return = return
 -}
-mapK :: (Monad m, MonadTrans t) => (a -> m b) -> (a -> t m b)
-mapK k a = lift (k a)
--- mapK = (lift .)
+liftK :: (Monad m, MonadTrans t) => (a -> m b) -> (a -> t m b)
+liftK k a = lift (k a)
+-- liftK = (lift .)
+
+{-| Convenience function equivalent to @(hoist f .)@
+
+> hoistK f >-> hoistK g = hoistK (f >-> g)
+>
+> hoistK idT = idT
+-}
+hoistK
+ :: (Monad m, MFunctor t)
+ => (forall a . m a -> n a) -> ((b' -> t m b) -> (b' -> t n b))
+hoistK k p a' = hoist k (p a')
+-- hoistK k = (hoist k .)
