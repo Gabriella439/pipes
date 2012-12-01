@@ -11,9 +11,9 @@ module Control.Proxy.Synonym (
     CoPipe,
     CoProducer,
     CoConsumer,
-    Pipeline,
     Client,
     Server,
+    Session,
 
     -- * Closed
     C
@@ -31,11 +31,6 @@ type Producer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b = p C () () b
 
     'Consumer's never 'respond'. -}
 type Consumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a = p () a () C
-
-{-| A self-contained 'Pipeline' that is ready to be run
-
-    'Pipeline's never 'request' nor 'respond'. -}
-type Pipeline (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
 -- | A 'Pipe' where everything flows upstream
 type CoPipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' b' = p a' () b' ()
