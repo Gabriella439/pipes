@@ -1,10 +1,20 @@
-{-|
-    This module provides the tutorial for "Control.Pipe".
--}
+-- | This module provides the tutorial for "Control.Proxy".
 
 module Control.Pipe.Tutorial (
-    -- * Types
-    -- $type
+    -- * Introduction
+    -- $intro
+
+    -- * Type Synonyms
+    -- $synonyms
+
+    -- * Initialize Proxies
+    -- $initial
+
+    -- * Composition
+    -- $composition
+
+    -- * The Proxy Class
+    -- $class
 
     -- * Composition
     -- $compose
@@ -27,7 +37,7 @@ module Control.Pipe.Tutorial (
     -- * Resource Management
     -- $resource
 
-    -- * Bidirectional Pipes
+    -- * Bidirectional Flow
     -- $bidirectional
     ) where
 
@@ -36,40 +46,42 @@ import Control.Category
 import Control.Monad.Trans.Class
 import Control.Proxy
 
-{- $type
-    The @pipes@ library simplifies writing streaming computations layered on top
-    of \"proxies\".
+{- $intro
+    The @pipes@ library encompasses many types of streaming abstractions, all of
+    which are special cases of \"proxies\".
 
-    Let's begin with the simplest proxy, a 'Producer':
+    Let's begin with the simplest 'Proxy', a 'Producer'.  The following
+    'Producer' generates a stream of 'Int's from user input:
 
 > import Control.Monad
 > import Control.Monad.Trans.Class (lift)
 > import Control.Proxy
 > 
-> promptInt :: (Proxy p) => () -> Producer p Integer IO r
+> -- Ignore the 'runIdentityP' and '()' for now
+>
+> promptInt :: (Proxy p) => () -> Producer p Int IO r
 > promptInt () = runIdentityP $ forever $ do
 >     lift $ putStrLn "Enter an Integer:"
 >     n <- lift readLn
 >     respond n
 
-    The above 'Producer' prompts for 'Integer's from the user and then sends the
-    integers downstream using 'respond'.
+    The next simplest 'Proxy' is a 'Consumer'.  The following 'Consumer'
+    consumes a stream of 'Show'able values and prints them:
 
-    The next simplest proxy is a 'Consumer':
-
-> printer :: (Show a, Proxy p) => () -> Consumer a IO r
+> printer :: (Show a, Proxy p) => () -> Consumer p a IO r
 > printer () = runIdentityP $ forever $ do
 >     a <- request ()
 >     lift $ putStrLn "Received a value:"
 >     lift $ print a
 
-    The above 'Consumer' 'request's 'Show'able values from upstream, and then
-    'print's them.
+    We compose a 'Consumer' and a 'Producer' using ('>->'), which gives us a
+    runnable 'Session':
 
-    We connect a 'Consumer' and a 'Producer' using '(<-<)', and run the result
-    using 'runProxy':
+> promptInt >-> printer :: (Proxy p) => () -> Session p IO r
 
-> runProxy $ printer <-< promptInt
+    ... and we can run the 'Session' using 'runProxy':
+
+>>> runProxy $ promptInt >-> printer :: IO r
 Enter an Integer:
 1<Enter>
 Received a value:
@@ -82,127 +94,560 @@ Received a value:
 
     This proceeds endlessly until we hit @Ctrl-C@ to interrupt it.  We would
     like to limit the number of iterations, so lets define an intermediate
-    'Pipe' which behaves like a verbose 'take':
+    'Proxy' that behaves like a verbose 'take'.  I will call it a 'Pipe' since
+    values flow through it:
 
-> take' :: (Monad m, Proxy p) => Int -> () -> Pipe a a m ()
-> take' n () = runIdentityP $ replicateM_ n $ do
->     a <- request ()
->     respond a
-
-    The simplest proxy type this library provides is a 'Pipe', which is a
-    unidirectional proxy.  A 'Pipe' is a monad transformer that extends the base
-    monad with the ability to 'request' input from upstream 'Pipe's or
-    'respond' with output to downstream 'Pipe's.
-
-    I'll introduce our first 'Pipe', which is a verbose version of the Prelude's
-    'take' function:
-
-> -- Ignore the 'runIdentityP' and extra ()'s for now
 > take' :: (Proxy p) => Int -> () -> Pipe p a a IO ()
 > take' n () = runIdentityP $ do
 >     replicateM_ n $ do
->         x <- request ()
->         respond x
+>         a <- request ()
+>         respond a
 >     lift $ putStrLn "You shall not pass!"
 
     This 'Pipe' forwards the first @n@ values it receives undisturbed, then it
-    outputs a cute message.
+    outputs a cute message.  We compose it between our 'Consumer' and
+    'Producer' using ('>->'):
 
-    Let's dissect the above 'Pipe''s type to learn a bit about how 'Pipe's work:
+>>> runProxy $ promptInt >-> take' 2 >-> printer
+Enter an Integer:
+9<Enter>
+Received a value:
+9
+Enter an Integer:
+2<Enter>
+Received a value:
+2
+You shall not pass!
 
->      | Underlying     | Input | Output | Base  | Return
->      | Implementation | Type  | Type   | Monad | Value
-> Pipe   p                a       a        IO      ()
+    However, these proxies only send information downstream in the direction of
+    the ('>->') arrow.  We can enhance these proxies with the ability to send
+    information upstream with each 'request' that determines how upstream stages
+    'respond'.
 
-    So @take'@ 'request's input values of type \'@a@\' from upstream 'Pipe's and
-    'respond's with output values of type \'@a@\' to downstream 'Pipe's.
-    @take'@ uses 'IO' as its base monad because it invokes the 'putStrLn'
-    function.  If we remove the call to 'putStrLn', the type would be
-    polymorphic in the base monad:
+    For example, 'Client's generalize 'Consumer's because they can supply an
+    argument other than @()@ with each 'request'.  The following 'Client'
+    sends three requests upstream, each with an 'Int' argument, and awaits a
+    'Bool' response:
 
-> take' :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m ()
+> threeReqs :: (Proxy p) => () -> Client p Int Bool IO ()
+> threeReqs () = runIdentityP $ forM_ [1, 3, 1] $ \argument -> do
+>     lift $ putStrLn $ "Client Sends:   " ++ show argument
+>     result <- request argument
+>     lift $ putStrLn $ "Client Receives:" ++ show result
+>     lift $ putStrLn $ if result then "Success" else "Failure"
+>     lift $ putStrLn "*"
 
-    Now let's create a function that converts a list into a 'Pipe' by 'yield'ing
-    each element of the list:
+    Notice how 'Client's use \"@request argument@\" instead of
+    \"@request ()@\".  This sends \"@argument@\" upstream to parametrize the
+    'request'.
 
-> fromList :: (Monad m, Proxy p) => [b] -> () -> Pipe p a b m ()
-> fromList bs () = runIdentityP $ mapM_ respond bs
+    'Server's generalize 'Producer's because they receive arguments other than
+    @()@.  The following 'Server' services all incoming 'Int' 'request's and
+    'respond's whether or not the request's argument was greater than two:
 
-    Note that @fromList xs@ is polymorphic in its input because it does not
-    'request' anything, so we could type restrict it to not 'request' any
-    useful input:
+> comparer :: (Proxy p) => Int -> Server p Int Bool IO r
+> comparer = runIdentityK go where
+>     go argument = do
+>         lift $ putStrLn $ "Server Receives:" ++ show argument
+>         let result = argument > 2
+>         lift $ putStrLn $ "Server Sends:   " ++ show result
+>         nextArgument <- respond result
+>         go nextArgument
 
-> fromList :: (Monad m, Proxy p) => [b] -> () -> Pipe () b m ()
+    Notice how 'Server's receive their first argument as a parameter and bind
+    each subsequent argument using 'respond'.
 
-    A 'Pipe' that doesn't 'request' (any useful input) can serve as the first
-    stage in a 'Pipeline'.  I provide a type synonym for this common case:
+    We compose a 'Client' and 'Server' using ('>->'), and this also returns a
+    runnable 'Session':
 
-> -- The true Producer type synonym differs slightly
-> type Producer p b m r = Pipe p () b m r
+> comparer >-> threeReqs :: (Proxy p) => () -> Session p IO ()
 
-    A 'Producer' is just a data source that can use the base monad to generate
-    more data.
+    Running this executes the client-server session:
 
-    You can then use the 'Producer' type synonym to rewrite the type signature
-    for @fromList@ as:
+>>> runProxy $ comparer >-> threeReqs :: IO ()
+Client Sends:    1
+Server Receives: 1
+Server Sends:    False
+Client Receives: False
+Failure
+*
+Client Sends:    3
+Server Receives: 3
+Server Sends:    True
+Client Receives: True
+Success
+*
+Client Sends:    1
+Server Receives: 1
+Server Sends:    False
+Client Receives: False
+Failure
+*
 
-> fromList :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
+    'Proxy's generalize 'Pipe's because, like 'Client's, they can make non-empty
+    'request's to upstream and, like 'Server's, they receive non-empty arguments
+    from downstream:
 
-    Now let's create a 'Pipe' that prints every value delivered to it:
+> import qualified Data.Map as M
+>
+> -- 'p' is the Proxy, as the (Proxy p) constraint indicates
+>
+> cache :: (Ord key, Proxy p) => key -> p key val key val IO r
+> cache = runIdentityK (go M.empty) where
+>     go m key = case M.lookup key m of
+>         Nothing -> do
+>             val  <- request key
+>             key2 <- respond val
+>             go (M.insert key val m) key2
+>         Just val -> do
+>             lift $ putStrLn "Used cache!"
+>             key2 <- respond val
+>             go m key2
 
-> printer :: (Show b, Proxy p) => () -> Pipe p b c IO r
+    We can compose the @cache@ 'Proxy' between our 'Client' and 'Server' using
+    ('>->'):
+
+>>> runProxy $ comparer >-> cache >-> threeReqs
+Client Sends:    1
+Server Receives: 1
+Server Sends:    False
+Client Receives: False
+Failure
+*
+Client Sends:    3
+Server Receives: 3
+Server Sends:    True
+Client Receives: True
+Success
+*
+Client Sends:    1
+Used cache!
+Client Receives: False
+Failure
+*
+
+-}
+
+{- $synonyms
+    You might wonder why ('>->') accepts 'Producer's, 'Consumer's, 'Pipe's,
+    'Client's, 'Server's, and 'Proxy's.  These all type-check because they are
+    all type synonyms built on top of the central 'Proxy' type:
+
+> -- The most general type
+> (Proxy p) => p a' a b' b m r
+
+    The ('>->') composition operator composes 'Proxy's, and all of the above
+    abstractions are just special cases of proxies so it can compose all of
+    them.
+
+    Like the name suggests, a 'Proxy' has two interfaces: an upstream interface
+    and a downstream interface.  Each interface can both send and receive
+    values:
+
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> a' <==       <== b'
+>     |  Proxy  |
+> a  ==>       ==> b
+>     |         |
+>     +---------+
+
+    Instances of the 'Proxy' type class are monad transformers that enrich the
+    base monad with the ability to send or receive values upstream or
+    downstream:
+
+>   | Sends    | Receives | Receives   | Sends      | Base  | Return
+>   | Upstream | Upstream | Downstream | Downstream | Monad | Value
+> p   a'         a          b'           b            m       r
+
+    We can selectively close certain inputs or outputs to generate specialized
+    proxies.  A 'Producer' is a 'Proxy' that can only output values to its
+    downstream interface:
+
+> -- The 'C' type is uninhabited, so it 'C'loses an output end
+>
+> Upstream | Downstream
+>     +----------+
+>     |          |
+> C  <==        <== ()
+>     | Producer |
+> () ==>        ==> b
+>     |          |
+>     +----------+
+>
+> type Producer p b m r = p C () () b m r
+
+    A 'Consumer' is a 'Proxy' that can only receive values on its upstream
+    interface:
+
+> Upstream | Downstream
+>     +----------+
+>     |          |
+> () <==        <== ()
+>     | Consumer |
+> a  ==>        ==> C
+>     |          |
+>     +----------+
+>
+> type Consumer p b m r = p () a () C m r
+
+    A 'Pipe' is a 'Proxy' that can only receive values on its upstream interface
+    and send values on its downstream interface:
+
+> Upstream | Downstream
+>     +--------+
+>     |        |
+> () <==      <== ()
+>     |  Pipe  |
+> a  ==>      ==> b
+>     |        |
+>     +--------+
+>
+> type Pipe p a p b m r = p () a () b m r
+
+    When we compose proxies, the type system ensures sure that their input and
+    output types match:
+
+>       promptInt    >->    take' 2    >->    printer
+>
+>     +-----------+       +---------+       +---------+
+>     |           |       |         |       |         |
+> C  <==         <== ()  <==       <== ()  <==       <== ()
+>     |           |       |         |       |         |
+>     | promptInt |       | take' 2 |       | printer |
+>     |           |       |         |       |         |
+> () ==>         ==> Int ==>       ==> Int ==>       ==> C
+>     |           |       |         |       |         |
+>     +-----------+       +---------+       +---------+
+
+    Composition fuses these into a new 'Proxy' that has both ends closed, which
+    is a 'Session':
+
+>     +-----------------------------------+
+>     |                                   |
+> C  <==                                 <== ()
+>     |                                   |
+>     | promptInt >-> take' 2 >-> printer |
+>     |                                   |
+> () ==>                                 ==> C
+>     |                                   |
+>     +-----------------------------------+
+>
+> type Session p m r = p C () () C m r
+
+    A 'Client' is a 'Proxy' that only uses its upstream interface:
+
+> Upstream | Downstream
+>     +----------+
+>     |          |
+> a' <==        <== ()
+>     |  Client  |
+> a  ==>        ==> C
+>     |          |
+>     +----------+
+>
+> type Client p a' a m r = p a' a () C m r
+
+    A 'Server' is a 'Proxy' that only uses its downstream interface:
+
+
+> Upstream | Downstream
+>     +----------+
+>     |          |
+> C  <==        <== b'
+>     |  Server  |
+> () ==>        ==> b
+>     |          |
+>     +----------+
+>
+> type Server p b' b m r = p C () b' b m r
+
+    The compiler ensures that the types match when we compose 'Client's,
+    'Server's, and 'Proxy's.
+
+>        comparer   >->     cache   >->      threeReqs
+>
+>     +----------+        +-------+        +-----------+
+>     |          |        |       |        |           |
+> C  <==        <== Int  <==     <== Int  <==         <== ()
+>     |          |        |       |        |           |
+>     | comparer |        | cache |        | threeReqs |
+>     |          |        |       |        |           |
+> () ==>        ==> Bool ==>     ==> Bool ==>         ==> C
+>     |          |        |       |        |           |
+>     +----------+        +-------+        +-----------+
+
+    This similarly fuses into a 'Session':
+
+>     +----------------------------------+
+>     |                                  |
+> C  <==                                <== ()
+>     |                                  |
+>     | comparer >-> cache >-> threeReqs |
+>     |                                  |
+> () ==>                                ==> C
+>     |                                  |
+>     +----------------------------------+
+-}
+
+{- $initial
+    You might wonder why every 'Proxy' we define takes some sort of initial
+    argument:
+
+>          What is this all about? --+
+>                                    |
+>                                    v
+> promptInt :: (Proxy p)          => ()  -> Producer p Int IO r
+> printer   :: (Show a, Proxy p)  => ()  -> Consumer p a IO r
+> take'     :: (Proxy p)   => Int -> ()  -> Pipe p a a IO ()
+> comparer  :: (Proxy p)          => Int -> Server p Int Bool IO r
+> cache     :: (Ord key, Proxy p) => key -> p key val key val IO r
+
+    If we expand all the type synonyms out, we notice a common pattern:
+
+>                                    +--These Match---+
+>                                    |                |
+>                                    v                v
+> promptInt :: (Proxy p)          => ()  -> p C   ()  ()  Int  IO r
+> printer   :: (Proxy p, Show a)  => ()  -> p ()  a   ()  C    IO r
+> take'     :: (Proxy p)   => Int -> ()  -> p ()  a   ()  a    IO ()
+> comparer  :: (Proxy p)  =>         Int -> p C   ()  Int Bool IO r
+> cache     :: (Ord key, Proxy p) => key -> p key val key val  IO r
+
+    The initial argument each 'Proxy' accepts always matches the third type
+    parameter, which is the input received on the downstream interface, which
+    I've marked on the following diagram:
+
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> a' <==       <== b' << Entry point
+>     |  Proxy  |
+> a  ==>       ==> b
+>     |         |
+>     +---------+
+
+    Composition initializes all 'Proxy's from their downstream interface by
+    supplying the first argument.  This follows directly from the type of
+    composition:
+
+> (>->) :: (Monad m, Proxy p)
+>  => (b' -> p a' a b' b m r)
+>  -> (c' -> p b' b c' c m r)
+>  -> (c' -> p a' a c' c m r)
+>      ^            ^
+>      |   These    |
+>      +---Match----+
+
+    We can trivially initialize 'Producer's, 'Consumer's, 'Pipe's, and
+    'Client's with '()' since they don't require any useful input on their
+    downstream interface.  However, 'Server's and 'Proxy's cannot begin until
+    they receive their first argument.
+
+    'Server's and 'Proxy's aren't the only abstractions that require this
+    initial argument.  "Control.Proxy.Synonym" defines the full constellation of
+    type synonyms, including the dual 'CoProducer', 'CoConsumer', and 'CoPipe'
+    synonyms, where information only flows upstream.  These three dual
+    constructions require an initial argument as well. -}
+
+{- $composition
+    When we compose @(p1 >-> p2)@, composition ensures that @p1@'s downstream
+    interface matches @p2@'s upstream interface.  This follows from the type of
+    ('>->'):
+
+> (>->) :: (Monad m, Proxy p)
+>  => (b' -> p a' a b' b m r) -- Proxy from (a', a) to (b', b)
+>  -> (c' -> p b' b c' c m r) -- Proxy from (b', b) to (c', c)
+>  -> (c' -> p a' a c' c m r) -- Proxy from (a', a) to (c', c)
+
+>         p1     >->      p2
+>
+>     +--------+      +--------+
+>     |        |      |        |
+> a' <==      <== b' <==      <== c'
+>     |   p1   |      |   p2   |
+> a  ==>      ==> b  ==>      ==> c
+>     |        |      |        |
+>     +--------+      +--------+
+
+    @p1@'s downstream @(b', b)@ interface matches @p2@'s upstream @(b', b)@
+    interface, so composition connects them on this shared interface.  This
+    fuses away the @(b', b)@ interface, leaving behind @p1@'s upstream @(a', a)@
+    interface and @p2@'s downstream @(c', c)@ interface:
+
+>     +-----------------+
+>     |                 |
+> a' <==               <== c'
+>     |   p1  >->  p2   |
+> a  ==>               ==> c
+>     |                 |
+>     +-----------------+
+
+    Proxy composition has the very nice property that it is associative, meaning
+    that it behaves the exact same way no matter how you group composition:
+
+> (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
+
+    ... so you can safely elide the parentheses entirely:
+
+> p1 >-> p2 >-> p3
+
+    Also, we can define a \"transparent\" 'Proxy' that auto-forwards values both
+    ways:
+
+> idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+> idT = runIdentityK go where
+>     go a' = do
+>         a   <- request a'
+>         a'2 <- respond a
+>         go a'2
+
+    Transparency means that:
+
+> idT >-> p = p
+>
+> p >-> idT = p
+
+    In other words, 'idT' is an identity of composition.
+
+    This means that proxies form a 'Category' where ('>->') is the composition
+    and 'idT' is the identity.   The associativity law and the two identity laws
+    are just the 'Category' laws.
+
+    These 'Category' laws guarantee the following important properties:
+
+    * You can reason about each proxy's behavior independently of other proxies
+      (thanks to the associativity law)
+
+    * You don't encounter weird behavior at the boundary between components
+      (thanks to the identity laws)
+
+    * You don't encounter corner cases at the 'Server' or 'Client' ends of a
+     'Session' (thanks to the identity laws) -}
+
+{-
+    'Producer's, 'Consumer's and 'Pipe's only send information downstream, but
+    the more general proxy type permits information flow upstream.  To see how,
+    let's inspect the types of the 'request' and 'respond' primitives:
+
+> request :: (Monad m, Proxy p) => a' -> p a' a b' b m a
+
+    'request' requires an argument of type @a'@ that it sends upstream.  It
+    then receives a result of type @a@.  'request' corresponds to the upstream
+    interface of a proxy:
+
+> Upstream |
+>     +-----
+>     |  request
+> a' <== argument
+>     |
+> a  ==> request
+>     |  result
+>     +-----
+
+    'respond' is the dual of 'request':
+
+> respond :: (Monad m, Proxy p) => b -> p a' a b' b m b'
+
+    'respond' answers a downstream request with a value of type @b@, and then
+    binds the next request's argument of type @b'@.  'respond' corresponds to
+    the downstream interface of a proxy:
+
+>      | Downstream
+>      -----+
+>     next  |
+> argument <== b'
+>           |
+>  current ==> b
+>   result  |
+>      -----+
+
+    If @b'@ is always the /next/ argument, where does the proxy get its
+    /first/ argument?  We pass the first argument as an ordinary parameter of
+    type @b'@:
+
+> b' -> p a' a b' b m r
+
+    This is why all the initial examples require an extra @()@ parameter.  We
+    can see this if we expand out their type synonyms, where the initial
+    argument always matches the third type parameter:
+
+>                                   +-- These  --+
+>                                   |   Match    |
+>                                   v            v
+> promptInt :: (Proxy p)         => () -> p C () () Int IO r
+> printer   :: (Proxy p, Show a) => () -> p () a () C   IO r
+> take'     :: (Proxy p)  => Int -> () -> p () a () a   IO ()
+
+    We can expand the type synonyms for @oneTwoThree@ and @incrementer@ to
+    verify that they also take an initial argument corresponding to the input
+    on their downstream interface:
+
+>                                      +--   These    --+
+>                                      |     Match      |
+>                                      v                v
+> incrementer :: (Monad m, Proxy p) => Int -> p C   ()  Int Int m r
+> oneTwoThree :: (Monad m, Proxy p) => ()  -> p Int Int ()  C   m r
+
+    Since they are still proxies under the hood, we compose them together using
+    the same mechanism
+
 > printer () = runIdentityP $ forever $ do
->     x <- request ()
->     lift $ print x
+>     a <- request () -- <== '()' sent upstream
+>     ...
 
-    Here, @printer@ is polymorphic in its output.  We could type-restrict it to
-    guarantee it will never 'respond' by setting the output to 'C', an unhabited
-    type that \'@C@\'loses the output end:
+ which is why the examples 
 
-> printer :: (Show b, Proxy p) => () -> Pipe p b C IO r
+"Control.Proxy.Synonym" defines even more type synonyms, including ones that
+-}
 
-    A 'Pipe' that never 'respond's can be the final stage in a 'Pipeline'.
-    Again, I provide a type synonym for this common case:
+{- $class
+    All of our proxy code programmed generically over the 'Proxy' type class.
+    This type class defines the four central operations of this library's API:
 
-> type Consumer p b m r = Pipe p b C m r
+    * ('<-<'): Proxy composition
 
-    So we could instead write @printer@'s type as:
+    * 'idT': The identity proxy
 
-> printer :: (Show b, Proxy p) => () -> Consumer p b IO r
+    * 'request': Request input from upstream
 
-    A 'Consumer' is a data sink that can run actions in the base monad depending
-    on what kind of data it receives.
+    * 'respond': Respond with output to downstream
+
+    Everything else is built on top of these four operations, which is why all
+    the library's utilities are polymorphic over the 'Proxy' type class.
+
+    Let's look at some example instances of the 'Proxy' type class:
+
+> instance Proxy ProxyFast     -- Faster
+> instance Proxy ProxyCorrect  -- Correct by construction
+
+    These two proxy types are the two alternative base implementations.  As the
+    names suggest, the 'ProxyFast' implementation is faster but requires hiding
+    some internals, while 'ProxyCorrect' is correct by construction.
+    "Control.Proxy" automatically selects the 'ProxyFast' implementation for
+    you, but you can switch to 'ProxyCorrect' by instead importing:
+
+> import Control.Proxy.Core    -- Everything except the base implementation
+> import Control.Proxy.Correct -- The base implementation
+
+    These are not the only 'Proxy' instances, though!  This library defines
+    several extensions to the base 'Proxy' type, all of which implement the
+    'Proxy' type class:
+
+> instance (Proxy p) => Proxy (IdentityP p) -- Like IdentityT
+> instance (Proxy p) => Proxy (MaybeP    p) -- Like MaybeT
+> instance (Proxy p) => Proxy (EitherP e p) -- Like EitherT
+> instance (Proxy p) => Proxy (StateP  s p) -- Like StateT
+
+    These extensions behave like monad transformers, except they also correctly
+    lift proxy operations over the monad transformer.
 -}
 
 {- $compose
     What distinguishes 'Pipe's from every other iteratee implementation is that
     they form a true 'Category'.  Because of this, you can literally compose
     'Pipe's into 'Pipeline's using ordinary composition:
-
-> newtype PipeC m r a b = PipeC { unPipeC :: Pipe a b m r }
-> instance Category (PipeC m r) where ...
-
-    For example, you can compose the above 'Pipe's with:
-
-> pipeline :: Pipe () C IO ()
-> pipeline = unPipeC $ PipeC printer . PipeC (take' 3) . PipeC (fromList [1..])
-
-    The compiler deduces that the final 'Pipe' must be blocked at both ends,
-    meaning it will never 'await' useful input and it will never 'yield' any
-    output.  This represents a self-contained 'Pipeline' and I provide a type
-    synonym for this common case:
-
-> type Pipeline m r = Pipe () C m r
-
-    Also, I provide '<+<' as a convenience operator for composing 'Pipe's
-    without the burden of wrapping and unwrapping newtypes:
-
-> p1 <+< p2 == unPipeC $ PipeC p1 . PipeC p2
-
-    So you can rewrite @pipeline@ as:
-
-> pipeline :: Pipeline IO ()
-> pipeline = printer <+< take' 3 <+< fromList [1..]
 
     Like many other monad transformers, you convert the 'Pipe' monad back to the
     base monad using some sort of \"@run...@\" function.  In this case, it's the
