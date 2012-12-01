@@ -1,3 +1,5 @@
+{-# LANGUAGE KindSignatures #-}
+
 {-| This module provides an API similar to "Control.Pipe" for those who prefer
     the classic 'Pipe' API.
 
@@ -15,6 +17,9 @@ module Control.Proxy.Pipe (
     (>+>),
     idP,
 
+    -- * Synonyms
+    Pipeline,
+
     -- * Run Pipes
     -- $run
 
@@ -24,7 +29,7 @@ module Control.Proxy.Pipe (
 
 import Control.Monad (forever)
 import Control.Proxy.Class (Proxy(request, respond, (>->), (?>=)))
-import Control.Proxy.Synonym (Pipe, Consumer, Producer)
+import Control.Proxy.Synonym (Pipe, Consumer, Producer, C)
 import Control.Proxy.Trans.Identity (runIdentityP)
 
 {-| Wait for input from upstream
@@ -65,6 +70,11 @@ idP :: (Monad m, Proxy p) => Pipe p a a m r
 idP = runIdentityP $ forever $ do
     a <- request ()
     respond a
+
+{-| A self-contained 'Pipeline' that is ready to be run
+
+    'Pipeline's never 'request' nor 'respond'. -}
+type Pipeline (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
 {- $run
     The "Control.Proxy.Core.Fast" and "Control.Proxy.Core.Correct" modules
@@ -153,7 +163,8 @@ idP = runIdentityP $ forever $ do
     or sequence your 'Pipe' within any feature set transparently.
 
     Finally, replace each 'await' with @request ()@ and each 'yield' with
-    'respond'.  This lets you drop the "Control.Proxy.Pipe" import:
+    'respond'.  Also, replace every 'Pipeline' with 'Session'.  This lets you
+    drop the "Control.Proxy.Pipe" import:
 
 > import Control.Proxy
 >
