@@ -121,7 +121,6 @@ instance MonadIOP ProxyFast where
     liftIO_P = liftIO
 
 instance Proxy ProxyFast where
-    idT = \a' -> Request a' (\a -> Respond a idT)
  -- k1 <-< k2_0 = ...
     k2_0 >-> k1 = \c' -> k1 c' |-< k2_0 where
         p1 |-< k2 = case p1 of

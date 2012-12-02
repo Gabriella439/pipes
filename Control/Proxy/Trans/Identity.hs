@@ -82,9 +82,6 @@ instance (MFunctorP           p )
 
 instance (Proxy            p )
        => Proxy (IdentityP p) where
-    idT = \a' -> IdentityP (idT a')
- -- idT = IdentityP . idT
-
     p1 >-> p2 = \c'1 -> IdentityP (
         ((\c'2 -> runIdentityP (p1 c'2))
      >-> (\b'  -> runIdentityP (p2 b' )) ) c'1 )

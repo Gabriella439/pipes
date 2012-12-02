@@ -15,6 +15,7 @@
 module Control.Proxy.Class (
     -- * Core proxy class
     Proxy(..),
+    idT,
     (<-<),
     -- * request/respond substitution
     Interact(..),
@@ -52,8 +53,6 @@ infixl 1 ?>= -- This should match the fixity of >>=
     First, all proxies must support a bidirectional flow of information.
     Minimal definition:
 
-    * 'idT'
-
     * ('>->')
 
     * 'request'
@@ -65,8 +64,11 @@ infixl 1 ?>= -- This should match the fixity of >>=
 
     These must satisfy the following laws:
 
-    * ('>->') and 'idT' form a category:
+    * ('>->') and 'idT' form a category, given the following definition for
+      'idT':
 
+> Define: idT = request >=> respond >=> idT
+>
 > idT >-> f = f
 >
 > f >-> idT = f
@@ -85,8 +87,6 @@ infixl 1 ?>= -- This should match the fixity of >>=
     Additionally, the following laws govern how proxy composition interacts with
     the proxy monad:
 
-> idT = request >=> respond >=> idT
->
 > f >-> (respond >=> g) = respond >=> (f >-> g)
 >
 > (respond >=> f) >-> (request >=> g) = f >-> g
@@ -111,10 +111,6 @@ infixl 1 ?>= -- This should match the fixity of >>=
 > (lift . k >=> f) >-> (request >=> g) = lift . k >=> (f >-> (request >=> g))
 -}
 class Proxy p where
-    {-| 'idT' acts like a \'T\'ransparent proxy, passing all requests further
-        upstream, and passing all responses further downstream. -}
-    idT :: (Monad m) => a' -> p a' a a' a m r
-
     {-| Compose two proxies, satisfying all requests from downstream with
         responses from upstream. -}
     (>->) :: (Monad m)
@@ -150,6 +146,16 @@ class Proxy p where
     {-| 'lift_P' is identical to 'lift', except with a more polymorphic
         constraint. -}
     lift_P :: (Monad m) => m r -> p a' a b' b m r
+
+{-| 'idT' acts like a \'T\'ransparent proxy, passing all requests further
+    upstream, and passing all responses further downstream. -}
+idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+idT = go where
+    go a' =
+        request a' ?>= \a   ->
+        respond a  ?>= \a'2 ->
+        go a'2
+-- idT = foreverK $ request >=> respond
 
 {-| Compose two proxies, satisfying all requests from downstream with
     responses from upstream. -}

@@ -89,8 +89,6 @@ instance (MFunctorP          p )
 
 instance (Proxy           p )
        => Proxy (StateP s p) where
-    idT = \a' -> StateP (\_ -> idT a')
-
     p1 >-> p2 = \c'1 -> StateP (\s ->
         ((\b' -> unStateP (p1 b') s) >-> (\c'2 -> unStateP (p2 c'2) s)) c'1 )
  {- (p1 >-> p2) = \c' -> StateP $ \s ->

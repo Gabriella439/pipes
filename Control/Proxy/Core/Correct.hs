@@ -91,9 +91,6 @@ instance MonadIOP ProxyCorrect where
     liftIO_P = liftIO
 
 instance Proxy ProxyCorrect where
-    idT = \a' ->
-        Proxy (return (Request a' (\a ->
-        Proxy (return (Respond a idT)) )))
 --  k1 <-< k2_0 = ...
     k2_0 >-> k1 = \c' -> k1 c' |-< k2_0 where
         p1 |-< k2 = Proxy (do

@@ -95,9 +95,6 @@ instance (MFunctorP        p )
 
 instance (Proxy         p )
        => Proxy (MaybeP p) where
-    idT = \a' -> MaybeP (idT a')
- -- idT = MaybeP . idT
-
     p1 >-> p2 = \c'1 -> MaybeP (
         ((\b' -> runMaybeP (p1 b')) >-> (\c'2 -> runMaybeP (p2 c'2))) c'1 )
  -- p1 >-> p2 = (MaybeP .) $ runMaybeP . p1 >-> runMaybeP . p2
