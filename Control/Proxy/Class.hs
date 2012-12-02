@@ -59,10 +59,10 @@ infixl 1 ?>= -- This should match the fixity of >>=
 
     * 'respond'
 
-    Intuitively, @p1 >-> p2@ satisfies all 'request's in @p2@ with 'respond's in
-    @p1@.
+    Intuitively, @p1 >-> p2@ satisfies each 'request' in @p2@ with a 'respond'
+    in @p1@.
 
-    These must satisfy the following laws:
+    These primitives must satisfy the following laws:
 
     * ('>->') and 'idT' form a category, given the following definition for
       'idT':
@@ -87,15 +87,17 @@ infixl 1 ?>= -- This should match the fixity of >>=
     Additionally, the following laws govern how proxy composition interacts with
     the proxy monad:
 
-> f >-> (respond >=> g) = respond >=> (f >-> g)
+> -- I will later add more general versions of these laws
 >
-> (respond >=> f) >-> (request >=> g) = f >-> g
+> p1 >-> (respond >=> p2) = respond >=> (p1 >-> p2)
 >
-> (request >=> f) >-> (request >=> g) = request >=> (f >-> (request >=> g))
+> (respond >=> p1) >-> (request >=> p2) = p1 >-> p2
 >
-> f >-> return = return
+> (request >=> p1) >-> (request >=> p2) = request >=> (p1 >-> (request >=> p2))
 >
-> return >-> (request >=> f) = return
+> p1 >-> return = return
+>
+> return >-> (request >=> p1) = return
 
     Third, all proxies are monad transformers.  Minimal definition:
 
@@ -106,9 +108,9 @@ infixl 1 ?>= -- This should match the fixity of >>=
     Additionally, the following laws govern how proxy composition interacts with
     the base monad:
 
-> f >=> (lift . k >=> g) = lift . k >=> (f >-> g)
+> p1 >=> (lift . k >=> p2) = lift . k >=> (p1 >-> p2)
 >
-> (lift . k >=> f) >-> (request >=> g) = lift . k >=> (f >-> (request >=> g))
+> (lift . k >=> f) >-> (request >=> p2) = lift . k >=> (p1 >-> (request >=> p2))
 -}
 class Proxy p where
     {-| Compose two proxies, satisfying all requests from downstream with
