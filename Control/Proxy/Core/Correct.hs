@@ -127,6 +127,8 @@ instance Proxy ProxyCorrect where
 
     lift_P m = Proxy (m >>= \r -> return (Pure r))
 
+    hoist_P = hoist
+
 instance Interact ProxyCorrect where
     k2 \>\ k1 = \a' -> go (k1 a') where
         go p = Proxy (do
@@ -151,9 +153,6 @@ instance MFunctor (ProxyCorrect a' a b' b) where
                 Request a' fa  -> Request a' (\a  -> go (fa  a ))
                 Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
                 Pure       r   -> Pure r )))
-
-instance MFunctorP ProxyCorrect where
-    hoist_P = hoist
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to

@@ -153,6 +153,8 @@ instance Proxy ProxyFast where
 
     lift_P = _lift
 
+    hoist_P = hoist
+
 {-# RULES
     "_bind (Request a' Pure) f" forall a' f .
         _bind (Request a' Pure) f = Request a' f;
@@ -181,9 +183,6 @@ instance MFunctor (ProxyFast a' a b' b) where
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (nat (m >>= \p' -> return (go p')))
             Pure       r   -> Pure r
-
-instance MFunctorP ProxyFast where
-    hoist_P = hoist
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to

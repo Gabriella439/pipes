@@ -27,7 +27,6 @@ module Control.Proxy.Class (
     -- $poly
     MonadPlusP(..),
     MonadIOP(..),
-    MFunctorP(..),
     ) where
 
 import Control.Monad.IO.Class (MonadIO)
@@ -83,7 +82,13 @@ infixl 1 ?>= -- This should match the fixity of >>=
 
     This must satisfy the monad transformer laws, using @lift = lift_P@.
 
-    Additionally, all 'Proxy' instances must satisfy the 'Proxy' laws:
+    Fourth, all proxies are functors in the category of monads, defined by:
+
+    * 'hoist_P'
+
+    This must satisfy the functor laws, using @hoist = hoist_P@.
+
+    All 'Proxy' instances must satisfy these additional laws:
 
     * ('>->') and 'idT' form a category:
 
@@ -105,7 +110,19 @@ infixl 1 ?>= -- This should match the fixity of >>=
 >
 > (p1 >~> p2) >~> p3 = p1 >~> (p2 >~> p3)
 
-    * Additionally:
+    * '(hoistK f)' defines a functor between proxy categories:
+
+> Define: hoistK f = (hoist f .)
+>
+> hoistK f (p1 >-> p2) = hoistK f p1 >-> hoistK p2
+>
+> hoistK f idT = idT
+>
+> hoistK f (p1 >~> p2) = hoistK f p1 >~> hoistK p2
+>
+> hoistK f coidT = coidT
+
+    Also, all proxies must satisfy the following 'Proxy' laws:
 
 > -- Define: mapK = (lift .)
 >
@@ -178,6 +195,12 @@ class Proxy p where
     {-| 'lift_P' is identical to 'lift', except with a more polymorphic
         constraint. -}
     lift_P :: (Monad m) => m r -> p a' a b' b m r
+
+    {-| 'hoist_P' is identical to 'hoist', except with a more polymorphic
+        constraint. -}
+    hoist_P
+     :: (Monad m)
+     => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')
 
 {-| 'idT' forwards requests followed by responses
 
@@ -400,12 +423,3 @@ class (Proxy p) => MonadPlusP p where
 -}
 class (Proxy p) => MonadIOP p where
     liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r
-
-{-| The @(MFunctorP p)@ constraint is equivalent to the following constraint:
-
-> (forall a' a b' b . MFunctor (p a' a b' b)) => ...
--}
-class MFunctorP p where
-    hoist_P
-     :: (Monad m)
-     => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')

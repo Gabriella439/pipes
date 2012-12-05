@@ -71,12 +71,7 @@ instance (MonadIOP           p, MonadIO m)
        => MonadIO (IdentityP p a' a b' b m) where
     liftIO = liftIO_P
 
-instance (MFunctorP            p )
-       => MFunctorP (IdentityP p) where
-    hoist_P nat p = IdentityP (hoist_P nat (runIdentityP p))
- -- hoist nat = IdentityP . hoist nat . runIdentityP
-
-instance (MFunctorP           p )
+instance (Proxy               p )
        => MFunctor (IdentityP p a' a b' b) where
     hoist = hoist_P
 
@@ -107,6 +102,9 @@ instance (Proxy            p )
 
     lift_P m = IdentityP (lift_P m)
  -- lift = P . lift
+
+    hoist_P nat p = IdentityP (hoist_P nat (runIdentityP p))
+ -- hoist nat = IdentityP . hoist nat . runIdentityP
 
 instance (Interact            p )
       =>  Interact (IdentityP p) where
