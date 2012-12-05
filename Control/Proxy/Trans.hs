@@ -27,7 +27,7 @@ import Control.Proxy.Class
 
 > mapP (f >-> g) = mapP f >-> mapP g
 >
-> mapP idPull = idPull
+> mapP idT = idT
 
 > mapP (f >~> g) = mapP f >~> mapP g
 >

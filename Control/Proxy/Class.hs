@@ -15,8 +15,8 @@
 module Control.Proxy.Class (
     -- * Core proxy class
     Proxy(..),
-    idPush,
-    idPull,
+    idT,
+    coidT,
     (<-<),
     (<~<),
     -- * request/respond substitution
@@ -85,23 +85,23 @@ infixl 1 ?>= -- This should match the fixity of >>=
 
     Additionally, all 'Proxy' instances must satisfy the 'Proxy' laws:
 
-    * ('>->') and 'idPull' form a category:
+    * ('>->') and 'idT' form a category:
 
-> Define: idPull = request >=> respond >=> idPull
+> Define: idT = request >=> respond >=> idT
 >
-> idPull >-> p = p
+> idT >-> p = p
 >
-> p >-> idPull = p
+> p >-> idT = p
 >
 > (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
 
-    * ('>~>') and 'idPush' form a category:
+    * ('>~>') and 'coidT' form a category:
 
-> Define: idPush = respond >=> request >=> idPush
+> Define: coidT = respond >=> request >=> coidT
 >
-> idPush >~> p = p
+> coidT >~> p = p
 >
-> p >~> idPush = p
+> p >~> coidT = p
 >
 > (p1 >~> p2) >~> p3 = p1 >~> (p2 >~> p3)
 
@@ -179,29 +179,29 @@ class Proxy p where
         constraint. -}
     lift_P :: (Monad m) => m r -> p a' a b' b m r
 
-{-| 'idPull' forwards requests followed by responses
+{-| 'idT' forwards requests followed by responses
 
-> idPull = request >=> respond >=> idPull
+> idT = request >=> respond >=> idT
 -}
-idPull :: (Monad m, Proxy p) => a' -> p a' a a' a m r
-idPull = go where
+idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+idT = go where
     go a' =
         request a' ?>= \a   ->
         respond a  ?>= \a'2 ->
         go a'2
--- idPull = foreverK $ request >=> respond
+-- idT = foreverK $ request >=> respond
 
-{-| 'idPush' forwards responses followed by requests
+{-| 'coidT' forwards responses followed by requests
 
-> idPush = respond >=> request >=> idPush
+> coidT = respond >=> request >=> coidT
 -}
-idPush :: (Monad m, Proxy p) => a -> p a' a a' a m r
-idPush = go where
+coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
+coidT = go where
     go a =
         respond a  ?>= \a' ->
         request a' ?>= \a2 ->
         go a2
--- idPush = foreverK $ respond >=> request
+-- coidT = foreverK $ respond >=> request
 
 {-| Compose two proxies blocked on a 'respond'
 
