@@ -310,7 +310,7 @@ p1 /</ p2 = p2 \>\ p1
 p1 \<\ p2 = p2 />/ p1
 
 {- $poly
-    All of the below type classes contain methods which copy methods from more
+    Many of these type classes contain methods which copy methods from more
     familiar type classes.  These duplicate methods serve two purposes.
 
     First, this library requires type class instances that would otherwise be
