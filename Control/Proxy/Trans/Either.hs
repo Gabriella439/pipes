@@ -100,6 +100,10 @@ instance (Proxy            p )
         ((\b' -> runEitherP (p1 b')) >-> (\c'2 -> runEitherP (p2 c'2))) c'1 )
  -- p1 >-> p2 = (EitherP .) $ runEitherP . p1 >-> runEitherP . p2
 
+    p1 >~> p2 = \c'1 -> EitherP (
+        ((\b' -> runEitherP (p1 b')) >~> (\c'2 -> runEitherP (p2 c'2))) c'1 )
+ -- p1 >~> p2 = (EitherP .) $ runEitherP . p1 >~> runEitherP . p2
+
     request = \a' -> EitherP (request a' ?>= \a  -> return_P (Right a ))
     respond = \b  -> EitherP (respond b  ?>= \b' -> return_P (Right b'))
 

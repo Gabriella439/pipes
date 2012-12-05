@@ -99,6 +99,10 @@ instance (Proxy         p )
         ((\b' -> runMaybeP (p1 b')) >-> (\c'2 -> runMaybeP (p2 c'2))) c'1 )
  -- p1 >-> p2 = (MaybeP .) $ runMaybeP . p1 >-> runMaybeP . p2
 
+    p1 >~> p2 = \c'1 -> MaybeP (
+        ((\b' -> runMaybeP (p1 b')) >~> (\c'2 -> runMaybeP (p2 c'2))) c'1 )
+ -- p1 >~> p2 = (MaybeP .) $ runMaybeP . p1 >~> runMaybeP . p2
+
     request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
     respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))
 

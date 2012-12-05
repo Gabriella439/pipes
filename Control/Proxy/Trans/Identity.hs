@@ -87,6 +87,11 @@ instance (Proxy            p )
      >-> (\b'  -> runIdentityP (p2 b' )) ) c'1 )
  -- p1 >-> p2 = (IdentityP .) $ runIdentityP . p1 >-> runIdentityP . p2
 
+    p1 >~> p2 = \c'1 -> IdentityP (
+        ((\c'2 -> runIdentityP (p1 c'2))
+     >~> (\b'  -> runIdentityP (p2 b' )) ) c'1 )
+ -- p1 >~> p2 = (IdentityP .) $ runIdentityP . p1 >~> runIdentityP . p2
+
     request = \a' -> IdentityP (request a')
  -- request = P . request
 

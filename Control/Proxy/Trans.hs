@@ -11,9 +11,9 @@ module Control.Proxy.Trans (
 
 import Control.Proxy.Class
 
-{-| 'mapP' defines a functor that preserves four categories:
+{-| 'mapP' defines a functor that preserves five categories:
 
-    * Proxy category
+    * The two Proxy categories
 
     * Kleisli category
 
@@ -25,9 +25,13 @@ import Control.Proxy.Class
 
     * Functor between 'Proxy' categories
 
-> mapP (f <-< g) = mapP f <-< mapP g
+> mapP (f >-> g) = mapP f >-> mapP g
 >
-> mapP idT = idT
+> mapP idPull = idPull
+
+> mapP (f >~> g) = mapP f >~> mapP g
+>
+> mapP idPush = idPush
 
     * Functor between Kleisli categories
 

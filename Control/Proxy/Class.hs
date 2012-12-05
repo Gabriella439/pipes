@@ -15,8 +15,10 @@
 module Control.Proxy.Class (
     -- * Core proxy class
     Proxy(..),
-    idT,
+    idPush,
+    idPull,
     (<-<),
+    (<~<),
     -- * request/respond substitution
     Interact(..),
     (/</),
@@ -50,32 +52,23 @@ infixl 1 ?>= -- This should match the fixity of >>=
 {-| The 'Proxy' class defines an interface to all core proxy capabilities that
     all proxy-like types must implement.
 
-    First, all proxies must support a bidirectional flow of information.
-    Minimal definition:
+    First, all proxies must support a bidirectional flow of information, defined
+    by:
 
     * ('>->')
+
+    * ('>~>')
 
     * 'request'
 
     * 'respond'
 
-    Intuitively, @p1 >-> p2@ satisfies each 'request' in @p2@ with a 'respond'
-    in @p1@.
+    Intuitively, both @p1 >-> p2@ and @p1 >~> p2@ pair each 'request' in @p2@
+    with a 'respond' in @p1@.  ('>->') accepts proxies blocked on 'respond' and
+    begins from the downstream end, whereas ('>~>') accepts proxies blocked on
+    'request' and begins from the upstream end.
 
-    These primitives must satisfy the following laws:
-
-    * ('>->') and 'idT' form a category, given the following definition for
-      'idT':
-
-> Define: idT = request >=> respond >=> idT
->
-> idT >-> f = f
->
-> f >-> idT = f
->
-> (f >-> g) >-> h = f >-> (g >-> h)
-
-    Second, all proxies are monads.  Minimal definition:
+    Second, all proxies are monads, defined by:
 
     * 'return_P'
 
@@ -84,42 +77,59 @@ infixl 1 ?>= -- This should match the fixity of >>=
     These must satify the monad laws using @(>>=) = (?>=)@ and
     @return = return_P@.
 
-    Additionally, the following laws govern how proxy composition interacts with
-    the proxy monad:
-
-> -- I will later add more general versions of these laws
->
-> p1 >-> (respond >=> p2) = respond >=> (p1 >-> p2)
->
-> (respond >=> p1) >-> (request >=> p2) = p1 >-> p2
->
-> (request >=> p1) >-> (request >=> p2) = request >=> (p1 >-> (request >=> p2))
->
-> p1 >-> return = return
->
-> return >-> (request >=> p1) = return
-
-    Third, all proxies are monad transformers.  Minimal definition:
+    Third, all proxies are monad transformers, defined by:
 
     * 'lift_P'
 
     This must satisfy the monad transformer laws, using @lift = lift_P@.
 
-    Additionally, the following laws govern how proxy composition interacts with
-    the base monad:
+    Additionally, all 'Proxy' instances must satisfy the 'Proxy' laws:
 
-> p1 >=> (lift . k >=> p2) = lift . k >=> (p1 >-> p2)
+    * ('>->') and 'idPull' form a category:
+
+> Define: idPull = request >=> respond >=> idPull
 >
-> (lift . k >=> f) >-> (request >=> p2) = lift . k >=> (p1 >-> (request >=> p2))
+> idPull >-> p = p
+>
+> p >-> idPull = p
+>
+> (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
+
+    * ('>~>') and 'idPush' form a category:
+
+> Define: idPush = respond >=> request >=> idPush
+>
+> idPush >~> p = p
+>
+> p >~> idPush = p
+>
+> (p1 >~> p2) >~> p3 = p1 >~> (p2 >~> p3)
+
+    * Additionally:
+
+> -- Define: mapK = (lift .)
+>
+> p1 >-> mapK f = mapK f
+>
+> p1 >-> (mapK f >=> respond >=> p2) = mapK f >=> respond >=> (p1 >-> p2)
+>
+> (mapK g >=> respond >=> p1) >-> (mapK f >=> request >=> mapK h >=> p2)
+>     = mapK (f >=> g >=> h) >=> (p1 >-> p2)
+>
+> (mapK g >=> request >=> p1) >-> (mapK f >=> request >=> p2)
+>     = mapK (f >=> g) >=> request >=> (p1 >~> p2)
+>
+> mapK f >~> p2 = mapK f
+>
+> (mapK f >=> request >=> p1) >~> p2 = mapK f >=> request >=> (p1 >~> p2)
+>
+> (mapK f >=> respond >=> mapK h >=> p1) >~> (mapK g >=> request >=> p2)
+>     = mapK (f >=> g >=> h) >=> (p1 >~> p2)
+>
+> (mapK f >=> respond >=> p1) >~> (mapK g >=> respond >=> p2)
+>     = mapK (f >=> g) >=> (p1 >-> p2)
 -}
 class Proxy p where
-    {-| Compose two proxies, satisfying all requests from downstream with
-        responses from upstream. -}
-    (>->) :: (Monad m)
-          => (b' -> p a' a b' b m r)
-          -> (c' -> p b' b c' c m r)
-          -> (c' -> p a' a c' c m r)
-
     {-| 'request' input from upstream, passing an argument with the request
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
@@ -135,6 +145,26 @@ class Proxy p where
         argument of type @b'@ from the next 'request' as its return value. -}
     respond :: (Monad m) => b -> p a' a b' b m b'
 
+    {-| Compose two proxies blocked on a 'respond'
+
+        Begins from the downstream end and satisfies every 'request' with a
+        'respond' -}
+    (>->)
+     :: (Monad m)
+     => (b' -> p a' a b' b m r)
+     -> (c' -> p b' b c' c m r)
+     -> (c' -> p a' a c' c m r)
+
+    {-| Compose two proxies blocked on a 'request'
+
+        Begins from the upstream end and satisfies every 'respond' with a
+        'request' -}
+    (>~>)
+     :: (Monad m)
+     => (a -> p a' a b' b m r)
+     -> (b -> p b' b c' c m r)
+     -> (a -> p a' a c' c m r)
+
     {-| 'return_P' is identical to 'return', except with a more polymorphic
         constraint. -}
     return_P :: (Monad m) => r -> p a' a b' b m r
@@ -149,23 +179,51 @@ class Proxy p where
         constraint. -}
     lift_P :: (Monad m) => m r -> p a' a b' b m r
 
-{-| 'idT' acts like a \'T\'ransparent proxy, passing all requests further
-    upstream, and passing all responses further downstream. -}
-idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
-idT = go where
+{-| 'idPull' forwards requests followed by responses
+
+> idPull = request >=> respond >=> idPull
+-}
+idPull :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+idPull = go where
     go a' =
         request a' ?>= \a   ->
         respond a  ?>= \a'2 ->
         go a'2
--- idT = foreverK $ request >=> respond
+-- idPull = foreverK $ request >=> respond
 
-{-| Compose two proxies, satisfying all requests from downstream with
-    responses from upstream. -}
-(<-<) :: (Monad m, Proxy p)
-      => (c' -> p b' b c' c m r)
-      -> (b' -> p a' a b' b m r)
-      -> (c' -> p a' a c' c m r)
+{-| 'idPush' forwards responses followed by requests
+
+> idPush = respond >=> request >=> idPush
+-}
+idPush :: (Monad m, Proxy p) => a -> p a' a a' a m r
+idPush = go where
+    go a =
+        respond a  ?>= \a' ->
+        request a' ?>= \a2 ->
+        go a2
+-- idPush = foreverK $ respond >=> request
+
+{-| Compose two proxies blocked on a 'respond'
+
+    Begins from the downstream end and satisfies every 'request' with a
+    'respond' -}
+(<-<)
+ :: (Monad m, Proxy p)
+ => (c' -> p b' b c' c m r)
+ -> (b' -> p a' a b' b m r)
+ -> (c' -> p a' a c' c m r)
 p1 <-< p2 = p2 >-> p1
+
+{-| Compose two proxies blocked on a 'request'
+
+    Begins from the upstream end and satisfies every 'respond' with a
+    'request' -}
+(<~<)
+ :: (Monad m, Proxy p)
+ => (b -> p b' b c' c m r)
+ -> (a -> p a' a b' b m r)
+ -> (a -> p a' a c' c m r)
+p1 <~< p2 = p2 >~> p1
 
 {-| This class exists primarily for theoretical interest and to justify some of
     the functor laws for the 'ProxyTrans' type class.  You probably do not need

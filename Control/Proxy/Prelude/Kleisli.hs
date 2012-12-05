@@ -55,7 +55,7 @@ liftK k a = lift (k a)
 
 > hoistK f >-> hoistK g = hoistK (f >-> g)
 >
-> hoistK idT = idT
+> hoistK idPull = idPull
 -}
 hoistK
  :: (Monad m, MFunctor t)

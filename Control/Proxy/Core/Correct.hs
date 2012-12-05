@@ -91,19 +91,32 @@ instance MonadIOP ProxyCorrect where
     liftIO_P = liftIO
 
 instance Proxy ProxyCorrect where
---  k1 <-< k2_0 = ...
-    k2_0 >-> k1 = \c' -> k1 c' |-< k2_0 where
-        p1 |-< k2 = Proxy (do
+    fb'_0 >-> fc' = \c' -> fb'_0 >-| fc' c' where
+        fb' >-| p1 = Proxy (do
             x <- unProxy p1
             case x of
-                Request b' fb  -> unProxy (fb <-| k2 b')
-                Respond c  fc' -> return (Respond c (\c' -> fc' c' |-< k2))
+                Request b' fb  -> unProxy (fb' b' |-> fb)
+                Respond c  fc' -> return (Respond c (\c' -> fb' >-| fc' c'))
                 Pure       r   -> return (Pure r) )
-        fb <-| p2 = Proxy (do
+        p2 |-> fb = Proxy (do
             x <- unProxy p2
             case x of
-                Request a' fa  -> return (Request a' (\a -> fb <-| fa a))
-                Respond b  fb' -> unProxy (fb b |-< fb')
+                Request a' fa  -> return (Request a' (\a -> fa a |-> fb))
+                Respond b  fb' -> unProxy (fb' >-| fb b)
+                Pure       r   -> return (Pure r) )
+
+    fa_0 >~> fb_0 = \a -> fa_0 a |-> fb_0 where
+        fb' >-| p1 = Proxy (do
+            x <- unProxy p1
+            case x of
+                Request b' fb  -> unProxy (fb' b' |-> fb)
+                Respond c  fc' -> return (Respond c (\c' -> fb' >-| fc' c'))
+                Pure       r   -> return (Pure r) )
+        p2 |-> fb = Proxy (do
+            x <- unProxy p2
+            case x of
+                Request a' fa  -> return (Request a' (\a -> fa a |-> fb))
+                Respond b  fb' -> unProxy (fb' >-| fb b)
                 Pure       r   -> return (Pure r) )
 
     request a' = Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
