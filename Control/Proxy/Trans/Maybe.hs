@@ -50,7 +50,7 @@ instance (Proxy               p, Monad m)
 instance (Proxy         p, Monad m)
        => Monad (MaybeP p a' a b' b m) where
     return = return_P
-    (>>=) = (?>=)
+    (>>=)  = (?>=)
 
 instance (Proxy               p, Monad m)
        => Alternative (MaybeP p a' a b' b m) where
@@ -64,7 +64,7 @@ instance (Proxy              p )
         runMaybeP m1 ?>= \ma ->
         runMaybeP (case ma of
             Nothing -> m2
-            Just a  -> just a) )
+            Just a  -> just a ) )
 
 instance (Proxy             p, Monad m)
        => MonadPlus (MaybeP p a' a b' b m) where
