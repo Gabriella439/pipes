@@ -1,4 +1,6 @@
--- | This module provides the tutorial for "Control.Proxy".
+{-| This module provides a brief introductory tutorial in the \"Introduction\"
+    section followed by a lengthy discussion of the library's design and idioms.
+-}
 
 module Control.Pipe.Tutorial (
     -- * Introduction
@@ -13,11 +15,20 @@ module Control.Pipe.Tutorial (
     -- * Composition
     -- $composition
 
-    -- * Extensions
-    -- $extend
-
     -- * The Proxy Class
     -- $class
+
+    -- * Interleaving Effects
+    -- $interleave
+
+    -- * Mixing Base Monads
+    -- $hoist
+
+    -- * The Base Monad
+    -- $base
+
+    -- * Extensions
+    -- $extend
 
     -- * Running Proxies
     -- $run
@@ -50,7 +61,10 @@ module Control.Pipe.Tutorial (
 -- For documentation
 import Control.Category
 import Control.Monad.Trans.Class
+import Control.MFunctor
 import Control.Proxy
+import Control.Proxy.Trans.Either
+import Prelude hiding (catch)
 
 {- $intro
     The @pipes@ library encompasses many types of streaming abstractions, all of
@@ -80,13 +94,13 @@ import Control.Proxy
 > --                   Consumes 'a's ---+----------+    +-- Never terminates, so
 > --                                    |          |    |   the return value is
 > --                                    v          v    v   polymorphic
-> printer :: (Show a, Proxy p) => () -> Consumer p a IO r
+> printer :: (Proxy p, Show a) => () -> Consumer p a IO r
 > printer () = runIdentityP $ forever $ do
 >     a <- request ()
 >     lift $ putStrLn "Received a value:"
 >     lift $ print a
 
-    You can compose a 'Consumer' and a 'Producer' using ('>->'), which produces
+    You can compose a 'Producer' and a 'Consumer' using ('>->'), which produces
     a runnable 'Session':
 
 > --                Self-contained session ---+         +--+-- These must match
@@ -94,9 +108,10 @@ import Control.Proxy
 > --                                          v         v  v
 > promptInt >-> printer :: (Proxy p) => () -> Session p IO r
 
-    This connects each 'request' in @printer@ with a 'respond' in @promptInt@.
+    ('>->') connects each 'request' in @printer@ with a 'respond' in
+    @promptInt@.
 
-    Finally, you run the 'Session' using 'runProxy' to convert it back to the
+    Finally, you use 'runProxy' to run the 'Session' and convert it back to the
     base monad:
 
 >>> runProxy $ promptInt >-> printer :: IO r
@@ -127,8 +142,8 @@ Received a value:
 >     lift $ putStrLn "You shall not pass!"
 
     This 'Pipe' forwards the first @n@ values it receives undisturbed, then it
-    outputs a cute message.  You can compose it between the 'Consumer' and
-    'Producer' using ('>->'):
+    outputs a cute message.  You can compose it between the 'Producer' and
+    'Consumer' using ('>->'):
 
 >>> runProxy $ promptInt >-> take' 2 >-> printer :: IO ()
 Enter an Integer:
@@ -141,8 +156,11 @@ Received a value:
 2
 You shall not pass!
 
-    However, so far we've only defined proxies that send information downstream
-    in the direction of the ('>->') arrow.  We need not limit ourselves to
+    Notice how when @take' 2@ terminates, it brings down every 'Proxy' composed
+    with it.
+
+    So far we've only defined proxies that send information downstream in the
+    direction of the ('>->') arrow.  However, we need not limit ourselves to
     unidirectional communication and we can enhance these proxies with the
     ability to send information upstream with each 'request' that determines
     how upstream stages 'respond'.
@@ -186,7 +204,7 @@ You shall not pass!
     Notice how 'Server's receive their first argument as a parameter and bind
     each subsequent argument using 'respond'.
 
-    You can compose a 'Client' and 'Server' using ('>->'), and this also returns
+    You can compose a 'Server' and 'Client' using ('>->'), and this also returns
     a runnable 'Session':
 
 > comparer >-> threeReqs :: (Proxy p) => () -> Session p IO ()
@@ -233,7 +251,7 @@ Failure
 >             key2 <- respond val
 >             loop m key2
 
-    You can compose the @cache@ 'Proxy' between the 'Client' and 'Server' using
+    You can compose the @cache@ 'Proxy' between the 'Server' and 'Client' using
     ('>->'):
 
 >>> runProxy $ comparer >-> cache >-> threeReqs
@@ -391,8 +409,8 @@ Failure
 >
 > type Server p b' b m r = p C () b' b m r
 
-    The compiler ensures that the types match when we compose 'Client's,
-    'Server's, and 'Proxy's.
+    The compiler ensures that the types match when we compose 'Server's,
+    'Proxy's, and 'Client's.
 
 >        comparer   >->     cache   >->      threeReqs
 >
@@ -451,11 +469,13 @@ Failure
     'request's a new value.
 
     Wait, if 'respond' always binds the /next/ argument, where does the /first/
-    argument come from?  Well, it turns out that every 'Proxy' receives its
-    initial argument as an ordinary parameter.
+    argument come from?  Well, it turns out that every 'Proxy' receives this
+    initial argument as an ordinary parameter, as if they all began blocked on
+    a 'respond' statement.
    
     We can see this if we take all the previous proxies we defined and fully
-    expand every type synonym:
+    expand every type synonym.  The initial argument of each 'Proxy' matches
+    the type parameter corresponding to the return value of 'respond':
 
 >                                          These
 >                                    +--  Columns  ---+
@@ -467,8 +487,9 @@ Failure
 > comparer  :: (Proxy p)          => Int -> p C   ()  Int Bool IO r
 > cache     :: (Proxy p, Ord key) => key -> p key val key val  IO r
 
-    You can also study the type of composition, which similarly insists that
-    each proxy takes an initial argument matching their third type parameter:
+    You can also study the type of composition, which follows this same pattern.
+    Composition requires two 'Proxy's blocked on a 'respond', and produces a new
+    'Proxy' similarly blocked on a 'respond':
 
 > (>->) :: (Monad m, Proxy p)
 >  => (b' -> p a' a b' b m r)
@@ -478,67 +499,37 @@ Failure
 >      |   These    |
 >      +---Match----+
 
-    The initial argument each 'Proxy' accepts always matches the third type
-    parameter: the input received on the downstream interface.  I've marked this
-    input on the following diagram:
+    This is why 'Producer's, 'Consumer's, and 'Client's all take @()@ as their
+    initial argument, because their corresponding 'respond' commands all have a
+    return value of @()@.
 
-> Upstream | Downstream
->     +---------+
->     |         |
-> a' <==       <== b' << Entry
->     |  Proxy  |        Point
-> a  ==>       ==> b
->     |         |
->     +---------+
+    This library also provides ('>~>'), which is the dual of the ('>->')
+    composition operator.  ('>~>') composes two 'Proxy's blocked on a 'request'
+    and returns a new 'Proxy' blocked on a 'request':
 
-    In fact, one invariant of all 'Session's is that there is always exactly one
-    'Proxy' active at all times and every 'Proxy' in the 'Session' is either:
+> (>~>)
+>  :: (Monad m, Proxy p)
+>  => (a -> p a' a b' b m r)
+>  -> (b -> p b' b c' c m r)
+>  -> (a -> p a' a c' c m r)
 
-    * The currently active 'Proxy'
+    In fact, if you went back through the previous code and systematically
+    replaced every:
 
-    * Downstream of the active 'Proxy', blocked on a 'request'
+    * ('>->') with ('>~>'),
 
-    * Upstream of the active 'Proxy', blocked on a 'respond'
+    * 'respond' with 'request', and
 
-    The following diagram demonstrates this for a hypothetical chain of four
-    proxies:
+    * 'request' with 'respond'
 
->      Blocked        Blocked       Currently       Blocked
->        on             on            Active          on
->      respond        respond         Proxy         request
->     +-------+      +-------+      +-------+      +-------+
->     |       |      |       |      |       |      |       |
-> a' <==     <== b' <==     <== c' <==     <== d' <==     <== e'
->     | Proxy |      | Proxy |      | Proxy |      | Proxy |
-> a  ==>     ==> b  ==>     ==> c  ==>     ==> d  ==>     ==> e
->     |       |      |       |      |       |      |       |
->     +-------+      +-------+      +-------+      +-------+
+    ... then everything would still work and produce identical behavior, except
+    the compiler would now infer the symmetric types with all interfaces
+    reversed.
 
-    Conceptually, when you start a 'Session' every 'Proxy' is initially blocked
-    on a 'respond'.  This is why their initial parameter matches the return
-    value of 'respond':
-
->      Blocked        Blocked        Blocked        Blocked
->        on             on             on             on
->      respond        respond        respond        respond
->     +-------+      +-------+      +-------+      +-------+
->     |       |      |       |      |       |      |       |
-> a' <==     <== b' <==     <== c' <==     <== d' <==     <== e' << Entry
->     | Proxy |      | Proxy |      | Proxy |      | Proxy |        Point
-> a  ==>     ==> b  ==>     ==> c  ==>     ==> d  ==>     ==> e
->     |       |      |       |      |       |      |       |
->     +-------+      +-------+      +-------+      +-------+
-
-    'Producer's, 'Consumer's, 'Pipe's, and 'Client's all use @()@ as their
-    initial argument since they don't require any useful input on their
-    downstream interface.  However, 'Server's and 'Proxy's use non-empty initial
-    arguments to provide their initial input.
-
-    'Server's and 'Proxy's aren't the only abstractions that use this initial
-    argument.  "Control.Proxy.Synonym" defines the full constellation of type
-    synonyms, including the dual 'CoProducer', 'CoConsumer', and 'CoPipe'
-    synonyms, where information only flows upstream.  These three dual
-    constructions require an initial argument as well. -}
+    Since these two composition operators are perfectly symmetric, I arbitrarily
+    picked ('>->') to standardize on and I provide all standard library 'Proxy's
+    blocked on 'respond' so that they work with ('>->').
+-}
 
 {- $composition
     When we compose @(p1 >-> p2)@, composition ensures that @p1@'s downstream
@@ -621,10 +612,355 @@ Failure
 
     * You can reason about each proxy's behavior independently of other proxies
 
-    * You don't encounter weird behavior at the boundary between components
+    * You don't encounter weird behavior at the interface between two components
 
     * You don't encounter corner cases at the 'Server' or 'Client' ends of a
      'Session' -}
+
+{- $class
+    All of our code so far programmed generically over the 'Proxy' type class,
+    which defines the three central operations of this library's API:
+
+    * ('>->'): Proxy composition
+
+    * 'request': Request input from upstream
+
+    * 'respond': Respond with output to downstream
+
+    @pipes@ defines everything in terms of these three operations, which is
+    why all the library's utilities are polymorphic over the 'Proxy' type class.
+
+    Let's look at some example instances of the 'Proxy' type class:
+
+> instance Proxy ProxyFast     -- Fastest implementation
+> instance Proxy ProxyCorrect  -- Strict monad transformer laws
+
+    These two types provide the two alternative base implementations.  As the
+    names suggest, the 'ProxyFast' implementation is faster but the
+    'ProxyCorrect' implementation has a monad transformer implementation that is
+    correct by construction.
+
+    These two implementations differ only in the 'runProxy' function that they
+    export, which is how the compiler selects which 'Proxy' implementation to
+    use.
+
+    "Control.Proxy" automatically selects the fast implementation for you, but
+    you can always choose the correct implementation instead by replacing
+    "Control.Proxy" with the following two imports:
+
+> import Control.Proxy.Core    -- Everything except the base implementation
+> import Control.Proxy.Correct -- The base implementation
+
+    Keep in mind that these two base implementations are not the only instances
+    of the 'Proxy' type class.  I will introduce 'Proxy' extensions below, which
+    add additional features while still preserving the 'Proxy' type class API.
+
+    The price of type-classing the 'Proxy' API is that if you want to write
+    fully polymorphic code you must embed your code in a a
+-}
+
+{- $interleave
+    When you compose two 'Proxy's, you interleave their effects in the base
+    monad.  The following two 'Proxy's demonstrate this interleaving of effects:
+
+> downstream :: (Proxy p) => Consumer p () IO ()
+> downstream () = runIdentityP $ do
+>     lift $ print 1
+>     request ()  -- Switch to upstream
+>     lift $ print 3
+>     request ()  -- Switch to upstream
+>
+> upstream :: (Proxy p) => Producer p () IO ()
+> upstream () = runIdentityP $ do
+>     lift $ print 2
+>     respond () -- Switch to downstraem
+>     lift $ print 4
+
+     "Control.Proxy.Class" enumerates the 'Proxy' laws, which equationally
+     define how all 'Proxy' instances must behave.  These laws require that
+     @(upstream >-> downstream)@ must reduce to:
+
+> upstream >-> downstream
+> =
+> \() -> lift $ do
+>     print 1
+>     print 2
+>     print 3
+>     print 4
+
+    Conceptually, 'runProxy' just applies this to @()@ and removes the 'lift':
+
+> runProxy $ upstream >-> downstream
+> =
+> do print 1
+>    print 2
+>    print 3
+>    print 4
+
+    Let's test this:
+
+>>> runProxy $ upstream >-> downstream
+1
+2
+3
+4
+
+    You can reason about how 'Proxy's interleave effects without knowing any
+    specifics about the underlying implementation.  Intuitively, the 'Proxy'
+    laws say that:
+
+    * 'request' passes a value and control upstream
+
+    * 'respond' passes a value and control downstream
+
+    * If a 'Proxy' terminates, it terminates every 'Proxy' composed with it
+
+    Several of the utilities in "Control.Proxy.Prelude.Base" use these
+    equational laws to rigorously prove things about their behavior.  For
+    example, consider the 'mapD' 'Proxy', which applies a function @f@ to all
+    values flowing downstream:
+
+> mapD :: (Monad m, Proxy p) => (a -> b) -> x -> p x a x b m r
+> mapD f = runIdentityK loop where
+>     loop x = do
+>         a  <- request x
+>         x2 <- respond (f a)
+>         loop x2
+
+    We can use the 'Proxy' laws to prove that:
+
+> mapD f >-> mapD g = mapD (g . f)
+>
+> mapD id = idT
+
+    ... which is what we intuitively expect.  We can fuse two consecutive
+    'mapD's into one by composing their functions, and mapping 'id' does nothing
+    at all, just like the identity 'Proxy', 'idT'.
+
+    In fact, these are just the functor laws in disguise, where 'mapD' defines a
+    functor between the category of Haskell function composition and the
+    category of 'Proxy' composition.  "Control.Proxy.Prelude.Base" is full of
+    utilities like this that are simultaneously practical and theoretically
+    elegant.
+-}
+
+{- $hoist
+    Composition can't interleave two proxies if their base monads do not
+    match.  As an example, I might try to modify @promptInt@ to use
+    @EitherT String@ to report the error instead of using exceptions:
+
+> import Control.Error  -- from the "errors" package
+>
+> promptInt2 :: (Proxy p) => () -> Producer p Int (EitherT String IO) r
+> promptInt2 () = runIdentityP $ forever $ do
+>     let liftIO = lift . lift
+>     liftIO $ putStrLn "Enter an Integer:"
+>     str <- liftIO getLine
+>     n   <- lift $ tryRead "Could not read Integer" str
+>     respond n
+
+    However, if I try to compose it with @printer@, I receive a type error:
+
+>>> runEitherT $ runProxy $ promptInt2 >-> printer
+<interactive>:2:40:
+    Couldn't match expected type `EitherT String IO'
+                with actual type `IO'
+    ...
+
+    The type error says that @promptInt2@ uses @(EitherT String IO)@ for its
+    base monad, but @printer@ uses 'IO' for its base monad, so composition can't
+    interleave them.
+
+    You can easily fix this using the 'hoist' function from the 'MFunctor' type
+    class in "Control.MFunctor".  This function allows you to transform the base
+    monad of any monad transformer, including the 'Proxy' monad transformer.
+    "Control.MFunctor" really belongs in the @transformers@ package, however it
+    currently resides here because it requires @Rank2Types@.
+
+    You will commonly use 'hoist' to 'lift' one proxy's base monad to match
+    another proxy's base monad, like so:
+
+>>> import Control.MFunctor
+>>> runEitherT $ runProxy $ promptInt2 >-> (hoist lift . printer)
+Enter an Integer:
+Hello<Enter>
+Left "Could not read Integer"
+
+    This library provides two syntactic conveniences for making this easier to
+    write.
+
+    First, ('.') has higher precedence than ('>->'), so you can drop the
+    parentheses:
+
+>>> runEitherT $ runProxy $ promptInt2 >-> hoist lift . printer
+...
+
+    Second, "Control.Proxy.Prelude.Kleisli" provides the 'hoistK' function, so
+    that you can skip the function composition:
+
+>>> runEitherT $ runProxy $ promptInt2 >-> hoistK lift printer
+...
+
+    Note that "Control.MFunctor" also provides 'MFunctor' instances for all the
+    monad transformers in the @transformers@ package.  This means that you can
+    fix any incompatibility between two monad transformer stacks just using
+    various combinations of 'hoist' and 'lift'.
+
+    Also, avoid the following anti-pattern, which uses 'hoist' to lower a monad
+    transformer
+
+> hoist (`evalStateT` 0) -- Bad idea
+
+    The theoretical reason to avoid this is that 'hoist' expects a monad
+    morphism.  'lift' is a monad morphism, but lowering a monad transformer
+    typically is not a monad morphism.
+
+    The practical reason is that you can uniformly 'lift' all monad
+    transformers, but you can't uniformly lower all monad transformers.  So
+    whenever you have two different monad transformer stacks, you should always
+    'lift' one (or both) to match the other.
+-}
+
+{- $base
+> stateConsumer :: (Proxy p) => () -> Consumer p () (StateT Int IO) r
+> stateConsumer () = runIdentityP $ forever $ do
+>     n <- lift get
+>     lift $ lift $ print n
+>     request ()
+>
+> stateProducer :: (Monad m, Proxy p) => () -> Producer p () (StateT Int m) r
+> stateProducer () = runIdentityP $ forever $ do
+>     lift $ modify (+ 1)
+>     respond ()
+
+    @stateProducer@ uses the base base monad to keep track of state, which
+    modifies the state @stateConsumer@ observes each time it @get@s the current
+    state:
+
+>>> (`evalStateT` 0) $ runProxy $ stateProducer >-> stateConsumer
+0
+1
+2
+3
+...
+
+    Similarly, if you use `EitherT` in the base monad, any 'Proxy' that throws a
+    'Left' will bring down the entire 'Session' unrecoverably:
+
+> eitherProducer
+>  :: (Monad m, Proxy p) => () -> Producer p Int (EitherT String m) r
+> eitherProducer () = forM_ [0..] $ \n -> do
+>     respond n
+>     when (n == 2) $ lift $ left "Failure"
+
+>>> runEitherT $ runProxy $ eitherProducer >-> hoistK lift printer
+0
+1
+Left "Failure"
+
+    Sometimes you don't want 'Proxy's to share effects in the base monad.  You
+    might want a 'Proxy' to have its own local state or to be able to 'throw'
+    and 'catch' errors without interrupting other 'Proxy's.
+
+    This library solves the problem of isolating effects using \"proxy
+    transformers\".  These behave like monad transformers, except that they lift
+    the 
+-}
+
+{- $extend
+    This library provides several extensions that add features on top of the
+    base 'Proxy' API.  These extensions behave like monad transformers, except
+    that they also lift the 'Proxy' class through the extension so that the
+    extended proxy can still 'request', 'respond', and be compose with other
+    proxies:
+
+> instance (Proxy p) => Proxy (EitherP e p)  -- Equivalent to EitherT
+> instance (Proxy p) => Proxy (MaybeP    p)  -- Equivalent to MaybeT
+> instance (Proxy p) => Proxy (StateP  s p)  -- Equivalent to StateT
+
+    To understand how these extensions work, consider
+    like monad transformers, they add new features, but in addition to adding
+    new features.
+
+    I type-class the 'Proxy' operations to permit extensions to the 'Proxy' API.
+    For example, the "Control.Proxy.Trans.Either" module provides the
+    error-handling extension.
+
+    To motivate these extensions, let's revisit the @promptInt2@ function.  We
+    would like to be able to 'catch' the read error so that we can handle the
+    error and gracefully resume.  We might try to write a 'catch' function with
+    the following type:
+
+> catch
+>  :: (Monad m, Proxy p)
+>  => p a' a b' b (EitherT e1 m) r
+>  -> (e1 -> p a' a b' b (EitherT e2 m) r)
+>  -> p a' a b' b (EitherT e2 m) r
+
+    However, we cannot write such a function!  We cannot access the potential
+    'Left' value without running the proxy using 'runProxy', but by then it's
+    too late to resume from the error.
+
+    We might try to use @catchT@ from @Control.Error@ to catch the error:
+
+> catchT
+>  :: (Monad m)
+>  => EitherT e  m r
+>  -> (e -> EitherT e' m r)
+>  -> EitherT e' m r
+
+    That would require switching the order of 'EitherT' and 'Proxy' so that the
+    'Proxy' monad transformer is on the inside and 'EitherT' is on the outside,
+    like this:
+
+> promptInt3 :: (Proxy p) => () -> EitherT String (Producer p Int IO) r
+> promptInt3 () = runIdentityP $ forever $ do
+>     let liftIO     = lift . lift
+>         liftEither = id
+>         liftProxy  = lift
+>     liftIO $ putStrLn "Enter an Integer:"
+>     str <- liftIO getLine
+>     n   <- liftEither $ tryRead "Could not read Integer" str
+>     liftPipe $ respond n
+
+    The problem is that we cannot make 'EitherT' an instance of the 'Proxy' type
+    class because it has the wrong kind and all the type variables are in the
+    wrong place.  This is a shame, because there's a perfectly valid way to
+    compose values of this type:
+
+(<?<)
+ :: (Monad m, Proxy p)
+ => (b' -> EitherT e (p a' a b' b m) r)
+ -> (c' -> EitherT e (p b' b c' c m) r)
+ -> (c' -> EitherT e (p a' a c' c m) r)
+p1 <?< p2 = (EitherT .) $ runEitherT . p1 <-< runEitherT . p2
+ 
+    error handling at the expense of being able to compose @promptInt3@, which
+    defeats the purpose.
+
+    "Control.Proxy.Trans.Either" provides the solution: 'EitherP'.
+    implementation of 'EitherT' which 
+
+    we cannot access the base monad's return value
+    'readLn', which throws an exception if it fails to parse an 'Int'.
+
+>>> runProxy $ promptInt >-> printer
+Enter an Integer:
+Hello<Enter>
+*** Exception: user error (Prelude.readIO: no parse)
+
+    We might try using @(EitherT SomeException)@ to report errors, perhaps using
+    something like this:
+
+>>> runEitherT $ runProxy $ promptInt-MkII >-> hoistK lift
+Enter an Integer:
+Hello<Enter>
+Left "Could not read Integer"
+-}
+
+{- $termination
+    Not all proxies loop 'forever'.  So what happens when a 'Proxy' terminates?
+-}
 
 {- $vertical
     'Proxy's support two main ways to combine 'Proxy's:
@@ -651,42 +987,15 @@ Failure
 
 -}
 
-{- $termination
-    Not all proxies loop 'forever'.  So what happens when a 'Proxy' terminates?
+
+
+{-
+    'hoistK' has the nice property that it distributes over Kleisli composition
+    (i.e. monads):
+
+>>> runEitherT$
 -}
 
-{- $hoist
-    When we compose two proxies, their base monads 
--}
-
-{- $extend
-    Our original @promptInt@ 'Producer' had one flaw, namely that it used
-    'readLn', which throws an exception if it fails to parse an 'Int'.
-
->>> runProxy $ promptInt >-> printer
-Enter an Integer:
-Hello<Enter>
-*** Exception: user error (Prelude.readIO: no parse)
-
-    We might try using 'EitherT SomeException' to report errors, perhaps using
-    something like this:
-
-> import Control.Error  -- from the "errors" package
->
-> promptInt-MkII :: (Proxy p) => () -> Producer p Int (EitherT String IO) r
-> promptInt-MkII () = runIdentityP $ forever $ do
->     let liftIO     = lift . lift
->         liftEither = lift
->     liftIO $ putStrLn "Enter an Integer:"
->     str <- liftIO getLine
->     n   <- liftEither $ tryRead str
->     respond n
-
-    We can throw errors this way, but we cannot catch them since the error value
-    is unreachable until we run the proxy:
-
->>> runProxy $ promptInt-MkII >-> hoistK lift 
--}
 
 {- $stdlib
     "Control.Proxy" re-exports "Control.Proxy.Prelude" which provides the
@@ -701,37 +1010,7 @@ Hello<Enter>
     These utilities not only simplify many common tasks but also provide code
     examples that you can consult when learning to define your own proxies.
 -}
-
-{- $class
-    All of our proxy code programs generically over the 'Proxy' type class,
-    which defines the three central operations of this library's API:
-
-    * ('>->'): Proxy composition
-
-    * 'request': Request input from upstream
-
-    * 'respond': Respond with output to downstream
-
-    @pipes@ defines everything in terms of these three operations, which is
-    why all the library's utilities are polymorphic over the 'Proxy' type class.
-
-    Let's look at some example instances of the 'Proxy' type class:
-
-> instance Proxy ProxyFast     -- Fastest implementation
-> instance Proxy ProxyCorrect  -- Strict monad transformer laws
-
-    These two proxy types are the two alternative base implementations.  As the
-    names suggest, the 'ProxyFast' implementation is faster but the
-    'ProxyCorrect' implementation has a monad transformer implementation that is
-    correct by construction.
-
-    "Control.Proxy" automatically selects the fast implementation for you, but
-    you can always select the correct implementation instead by replacing
-    "Control.Proxy" with the following two imports:
-
-> import Control.Proxy.Core    -- Everything except the base implementation
-> import Control.Proxy.Correct -- The base implementation
-
+{-
     These are not the only 'Proxy' instances, though!  This library defines
     several extensions to the base 'Proxy' type, all of which also implement the
     'Proxy' type class:
