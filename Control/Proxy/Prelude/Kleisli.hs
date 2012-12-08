@@ -7,7 +7,7 @@ module Control.Proxy.Prelude.Kleisli (
     foreverK,
     replicateK,
     liftK,
-    hoistK,
+    raiseK,
     ) where
 
 import Control.MFunctor (MFunctor(hoist))
@@ -53,12 +53,22 @@ liftK k a = lift (k a)
 
 {-| Convenience function equivalent to @(hoist f .)@
 
-> hoistK f >-> hoistK g = hoistK (f >-> g)
+> hoistK f p1 >-> hoistK f p2 = hoistK f (p1 >-> p2)
 >
-> hoistK idT = idT
+> hoistK f idT = idT
 -}
 hoistK
  :: (Monad m, MFunctor t)
  => (forall a . m a -> n a) -> ((b' -> t m b) -> (b' -> t n b))
 hoistK k p a' = hoist k (p a')
 -- hoistK k = (hoist k .)
+
+{-| Convenience function equivalent to @(hoist lift .)@
+
+> raiseK p1 >-> raiseK p2 = raiseK (p1 >-> p2)
+>
+> raiseK idT = idT
+-}
+raiseK
+ :: (Monad m, MFunctor t1, MonadTrans t2) => (q -> t1 m r) -> (q -> t1 (t2 m) r)
+raiseK = (hoist lift .)
