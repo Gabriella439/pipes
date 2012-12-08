@@ -24,8 +24,11 @@ module Control.Pipe.Tutorial (
     -- * Mixing Base Monads
     -- $hoist
 
-    -- * The Base Monad
-    -- $base
+    -- * Utilities
+    -- $utilities
+
+    -- * Folds
+    -- $folds
 
     -- * Extensions
     -- $extend
@@ -63,6 +66,7 @@ import Control.Category
 import Control.Monad.Trans.Class
 import Control.MFunctor
 import Control.Proxy
+import Control.Proxy.Core.Correct (ProxyCorrect)
 import Control.Proxy.Trans.Either
 import Prelude hiding (catch)
 
@@ -274,11 +278,12 @@ Failure
 *
 
     This bidirectional flow of information separates @pipes@ from other
-    streaming libraries which cannot model 'Client's, 'Server's, or 'Proxy's. -}
+    streaming libraries which cannot model 'Client's, 'Server's, or 'Proxy's.
+-}
 
 {- $synonyms
     You might wonder why ('>->') accepts 'Producer's, 'Consumer's, 'Pipe's,
-    'Client's, 'Server's, and 'Proxy's.  It turns out that these all type-check
+    'Client's, 'Server's, and 'Proxy's.  It turns out that these type-check
     because they are all type synonyms around the following type:
 
 > -- The central type
@@ -336,7 +341,7 @@ Failure
 >     |          |
 >     +----------+
 >
-> type Consumer p b m r = p () a () C m r
+> type Consumer p a m r = p () a () C m r
 
     A 'Pipe' is a 'Proxy' that can only receive values on its upstream interface
     and send values on its downstream interface:
@@ -442,7 +447,8 @@ Failure
 
     * You only use one composition operator: ('>->')
 
-    * You can mix multiple abstractions together as long as the types match -}
+    * You can mix multiple abstractions together as long as the types match
+-}
 
 {- $interact
     There are only two ways to interact with other 'Proxy's: 'request' and
@@ -615,11 +621,12 @@ Failure
     * You don't encounter weird behavior at the interface between two components
 
     * You don't encounter corner cases at the 'Server' or 'Client' ends of a
-     'Session' -}
+     'Session'
+-}
 
 {- $class
-    All of our code so far programmed generically over the 'Proxy' type class,
-    which defines the three central operations of this library's API:
+    All the proxy code we wrote was genericover the 'Proxy' type class, which
+    defines the three central operations of this library's API:
 
     * ('>->'): Proxy composition
 
@@ -635,10 +642,15 @@ Failure
 > instance Proxy ProxyFast     -- Fastest implementation
 > instance Proxy ProxyCorrect  -- Strict monad transformer laws
 
-    These two types provide the two alternative base implementations.  As the
-    names suggest, the 'ProxyFast' implementation is faster but the
-    'ProxyCorrect' implementation has a monad transformer implementation that is
-    correct by construction.
+    These two types provide the two alternative base implementations:
+
+    * 'ProxyFast': This runs significantly faster on pure code segments and
+      employs several rewrite rules to optimize your code into the equivalent
+      hand-tuned code.
+
+    * 'ProxyCorrect': This uses a monad transformer implementation that is
+      correct by construction, but runs about 8x slower on pure code segments.
+      However, for 'IO'-bound code, the performance gap is small.
 
     These two implementations differ only in the 'runProxy' function that they
     export, which is how the compiler selects which 'Proxy' implementation to
@@ -649,14 +661,54 @@ Failure
     "Control.Proxy" with the following two imports:
 
 > import Control.Proxy.Core    -- Everything except the base implementation
-> import Control.Proxy.Correct -- The base implementation
+> import Control.Proxy.Correct -- The alternative base implementation
 
-    Keep in mind that these two base implementations are not the only instances
-    of the 'Proxy' type class.  I will introduce 'Proxy' extensions below, which
-    add additional features while still preserving the 'Proxy' type class API.
+    These are not the only instances of the 'Proxy' type class!  This library
+    also provides several \"proxy transformers\", which are like monad
+    transformers except that they also correctly lift the 'Proxy' type class:
 
-    The price of type-classing the 'Proxy' API is that if you want to write
-    fully polymorphic code you must embed your code in a a
+> instance (Proxy p) => Proxy (IdentityP p)  -- Equivalent to IdentityT
+> instance (Proxy p) => Proxy (EitherP e p)  -- Equivalent to EitherT
+> instance (Proxy p) => Proxy (MaybeP    p)  -- ... You get the idea
+> instance (Proxy p) => Proxy (ReaderP i p)
+> instance (Proxy p) => Proxy (StateP  s p)
+> instance (Proxy p) => Proxy (WriterP w p)
+
+    All of the 'Proxy' code we wrote so far also works seamlessly with all of
+    these proxy transformers.  The 'Proxy' class abstracts over the
+    implementation details and extensions so that you can reuse the same library
+    code for any feature set.
+
+    This polymorphism comes at a price: you must embed your 'Proxy' code in at
+    least one proxy transformer if you want clean type class constraints.  This
+    is why all the examples use 'runIdentityP' or 'runIdentityK' to embed their
+    code in the 'IdentityP' proxy transformer.  "Control.Proxy.Class" provides
+    even more discussion on this subject.
+
+    Without this 'IdentityP' embedding, the compiler infers uglier constraints,
+    which are also significantly less polymorphic.  We can show this by
+    removing the 'runIdentityP' call from @promptInt@ and see what type the
+    compiler infers:
+
+> promptInt () = forever $ do
+>     lift $ putStrLn "Enter an Integer:"
+>     n <- lift readLn
+>     respond n
+
+>>> :t promptInt -- I've substantially cleaned up the inferred type
+promptInt
+  :: (Monad (Producer p Int IO), MonadTrans (Producer p Int), Proxy p) =>
+     () -> Producer p Int IO r
+
+    All 'Proxy' instances are already monads and monad transformers, but the
+    compiler cannot infer that without the 'IdentityP' embedding.  When we embed
+    @promptInt@ in 'IdentityP', the compiler collapses the 'Monad' and
+    'MonadTrans' constraints into the 'Proxy' constraint.
+
+    Fortunately, you do not pay any performance price for this 'IdentityP'
+    embedding or the type class polymorphism.  Your polymorphic code will still
+    run very rapidly, as fast as if you had specialized it to a concrete
+    'Proxy' instance without the 'IdentityP' embedding.
 -}
 
 {- $interleave
@@ -709,9 +761,9 @@ Failure
     specifics about the underlying implementation.  Intuitively, the 'Proxy'
     laws say that:
 
-    * 'request' passes a value and control upstream
+    * 'request' blocks until upstream 'respond's
 
-    * 'respond' passes a value and control downstream
+    * 'respond' blocks until downstream 'request's
 
     * If a 'Proxy' terminates, it terminates every 'Proxy' composed with it
 
@@ -735,7 +787,7 @@ Failure
 
     ... which is what we intuitively expect.  We can fuse two consecutive
     'mapD's into one by composing their functions, and mapping 'id' does nothing
-    at all, just like the identity 'Proxy', 'idT'.
+    at all, just like the identity 'Proxy': 'idT'.
 
     In fact, these are just the functor laws in disguise, where 'mapD' defines a
     functor between the category of Haskell function composition and the
@@ -746,7 +798,7 @@ Failure
 
 {- $hoist
     Composition can't interleave two proxies if their base monads do not
-    match.  As an example, I might try to modify @promptInt@ to use
+    match.  For instance, I might try to modify @promptInt@ to use
     @EitherT String@ to report the error instead of using exceptions:
 
 > import Control.Error  -- from the "errors" package
@@ -775,7 +827,7 @@ Failure
     class in "Control.MFunctor".  This function allows you to transform the base
     monad of any monad transformer, including the 'Proxy' monad transformer.
     "Control.MFunctor" really belongs in the @transformers@ package, however it
-    currently resides here because it requires @Rank2Types@.
+    currently resides here because it requires the @Rank2Types@ extension.
 
     You will commonly use 'hoist' to 'lift' one proxy's base monad to match
     another proxy's base monad, like so:
@@ -795,8 +847,8 @@ Left "Could not read Integer"
 >>> runEitherT $ runProxy $ promptInt2 >-> hoist lift . printer
 ...
 
-    Second, "Control.Proxy.Prelude.Kleisli" provides the 'hoistK' function, so
-    that you can skip the function composition:
+    Second, "Control.Proxy.Prelude.Kleisli" provides the 'hoistK' convenience
+    function, so that you can skip the function composition:
 
 >>> runEitherT $ runProxy $ promptInt2 >-> hoistK lift printer
 ...
@@ -821,51 +873,89 @@ Left "Could not read Integer"
     'lift' one (or both) to match the other.
 -}
 
-{- $base
-> stateConsumer :: (Proxy p) => () -> Consumer p () (StateT Int IO) r
-> stateConsumer () = runIdentityP $ forever $ do
->     n <- lift get
->     lift $ lift $ print n
->     request ()
+{- $utilities
+    The "Control.Proxy.Prelude" heirarchy provides several utility functions
+    for common tasks.  We can redefine the previous example functions just by
+    composing these utilities.
+
+    For example, 'readLnS' 'read's values from user input, so we can read 'Int's
+    just by specializing its type:
+
+> readLnS :: (Proxy p, Read a) => () -> Producer p a IO r
 >
-> stateProducer :: (Monad m, Proxy p) => () -> Producer p () (StateT Int m) r
-> stateProducer () = runIdentityP $ forever $ do
->     lift $ modify (+ 1)
->     respond ()
+> readIntS :: (Proxy p) => () -> Producer p Int IO r
+> readIntS = readLnS
 
-    @stateProducer@ uses the base base monad to keep track of state, which
-    modifies the state @stateConsumer@ observes each time it @get@s the current
-    state:
+    The @S@ suffix indicates that it belongs in the \'@S@\'server position.
 
->>> (`evalStateT` 0) $ runProxy $ stateProducer >-> stateConsumer
-0
-1
-2
-3
-...
+    @(takeB_ n)@ allows at most @n@ value to pass through it in \'@B@\'oth
+    directions:
 
-    Similarly, if you use `EitherT` in the base monad, any 'Proxy' that throws a
-    'Left' will bring down the entire 'Session' unrecoverably:
+> takeB_ :: (Monad m, Proxy p) => Int -> a' -> p a' a a' a m ()
 
-> eitherProducer
->  :: (Monad m, Proxy p) => () -> Producer p Int (EitherT String m) r
-> eitherProducer () = forM_ [0..] $ \n -> do
->     respond n
->     when (n == 2) $ lift $ left "Failure"
+    'takeB_' has a more general type than @take'@ because it allows any type of
+    value to flow upstream.
 
->>> runEitherT $ runProxy $ eitherProducer >-> hoistK lift printer
-0
-1
-Left "Failure"
+     'printD' 'print's all values flowing \'@D@\'ownstream:
 
-    Sometimes you don't want 'Proxy's to share effects in the base monad.  You
-    might want a 'Proxy' to have its own local state or to be able to 'throw'
-    and 'catch' errors without interrupting other 'Proxy's.
+> printD :: (Proxy p, Show a) => x -> p x a x a IO r
 
-    This library solves the problem of isolating effects using \"proxy
-    transformers\".  These behave like monad transformers, except that they lift
-    the 
+    'printD' has a more general type than our original @printer@ because it
+    forwards all values further downstream after 'print'ing them.  This means
+    that you could use it as an intermediate stage as well.  However, 'printD'
+    still type-checks as the most downstream stage, too, since 'runProxy' just
+    discards any unused outbound values.
+
+    We can assemble these functions into a silent version of our previous
+    'Session':
+
+>>> runProxy $ readIntS >-> takeB_ 2 >-> printD
+4<Enter>
+4
+39<Enter>
+39
+
+    Fortunately, we don't have to give up our previous useful diagnostics.
+    'execD' executes an action each time values flow upstream through it, and
+    'execU' executes an action each time values flow downstream through it:
+
+> promptInt :: (Proxy p) => () -> Producer p Int IO r
+> promptInt = readLnS >-> execU (putStrLn "Enter an Integer:")
+>
+> printer :: (Proxy p, Show a) => x -> p x a x a IO r
+> printer = execD (putStrLn "Received a value:") >-> printD
+
+    Similarly, we can build our old @take'@ on top of @takeB_'@:
+
+> take' :: (Proxy p) => Int -> a' -> p a' a a' a m ()
+> take' n a' = runIdentityP $ do  -- Remember, we need 'runIdentityP' if
+>     takeB_ n a'                 -- we use 'do' notation or 'lift'
+>     lift $ putStrLn "You shall not pass!"
+
+>>> runProxy $ promptInt >-> take' 2 >-> printer
+<Exact same behavior>
+
+    You could write a loop that does the same thing, but proxies allow you to
+    factor out reusable behaviors into their own modular components.  This
+    compositional programming style emphasizes building a library of reusable
+    components and connecting them like Unix pipes to assemble the desired
+    streaming program.
 -}
+
+{- $folds
+    Sometimes you want to fold some information about a stream, such as how
+    many values passed through and include that in the session's return value
+    when it terminates.  You do this by including 'WriterT' (from
+    @Control.Monad.Trans.Writer.Strict@) in the base monad and converting the
+    stream to the appropriate 'Monoid' to fold the value.
+
+    For example, if you wanted to compute how many values flow downstream
+    through a given stage, you can use 'lengthD':
+
+> lengthD :: (Monad m, Proxy p) => 
+-}
+
+{- $multipleinputsoutputs -}
 
 {- $extend
     This library provides several extensions that add features on top of the
@@ -956,10 +1046,6 @@ Hello<Enter>
 Enter an Integer:
 Hello<Enter>
 Left "Could not read Integer"
--}
-
-{- $termination
-    Not all proxies loop 'forever'.  So what happens when a 'Proxy' terminates?
 -}
 
 {- $vertical
