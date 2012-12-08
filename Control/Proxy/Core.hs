@@ -5,11 +5,17 @@ module Control.Proxy.Core (
     -- $modules
     module Control.Proxy.Class,
     module Control.Proxy.Synonym,
+    module Control.Proxy.Prelude,
     module Control.Proxy.Trans,
     module Control.Proxy.Trans.Identity,
-    module Control.Proxy.Prelude,
+    module Control.Monad,
+    module Control.Monad.Trans.Class,
+    module Control.MFunctor
     ) where
 
+import Control.MFunctor (MFunctor(hoist))
+import Control.Monad (forever, (>=>), (<=<))
+import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans
@@ -23,11 +29,17 @@ import Control.Proxy.Prelude
     "Control.Proxy.Synonym" defines type synonyms for proxies that don't use all
     of their inputs or outputs, such as 'Pipe's, 'Producer's, and 'Server's.
 
+    "Control.Proxy.Prelude" provides a standard library of proxies.
+
     "Control.Proxy.Trans" defines the 'ProxyTrans' type class that lets you
     write your own proxy extensions.
 
-    "Control.Proxy.Prelude" provides a standard library of proxies.
-
     "Control.Proxy.Trans.Identity" exports 'runIdentityP', which substantially
     eases writing completely polymorphic proxies.
+
+    "Control.Monad" exports 'forever', ('>=>'), and ('<=<').
+
+    "Control.Monad.Trans.Class" exports 'lift'.
+
+    "Control.MFunctor" exports 'hoist'.
 -}
