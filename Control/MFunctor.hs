@@ -54,5 +54,9 @@ instance MFunctor (WriterStrict.WriterT w) where
 instance MFunctor (WriterLazy.WriterT w) where
     hoist nat = WriterLazy.mapWriterT nat
 
+{-| Lift the base monad
+
+> raise = hoist lift
+-}
 raise :: (Monad m, MFunctor t1, MonadTrans t2) => t1 m r -> t1 (t2 m) r
 raise = hoist lift
