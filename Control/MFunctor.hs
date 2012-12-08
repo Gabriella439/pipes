@@ -10,13 +10,15 @@
 
 module Control.MFunctor (
     -- * Monads over functors
-    MFunctor(..)
+    MFunctor(..),
+    raise
     ) where
 
-import Control.Monad.Trans.Identity
-import Control.Monad.Trans.Maybe
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.RWS
+import Control.Monad.Trans.Class (MonadTrans(lift))
+import Control.Monad.Trans.Identity (IdentityT, mapIdentityT)
+import Control.Monad.Trans.Maybe (MaybeT, mapMaybeT)
+import Control.Monad.Trans.Reader (ReaderT, mapReaderT)
+import Control.Monad.Trans.RWS (RWST, mapRWST)
 import qualified Control.Monad.Trans.State.Strict as StateStrict
 import qualified Control.Monad.Trans.State.Lazy   as StateLazy 
 import qualified Control.Monad.Trans.Writer.Strict as WriterStrict
@@ -51,3 +53,6 @@ instance MFunctor (WriterStrict.WriterT w) where
 
 instance MFunctor (WriterLazy.WriterT w) where
     hoist nat = WriterLazy.mapWriterT nat
+
+raise :: (Monad m, MFunctor t1, MonadTrans t2) => t1 m r -> t1 (t2 m) r
+raise = hoist lift
