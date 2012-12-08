@@ -78,7 +78,6 @@ import Prelude hiding (catch)
     'Producer' generates a stream of 'Int's from user input:
 
 > import Control.Monad
-> import Control.Monad.Trans.Class (lift)
 > import Control.Proxy
 > 
 > --             Produces Ints ---+----------+   +-- Uses 'IO' as the base monad
@@ -838,7 +837,7 @@ Enter an Integer:
 Hello<Enter>
 Left "Could not read Integer"
 
-    This library provides two syntactic conveniences for making this easier to
+    This library provides three syntactic conveniences for making this easier to
     write.
 
     First, ('.') has higher precedence than ('>->'), so you can drop the
@@ -847,10 +846,20 @@ Left "Could not read Integer"
 >>> runEitherT $ runProxy $ promptInt2 >-> hoist lift . printer
 ...
 
-    Second, "Control.Proxy.Prelude.Kleisli" provides the 'hoistK' convenience
-    function, so that you can skip the function composition:
+    Second, "lift" is such a common argument to 'hoist' that "Control.MFunctor"
+    provides the 'raise' function:
 
->>> runEitherT $ runProxy $ promptInt2 >-> hoistK lift printer
+> raise = hoist lift
+
+>>> runEitherT $ runProxy $ promptInt2 >-> raise . printer
+...
+
+    Third, "Control.Proxy.Prelude.Kleisli" provides the 'raiseK' function in
+    case you think the composition looks ugly:
+
+> raiseK = (raise .)
+
+>>> runEitherT $ runProxy $ promptInt2 >-> raiseK printer
 ...
 
     Note that "Control.MFunctor" also provides 'MFunctor' instances for all the
@@ -863,14 +872,14 @@ Left "Could not read Integer"
 
 > hoist (`evalStateT` 0) -- Bad idea
 
-    The theoretical reason to avoid this is that 'hoist' expects a monad
+    Theoretically, you should avoid this because 'hoist' expects a monad
     morphism.  'lift' is a monad morphism, but lowering a monad transformer
     typically is not a monad morphism.
 
-    The practical reason is that you can uniformly 'lift' all monad
-    transformers, but you can't uniformly lower all monad transformers.  So
-    whenever you have two different monad transformer stacks, you should always
-    'lift' one (or both) to match the other.
+    Practically, you should avoid because while you can uniformly 'lift' all
+    monad transformers, you can't uniformly lower them.  So whenever you have
+    two different monad transformer stacks, you should always 'lift' one (or
+    both) to match the other.
 -}
 
 {- $utilities
@@ -935,27 +944,142 @@ Left "Could not read Integer"
 >>> runProxy $ promptInt >-> take' 2 >-> printer
 <Exact same behavior>
 
-    You could write a loop that does the same thing, but proxies allow you to
-    factor out reusable behaviors into their own modular components.  This
-    compositional programming style emphasizes building a library of reusable
-    components and connecting them like Unix pipes to assemble the desired
-    streaming program.
+    These utilities do not clash with the Prelude namespace or common libraries
+    and they all end with a capital letter suffix that indicates their
+    directionality:
+
+    * \'@D@\' suffix: interacts with values flowing \'@D@\'ownstream
+
+    * \'@U@\' suffix: interacts with values flowing \'@U@\'pstream
+
+    * \'@B@\' suffix: interacts with values flowing \'@B@\'oth ways (or:
+      \'@B@\'idirectional)
+
+    * \'@S@\' suffix: belongs furthest upstream in the \'@S@\'erver position
+
+    * \'@C@\' suffix: belongs furthest downstream in the \'@C@\'lient position
+
+    Or perhaps I want to forgot user input for testing and mock @promptInt@ by
+    replacing it with a predefined set of values:
+
+>>> runProxy $ fromListS [4, 37, 1] >-> take'2 >-> printer
+Received a value:
+4
+Received a value:
+37
+
+    You could write a loop that does the same thing, but proxies let you:
+
+    * Rapidly swap in and out components for testing, debugging, and fast
+      prototyping
+
+    * Factor out common patterns into modular components
+
+    * Mix and match simple stages to build sophisticated programs
+
+    This compositional programming style emphasizes building a library of
+    reusable components and connecting them like Unix pipes to assemble the
+    desired streaming program.
 -}
 
 {- $folds
-    Sometimes you want to fold some information about a stream, such as how
-    many values passed through and include that in the session's return value
-    when it terminates.  You do this by including 'WriterT' (from
-    @Control.Monad.Trans.Writer.Strict@) in the base monad and converting the
-    stream to the appropriate 'Monoid' to fold the value.
+    You can fold a stream of values in two ways:
 
-    For example, if you wanted to compute how many values flow downstream
-    through a given stage, you can use 'lengthD':
+    * Use 'WriterT' in the base monad and 'tell' the values to fold
 
-> lengthD :: (Monad m, Proxy p) => 
+    * Use 'StateT' in the base monad and 'put' strict values
+
+    'WriterT' is more elegant in principle but leaks space for a large number of
+    values to fold.  'StateT' does not leak space if you keep the accumulator
+    strict, but is less elegant and doesn't guarantee write-only behavior.
+
+    "Control.Proxy.Prelude.Base" provides several common folds using 'WriterT'
+    as the base monad, such as:
+
+    * 'lengthD': Count how many values flow downstream
+
+> lengthD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Sum Int) m) r
+
+    * 'toListD': Fold the values flowing downstream into a list.
+
+> toListD :: (Monad m, Proxy p) => x -> p x a x a (WriterT [a] m) r
+
+    * 'anyD': Determine whether any values satisfy the predicate
+
+> anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
+
+    These 'WriterT' versions demonstrate how the elegant approach should work in
+    principle and they should be okay for folding a small number of values.  If
+    space leaks cause problems, rewrite the 'WriterT' folds using the following
+    two strict 'StateT' folds:
+
+    * 'foldlD'': Strictly fold values flowing downstream
+
+> foldlD'
+>  :: (Monad m, Proxy p) => (b -> a -> b) -> x -> p x a x a (StateT b m) r
+
+    * 'foldlU'': Strictly fold values flowing upstream
+
+> foldU'
+>  :: (Monad m, Proxy p) => (b -> a' -> b) -> a' -> p a' x a' x (StateT b m) r
+
+    I don't use the 'StateT' approach by default because I am currently working
+    on adding a 'WriterT' that doesn't leak space to @transformers@.
+
+    Now, let's try these folds out and see if we can build a list from user
+    input:
+
+>>> runWriterT $ runProxy $ raiseK promptInt >-> takeB_ 3 >-> toListD
+Enter an Integer:
+1<Enter>
+Enter an Integer:
+66<Enter>
+Enter an Integer:
+5<Enter>
+((), [1, 66, 5])
+
+    Notice that @promptInt@ uses 'IO' as its base monad, but 'toListD' uses
+    @(WriterT [Int] m)@ as its base monad, so I 'raiseK' @promptInt@ to get the
+    base monads to match.
+
+    You can insert these folds anywhere in the middle of a pipeline and they
+    still work:
+
+>>> runWriterT $ runProxy $ fromListS [5, 7, 4] >-> lengthD >-> raiseK printD
+5
+7
+4
+((), Sum 3)
+
+    You can also run multiple folds at the same time just by adding more
+    'WriterT' layers to your base monad:
+
+>>> runWriterT $ runWriterT $ fromListS [9, 10] >-> anyD even >-> raiseK sumD
+(((), Any {getAny = True},Sum {getSum = 19})
+
+    I designed certain special folds to terminate the 'Session' early if they
+    can compute their result prematurely, in order to draw as little input as
+    possible.  These folds end with an underscore, such as 'anyD_', which
+    behaves exactly like 'anyD' except it terminates the stream when it
+    receives a 'True' value, which seals the result:
+
+>>> runWriterT $ runProxy $ fromListS [3, 4, 9] >-> anyD_ even >-> printD
+3
+((), Any {getAny = True})
+
+    Compare to using 'anyD', which folds the entire input:
+
+>>> runWriterT $ runProxy $ fromListS [3, 4, 9] >-> anyD even >-> printD
+3
+4
+9
+((), Any {getAny = True})
+
 -}
 
 {- $multipleinputsoutputs -}
+
+{- $raiseKisapipemorphism -}
 
 {- $extend
     This library provides several extensions that add features on top of the
