@@ -68,17 +68,31 @@ module Control.Proxy.Prelude.Base (
     -- * Closed Adapters
     -- $open
     unitD,
-    unitU
+    unitU,
+
+    -- * Modules
+    -- $modules
+    module Control.Monad.Trans.State.Strict,
+    module Control.Monad.Trans.Writer.Strict,
+    module Data.Monoid
     ) where
 
 import Control.MFunctor (hoist)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Writer.Strict (WriterT, tell)
-import Control.Monad.Trans.State.Strict (StateT, get, put)
+import Control.Monad.Trans.Writer.Strict (
+    WriterT(runWriterT), execWriterT, tell )
+import Control.Monad.Trans.State.Strict (
+    StateT(runStateT), execStateT, get, put )
 import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
-import Data.Monoid
+import Data.Monoid (
+    Monoid,
+    Endo(Endo, appEndo),
+    All(All, getAll),
+    Any(Any, getAny),
+    Sum(Sum, getSum),
+    Product(Product, getProduct) )
 
 {-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
 
@@ -691,23 +705,27 @@ foldlU' f = runIdentityK go where
 
 -- | Zip values flowing downstream
 zipD
- :: (Monad m, Proxy p1, Proxy p2) => () -> Consumer p1 a (Pipe p2 b (a, b) m) r
-zipD () = runIdentityP $ hoist runIdentityP go where
+ :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
+ => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
+zipD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
     go = do
         a <- request ()
         lift $ do
             b <- request ()
-            respond (a, b)
+            lift $ respond (a, b)
         go
 
-mergeD :: (Monad m, Proxy p1, Proxy p2) => () -> Consumer p1 a (Pipe p2 a a m) r
-mergeD () = runIdentityP $ hoist runIdentityP go where
+-- | Interleave values flowing downstream using simple alternation
+mergeD
+ :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
+ => () -> Consumer p1 a (Consumer p2 a (Producer p3 a m)) r
+mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
     go = do
         a1 <- request ()
         lift $ do
-            respond a1
+            lift $ respond a1
             a2 <- request ()
-            respond a2
+            lift $ respond a2
         go
 
 {- $open
@@ -742,3 +760,7 @@ unitU _ = runIdentityP go where
     go = do
         request ()
         go
+
+{- $modules
+    These modules help you build, run, and extract folds
+-}
