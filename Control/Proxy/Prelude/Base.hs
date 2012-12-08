@@ -14,6 +14,7 @@ module Control.Proxy.Prelude.Base (
     execD,
     execU,
     execB,
+
     -- * Filters
     takeB,
     takeB_,
@@ -25,14 +26,17 @@ module Control.Proxy.Prelude.Base (
     dropWhileU,
     filterD,
     filterU,
+
     -- * Lists
     fromListS,
     fromListC,
+
     -- * Enumerations
     enumFromS,
     enumFromC,
     enumFromToS,
     enumFromToC,
+
     -- * Folds
     foldD,
     foldU,
@@ -56,12 +60,18 @@ module Control.Proxy.Prelude.Base (
     foldrU,
     foldlD',
     foldlU',
+
+    -- * Zips and Merges
+    zipD,
+    mergeD,
+
     -- * Closed Adapters
     -- $open
     unitD,
     unitU
     ) where
 
+import Control.MFunctor (hoist)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
 import Control.Monad.Trans.State.Strict (StateT, get, put)
@@ -678,6 +688,27 @@ foldlU' f = runIdentityK go where
         x   <- request a'
         a'2 <- respond x
         go a'2
+
+-- | Zip values flowing downstream
+zipD
+ :: (Monad m, Proxy p1, Proxy p2) => () -> Consumer p1 a (Pipe p2 b (a, b) m) r
+zipD () = runIdentityP $ hoist runIdentityP go where
+    go = do
+        a <- request ()
+        lift $ do
+            b <- request ()
+            respond (a, b)
+        go
+
+mergeD :: (Monad m, Proxy p1, Proxy p2) => () -> Consumer p1 a (Pipe p2 a a m) r
+mergeD () = runIdentityP $ hoist runIdentityP go where
+    go = do
+        a1 <- request ()
+        lift $ do
+            respond a1
+            a2 <- request ()
+            respond a2
+        go
 
 {- $open
     Use the @unit@ functions when you need to embed a proxy with a closed end
