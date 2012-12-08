@@ -32,7 +32,10 @@ module Control.Proxy.Prelude.IO (
     hPrintU,
     hPutStrLnB,
     hPutStrLnD,
-    hPutStrLnU
+    hPutStrLnU,
+
+    -- ** Types
+    IO.Handle
     ) where
 
 import Control.Monad (forever)
@@ -41,7 +44,7 @@ import Control.Proxy.Prelude.Kleisli (foreverK)
 import Control.Proxy.Class (Proxy(request, respond))
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
 import Control.Proxy.Synonym (Client, Server, Producer, CoProducer)
-import System.IO
+import qualified System.IO as IO
 
 -- | A 'Producer' that sends lines from 'stdin' downstream
 getLineS :: (Proxy p) => () -> Producer p String IO r
@@ -141,26 +144,26 @@ promptC () = runIdentityP $ forever $ do
     lift $ putStrLn recv
 
 -- | A 'Producer' that sends lines from a handle downstream
-hGetLineS :: (Proxy p) => Handle -> () -> Producer p String IO ()
+hGetLineS :: (Proxy p) => IO.Handle -> () -> Producer p String IO ()
 hGetLineS h () = runIdentityP go where
     go = do
-        eof <- lift $ hIsEOF h
+        eof <- lift $ IO.hIsEOF h
         if eof
             then return ()
             else do
-                str <- lift $ hGetLine h
+                str <- lift $ IO.hGetLine h
                 respond str
                 go
 
--- | A 'CoProducer' that sends lines from a handle upstream
-hGetLineC :: (Proxy p) => Handle -> () -> CoProducer p String IO ()
+-- | A 'CoProducer' that sends lines from a 'Handle' upstream
+hGetLineC :: (Proxy p) => IO.Handle -> () -> CoProducer p String IO ()
 hGetLineC h () = runIdentityP go where
     go = do
-        eof <- lift $ hIsEOF h
+        eof <- lift $ IO.hIsEOF h
         if eof
             then return ()
             else do
-                str <- lift $ hGetLine h
+                str <- lift $ IO.hGetLine h
                 request str
                 go
 
@@ -168,28 +171,28 @@ hGetLineC h () = runIdentityP go where
 
     Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
 -}
-hPrintB :: (Show a, Show a', Proxy p) => Handle -> a' -> p a' a a' a IO r
+hPrintB :: (Show a, Show a', Proxy p) => IO.Handle -> a' -> p a' a a' a IO r
 hPrintB h = runIdentityK $ foreverK $ \a' -> do
     lift $ do
-        hPutStr h "U: "
-        hPrint h a'
+        IO.hPutStr h "U: "
+        IO.hPrint h a'
     a <- request a'
     lift $ do
-        hPutStr h "D: "
-        hPrint h a
+        IO.hPutStr h "D: "
+        IO.hPrint h a
     respond a
 
 -- | 'print's all values flowing \'@D@\'ownstream to a 'Handle'
-hPrintD :: (Show a, Proxy p) => Handle -> x -> p x a x a IO r
+hPrintD :: (Show a, Proxy p) => IO.Handle -> x -> p x a x a IO r
 hPrintD h = runIdentityK $ foreverK $ \x -> do
     a <- request x
-    lift $ hPrint h a
+    lift $ IO.hPrint h a
     respond a
 
 -- | 'print's all values flowing \'@U@\'pstream to a 'Handle'
-hPrintU :: (Show a', Proxy p) => Handle -> a' -> p a' x a' x IO r
+hPrintU :: (Show a', Proxy p) => IO.Handle -> a' -> p a' x a' x IO r
 hPrintU h = runIdentityK $ foreverK $ \a' -> do
-    lift $ hPrint h a'
+    lift $ IO.hPrint h a'
     x <- request a'
     respond x
 
@@ -198,27 +201,27 @@ hPrintU h = runIdentityK $ foreverK $ \a' -> do
     Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
 -}
 hPutStrLnB
- :: (Proxy p) => Handle -> String -> p String String String String IO r
+ :: (Proxy p) => IO.Handle -> String -> p String String String String IO r
 hPutStrLnB h = runIdentityK $ foreverK $ \a' -> do
     lift $ do
-        hPutStr h "U: "
-        hPutStrLn h a'
+        IO.hPutStr h "U: "
+        IO.hPutStrLn h a'
     a <- request a'
     lift $ do
-        hPutStr h "D: "
-        hPutStrLn h a
+        IO.hPutStr h "D: "
+        IO.hPutStrLn h a
     respond a
 
 -- | 'putStrLn's all values flowing \'@D@\'ownstream to a 'Handle'
-hPutStrLnD :: (Proxy p) => Handle -> x -> p x String x String IO r
+hPutStrLnD :: (Proxy p) => IO.Handle -> x -> p x String x String IO r
 hPutStrLnD h = runIdentityK $ foreverK $ \x -> do
     a <- request x
-    lift $ hPutStrLn h a
+    lift $ IO.hPutStrLn h a
     respond a
 
 -- | 'putStrLn's all values flowing \'@U@\'pstream to a 'Handle'
-hPutStrLnU :: (Proxy p) => Handle -> String -> p String x String x IO r
+hPutStrLnU :: (Proxy p) => IO.Handle -> String -> p String x String x IO r
 hPutStrLnU h = runIdentityK $ foreverK $ \a' -> do
-    lift $ hPutStrLn h a'
+    lift $ IO.hPutStrLn h a'
     x <- request a'
     respond x
