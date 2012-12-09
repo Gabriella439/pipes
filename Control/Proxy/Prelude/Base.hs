@@ -54,6 +54,12 @@ module Control.Proxy.Prelude.Base (
     productU,
     lengthD,
     lengthU,
+    headD,
+    headD_,
+    headU,
+    headU_,
+    lastD,
+    lastU,
     toListD,
     toListU,
     foldrD,
@@ -92,7 +98,9 @@ import Data.Monoid (
     All(All, getAll),
     Any(Any, getAny),
     Sum(Sum, getSum),
-    Product(Product, getProduct) )
+    Product(Product, getProduct),
+    First(First, getFirst),
+    Last(Last, getLast) )
 
 {-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
 
@@ -654,6 +662,36 @@ lengthD = foldD (\_ -> Sum 1)
 -- | Count how many values flow \'@U@\'pstream
 lengthU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (Sum Int) m) r
 lengthU = foldU (\_ -> Sum 1)
+
+-- | Retrieve the first value going \'@D@\'ownstream
+headD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (First a) m) r
+headD = foldD (First . Just)
+
+{-| Retrieve the first value going \'@D@\'ownstream
+
+    'headD_' terminates on the first value it receives -}
+headD_ :: (Monad m, Proxy p) => x -> p x a x a (WriterT (First a) m) ()
+headD_ x = runIdentityP $ do
+    a <- request x
+    lift $ tell $ First (Just a)
+
+-- | Retrieve the first value going \'@U@\'pstream
+headU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (First a') m) r
+headU = foldU (First . Just)
+
+{-| Retrieve the first value going \'@U@\'pstream
+
+    'headU_' terminates on the first value it receives -}
+headU_ :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (First a') m) ()
+headU_ a' = runIdentityP $ lift $ tell $ First (Just a')
+
+-- | Retrieve the last value going \'@D@\'ownstream
+lastD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Last a) m) r
+lastD = foldD (Last . Just)
+
+-- | Retrieve the last value going \'@U@\'pstream
+lastU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (Last a') m) r
+lastU = foldU (Last . Just)
 
 -- | Fold the values flowing \'@D@\'ownstream into a list
 toListD :: (Monad m, Proxy p) => x -> p x a x a (WriterT [a] m) r
