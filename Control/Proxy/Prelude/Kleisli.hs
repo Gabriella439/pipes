@@ -7,6 +7,7 @@ module Control.Proxy.Prelude.Kleisli (
     foreverK,
     replicateK,
     liftK,
+    hoistK,
     raiseK,
     ) where
 
