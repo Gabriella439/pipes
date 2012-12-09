@@ -67,10 +67,6 @@ module Control.Proxy.Prelude.Base (
     foldlD',
     foldlU',
 
-    -- * Zips and Merges
-    zipD,
-    mergeD,
-
     -- * Closed Adapters
     -- $open
     unitD,
@@ -740,31 +736,6 @@ foldlU' f = runIdentityK go where
         x   <- request a'
         a'2 <- respond x
         go a'2
-
--- | Zip values flowing downstream
-zipD
- :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
- => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
-zipD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
-    go = do
-        a <- request ()
-        lift $ do
-            b <- request ()
-            lift $ respond (a, b)
-        go
-
--- | Interleave values flowing downstream using simple alternation
-mergeD
- :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
- => () -> Consumer p1 a (Consumer p2 a (Producer p3 a m)) r
-mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
-    go = do
-        a1 <- request ()
-        lift $ do
-            lift $ respond a1
-            a2 <- request ()
-            lift $ respond a2
-        go
 
 {- $open
     Use the @unit@ functions when you need to embed a proxy with a closed end
