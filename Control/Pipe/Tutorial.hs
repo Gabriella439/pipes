@@ -27,20 +27,14 @@ module Control.Pipe.Tutorial (
     -- * Utilities
     -- $utilities
 
+    -- * Mix Monads and Composition
+    -- $mixmonadcomp
+
     -- * Folds
     -- $folds
 
     -- * Extensions
     -- $extend
-
-    -- * Running Proxies
-    -- $run
-
-    -- * Composition
-    -- $compose
-
-    -- * Modularity
-    -- $modular
 
     -- * Vertical Concatenation
     -- $vertical
@@ -51,14 +45,8 @@ module Control.Pipe.Tutorial (
     -- * Termination
     -- $terminate
 
-    -- * Folds
-    -- $folds
-
     -- * Resource Management
     -- $resource
-
-    -- * Bidirectional Flow
-    -- $bidirectional
     ) where
 
 -- For documentation
@@ -450,7 +438,7 @@ Failure
 -}
 
 {- $interact
-    There are only two ways to interact with other 'Proxy's: 'request' and
+    There are only two ways to interact with other proxies: 'request' and
     'respond'.  Let's examine their type signatures to understand how they
     work:
 
@@ -532,7 +520,7 @@ Failure
     reversed.
 
     Since these two composition operators are perfectly symmetric, I arbitrarily
-    picked ('>->') to standardize on and I provide all standard library 'Proxy's
+    picked ('>->') to standardize on and I provide all standard library proxies
     blocked on 'respond' so that they work with ('>->').
 -}
 
@@ -711,8 +699,8 @@ promptInt
 -}
 
 {- $interleave
-    When you compose two 'Proxy's, you interleave their effects in the base
-    monad.  The following two 'Proxy's demonstrate this interleaving of effects:
+    When you compose two proxies, you interleave their effects in the base
+    monad.  The following two proxies demonstrate this interleaving of effects:
 
 > downstream :: (Proxy p) => Consumer p () IO ()
 > downstream () = runIdentityP $ do
@@ -756,7 +744,7 @@ promptInt
 3
 4
 
-    You can reason about how 'Proxy's interleave effects without knowing any
+    You can reason about how proxies interleave effects without knowing any
     specifics about the underlying implementation.  Intuitively, the 'Proxy'
     laws say that:
 
@@ -874,7 +862,8 @@ Left "Could not read Integer"
 
     Theoretically, you should avoid this because 'hoist' expects a monad
     morphism.  'lift' is a monad morphism, but lowering a monad transformer
-    typically is not a monad morphism.
+    typically is not a monad morphism (Exception: 'runIdentityP' IS a monad
+    morphism).
 
     Practically, you should avoid because while you can uniformly 'lift' all
     monad transformers, you can't uniformly lower them.  So whenever you have
@@ -915,6 +904,21 @@ Left "Could not read Integer"
     still type-checks as the most downstream stage, too, since 'runProxy' just
     discards any unused outbound values.
 
+    These utilities do not clash with the Prelude namespace or common libraries
+    and they all end with a capital letter suffix that indicates their
+    directionality:
+
+    * \'@D@\' suffix: interacts with values flowing \'@D@\'ownstream
+
+    * \'@U@\' suffix: interacts with values flowing \'@U@\'pstream
+
+    * \'@B@\' suffix: interacts with values flowing \'@B@\'oth ways (or:
+      \'@B@\'idirectional)
+
+    * \'@S@\' suffix: belongs furthest upstream in the \'@S@\'erver position
+
+    * \'@C@\' suffix: belongs furthest downstream in the \'@C@\'lient position
+
     We can assemble these functions into a silent version of our previous
     'Session':
 
@@ -934,7 +938,7 @@ Left "Could not read Integer"
 > printer :: (Proxy p, Show a) => x -> p x a x a IO r
 > printer = execD (putStrLn "Received a value:") >-> printD
 
-    Similarly, we can build our old @take'@ on top of @takeB_'@:
+    Similarly, we can build our old @take'@ on top of 'takeB_':
 
 > take' :: (Proxy p) => Int -> a' -> p a' a a' a m ()
 > take' n a' = runIdentityP $ do  -- Remember, we need 'runIdentityP' if
@@ -943,21 +947,6 @@ Left "Could not read Integer"
 
 >>> runProxy $ promptInt >-> take' 2 >-> printer
 <Exact same behavior>
-
-    These utilities do not clash with the Prelude namespace or common libraries
-    and they all end with a capital letter suffix that indicates their
-    directionality:
-
-    * \'@D@\' suffix: interacts with values flowing \'@D@\'ownstream
-
-    * \'@U@\' suffix: interacts with values flowing \'@U@\'pstream
-
-    * \'@B@\' suffix: interacts with values flowing \'@B@\'oth ways (or:
-      \'@B@\'idirectional)
-
-    * \'@S@\' suffix: belongs furthest upstream in the \'@S@\'erver position
-
-    * \'@C@\' suffix: belongs furthest downstream in the \'@C@\'lient position
 
     Or perhaps I want to forgot user input for testing and mock @promptInt@ by
     replacing it with a predefined set of values:
@@ -980,6 +969,75 @@ Received a value:
     This compositional programming style emphasizes building a library of
     reusable components and connecting them like Unix pipes to assemble the
     desired streaming program.
+-}
+
+{- $mixmonadcomp
+    Don't limit yourself to only using composition to assemble proxies.  You can
+    also sequence proxies using @do@ notation to generate more elaborate
+    behaviors.
+
+    Most commonly, you will sequence two proxies to combine their inputs, very
+    similar to how the Unix @cat@ utility behaves:
+
+> threeSources () = do
+>     source1 ()
+>     source2 ()
+>     source3 ()
+>
+> -- or: threeSources = source1 >=> source2 >=> source3
+
+    As a concrete example, we could create a 'Producer' where our first source
+    presets the first few values and then we let the user take over to generate
+    the remaining values:
+
+> source1 :: (Proxy p) => () -> Producer p Int IO r
+> source1 () = runIdentityP $ do
+>     fromListS [4, 4] ()  -- Source 1
+>     promptInt ()         -- Source 2
+>
+> -- or: source1 = runIdentityK (fromListS [4, 4] >=> promptInt)
+
+    What if we only want the user to provide three values?  We can 
+    selectively throttle it with 'takeB_':
+
+> source2 :: (Proxy p) => () -> Producer p Int IO ()
+> source2 () = runIdentityP $ do
+>     fromListS [4, 4] ()
+>     (promptInt >-> takeB_ 3) () -- You can compose inside a do block!
+>
+> -- or: source2 = runIdentityK (fromListS [4, 4] >=> (promptInt >-> takeB_ 3))
+
+    Notice that composition works inside of a @do@ block!  This is a very handy
+    trick!
+
+    You can also concatenate sinks, too:
+
+> sink1 :: (Proxy p) => () -> Consumer p Int IO ()
+> sink1 () = do
+>     (takeB_ 3         >-> printer) () -- Sink 1
+>     (takeWhileD (< 4) >-> printer) () -- Sink 2
+>
+> -- or: sink1 = (takeB_ 3 >-> printer) >=> (takeWhileD (< 4) >-> printer)
+
+    ... but the above example is gratuitous because you can simply concatenate
+    the intermediate stages:
+
+> sink2 :: (Proxy p) => () -> Consumer p Int IO ()
+> sink2 () = intermediate >-> printer where
+>     intermediate () = do
+>         takeB_ 3 ()       -- Intermediate stage 1
+>         takeWhileD (< 4)  -- Intermediate stage 2
+>
+> -- or: sink2 = (takeB_3 >=> takeWhileD (< 4)) >-> printer
+
+    These examples demonstrate the two principal ways to combine proxies:
+
+    * \"Vertical\" composition, using ('>=>') from the Kleisli category
+
+    * \"Horizontal\" composition: using ('>->') from the Proxy category
+
+    You assemble most proxies simply by composing them in one or both of these
+    two categories.
 -}
 
 {- $folds
@@ -1059,25 +1117,24 @@ Enter an Integer:
 
     I designed certain special folds to terminate the 'Session' early if they
     can compute their result prematurely, in order to draw as little input as
-    possible.  These folds end with an underscore, such as 'anyD_', which
-    behaves exactly like 'anyD' except it terminates the stream when it
-    receives a 'True' value, which seals the result:
+    possible.  These folds end with an underscore, such as 'headD_', which
+    terminates the stream once it receives an input:
 
->>> runWriterT $ runProxy $ fromListS [3, 4, 9] >-> anyD_ even >-> printD
+> headD_ :: (Monad m, Proxy p) => x -> p x a x a (WriterT (First a) m) ()
+
+>>> runWriterT $ runProxy $ fromListS [3, 4, 9] >-> raiseK printD >-> headD_
 3
-((), Any {getAny = True})
+((), First {getFirst = Just 3})
 
-    Compare to using 'anyD', which folds the entire input:
+    Compare to 'headD' without underscore, which folds the entire input:
 
->>> runWriterT $ runProxy $ fromListS [3, 4, 9] >-> anyD even >-> printD
+>>> runWriterT $ runProxy $ fromListS [3, 4, 9] >-> raiseK printD >-> headD
 3
 4
 9
-((), Any {getAny = True})
+((), First {getFirst = Just 3})
 
 -}
-
-{- $multipleinputsoutputs -}
 
 {- $raiseKisapipemorphism -}
 
@@ -1173,7 +1230,7 @@ Left "Could not read Integer"
 -}
 
 {- $vertical
-    'Proxy's support two main ways to combine 'Proxy's:
+    Proxies support two main ways to combine 'Proxy's:
 
     * \"Horizontally\" (i.e. 'Proxy' composition)
 
@@ -1197,237 +1254,12 @@ Left "Could not read Integer"
 
 -}
 
+{- $fork
+    Proxies permit interactions with multiple sources and sinks.  To fork inputs
+    or outputs, you next the 'Proxy' monad transformer within itself.
 
-
-{-
-    'hoistK' has the nice property that it distributes over Kleisli composition
-    (i.e. monads):
-
->>> runEitherT$
--}
-
-
-{- $stdlib
-    "Control.Proxy" re-exports "Control.Proxy.Prelude" which provides the
-    \"Proxy Prelude\": a standard library of useful utility functions.
-
-    Many of the proxies we wrote already exist in the standard library, such as
-    'printD', which generalizes @printer@:
-
-> printD :: (Proxy p, Show a) => x -> p x a x a IO r
-> 
-
-    These utilities not only simplify many common tasks but also provide code
-    examples that you can consult when learning to define your own proxies.
--}
-{-
-    These are not the only 'Proxy' instances, though!  This library defines
-    several extensions to the base 'Proxy' type, all of which also implement the
-    'Proxy' type class:
-
-> instance (Proxy p) => Proxy (IdentityP p) -- Like IdentityT
-> instance (Proxy p) => Proxy (MaybeP    p) -- Like MaybeT
-> instance (Proxy p) => Proxy (EitherP e p) -- Like EitherT
-> instance (Proxy p) => Proxy (StateP  s p) -- Like StateT
-
-    These extensions behave like monad transformers, except they also correctly
-    lift proxy operations over the monad transformer.
-
-    This means that when we define a utility like @printer@:
-
-> printer :: (Show a, Proxy p) => () -> Consumer p a IO r
-
-    ... it works transparently with these extensions, too!
-
-    These are not the only extensions possible and I plan on releasing more as
-    separate packages.  I included these extensions in the main library because
-    they are simple and illustrate how to define your extensions.  Also, these
-    extensions solve many common issues that @pipes@ users face.
-
-    The 'Proxy' type class lets you define your own base implementations or
-    extensions while still sharing standard utility functions.  This encourages
-    substantial code reuse and preserves a unified API for the @pipes@ ecosystem
-    that plays nicely with extensions.
--}
-
-{- $run
-    All instance of the 'Proxy' type class are monad transformers.  One such
-    instance is the 'ProxyFast' type, which provides a very fast implementation
-    of the 'Proxy' type class:
-
-> instance Proxy ProxyFast where ...
-
-    Like many other monad transformers, you convert a 'Proxy' back to the base
-    monad using some sort of \"@run...@\" function.  In this case, it's the
-    'runProxy' function:
-
-> runProxy :: (Monad m) => (() -> ProxyFast a' () () b m r)
-
-    'runProxy' accepts any 'Proxy' that has trivially satisfiable inputs of type
-    @()@ and just discards any out-going values:
-
->     +----------+
->     |          |
-> a' <==        <== ()
->     |          |
->     | Runnable |
->     |          |
-> () ==>        ==> b
->     |          |
->     +----------+
->
-> -- 'runProxy' discards any outgoing a' and b values
-
-    'runProxy' accepts 'Session's since their inputs are trivially satisfiable:
-
->     +---------+
->     |         |
-> C  <==       <== ()
->     |         |
->     | Session |
->     |         |
-> () ==>       ==> C
->     |         |
->     +---------+
-
-    However, it also accepts 'Producer's, for example, since their inputs are
-    also trivially satisfiable:
-
->     +----------+
->     |          |
-> C  <==        <== ()
->     |          |
->     | Producer |
->     |          |
-> () ==>        ==> b
->     |          |
->     +----------+
-
->>> runProxy $ promptInt
-Enter an Integer:
-77<Enter>
-Enter an Integer:
-8<Enter>
-Enter an Integer:
-9<Enter>
-...
-
-    'runProxy' discards by default because it significantly improves the
-    reusability of components.  Without this
--}
-
-
-{- $compose
-2
-3
-You shall not pass!
-
-    Fascinating!  Our 'Pipe' terminates even though @printer@ never terminates
-    and @fromList@ never terminates when given an infinite list.  To illustrate
-    why our 'Pipe' terminates, let's outline the 'Pipe' flow control rules for
-    composition:
-
-    * 'Pipe's are lazy, so execution begins at the most downstream 'Pipe'
-      (@printer@ in our example).
-
-    * When a 'Pipe' 'await's, it blocks until it receives input from the next
-      'Pipe' upstream
-
-    * When a 'Pipe' 'yield's, it blocks until it receives a new 'await' request
-      from downstream.
-
-    * If a 'Pipe' terminates, it terminates every other 'Pipe' composed with it.
-
-    All of these flow control rules uniquely follow from the 'Category' laws.
-
-    It might surprise you that termination brings down the entire 'Pipeline'
-    until you realize that:
-
-    * Downstream 'Pipe's depending on the result from the terminated 'Pipe'
-      cannot proceed
-
-    * Upstream 'Pipe's won't be further evaluated because the terminated 'Pipe'
-      will not request any further input from them
-
-    So in our previous example, the 'Pipeline' terminated because \"@take' 3@\"
-    terminated and brought down the entire 'Pipeline' with it.
-
-    Actually, these flow control rules will mislead you into thinking that
-    composed 'Pipe's behave as a collection of sub-'Pipe's with some sort of
-    message passing architecture between them, but nothing could be further from
-    the truth! When you compose 'Pipe's, they automatically fuse into a single
-    'Pipe' that corresponds to how you would have written the control flow by
-    hand.
-
-    For example, if you compose @printer@ and @fromList@:
-
-> printer <+< fromList [1..]
-
-    The result is indistinguishable from:
-
-> lift (mapM_ print [1..])
-
-    ... which is what we would have written by hand if we had not used 'Pipe's
-    at all!  All 'runPipe' does is just remove the 'lift'!
--}
-
-{- $modular
-    Given a loop like:
-
-> loop :: IO r
-> loop = forever $ do
->     x <- dataSource
->     y <- processData x
->     dataSink y
-
-    We could decompose it into three separate parts:
-
-> stage1 :: Producer a IO r
-> stage1 = forever $ do
->     x <- dataSource
->     yield x
->
-> stage2 :: Pipe a b IO r
-> stage2 = forever $ do
->     x <- await
->     y <- processData x
->     yield y
->
->
-> stage3 :: Consumer b IO r
-> stage3 = forever $ do
->     y <- await
->     dataSink y
->
-> stage3 <+< stage2 <+< stage1 = lift loop
-
-    In other words, 'Pipe's let you decompose loops into modular components,
-    which promotes loose coupling and allows you to freely mix and match those
-    components.
-
-    To demonstrate this, let's define a new data source that indefinitely
-    prompts the user for integers:
-
-> prompt :: Producer Int IO a
-> prompt = forever $ do
->     lift $ putStrLn "Enter a number: "
->     n <- read <$> lift getLine
->     yield n
-
-    Now we can use it as a drop-in replacement for @fromList@:
-
->>> runPipe $ printer <+< take' 3 <+< prompt
-Enter a number:
-1<Enter>
-1
-Enter a number:
-2<Enter>
-2
-Enter a number:
-3<Enter>
-3
-You shall not pass!
-
+    For instance, let's say we want to zip two incoming streams into an output
+    stream.
 -}
 
 {- $vertical
@@ -1576,35 +1408,6 @@ Nothing
     are 'await' and 'yield'.
 -}
 
-{- $folds
-    While we cannot intercept termination, we can still fold our input.  We can
-    embed 'WriterT' in our base monad, since 'Pipe' is a monad transformer, and
-    store the result in the monoid:
-
-> toList :: Consumer a (WriterT [a] m) r
-> toList = forever $ do
->     a <- await
->     lift $ tell [a]
-
->>> execWriterT $ runPipe $ toList <+< fromList [1..4]
-[1,2,3,4]
-
-    But what if other pipes have a base monad that is not compatible, such as:
-
-> prompt3 :: Producer Int IO a
-> prompt3 = take' 3 <+< prompt
-
-    That's okay, because we can transparently 'lift' any Pipe's base monad,
-    using 'hoistFreeT' from @Control.Monad.Trans.Free@ in the @free@ package:
-
->>> execWriterT $ runPipe $ toList <+< hoistFreeT lift prompt3
-3<Enter>
-4<Enter>
-6<Enter>
-[3,4,6]
-
--}
-
 {- $resource
     Pipes handle streaming computations well, but do not handle resource
     management well.  To see why, let's say we have the file \"@test.txt@\"
@@ -1666,21 +1469,4 @@ You shall not pass!
     The "Control.Frame" module of this library provides a temporary solution to
     this problem, but in the longer run there will be a more elegant solution
     built on top of "Control.Proxy".
--}
-
-{- $bidirectional
-    The 'Pipe' type suffers from one restriction: it only handles a
-    unidirectional flow of information.  If you want a bidirectional 'Pipe'
-    type, then use the 'Proxy' type from "Control.Proxy", which generalizes the
-    'Pipe' type to bidirectional flow.
-
-    More importantly, the 'Proxy' type is a strict superset of the 'Pipe' type,
-    so all 'Pipe' utilities and extensions are actually written as 'Proxy'
-    utilities and extensions, in order to avoid code duplication.
-
-    So if you want to use these extensions, import "Control.Proxy" instead,
-    which exports a backwards compatible 'Pipe' implementation along with all
-    utilities and extensions.  The 'Pipe' implementation in "Control.Pipe.Core"
-    exists purely as a reference implementation for people who wish to study the
-    simpler 'Pipe' type when building their own iteratee libraries.
 -}
