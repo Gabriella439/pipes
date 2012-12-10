@@ -25,6 +25,7 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
+import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Data.Monoid (Monoid(mempty, mappend))
@@ -111,6 +112,9 @@ instance (Proxy            p )
 
 instance ProxyTrans (WriterP w) where
     liftP m = WriterP (\w -> m ?>= \r -> return_P (r, w))
+
+instance PFunctor (WriterP w) where
+    hoistP nat = WriterP . (nat .) . unWriterP
 
 -- | Run a 'WriterP' computation, producing the final result and monoid
 runWriterP :: (Monoid w) => WriterP w p a' a b' b m r -> p a' a b' b m (r, w)

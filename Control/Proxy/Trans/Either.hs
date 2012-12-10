@@ -21,6 +21,7 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
+import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Prelude hiding (catch)
@@ -118,6 +119,9 @@ instance (Proxy            p )
 instance ProxyTrans (EitherP e) where
     liftP p = EitherP (p ?>= \x -> return_P (Right x))
  -- liftP = EitherP . liftM Right
+
+instance PFunctor (EitherP e) where
+    hoistP nat = EitherP . nat . runEitherP
 
 -- | Run an 'EitherP' \'@K@\'leisi arrow, returning either a 'Left' or 'Right'
 runEitherK

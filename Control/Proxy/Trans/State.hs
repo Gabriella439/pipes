@@ -23,6 +23,7 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
+import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -109,6 +110,9 @@ instance (Proxy           p )
 
 instance ProxyTrans (StateP s) where
     liftP m = StateP (\s -> m ?>= \r -> return_P (r, s))
+
+instance PFunctor (StateP s) where
+    hoistP nat = StateP . (nat .) . unStateP
 
 -- | Run a 'StateP' computation, producing the final result and state
 runStateP :: s -> StateP s p a' a b' b m r -> p a' a b' b m (r, s)

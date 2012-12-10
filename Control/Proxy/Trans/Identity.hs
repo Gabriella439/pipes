@@ -14,6 +14,7 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
+import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -120,6 +121,9 @@ instance (Interact            p )
 
 instance ProxyTrans IdentityP where
     liftP = IdentityP
+
+instance PFunctor IdentityP where
+    hoistP nat = IdentityP . nat . runIdentityP
 
 -- | Wrap a \'@K@\'leisli arrow in 'IdentityP'
 identityK :: (q -> p a' a b' b m r) -> (q -> IdentityP p a' a b' b m r)

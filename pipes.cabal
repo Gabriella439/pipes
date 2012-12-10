@@ -48,6 +48,7 @@ Library
         transformers >= 0.2.0.0
     Exposed-Modules:
         Control.MFunctor,
+        Control.PFunctor,
         Control.Pipe,
         Control.Proxy,
         Control.Proxy.Class,

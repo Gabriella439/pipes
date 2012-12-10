@@ -19,6 +19,7 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
+import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -119,6 +120,9 @@ instance (Interact            p)
 
 instance ProxyTrans (ReaderP i) where
     liftP m = ReaderP (\_ -> m)
+
+instance PFunctor (ReaderP i) where
+    hoistP nat = ReaderP . (nat .) . unReaderP
 
 -- | Run a 'ReaderP' computation, supplying the environment
 runReaderP :: i -> ReaderP i p a' a b' b m r -> p a' a b' b m r

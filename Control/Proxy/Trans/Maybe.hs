@@ -16,6 +16,7 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
+import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -117,6 +118,9 @@ instance (Proxy         p )
 instance ProxyTrans MaybeP where
     liftP p = MaybeP (p ?>= \x -> return_P (Just x))
  -- liftP = MaybeP . liftM Just
+
+instance PFunctor MaybeP where
+    hoistP nat = MaybeP . nat . runMaybeP
 
 -- | Run a 'MaybeP' \'@K@\'leisli arrow, returning the result or 'Nothing'
 runMaybeK :: (q -> MaybeP p a' a b' b m r) -> (q -> p a' a b' b m (Maybe r))
