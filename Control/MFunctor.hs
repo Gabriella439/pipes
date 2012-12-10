@@ -1,10 +1,4 @@
-{-| This module temporarily holds this class until it can find a better home.
-
-    Note: When combining two monad transformers with two different base monads,
-    use @(hoist lift)@ to lift one, not @(hoist runXXX)@ to lower one.  The
-    former approach not only works better but also provides 'hoist' with a monad
-    morphism, which is what it expects in theory.
--}
+-- | This module temporarily holds this class until it can find a better home.
 
 {-# LANGUAGE Rank2Types #-}
 
