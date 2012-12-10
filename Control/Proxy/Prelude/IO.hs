@@ -33,9 +33,6 @@ module Control.Proxy.Prelude.IO (
     hPutStrLnB,
     hPutStrLnD,
     hPutStrLnU,
-
-    -- ** Types
-    IO.Handle
     ) where
 
 import Control.Monad (forever)
