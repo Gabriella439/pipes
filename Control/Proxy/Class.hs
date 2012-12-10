@@ -1,16 +1,13 @@
 {-# LANGUAGE Rank2Types #-}
 
-{-| This module provides an abstract interface to 'Proxy'-like behavior, so that
-    multiple proxy implementations and proxy transformers can share the same
-    library of utility proxies.
+{-| The 'Proxy' class defines the library's core API.  Everything else in this
+    library builds exclusively on top of the 'Proxy' type class so that all
+    proxy implementations and extensions can share the same standard library.
 
-    Several of these type classes, including 'Proxy', duplicate methods from
-    other type-classes (such as ('?>=') duplicating ('>>=')) in order to work
-    around Haskell's lack of polymorphic constraints.  You do NOT need
-    to use these duplicate methods, which exist solely to plumb internal
-    type class machinery and clean up type signatures.  Instead, read the
-    \"Polymorphic proxies\" section below to learn how to write clean proxy
-    code. -}
+    Several of these type classes duplicate methods from familiar type-classes
+    (such as ('?>=') duplicating ('>>=')).  You do NOT need to use these
+    duplicate methods.  Instead, read the \"Polymorphic proxies\" section below
+    which explains their purpose and how they help clean up type signatures. -}
 
 module Control.Proxy.Class (
     -- * Core proxy class
@@ -348,10 +345,10 @@ p1 \<\ p2 = p2 />/ p1
     original type classes as long as you embed your proxy code within at least
     one proxy transformer (or 'IdentityP' if don't use any transformers).  The
     type-class machinery will then automatically convert the messier and less
-    polymorphic constraints to the smaller and more general constraints.
+    polymorphic constraints to the simpler and more general constraints.
 
-    For example, consider the following almost-correct definition for
-    @mapMD@ (from "Control.Proxy.Prelude.Base"):
+    For example, consider the following almost-correct definition for @mapMD@
+    (from "Control.Proxy.Prelude.Base"):
 
 > import Control.Monad.Trans.Class
 > import Control.Proxy
@@ -361,7 +358,7 @@ p1 \<\ p2 = p2 />/ p1
 >     b <- lift (f a)
 >     respond b
 
-    The compiler infers the following messy signature:
+    The compiler infers the following messy constraint:
 
 > mapMD
 >  :: (Monad m, Monad (p x a x b m), MonadTrans (p x a x b), Proxy p)
@@ -376,7 +373,8 @@ p1 \<\ p2 = p2 />/ p1
 >     b <- lift (f a)
 >     respond b
 
-    ... and now the compiler infers the following cleaner type:
+    ... and now the compiler collapses all the constraints into the 'Proxy'
+    constraint:
 
 > mapMD :: (Monad m, Proxy p) => (a -> m b) -> x -> p x a x b m r
 
