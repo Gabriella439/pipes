@@ -28,6 +28,9 @@ Description:
   * /Extension Framework/: You can elegantly mix and match extensions to the
     base type and easily create your own.
   .
+  * /Lightweight Dependency/: @pipes@ only depends on @transformers@ and
+    compiles very rapidly
+  .
   * /Extensive Documentation/: Second to none!
   .
   "Control.Proxy" is the central import for the library.
