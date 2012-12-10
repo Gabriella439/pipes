@@ -1882,7 +1882,7 @@ Left "Could not read Integer"
 
     * Monad Transformers and Functors on Monads: 'lift' and 'hoist'
 
-    * Proxy transformers and Functors on Proxies: 'liftP' and 'hoistP'
+    * Proxy Transformers and Functors on Proxies: 'liftP' and 'hoistP'
 
     However, I don't expect everybody to immediately understand how so few
     primitives can implement such a wide variety of features.  This tutorial

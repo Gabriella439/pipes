@@ -20,7 +20,7 @@ Description:
   .
   * /Bidirectionality/: This library offers bidirectional communication
   .
-  * /Blazing fast/: Currently the fastest coroutine implementation
+  * /Blazing fast/: Highly tuned coroutine implementation
   .
   * /Clear semantics/: All abstractions are grounded in category theory, which
     leads to intuitive behavior (and fewer bugs, if any!).
@@ -28,8 +28,8 @@ Description:
   * /Extension Framework/: You can elegantly mix and match extensions to the
     base type and easily create your own.
   .
-  * /Lightweight Dependency/: @pipes@ only depends on @transformers@ and
-    compiles very rapidly
+  * /Lightweight Dependency/: @pipes@ depends only on @transformers@, compiles
+    rapidly, is Safe Haskell, and only uses @Rank2Types@ and @KindSignatures@.
   .
   * /Extensive Documentation/: Second to none!
   .
