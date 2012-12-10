@@ -30,16 +30,9 @@ Description:
   .
   * /Extensive Documentation/: Second to none!
   .
-  You can learn the library by reading the following three tutorials:
+  "Control.Proxy" is the central import for the library.
   .
-  * "Control.Pipe.Tutorial": This introduces the basic concepts using the
-    simpler unidirectional pipe API.
-  .
-  * "Control.Proxy.Tutorial": This introduces the proxy type which forms the
-     central abstraction of this library.
-  .
-  * "Control.Proxy.Trans.Tutorial": This introduces proxy extensions which let
-    you extend the base proxy type with new features.
+  Read "Control.Proxy.Tutorial" for a really extensive tutorial.
 Category: Control, Pipes, Proxies
 Tested-With: GHC ==7.4.1
 Source-Repository head
