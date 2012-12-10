@@ -1,4 +1,9 @@
-{-| The 'Pipe' type is a monad transformer that enriches the base monad with the
+{-| This module remains as a wistful reminder of this library's humble origins.
+    This library now builds upon the more general 'Proxy' type, but still keeps
+    the @pipes@ name.  Read "Control.Proxy.Tutorial" to learn about this new
+    implementation.
+
+    The 'Pipe' type is a monad transformer that enriches the base monad with the
     ability to 'await' or 'yield' data to and from other 'Pipe's. -}
 
 module Control.Pipe (
