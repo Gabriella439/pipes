@@ -86,9 +86,9 @@ module Control.Proxy.Prelude.Base (
 import Control.MFunctor (hoist)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Writer.Strict (
-    WriterT(runWriterT), execWriterT, tell )
+    WriterT(runWriterT), execWriterT, runWriter, tell )
 import Control.Monad.Trans.State.Strict (
-    StateT(runStateT), execStateT, get, put )
+    StateT(runStateT), execStateT, runState, execState, get, put )
 import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
