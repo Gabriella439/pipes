@@ -2,7 +2,7 @@
     section followed by a lengthy discussion of the library's design and idioms.
 -}
 
-module Control.Pipe.Tutorial (
+module Control.Proxy.Tutorial (
     -- * Introduction
     -- $intro
 

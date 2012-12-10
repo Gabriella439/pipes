@@ -52,6 +52,7 @@ Library
         transformers >= 0.2.0.0
     Exposed-Modules:
         Control.MFunctor,
+        Control.Pipe,
         Control.Proxy,
         Control.Proxy.Class,
         Control.Proxy.Core,
@@ -65,13 +66,10 @@ Library
         Control.Proxy.Trans.Maybe,
         Control.Proxy.Trans.Reader,
         Control.Proxy.Trans.State,
-        Control.Proxy.Trans.Tutorial,
         Control.Proxy.Trans.Writer,
         Control.Proxy.Tutorial,
         Control.Proxy.Prelude,
         Control.Proxy.Prelude.Base,
         Control.Proxy.Prelude.IO,
-        Control.Proxy.Prelude.Kleisli,
-        Control.Pipe,
-        Control.Pipe.Tutorial
+        Control.Proxy.Prelude.Kleisli
     Default-Language: Haskell98
