@@ -1340,7 +1340,7 @@ Opening file
 
     * is straightforward,
 
-    * requires no special integration with existing library, and
+    * requires no special integration with existing libraries, and
 
     * is exception safe.
 
@@ -1363,9 +1363,9 @@ Opening file
 
     * requires no dependencies other than @pipes@
 
-    * is written entirely using the 'Proxy' class with no extensions
-
-    * offers even prompter finalization than @conduit@
+    However, if you don't need this extra power, then just stick to the former
+    simpler approach.  I plan to release all standard libraries to be agnostic
+    of the finalization approach to let you use which one you prefer.
 -}
 
 {- $extend
