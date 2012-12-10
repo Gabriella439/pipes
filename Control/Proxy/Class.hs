@@ -110,7 +110,7 @@ infixl 1 ?>= -- This should match the fixity of >>=
 >
 > (p1 >~> p2) >~> p3 = p1 >~> (p2 >~> p3)
 
-    * '(hoistK f)' defines a functor between proxy categories:
+    * @(hoistK f)@ defines a functor between proxy categories:
 
 > Define: hoistK f = (hoist f .)
 >
@@ -162,7 +162,8 @@ class Proxy p where
         argument of type @b'@ from the next 'request' as its return value. -}
     respond :: (Monad m) => b -> p a' a b' b m b'
 
-    {-| Compose two proxies blocked on a 'respond'
+    {-| Compose two proxies blocked on a 'respond', generating a new proxy
+        blocked on a 'respond'
 
         Begins from the downstream end and satisfies every 'request' with a
         'respond' -}
@@ -172,7 +173,8 @@ class Proxy p where
      -> (c' -> p b' b c' c m r)
      -> (c' -> p a' a c' c m r)
 
-    {-| Compose two proxies blocked on a 'request'
+    {-| Compose two proxies blocked on a 'request', generating a new proxy
+        blocked on a 'request'
 
         Begins from the upstream end and satisfies every 'respond' with a
         'request' -}
@@ -226,7 +228,8 @@ coidT = go where
         go a2
 -- coidT = foreverK $ respond >=> request
 
-{-| Compose two proxies blocked on a 'respond'
+{-| Compose two proxies blocked on a 'respond', generating a new proxy blocked
+    on a 'respond'
 
     Begins from the downstream end and satisfies every 'request' with a
     'respond' -}
@@ -237,7 +240,8 @@ coidT = go where
  -> (c' -> p a' a c' c m r)
 p1 <-< p2 = p2 >-> p1
 
-{-| Compose two proxies blocked on a 'request'
+{-| Compose two proxies blocked on a 'request', generating a new proxy blocked
+    on a 'request'
 
     Begins from the upstream end and satisfies every 'respond' with a
     'request' -}
@@ -258,12 +262,6 @@ p1 <~< p2 = p2 >~> p1
 
     * Replace existing 'respond' commands using ('/>/')
     
-    Minimal definition:
-
-    * ('\>\')
-
-    * ('/>/')
-
     Laws:
 
     * ('\>\') and 'request' form a category:
@@ -281,6 +279,18 @@ p1 <~< p2 = p2 >~> p1
 > f />/ respond = f
 >
 > (f />/ g) />/ h = f />/ (g />/ h)
+
+    Additionally, ('\>\') and ('/>/') distribute in one direction over Kleisli
+    composition:
+
+> a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
+>
+> a \>\ return = return
+
+> (b >=> c) />/ a = (b />/ a) >=> (c />/ a)
+>
+> return />/ a = return
+
 -}
 class Interact p where
     -- | @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
