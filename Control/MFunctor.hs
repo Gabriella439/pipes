@@ -3,7 +3,7 @@
 {-# LANGUAGE Rank2Types #-}
 
 module Control.MFunctor (
-    -- * Monads over functors
+    -- * Functors over Monads
     MFunctor(..),
     raise
     ) where
