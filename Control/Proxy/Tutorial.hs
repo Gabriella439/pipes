@@ -1472,7 +1472,7 @@ Left "Could not read Integer"
 >  -> E.EitherP String p a' a b' b IO r
 > heartbeat p = p `E.catch` \err -> do
 >     lift $ putStrLn err  -- Print the error
->     p                    -- Restart 'p'
+>     heartbeat p          -- Restart 'p'
 
     This uses the 'catch' function from "Control.Proxy.Trans.Either", which
     lets you catch and handle errors locally without disturbing other proxies.
