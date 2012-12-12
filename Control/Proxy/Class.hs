@@ -273,27 +273,27 @@ p1 \<\ p2 = p2 />/ p1
 
     Also, all proxies must satisfy the following 'Proxy' laws:
 
-> -- Define: mapK = (lift .)
+> -- Define: liftK = (lift .)
 >
-> p1 >-> mapK f = mapK f
+> p1 >-> liftK f = liftK f
 >
-> p1 >-> (mapK f >=> respond >=> p2) = mapK f >=> respond >=> (p1 >-> p2)
+> p1 >-> (liftK f >=> respond >=> p2) = liftK f >=> respond >=> (p1 >-> p2)
 >
-> (mapK g >=> respond >=> p1) >-> (mapK f >=> request >=> mapK h >=> p2)
->     = mapK (f >=> g >=> h) >=> (p1 >-> p2)
+> (liftK g >=> respond >=> p1) >-> (liftK f >=> request >=> liftK h >=> p2)
+>     = liftK (f >=> g >=> h) >=> (p1 >-> p2)
 >
-> (mapK g >=> request >=> p1) >-> (mapK f >=> request >=> p2)
->     = mapK (f >=> g) >=> request >=> (p1 >~> p2)
+> (liftK g >=> request >=> p1) >-> (liftK f >=> request >=> p2)
+>     = liftK (f >=> g) >=> request >=> (p1 >~> p2)
 >
-> mapK f >~> p2 = mapK f
+> liftK f >~> p2 = liftK f
 >
-> (mapK f >=> request >=> p1) >~> p2 = mapK f >=> request >=> (p1 >~> p2)
+> (liftK f >=> request >=> p1) >~> p2 = liftK f >=> request >=> (p1 >~> p2)
 >
-> (mapK f >=> respond >=> mapK h >=> p1) >~> (mapK g >=> request >=> p2)
->     = mapK (f >=> g >=> h) >=> (p1 >~> p2)
+> (liftK f >=> respond >=> liftK h >=> p1) >~> (liftK g >=> request >=> p2)
+>     = liftK (f >=> g >=> h) >=> (p1 >~> p2)
 >
-> (mapK f >=> respond >=> p1) >~> (mapK g >=> respond >=> p2)
->     = mapK (f >=> g) >=> (p1 >-> p2)
+> (liftK f >=> respond >=> p1) >~> (liftK g >=> respond >=> p2)
+>     = liftK (f >=> g) >=> (p1 >-> p2)
 
     The 'Interact' class exists primarily for theoretical interest and to
     justify some of the functor laws for the 'ProxyTrans' type class.  You will
