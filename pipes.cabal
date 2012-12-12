@@ -15,25 +15,22 @@ Description:
   .
   Advantages over traditional iteratee\/coroutine implementations:
   .
-  * /Concise API/: This library uses a few simple abstractions with a very high
-    power-to-weight ratio to reduce adoption time.
+  * /Concise API/: Use three simple commands: ('>->'), 'request', and 'respond'
   .
-  * /Bidirectionality/: This library offers bidirectional communication
+  * /Bidirectionality/: Implement duplex channels
   .
-  * /Blazing fast/: Highly tuned coroutine implementation
+  * /Blazing fast/: Implementation tuned for speed
   .
-  * /Clear semantics/: All abstractions are grounded in category theory, which
-    leads to intuitive behavior (and fewer bugs, if any!).
+  * /Elegant semantics/: Use practical category theory
   .
-  * /Extension Framework/: You can elegantly mix and match extensions to the
-    base type and easily create your own.
+  * /Extension Framework/: Mix and match extensions and create your own
   .
-  * /Lightweight Dependency/: @pipes@ depends only on @transformers@, compiles
-    rapidly, is Safe Haskell, and only uses @Rank2Types@ and @KindSignatures@.
+  * /Lightweight Dependency/: @pipes@ depends only on @transformers@ and
+    compiles rapidly
   .
   * /Extensive Documentation/: Second to none!
   .
-  "Control.Proxy" is the central import for the library.
+  Import "Control.Proxy" to use the library.
   .
   Read "Control.Proxy.Tutorial" for a really extensive tutorial.
 Category: Control, Pipes, Proxies

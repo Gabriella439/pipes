@@ -16,17 +16,26 @@ module Control.Proxy.Class (
     coidT,
     (<-<),
     (<~<),
+
     -- * request/respond substitution
     Interact(..),
     (/</),
     (\<\),
+
+    -- * Laws
+    -- $laws
+
     -- * Polymorphic proxies
     -- $poly
     MonadPlusP(..),
-    MonadIOP(..),
+    MonadIOP(..)
     ) where
 
 import Control.Monad.IO.Class (MonadIO)
+
+-- Documentation imports
+import Control.Monad.Trans.Class (lift)
+import Control.MFunctor(hoist)
 
 {- * I make educated guesses about which associativy is most efficient for each
      operator.
@@ -45,103 +54,12 @@ infixl 8 \<\
 infixr 8 />/
 infixl 1 ?>= -- This should match the fixity of >>=
 
-{-| The 'Proxy' class defines an interface to all core proxy capabilities that
-    all proxy-like types must implement.
+{-| The core API for the @pipes@ library
 
-    First, all proxies must support a bidirectional flow of information, defined
-    by:
+    You should only use 'request', 'respond', and ('>->')
 
-    * ('>->')
-
-    * ('>~>')
-
-    * 'request'
-
-    * 'respond'
-
-    Intuitively, both @p1 >-> p2@ and @p1 >~> p2@ pair each 'request' in @p2@
-    with a 'respond' in @p1@.  ('>->') accepts proxies blocked on 'respond' and
-    begins from the downstream end, whereas ('>~>') accepts proxies blocked on
-    'request' and begins from the upstream end.
-
-    Second, all proxies are monads, defined by:
-
-    * 'return_P'
-
-    * ('?>=')
-
-    These must satify the monad laws using @(>>=) = (?>=)@ and
-    @return = return_P@.
-
-    Third, all proxies are monad transformers, defined by:
-
-    * 'lift_P'
-
-    This must satisfy the monad transformer laws, using @lift = lift_P@.
-
-    Fourth, all proxies are functors in the category of monads, defined by:
-
-    * 'hoist_P'
-
-    This must satisfy the functor laws, using @hoist = hoist_P@.
-
-    All 'Proxy' instances must satisfy these additional laws:
-
-    * ('>->') and 'idT' form a category:
-
-> Define: idT = request >=> respond >=> idT
->
-> idT >-> p = p
->
-> p >-> idT = p
->
-> (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
-
-    * ('>~>') and 'coidT' form a category:
-
-> Define: coidT = respond >=> request >=> coidT
->
-> coidT >~> p = p
->
-> p >~> coidT = p
->
-> (p1 >~> p2) >~> p3 = p1 >~> (p2 >~> p3)
-
-    * @(hoistK f)@ defines a functor between proxy categories:
-
-> Define: hoistK f = (hoist f .)
->
-> hoistK f (p1 >-> p2) = hoistK f p1 >-> hoistK p2
->
-> hoistK f idT = idT
->
-> hoistK f (p1 >~> p2) = hoistK f p1 >~> hoistK p2
->
-> hoistK f coidT = coidT
-
-    Also, all proxies must satisfy the following 'Proxy' laws:
-
-> -- Define: mapK = (lift .)
->
-> p1 >-> mapK f = mapK f
->
-> p1 >-> (mapK f >=> respond >=> p2) = mapK f >=> respond >=> (p1 >-> p2)
->
-> (mapK g >=> respond >=> p1) >-> (mapK f >=> request >=> mapK h >=> p2)
->     = mapK (f >=> g >=> h) >=> (p1 >-> p2)
->
-> (mapK g >=> request >=> p1) >-> (mapK f >=> request >=> p2)
->     = mapK (f >=> g) >=> request >=> (p1 >~> p2)
->
-> mapK f >~> p2 = mapK f
->
-> (mapK f >=> request >=> p1) >~> p2 = mapK f >=> request >=> (p1 >~> p2)
->
-> (mapK f >=> respond >=> mapK h >=> p1) >~> (mapK g >=> request >=> p2)
->     = mapK (f >=> g >=> h) >=> (p1 >~> p2)
->
-> (mapK f >=> respond >=> p1) >~> (mapK g >=> respond >=> p2)
->     = mapK (f >=> g) >=> (p1 >-> p2)
+    I only provide ('>~>') for theoretical symmetry, and the remaining methods
+    just implement internal type class plumbing.
 -}
 class Proxy p where
     {-| 'request' input from upstream, passing an argument with the request
@@ -240,8 +158,9 @@ p1 <-< p2 = p2 >-> p1
 {-| Compose two proxies blocked on a 'request', generating a new proxy blocked
     on a 'request'
 
-    Begins from the upstream end and satisfies every 'respond' with a
-    'request' -}
+    Begins from the upstream end and satisfies every 'respond' with a 'request'
+
+    You don't need to use this.  I include it only for symmetry. -}
 (<~<)
  :: (Monad m, Proxy p)
  => (b -> p b' b c' c m r)
@@ -249,9 +168,136 @@ p1 <-< p2 = p2 >-> p1
  -> (a -> p a' a c' c m r)
 p1 <~< p2 = p2 >~> p1
 
-{-| This class exists primarily for theoretical interest and to justify some of
-    the functor laws for the 'ProxyTrans' type class.  You probably do not need
-    to use these operators.
+-- | Two extra Proxy categories of theoretical interest
+class Interact p where
+    -- | @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
+    (\>\) :: (Monad m)
+          => (b' -> p a' a x' x m b)
+          -> (c' -> p b' b x' x m c)
+          -> (c' -> p a' a x' x m c)
+
+    -- | @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
+    (/>/) :: (Monad m)
+          => (a -> p x' x b' b m a')
+          -> (b -> p x' x c' c m b')
+          -> (a -> p x' x c' c m a')
+
+-- | @f \/<\/ g@ replaces all 'request's in 'f' with 'g'.
+(/</) :: (Monad m, Interact p)
+      => (c' -> p b' b x' x m c)
+      -> (b' -> p a' a x' x m b)
+      -> (c' -> p a' a x' x m c)
+p1 /</ p2 = p2 \>\ p1
+
+-- | @f \\<\\ g@ replaces all 'respond's in 'g' with 'f'.
+(\<\) :: (Monad m, Interact p)
+      => (b -> p x' x c' c m b')
+      -> (a -> p x' x b' b m a')
+      -> (a -> p x' x c' c m a')
+p1 \<\ p2 = p2 />/ p1
+
+{- $laws
+    The 'Proxy' class defines an interface to all core proxy capabilities that
+    all proxy-like types must implement.
+
+    First, all proxies must support a bidirectional flow of information, defined
+    by:
+
+    * ('>->')
+
+    * ('>~>')
+
+    * 'request'
+
+    * 'respond'
+
+    Intuitively, both @p1 >-> p2@ and @p1 >~> p2@ pair each 'request' in @p2@
+    with a 'respond' in @p1@.  ('>->') accepts proxies blocked on 'respond' and
+    begins from the downstream end, whereas ('>~>') accepts proxies blocked on
+    'request' and begins from the upstream end.
+
+    Second, all proxies are monads, defined by:
+
+    * 'return_P'
+
+    * ('?>=')
+
+    These must satify the monad laws using @(>>=) = (?>=)@ and
+    @return = return_P@.
+
+    Third, all proxies are monad transformers, defined by:
+
+    * 'lift_P'
+
+    This must satisfy the monad transformer laws, using @lift = lift_P@.
+
+    Fourth, all proxies are functors in the category of monads, defined by:
+
+    * 'hoist_P'
+
+    This must satisfy the functor laws, using @hoist = hoist_P@.
+
+    All 'Proxy' instances must satisfy these additional laws:
+
+    * ('>->') and 'idT' form a category:
+
+> Define: idT = request >=> respond >=> idT
+>
+> idT >-> p = p
+>
+> p >-> idT = p
+>
+> (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
+
+    * ('>~>') and 'coidT' form a category:
+
+> Define: coidT = respond >=> request >=> coidT
+>
+> coidT >~> p = p
+>
+> p >~> coidT = p
+>
+> (p1 >~> p2) >~> p3 = p1 >~> (p2 >~> p3)
+
+    * @(hoistK f)@ defines a functor between proxy categories:
+
+> Define: hoistK f = (hoist f .)
+>
+> hoistK f (p1 >-> p2) = hoistK f p1 >-> hoistK p2
+>
+> hoistK f idT = idT
+>
+> hoistK f (p1 >~> p2) = hoistK f p1 >~> hoistK p2
+>
+> hoistK f coidT = coidT
+
+    Also, all proxies must satisfy the following 'Proxy' laws:
+
+> -- Define: mapK = (lift .)
+>
+> p1 >-> mapK f = mapK f
+>
+> p1 >-> (mapK f >=> respond >=> p2) = mapK f >=> respond >=> (p1 >-> p2)
+>
+> (mapK g >=> respond >=> p1) >-> (mapK f >=> request >=> mapK h >=> p2)
+>     = mapK (f >=> g >=> h) >=> (p1 >-> p2)
+>
+> (mapK g >=> request >=> p1) >-> (mapK f >=> request >=> p2)
+>     = mapK (f >=> g) >=> request >=> (p1 >~> p2)
+>
+> mapK f >~> p2 = mapK f
+>
+> (mapK f >=> request >=> p1) >~> p2 = mapK f >=> request >=> (p1 >~> p2)
+>
+> (mapK f >=> respond >=> mapK h >=> p1) >~> (mapK g >=> request >=> p2)
+>     = mapK (f >=> g >=> h) >=> (p1 >~> p2)
+>
+> (mapK f >=> respond >=> p1) >~> (mapK g >=> respond >=> p2)
+>     = mapK (f >=> g) >=> (p1 >-> p2)
+
+    The 'Interact' class exists primarily for theoretical interest and to
+    justify some of the functor laws for the 'ProxyTrans' type class.  You will
+    probably never use it.
 
     The 'Interact' class defines the ability to:
     
@@ -287,34 +333,7 @@ p1 <~< p2 = p2 >~> p1
 > (b >=> c) />/ a = (b />/ a) >=> (c />/ a)
 >
 > return />/ a = return
-
 -}
-class Interact p where
-    -- | @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
-    (\>\) :: (Monad m)
-          => (b' -> p a' a x' x m b)
-          -> (c' -> p b' b x' x m c)
-          -> (c' -> p a' a x' x m c)
-
-    -- | @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
-    (/>/) :: (Monad m)
-          => (a -> p x' x b' b m a')
-          -> (b -> p x' x c' c m b')
-          -> (a -> p x' x c' c m a')
-
--- | @f \/<\/ g@ replaces all 'request's in 'f' with 'g'.
-(/</) :: (Monad m, Interact p)
-      => (c' -> p b' b x' x m c)
-      -> (b' -> p a' a x' x m b)
-      -> (c' -> p a' a x' x m c)
-p1 /</ p2 = p2 \>\ p1
-
--- | @f \\<\\ g@ replaces all 'respond's in 'g' with 'f'.
-(\<\) :: (Monad m, Interact p)
-      => (b -> p x' x c' c m b')
-      -> (a -> p x' x b' b m a')
-      -> (a -> p x' x c' c m a')
-p1 \<\ p2 = p2 />/ p1
 
 {- $poly
     Many of these type classes contain methods which copy methods from more

@@ -102,7 +102,7 @@ import Prelude hiding (catch)
 >         then return ()
 >         else do
 >             str <- lift $ hGetLine h
->             respond str
+>             respond str  -- Produce the string
 >             loop
 >
 > -- Ignore the 'runIdentityP' and '()' for now
@@ -128,7 +128,7 @@ import Prelude hiding (catch)
 > --                                    v          v    v   polymorphic
 > printer :: (Proxy p, Show a) => () -> Consumer p a IO r
 > printer () = runIdentityP $ forever $ do
->     a <- request ()
+>     a <- request ()  -- Consume a value
 >     lift $ putStrLn "Received a value:"
 >     lift $ print a
 
@@ -136,7 +136,7 @@ import Prelude hiding (catch)
     a runnable 'Session':
 
 > --                Self-contained session ---+         +--+-- These must match
-> --                                          |         |  |   both components
+> --                                          |         |  |   each component
 > --                                          v         v  v
 > promptInt >-> printer :: (Proxy p) => () -> Session p IO r
 >
@@ -157,7 +157,7 @@ import Prelude hiding (catch)
     The following program never brings more than a single line into memory (not
     that it matters for such a small file):
 
->>> withFile "test.txt" $ \h -> runProxy $ lines h >-> printer
+>>> withFile "test.txt" $ \h -> runProxy $ lines' h >-> printer
 Received a value:
 "Line 1"
 Received a value:
@@ -218,14 +218,11 @@ You shall not pass!
 
     We can already spot several improvements upon traditional lazy 'IO':
 
-    * You can easily define your own lazy components that have nothing to do
-      with files
+    * You can define your own lazy components that have nothing to do with files
 
-    * The underlying implementation never uses 'unsafePerformIO' and never
-      violates referential transparency.
+    * @pipes@ never uses 'unsafePerformIO' or violates referential transparency.
 
-    * You don't need to use confusing strictness hacks to ensure the proper
-      ordering of effects
+    * You don't need strictness hacks to ensure the proper ordering of effects
 
     * You can interleave effects in downstream stages, too
 
