@@ -6,7 +6,7 @@ module Control.Proxy.Prelude.Kleisli (
     -- * Core utility functions
     foreverK,
     replicateK,
-    liftK,
+    mapK,
     hoistK,
     raiseK,
     ) where
@@ -44,13 +44,13 @@ replicateK n0 k = go n0 where
 
 {-| Convenience function equivalent to @(lift .)@
 
-> liftK f >=> liftK g = liftK (f >=> g)
+> mapK f >=> mapK g = mapK (f >=> g)
 >
-> liftK return = return
+> mapK return = return
 -}
-liftK :: (Monad m, MonadTrans t) => (a -> m b) -> (a -> t m b)
-liftK k a = lift (k a)
--- liftK = (lift .)
+mapK :: (Monad m, MonadTrans t) => (a -> m b) -> (a -> t m b)
+mapK k a = lift (k a)
+-- mapK = (lift .)
 
 {-| Convenience function equivalent to @(hoist f .)@
 
