@@ -157,7 +157,7 @@ import Prelude hiding (catch)
     The following program never brings more than a single line into memory (not
     that it matters for such a small file):
 
->>> withFile "test.txt" $ \h -> runProxy $ lines' h >-> printer
+>>> withFile "test.txt" ReadMode $ \h -> runProxy $ lines' h >-> printer
 Received a value:
 "Line 1"
 Received a value:
