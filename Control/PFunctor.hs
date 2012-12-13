@@ -11,7 +11,7 @@ module Control.PFunctor (
 import Control.Proxy.Class (Proxy)
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
--- | A functor in the category of monads
+-- | A functor in the category of proxies
 class PFunctor (
     t :: (* -> * -> * -> * -> (* -> *) -> * -> *)
       ->  * -> * -> * -> * -> (* -> *) -> * -> * ) where
