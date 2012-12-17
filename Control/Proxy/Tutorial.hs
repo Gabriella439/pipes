@@ -1560,7 +1560,7 @@ Received a value:
 
 > zipD
 >  :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
->  => () -> Consumer p1 a (Consumer p2 b (Consumer p3 (a, b) m)) r
+>  => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
 > zipD = runIdentityP . hoist (runIdentityP . hoist runIdentityP) $ forever $ do
 >     -- Yes, this 'runIdentityP' mess is necessary.  Sorry!
 >
