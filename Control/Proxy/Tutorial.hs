@@ -94,7 +94,7 @@ import Prelude hiding (catch)
 > --                Produces Strings ---+----------+
 > --                                    |          |
 > --                                    v          v
-> lines' :: (Proxy p) => Handle -> () -> Producer p String IO r
+> lines' :: (Proxy p) => Handle -> () -> Producer p String IO ()
 > lines' h () = runIdentityP loop where
 >     loop = do
 >         eof <- lift $ hIsEOF h
@@ -811,14 +811,14 @@ promptInt
     When you compose two proxies, you interleave their effects in the base
     monad.  The following two proxies demonstrate this interleaving of effects:
 
-> downstream :: (Proxy p) => Consumer p () IO ()
+> downstream :: (Proxy p) => () -> Consumer p () IO ()
 > downstream () = runIdentityP $ do
 >     lift $ print 1
 >     request ()  -- Switch to upstream
 >     lift $ print 3
 >     request ()  -- Switch to upstream
 >
-> upstream :: (Proxy p) => Producer p () IO ()
+> upstream :: (Proxy p) => () -> Producer p () IO ()
 > upstream () = runIdentityP $ do
 >     lift $ print 2
 >     respond () -- Switch to downstraem
