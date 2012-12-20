@@ -1262,7 +1262,7 @@ Enter an Integer:
     You can also run multiple folds at the same time just by adding more
     'WriterT' layers to your base monad:
 
->>> runWriterT $ runWriterT $ fromListS [9, 10] >-> anyD even >-> raiseK sumD
+>>> runWriterT $ runWriterT $ runProxy $ fromListS [9, 10] >-> anyD even >-> raiseK sumD
 (((), Any {getAny = True},Sum {getSum = 19})
 
     I designed certain special folds to terminate the 'Session' early if they
