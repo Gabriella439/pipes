@@ -10,7 +10,8 @@ module Control.Proxy.Core (
     module Control.Proxy.Trans.Identity,
     module Control.Monad,
     module Control.Monad.Trans.Class,
-    module Control.MFunctor
+    module Control.MFunctor,
+    module Control.PFunctor
     ) where
 
 import Control.MFunctor (MFunctor(hoist))
@@ -21,6 +22,7 @@ import Control.Proxy.Synonym
 import Control.Proxy.Trans
 import Control.Proxy.Trans.Identity
 import Control.Proxy.Prelude
+import Control.PFunctor
 
 {- $modules
     "Control.Proxy.Class" defines the 'Proxy' type class that lets you program
@@ -42,4 +44,6 @@ import Control.Proxy.Prelude
     "Control.Monad.Trans.Class" exports 'lift'.
 
     "Control.MFunctor" exports 'hoist'.
+
+    "Control.PFunctor" exports 'hoistP'.
 -}
