@@ -91,9 +91,9 @@ import Prelude hiding (catch)
 > import Control.Proxy
 > import System.IO
 > 
-> --                Produces Strings ---+----------+
-> --                                    |          |
-> --                                    v          v
+> --                 Produces Strings ---+----------+
+> --                                     |          |
+> --                                     v          v
 > lines' :: (Proxy p) => Handle -> () -> Producer p String IO ()
 > lines' h () = runIdentityP loop where
 >     loop = do
@@ -138,9 +138,9 @@ import Prelude hiding (catch)
 > --                Self-contained session ---+         +--+-- These must match
 > --                                          |         |  |   each component
 > --                                          v         v  v
-> promptInt >-> printer :: (Proxy p) => () -> Session p IO r
->
 > lines' h  >-> printer :: (Proxy p) => () -> Session p IO ()
+>
+> promptInt >-> printer :: (Proxy p) => () -> Session p IO r
 
     ('>->') connects each 'request' in @printer@ with a 'respond' in
     @lines'@ or @promptInt@.
@@ -999,7 +999,7 @@ Left "Could not read Integer"
 
     The @S@ suffix indicates that it belongs in the \'@S@\'erver position.
 
-    @(takeB_ n)@ allows at most @n@ value to pass through it in \'@B@\'oth
+    @(takeB_ n)@ allows at most @n@ values to pass through it in \'@B@\'oth
     directions:
 
 > takeB_ :: (Monad m, Proxy p) => Int -> a' -> p a' a a' a m ()
@@ -1071,7 +1071,7 @@ Received a value:
 Received a value:
 37
 
-    What about our original @lines@ function?  That's just 'hGetLineS':
+    What about our original @lines'@ function?  That's just 'hGetLineS':
 
 > hGetLineS :: (Proxy p) => Handle -> () -> Producer p String IO ()
 
@@ -1345,7 +1345,7 @@ Opening file
 > cp inFile outFile =
 >     withFile file1 ReadMode  $ \hIn  ->
 >     withFile file2 WriteMode $ \hOut ->
->     runProxy $ hGetLineS hIn >-> hPutLineS hOut2
+>     runProxy $ hGetLineS hIn >-> hPutLineS hOut
 
     The advantage of this approach is that it:
 
@@ -1359,7 +1359,7 @@ Opening file
     this promptly deallocate them.
 
     The second approach is to use something like 'ResourceT' (from the
-    @resourceT@ package) to register finalizers and ensure they get released
+    @resourcet@ package) to register finalizers and ensure they get released
     deterministically.  You may prefer this approach if you have previously used
     the @conduit@ library, which uses 'ResourceT' in its base monad to offer
     resource determinism.  You can use 'ResourceT' with @pipes@, too, just by
@@ -1384,7 +1384,8 @@ Opening file
     This library provides several extensions that add features on top of the
     base 'Proxy' API.  These extensions behave like monad transformers, except
     that they also lift the 'Proxy' class through the extension so that the
-    extended proxy can still 'request', 'respond', compose with other proxies:
+    extended proxy can still 'request', 'respond', and compose with other
+    proxies:
 
 > instance (Proxy p) => Proxy (IdentityP p)  -- Equivalent to IdentityT
 > instance (Proxy p) => Proxy (EitherP e p)  -- Equivalent to EitherT
@@ -1411,8 +1412,8 @@ Opening file
 >         Just n  -> respond n
 
     There is no way to recover from the error and resume streaming data.  You
-    can only handle 'Left' value after using 'runProxy', but by then it is too 
-    late.
+    can only handle the 'Left' value after using 'runProxy', but by then it is
+    too late.
 
     We can solve this by switching the order of the two monad transformers, but
     using 'EitherP' this time instead of 'EitherT':
@@ -1561,12 +1562,13 @@ Received a value:
 > zipD
 >  :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
 >  => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
-> zipD = runIdentityP . hoist (runIdentityP . hoist runIdentityP) $ forever $ do
+> zipD () =
+>     runIdentityP . hoist (runIdentityP . hoist runIdentityP) $ forever $ do
 >     -- Yes, this 'runIdentityP' mess is necessary.  Sorry!
 >
->     a <- request ()               -- Request from the outer 'Consumer'
->     b <- lift $ request ()        -- Request from the inner 'Consumer'
->     lift $ lift $ respond (a, b)  -- Respond to the 'Producer'
+>         a <- request ()               -- Request from the outer 'Consumer'
+>         b <- lift $ request ()        -- Request from the inner 'Consumer'
+>         lift $ lift $ respond (a, b)  -- Respond to the 'Producer'
 
     'zipD' behaves analogously to a curried function.  We partially apply it to
     each layer using composition and 'runProxyK' or 'runProxy':
@@ -1699,13 +1701,13 @@ Left ()
 >       :: (Monad m, Proxy p)
 >       => p a' a b' b m r -> t p a' a b' b m r
 >
->  -- mapP is slightly more elegant
->     mapP
->      :: (Monad m, Proxy p)
->      => (q -> p a' a b' b m r) -> (q -> t p a' a b' b m r)
->     mapP = (liftP . )
+> -- mapP is slightly more elegant
+> mapP
+>  :: (Monad m, Proxy p, ProxyTrans t)
+>  => (q -> p a' a b' b m r) -> (q -> t p a' a b' b m r)
+> mapP = (liftP . )
 
-    It's very easy to use.  Just use 'mapP' (equivalent to @(liftP .)@ to lift
+    It's very easy to use.  Just use 'mapP' (equivalent to @(liftP .)@) to lift
     one proxy transformer to match another one.  For example, we can 'mapP'
     @increment2@ to match @promptInt3@:
 
@@ -1830,9 +1832,9 @@ Left "Could not read Integer"
 
     We can translate those to 'liftP' to get:
 
-> liftP $ request a' = request a'
+> liftP (request a') = request a'
 >
-> liftP $ respond b  = respond b
+> liftP (respond b)  = respond b
 
     In other words, 'request' and 'respond' in the extended proxy must behave
     exactly the same as lifting 'request' and 'respond' from the base proxy.
