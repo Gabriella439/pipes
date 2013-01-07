@@ -66,7 +66,6 @@ import Control.PFunctor
 import Control.Proxy
 import Control.Proxy.Core.Correct (ProxyCorrect)
 import Control.Proxy.Trans.Either
-import Prelude hiding (catch)
 
 {- $intro
     The @pipes@ library replaces lazy 'IO' with a safe, elegant, and
@@ -1475,7 +1474,7 @@ Left "Could not read Integer"
 >     lift $ putStrLn err  -- Print the error
 >     heartbeat p          -- Restart 'p'
 
-    This uses the 'catch' function from "Control.Proxy.Trans.Either", which
+    This uses the 'E.catch' function from "Control.Proxy.Trans.Either", which
     lets you catch and handle errors locally without disturbing other proxies.
 
 >>> runProxy $ E.runEitherK $ (heartbeat . promptInt3) >-> takeB_ 2 >-> printer

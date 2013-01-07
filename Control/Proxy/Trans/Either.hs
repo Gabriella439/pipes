@@ -1,6 +1,6 @@
 -- | This module provides the proxy transformer equivalent of 'EitherT'.
 
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE KindSignatures, CPP #-}
 
 module Control.Proxy.Trans.Either (
     -- * EitherP
@@ -24,7 +24,10 @@ import Control.MFunctor (MFunctor(hoist))
 import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
 import Control.Proxy.Trans (ProxyTrans(liftP))
+#if MIN_VERSION_base(4,6,0)
+#else
 import Prelude hiding (catch)
+#endif
 
 -- | The 'Either' proxy transformer
 newtype EitherP e p a' a b' b (m :: * -> *) r
