@@ -12,15 +12,15 @@ import Control.Proxy.Class (Proxy)
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | A functor in the category of proxies
-class PFunctor (
-    t :: (* -> * -> * -> * -> (* -> *) -> * -> *)
-      ->  * -> * -> * -> * -> (* -> *) -> * -> * ) where
+class PFunctor (t
+    :: (* -> * -> * -> * -> (* -> *) -> * -> *)
+    ->  * -> * -> * -> * -> (* -> *) -> * -> * ) where
     {-| Lift a proxy morphism from @p@ to @q@ into a proxy morphism from
         @(t p)@ to @(t q)@ -}
     hoistP
      :: (Monad m, Proxy p)
-     => (forall a' a b' b r1 . p a' a b' b m r1 -> q a' a b' b m r1)
-     -> (t p a' a b' b m r2 -> t q a' a b' b m r2)
+     => (forall r1 . p a' a b' b m r1 ->   q a' a b' b m r1)
+     -> (          t p a' a b' b m r2 -> t q a' a b' b m r2)
 
 {-| Lift the base proxy
 
