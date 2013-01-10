@@ -19,8 +19,8 @@ class PFunctor (t
         @(t p)@ to @(t q)@ -}
     hoistP
      :: (Monad m, Proxy p)
-     => (forall r1 . p a' a b' b m r1 ->   q a' a b' b m r1)
-     -> (          t p a' a b' b m r2 -> t q a' a b' b m r2)
+     => (forall r1 . p a' a b' b m r1 ->   q a' a b' b n r1)
+     -> (          t p a' a b' b m r2 -> t q a' a b' b n r2)
 
 {-| Lift the base proxy
 
