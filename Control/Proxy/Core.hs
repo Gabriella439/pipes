@@ -16,7 +16,7 @@ module Control.Proxy.Core (
     module Control.PFunctor
     ) where
 
-import Control.MFunctor (MFunctor(hoist))
+import Control.MFunctor
 import Control.Monad (forever, (>=>), (<=<))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
