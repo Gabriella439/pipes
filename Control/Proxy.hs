@@ -2,6 +2,8 @@
 
     Read "Control.Proxy.Tutorial" for an extended proxy tutorial. -}
 
+{-# LANGUAGE Safe #-}
+
 module Control.Proxy (
     -- * Modules
     -- $default

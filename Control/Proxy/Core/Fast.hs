@@ -21,6 +21,10 @@
     laws, but also guarantees that it works with the other proxy implementations
     and with any proxy transformers. -}
 
+{-# LANGUAGE Trustworthy #-}
+{- The rewrite RULES require the 'TrustWorthy' annotation.  I've supplied the
+   correctness proof for each rewrite rule immediately below each rule. -}
+
 module Control.Proxy.Core.Fast (
     -- * Types
     ProxyFast(..),
@@ -112,6 +116,21 @@ _lift m = M (m >>= \r -> return (Pure r))
     "_lift m ?>= f" forall m f .
         _bind (_lift m) f = M (m >>= \r -> return (f r))
   #-}
+{- Proof that the rewrite rule is Trustworthy:
+
+  _bind (_lift m) f
+= _bind (M (m >>= \r -> return (Pure r))) f
+= go (M (m >>= \r -> return (Pure r))) where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        M          m   -> M (m >>= \p' -> return (go p'))
+        Pure       r   -> f r
+= M ((m >>= \r -> return (Pure r)) >>= \p' -> return (go p'))
+= M (m >>= \r -> (return (Pure r) >>= \p' -> return (go p')))
+= M (m >>= \r -> return (go (Pure r)))
+= M (m >>= \r -> return (f r))
+-}
 
 instance (MonadIO m) => MonadIO (ProxyFast a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
@@ -161,6 +180,30 @@ instance Proxy ProxyFast where
     "_bind (Respond b  Pure) f" forall b  f .
         _bind (Respond b  Pure) f = Respond b  f
   #-}
+{- Proof that the rewrite rules are Trustworthy:
+
+  _bind (Request a' Pure) f
+= go (Request a' Pure) where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        M          m   -> M (m >>= \p' -> return (go p'))
+        Pure       r   -> f r
+= Request a' (\a -> go (Pure a))
+= Request a' (\a -> f a)
+= Request a' f
+
+  _bind (Respond b Pure) f
+= go (Respond b Pure) where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        M          m   -> M (m >>= \p' -> return (go p'))
+        Pure       r   -> f r
+= Respond b (\b' -> go (Pure b'))
+= Respond b (\b' -> f b')
+= Respond b f
+-}
 
 instance Interact ProxyFast where
     k2 \>\ k1 = \a' -> go (k1 a') where

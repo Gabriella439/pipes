@@ -1,6 +1,6 @@
 -- | This module provides the proxy transformer equivalent of 'StateT'.
 
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE KindSignatures, Safe #-}
 
 module Control.Proxy.Trans.State (
     -- * StateP

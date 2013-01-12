@@ -1,6 +1,6 @@
-{-# LANGUAGE Rank2Types #-}
-
 -- | Utility functions for Kleisli arrows
+
+{-# LANGUAGE Rank2Types, Safe #-}
 
 module Control.Proxy.Prelude.Kleisli (
     -- * Core utility functions

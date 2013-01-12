@@ -1,5 +1,7 @@
 -- | Default imports for the "Control.Proxy" hierarchy
 
+{-# LANGUAGE Safe #-}
+
 module Control.Proxy.Core (
     -- * Modules
     -- $modules

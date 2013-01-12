@@ -1,6 +1,6 @@
 -- | This module provides the proxy transformer equivalent of 'IdentityT'.
 
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE KindSignatures, Safe #-}
 
 module Control.Proxy.Trans.Identity (
     -- * Identity Proxy Transformer

@@ -1,6 +1,6 @@
 -- | This module provides the proxy transformer equivalent of 'EitherT'.
 
-{-# LANGUAGE KindSignatures, CPP #-}
+{-# LANGUAGE KindSignatures, CPP, Safe #-}
 
 module Control.Proxy.Trans.Either (
     -- * EitherP

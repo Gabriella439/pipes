@@ -1,11 +1,12 @@
-{-# LANGUAGE KindSignatures #-}
-
 {-| This module provides an API similar to "Control.Pipe" for those who prefer
     the classic 'Pipe' API.
 
     This module differs slightly from "Control.Pipe" in order to promote
     seamless interoperability with both pipes and proxies.  See the \"Upgrade
     Pipes to Proxies\" section below for details. -}
+
+{-# LANGUAGE KindSignatures, Safe #-}
+
 module Control.Proxy.Pipe (
     -- * Create Pipes
     await,

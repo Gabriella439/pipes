@@ -1,6 +1,6 @@
 -- | This module temporarily holds this class until it can find a better home.
 
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types, Safe #-}
 
 module Control.MFunctor (
     -- * Functors over Monads

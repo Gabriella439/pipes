@@ -1,5 +1,7 @@
 -- | General purpose proxies
 
+{-# LANGUAGE Safe #-}
+
 module Control.Proxy.Prelude.Base (
     -- * Maps
     mapD,

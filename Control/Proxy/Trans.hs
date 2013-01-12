@@ -5,6 +5,8 @@
     together.
 -}
     
+{-# LANGUAGE Safe #-}
+
 module Control.Proxy.Trans (
     -- * Proxy Transformers
     ProxyTrans(..),

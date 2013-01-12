@@ -1,5 +1,3 @@
-{-# LANGUAGE Rank2Types #-}
-
 {-| The 'Proxy' class defines the library's core API.  Everything else in this
     library builds exclusively on top of the 'Proxy' type class so that all
     proxy implementations and extensions can share the same standard library.
@@ -8,6 +6,8 @@
     (such as ('?>=') duplicating ('>>=')).  You do NOT need to use these
     duplicate methods.  Instead, read the \"Polymorphic proxies\" section below
     which explains their purpose and how they help clean up type signatures. -}
+
+{-# LANGUAGE Rank2Types, Safe #-}
 
 module Control.Proxy.Class (
     -- * Core proxy class

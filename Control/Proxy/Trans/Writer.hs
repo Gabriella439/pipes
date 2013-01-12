@@ -6,7 +6,7 @@
     The underlying implementation uses the state monad to avoid quadratic blowup
     from left-associative binds. -}
 
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE KindSignatures, Safe #-}
 
 module Control.Proxy.Trans.Writer (
     -- * WriterP

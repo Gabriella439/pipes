@@ -2,6 +2,8 @@
     section followed by a lengthy discussion of the library's design and idioms.
 -}
 
+{-# LANGUAGE Safe #-}
+
 module Control.Proxy.Tutorial (
     -- * Introduction
     -- $intro
