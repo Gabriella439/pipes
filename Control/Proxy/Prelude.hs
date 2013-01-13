@@ -1,7 +1,5 @@
 -- | Entry point for the Control.Proxy.Prelude hierarchy
 
-{-# LANGUAGE Safe #-}
-
 module Control.Proxy.Prelude (
     -- * Modules
     -- $modules

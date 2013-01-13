@@ -5,7 +5,7 @@
     seamless interoperability with both pipes and proxies.  See the \"Upgrade
     Pipes to Proxies\" section below for details. -}
 
-{-# LANGUAGE KindSignatures, Safe #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Control.Proxy.Pipe (
     -- * Create Pipes

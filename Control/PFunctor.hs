@@ -1,6 +1,6 @@
 -- | This module defines functors in the category of proxies
 
-{-# LANGUAGE KindSignatures, Rank2Types, Safe #-}
+{-# LANGUAGE KindSignatures, Rank2Types #-}
 
 module Control.PFunctor (
     -- * Functors over Proxies

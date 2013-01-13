@@ -1,7 +1,7 @@
 {-| These type synonyms simplify type signatures when proxies do not use all
     their type variables. -}
 
-{-# LANGUAGE KindSignatures, Safe #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Control.Proxy.Synonym (
     -- * Synonyms

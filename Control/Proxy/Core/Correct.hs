@@ -6,8 +6,6 @@
     import this module so that your code works with both 'Proxy' implementations
     and also works with all proxy transformers. -}
 
-{-# LANGUAGE Safe #-}
-
 module Control.Proxy.Core.Correct (
     -- * Types
     ProxyCorrect(..),

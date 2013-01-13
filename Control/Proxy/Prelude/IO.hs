@@ -5,8 +5,6 @@
     allow users to test simple I/O without requiring additional library
     dependencies. -}
 
-{-# LANGUAGE Safe #-}
-
 module Control.Proxy.Prelude.IO (
     -- * Standard I/O
     -- ** Input

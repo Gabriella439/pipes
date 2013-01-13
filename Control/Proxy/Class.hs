@@ -7,7 +7,7 @@
     duplicate methods.  Instead, read the \"Polymorphic proxies\" section below
     which explains their purpose and how they help clean up type signatures. -}
 
-{-# LANGUAGE Rank2Types, Safe #-}
+{-# LANGUAGE Rank2Types #-}
 
 module Control.Proxy.Class (
     -- * Core proxy class
