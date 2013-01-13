@@ -79,16 +79,17 @@ module Control.Proxy.Prelude.Base (
     -- * Modules
     -- $modules
     module Control.Monad.Trans.State.Strict,
-    module Control.Monad.Trans.Writer.Strict,
+    module W,
     module Data.Monoid
     ) where
 
 import Control.MFunctor (hoist)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Writer.Strict (
-    WriterT(runWriterT), execWriterT, runWriter, tell )
+import Control.Monad.Trans.Writer.Lazy as W (
+    WriterT(runWriterT), execWriterT, runWriter )
+import Control.Monad.Trans.Writer.Lazy (tell)
 import Control.Monad.Trans.State.Strict (
-    StateT(runStateT), execStateT, runState, execState, get, put )
+    StateT(StateT, runStateT), execStateT, runState, execState )
 import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
@@ -723,9 +724,7 @@ foldlD'
 foldlD' f = runIdentityK go where
     go x = do
         a  <- request x
-        lift $ do
-            b <- get
-            put $! f b a
+        lift $ StateT $ \b -> let b' = f b a in b' `seq` return ((), b')
         x2 <- respond a
         go x2
 
@@ -734,9 +733,7 @@ foldlU'
  :: (Monad m, Proxy p) => (b -> a' -> b) -> a' -> p a' x a' x (StateT b m) r
 foldlU' f = runIdentityK go where
     go a' = do
-        lift $ do
-            b <- get
-            put $! f b a'
+        lift $ StateT $ \b -> let b' = f b a' in b' `seq` return ((), b')
         x   <- request a'
         a'2 <- respond x
         go a'2
