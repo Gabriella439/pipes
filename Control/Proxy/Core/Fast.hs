@@ -40,7 +40,6 @@ module Control.Proxy.Core.Fast (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
--- import Control.Monad (ap, forever, liftM, (>=>))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
@@ -101,6 +100,37 @@ p0 `_bind` f = go p0 where
         Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       r   -> f r
+
+{-# RULES
+    "_bind (Request a' Pure) f" forall a' f .
+        _bind (Request a' Pure) f = Request a' f;
+    "_bind (Respond b  Pure) f" forall b  f .
+        _bind (Respond b  Pure) f = Respond b  f
+  #-}
+{- Proof that the rewrite rules are Trustworthy:
+
+  _bind (Request a' Pure) f
+= go (Request a' Pure) where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        M          m   -> M (m >>= \p' -> return (go p'))
+        Pure       r   -> f r
+= Request a' (\a -> go (Pure a))
+= Request a' (\a -> f a)
+= Request a' f
+
+  _bind (Respond b Pure) f
+= go (Respond b Pure) where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        M          m   -> M (m >>= \p' -> return (go p'))
+        Pure       r   -> f r
+= Respond b (\b' -> go (Pure b'))
+= Respond b (\b' -> f b')
+= Respond b f
+-}
 
 -- | Only satisfies laws modulo 'observe'
 instance MonadTrans (ProxyFast a' a b' b) where
@@ -173,37 +203,6 @@ instance Proxy ProxyFast where
     lift_P = _lift
 
     hoist_P = hoist
-
-{-# RULES
-    "_bind (Request a' Pure) f" forall a' f .
-        _bind (Request a' Pure) f = Request a' f;
-    "_bind (Respond b  Pure) f" forall b  f .
-        _bind (Respond b  Pure) f = Respond b  f
-  #-}
-{- Proof that the rewrite rules are Trustworthy:
-
-  _bind (Request a' Pure) f
-= go (Request a' Pure) where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        M          m   -> M (m >>= \p' -> return (go p'))
-        Pure       r   -> f r
-= Request a' (\a -> go (Pure a))
-= Request a' (\a -> f a)
-= Request a' f
-
-  _bind (Respond b Pure) f
-= go (Respond b Pure) where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        M          m   -> M (m >>= \p' -> return (go p'))
-        Pure       r   -> f r
-= Respond b (\b' -> go (Pure b'))
-= Respond b (\b' -> f b')
-= Respond b f
--}
 
 instance Interact ProxyFast where
     k2 \>\ k1 = \a' -> go (k1 a') where
