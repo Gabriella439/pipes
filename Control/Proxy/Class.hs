@@ -259,18 +259,6 @@ p1 \<\ p2 = p2 />/ p1
 >
 > (p1 >~> p2) >~> p3 = p1 >~> (p2 >~> p3)
 
-    * @(hoistK f)@ defines a functor between proxy categories:
-
-> Define: hoistK f = (hoist f .)
->
-> hoistK f (p1 >-> p2) = hoistK f p1 >-> hoistK p2
->
-> hoistK f idT = idT
->
-> hoistK f (p1 >~> p2) = hoistK f p1 >~> hoistK p2
->
-> hoistK f coidT = coidT
-
     Also, all proxies must satisfy the following 'Proxy' laws:
 
 > -- Define: liftK = (lift .)

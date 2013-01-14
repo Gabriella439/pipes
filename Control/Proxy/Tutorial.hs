@@ -219,7 +219,8 @@ You shall not pass!
 
     * You can define your own lazy components that have nothing to do with files
 
-    * @pipes@ never uses 'unsafePerformIO' or violates referential transparency.
+    * @pipes@ never uses 'unsafePerformIO' and never violates referential
+      transparency.
 
     * You don't need strictness hacks to ensure the proper ordering of effects
 
@@ -1093,7 +1094,7 @@ Received a value:
     Composition isn't the only way to assemble proxies.  You can also sequence
     predefined proxies using @do@ notation to generate more elaborate behaviors.
 
-    Most commonly, you will sequence two sources to combine their outputs, very
+    Most commonly, you will sequence sources to combine their outputs, very
     similar to how the Unix @cat@ utility behaves:
 
 > threeSources () = do
@@ -1296,8 +1297,8 @@ Enter an Integer:
     and write a streaming utility that lazily opens a file only in response to
     a 'request', such as the following 'Producer':
 
-> readFile' :: FilePath -> () -> Producer p String IO
-> readFile' file () = runIdentityP $ do
+> readFileS :: FilePath -> () -> Producer p String IO
+> readFileS file () = runIdentityP $ do
 >     h <- lift $ openFile file ReadMode
 >     lift $ putStrLn "Opening file"
 >     hGetLineS h ()
@@ -1306,7 +1307,7 @@ Enter an Integer:
 
     This works well if we fully demand the file:
 
->>> runProxy $ readFile' "test.txt" >-> printD
+>>> runProxy $ readFileS "test.txt" >-> printD
 Opening file
 "Line 1"
 "Line 2"
@@ -1316,27 +1317,32 @@ Closing file
     This also works well if we never demand the file at all, in which case we
     never open it:
 
->>> runProxy $ readFile' "test.txt" >-> return
+>>> runProxy $ readFileS "test.txt" >-> return
 -- Outputs nothing
 
     But it gives exactly the wrong behavior if we partially demand the file:
 
->>> runProxy $ readFile' "test.txt" >-> takeB_ 1 >-> printD
+>>> runProxy $ readFileS "test.txt" >-> takeB_ 1 >-> printD
 Opening file
 "Line 1"
 
     Notice that this does not close the file, because once @takeB_ 1@ terminates
-    it terminates the entire 'Session' and @readFile'@ does not get a chance to
+    it terminates the entire 'Session' and @readFileS@ does not get a chance to
     finalize the file.
 
-    I will release a separate library in the near future that offers lazy
-    resource management, too, but in the meantime I advise that you use one of
-    the following two strategies to guarantee deterministic resource
-    deallocation.
+    The @pipes-safe@ library solves this problem by providing resource
+    management abstractions built on top of @pipes@ and offers several other
+    nice features:
 
-    The first approach opens all resources before running the session and close
+    * It is completely exception safe, even against asynchronous exceptions
+
+    * It is backwards compatible with \"unmanaged\" ordinary proxies
+
+    Backwards compatibility means that you don't need to buy in to the
+    @pipes-safe@ way of doing things.  For example, another common approach is
+    to just open all resources before running the session and close
     them all afterward.  For example, if I wanted to emulate the Unix @cp@
-    command, streaming one line at a time, I would write:
+    command, streaming one line at a time, I might write:
 
 > import System.IO
 >
@@ -1346,37 +1352,26 @@ Opening file
 >     withFile file2 WriteMode $ \hOut ->
 >     runProxy $ hGetLineS hIn >-> hPutLineS hOut
 
-    The advantage of this approach is that it:
+    Some people prefer that approach because it:
 
-    * is straightforward,
+    * is straightforward, and
 
-    * requires no special integration with existing libraries, and
-
-    * is exception safe.
+    * can reuse functions from @Control.Exception@
 
     The disadvantage is that this does not lazily allocate resources, nor does
-    this promptly deallocate them.
+    this promptly deallocate them.  Also, there is no way to recover from
+    exceptions and resume the 'Session'.  On the other hand, @pipes-safe@ lets
+    you do all of these.
 
-    The second approach is to use something like 'ResourceT' (from the
-    @resourcet@ package) to register finalizers and ensure they get released
-    deterministically.  You may prefer this approach if you have previously used
-    the @conduit@ library, which uses 'ResourceT' in its base monad to offer
-    resource determinism.  You can use 'ResourceT' with @pipes@, too, just by
-    including it in the base monad.
+    Fortunately, you can choose whichever approach you prefer and rest assured
+    that the two approaches safely interoperate.  @Control.Proxy.Safe.Tutorial@
+    from the @pipes-safe@ package provides a separate tutorial on how to:
 
-    I plan to release a lazy resource management library very soon built on top
-    of @pipes@ that behaves similarly to 'ResourceT'.  The main advantages of
-    this upcoming implementation will be that it:
+    * extend @pipes@ with resource management,
 
-    * uses a simpler and pure implementation
+    * handle exceptions natively within proxies, and
 
-    * obeys several useful theoretical laws
-
-    * requires no dependencies other than @pipes@
-
-    However, if you don't need this extra power, then just stick to the former
-    simpler approach.  I plan to release all standard libraries to be agnostic
-    of the finalization approach to let you use which one you prefer.
+    * interoperate with unmanaged code.
 -}
 
 {- $extend
@@ -1706,9 +1701,9 @@ Left ()
 >  => (q -> p a' a b' b m r) -> (q -> t p a' a b' b m r)
 > mapP = (liftP . )
 
-    It's very easy to use.  Just use 'mapP' (equivalent to @(liftP .)@) to lift
-    one proxy transformer to match another one.  For example, we can 'mapP'
-    @increment2@ to match @promptInt3@:
+    It's very easy to use.  Just use 'mapP' to lift one proxy transformer to
+    match another one.  For example, we can 'mapP' @increment2@ to match
+    @promptInt3@:
 
 > promptInt3 >-> mapP increment2
 >  :: (Proxy p) => () -> Session (EitherP String (StateP Int p)) IO r
@@ -1774,10 +1769,9 @@ Left "Could not read Integer"
 >
 > (liftP .) return = return
 
-    The only difference is that I also include 'mapP' in the 'ProxyTrans' type
-    class for convenience, which sweetens these laws a little bit:
+    The only difference is 'mapP' sweetens these laws a little bit:
 
-> mapP = (lift .)
+> mapP = (liftP .)
 >
 > mapP (f >=> g) = mapP f >=> mapP g  -- These are functor laws!
 >
@@ -1789,7 +1783,7 @@ Left "Could not read Integer"
 
     This means that we need a set of laws that guarantee that the proxy
     transformer lifts the 'Proxy' instance correctly.  I call these laws the
-    \"proxy transformer laws\":
+    \"proxy morphism laws\":
 
 > mapP (f >-> g) = mapP f >-> mapP g  -- These are functor laws, too!
 >
@@ -1829,7 +1823,7 @@ Left "Could not read Integer"
 >
 > mapP respond = respond
 
-    We can translate those to 'liftP' to get:
+    We can translate those back to 'liftP' to get:
 
 > liftP (request a') = request a'
 >
@@ -1838,7 +1832,7 @@ Left "Could not read Integer"
     In other words, 'request' and 'respond' in the extended proxy must behave
     exactly the same as lifting 'request' and 'respond' from the base proxy.
 
-    All the proxy transformers in this library obey the proxy transformer laws,
+    All the proxy transformers in this library obey the proxy morphism laws,
     which ensure that 'liftP' / 'mapP' always do \"the right thing\".
 
     Proxy transformers also implement 'hoistP' from the 'PFunctor' class in

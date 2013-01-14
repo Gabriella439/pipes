@@ -7,11 +7,11 @@ module Control.Proxy.Trans.Reader (
     ReaderP(..),
     runReaderP,
     runReaderK,
-    withReaderP,
     -- * Reader operations
     ask,
-    local,
     asks,
+    local,
+    withReaderP,
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -133,12 +133,6 @@ runReaderK :: i -> (q -> ReaderP i p a' a b' b m r) -> (q -> p a' a b' b m r)
 runReaderK i p q = runReaderP i (p q)
 -- runReaderK i = (runReaderP i .)
 
--- | Modify a computation's environment (a more general version of 'local')
-withReaderP
- :: (j -> i) -> ReaderP i p a' a b' b m r -> ReaderP j p a' a b' b m r
-withReaderP f p = ReaderP (\i -> unReaderP p (f i))
--- withReaderP f p = ReaderP $ unReaderP p . f
-
 -- | Get the environment
 ask :: (Proxy p, Monad m) => ReaderP i p a' a b' b m i
 ask = ReaderP return_P
@@ -151,3 +145,9 @@ asks f = ReaderP (\i -> return_P (f i))
 local
  :: (i -> i) -> ReaderP i p a' a b' b m r -> ReaderP i p a' a b' b m r
 local = withReaderP
+
+-- | Modify a computation's environment (a more general version of 'local')
+withReaderP
+ :: (j -> i) -> ReaderP i p a' a b' b m r -> ReaderP j p a' a b' b m r
+withReaderP f p = ReaderP (\i -> unReaderP p (f i))
+-- withReaderP f p = ReaderP $ unReaderP p . f
