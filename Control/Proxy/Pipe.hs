@@ -42,7 +42,7 @@ await = request ()
 {-| Deliver output downstream
 
     'yield' restores control back downstream and binds its value to 'await'. -}
-yield :: (Monad m, Proxy p) => b -> p a' a b' b m ()
+yield :: (Monad m, Proxy p) => b -> p a' a () b m ()
 yield b = runIdentityP $ do
     respond b
     return ()
