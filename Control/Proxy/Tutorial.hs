@@ -1054,7 +1054,7 @@ Left "Could not read Integer"
 
     Similarly, we can build our old @take'@ on top of 'takeB_':
 
-> take' :: (Proxy p) => Int -> a' -> p a' a a' a m ()
+> take' :: (Proxy p) => Int -> a' -> p a' a a' a IO ()
 > take' n a' = runIdentityP $ do  -- Remember, we need 'runIdentityP' if
 >     takeB_ n a'                 -- we use 'do' notation or 'lift'
 >     lift $ putStrLn "You shall not pass!"
