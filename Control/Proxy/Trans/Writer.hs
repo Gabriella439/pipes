@@ -34,6 +34,13 @@ import Data.Monoid (Monoid(mempty, mappend))
 newtype WriterP w p a' a b' b (m :: * -> *) r
   = WriterP { unWriterP :: w -> p a' a b' b m (r, w) }
 
+instance (MonadP p) => MonadP (WriterP w p) where
+    return_P = \r -> WriterP (\w -> return_P (r, w))
+    m ?>= f  = WriterP (\w ->
+        unWriterP m w ?>= \(a, w') ->
+        unWriterP (f a) w' )
+
+
 instance (Proxy              p, Monad m)
        => Functor (WriterP w p a' a b' b m) where
     fmap f p = WriterP (\w0 ->
@@ -99,11 +106,6 @@ instance (Proxy            p )
 
     request = \a' -> WriterP (\w -> request a' ?>= \a  -> return_P (a,  w))
     respond = \b  -> WriterP (\w -> respond b  ?>= \b' -> return_P (b', w))
-
-    return_P = \r -> WriterP (\w -> return_P (r, w))
-    m ?>= f  = WriterP (\w ->
-        unWriterP m w ?>= \(a, w') ->
-        unWriterP (f a) w' )
 
     lift_P m = WriterP (\w -> lift_P (m >>= \r -> return (r, w)))
 

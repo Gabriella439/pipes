@@ -33,6 +33,14 @@ import Prelude hiding (catch)
 newtype EitherP e p a' a b' b (m :: * -> *) r
   = EitherP { runEitherP :: p a' a b' b m (Either e r) }
 
+instance (MonadP p) => MonadP (EitherP e p) where
+    return_P = \r -> EitherP (return_P (Right r))   -- right
+    m ?>= f = EitherP (
+        runEitherP m ?>= \e ->
+        runEitherP (case e of
+            Left  l -> EitherP (return_P (Left l))  -- left l
+            Right r -> f    r ) )
+
 instance (Proxy              p, Monad m)
        => Functor (EitherP e p a' a b' b m) where
     fmap f p = EitherP (
@@ -105,13 +113,6 @@ instance (Proxy            p )
 
     request = \a' -> EitherP (request a' ?>= \a  -> return_P (Right a ))
     respond = \b  -> EitherP (respond b  ?>= \b' -> return_P (Right b'))
-
-    return_P = right
-    m ?>= f = EitherP (
-        runEitherP m ?>= \e ->
-        runEitherP (case e of
-            Left  l -> left l
-            Right r -> f    r ) )
 
     lift_P m = EitherP (lift_P (m >>= \x -> return (Right x)))
  -- lift = EitherP . lift . liftM Right

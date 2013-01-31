@@ -27,6 +27,7 @@ module Control.Proxy.Class (
 
     -- * Polymorphic proxies
     -- $poly
+    MonadP(..),
     MonadPlusP(..),
     MonadIOP(..)
     ) where
@@ -61,7 +62,7 @@ infixl 1 ?>= -- This should match the fixity of >>=
     I only provide ('>~>') for theoretical symmetry, and the remaining methods
     just implement internal type class plumbing.
 -}
-class Proxy p where
+class (MonadP p) => Proxy p where
     {-| 'request' input from upstream, passing an argument with the request
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
@@ -98,16 +99,6 @@ class Proxy p where
      => (a -> p a' a b' b m r)
      -> (b -> p b' b c' c m r)
      -> (a -> p a' a c' c m r)
-
-    {-| 'return_P' is identical to 'return', except with a more polymorphic
-        constraint. -}
-    return_P :: (Monad m) => r -> p a' a b' b m r
-
-    {-| ('?>=') is identical to ('>>='), except with a more polymorphic
-        constraint. -}
-    (?>=)
-     :: (Monad m)
-     => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'
 
     {-| 'lift_P' is identical to 'lift', except with a more polymorphic
         constraint. -}
@@ -216,7 +207,7 @@ p1 \<\ p2 = p2 />/ p1
     begins from the downstream end, whereas ('>~>') accepts proxies blocked on
     'request' and begins from the upstream end.
 
-    Second, all proxies are monads, defined by:
+    Second, all proxies are monads, defined by their 'MonadP' instance:
 
     * 'return_P'
 
@@ -422,6 +413,16 @@ p1 \<\ p2 = p2 />/ p1
 >     when (c == ' ') $ E.throw "Error: received space"
 >     respond c
 -}
+
+{-| The @(MonadP p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b m . (Monad m) => Monad (p a' a b' b m)) => ...
+-}
+class MonadP p where
+    return_P :: (Monad m) => r -> p a' a b' b m r
+    (?>=)
+     :: (Monad m)
+     => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'
 
 {-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
 

@@ -31,6 +31,12 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype StateP s p a' a b' b (m :: * -> *) r
   = StateP { unStateP :: s -> p a' a b' b m (r, s) }
 
+instance (MonadP p) => MonadP (StateP s p) where
+    return_P = \r -> StateP (\s -> return_P (r, s))
+    m ?>= f  = StateP (\s ->
+        unStateP m s ?>= \(a, s') ->
+        unStateP (f a) s' )
+
 instance (Proxy             p, Monad m)
        => Functor (StateP s p a' a b' b m) where
        fmap f p = StateP (\s0 ->
@@ -97,11 +103,6 @@ instance (Proxy           p )
 
     request = \a' -> StateP (\s -> request a' ?>= \a  -> return_P (a , s))
     respond = \b  -> StateP (\s -> respond b  ?>= \b' -> return_P (b', s))
-
-    return_P = \r -> StateP (\s -> return_P (r, s))
-    m ?>= f  = StateP (\s ->
-        unStateP m s ?>= \(a, s') ->
-        unStateP (f a) s' )
 
     lift_P m = StateP (\s -> lift_P (m >>= \r -> return (r, s)))
 

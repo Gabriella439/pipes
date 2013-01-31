@@ -80,6 +80,10 @@ instance (Monad m) => Monad (ProxyCorrect a' a b' b m) where
                 Respond b  fb' -> return (Respond b  (\b' -> go (fb' b')))
                 Pure       r   -> unProxy (f r) )
 
+instance MonadP ProxyCorrect where
+    return_P = return
+    (?>=)   = (>>=)
+
 instance MonadTrans (ProxyCorrect a' a b' b) where
     lift = lift_P
 
@@ -121,9 +125,6 @@ instance Proxy ProxyCorrect where
 
     request a' = Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
     respond b  = Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
-
-    return_P = return
-    (?>=)   = (>>=)
 
     lift_P m = Proxy (m >>= \r -> return (Pure r))
 

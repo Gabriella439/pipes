@@ -22,6 +22,13 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype IdentityP p a' a b' b (m :: * -> *) r =
     IdentityP { runIdentityP :: p a' a b' b m r }
 
+instance (MonadP p) => MonadP (IdentityP p) where
+    return_P = \r -> IdentityP (return_P r)
+
+    m ?>= f = IdentityP (
+        runIdentityP m ?>= \x ->
+        runIdentityP (f x) )
+
 instance (Proxy              p, Monad m)
        => Functor (IdentityP p a' a b' b m) where
     fmap f p = IdentityP (
@@ -93,13 +100,6 @@ instance (Proxy            p )
 
     respond = \b -> IdentityP (respond b)
  -- respond = P . respond
-
-    return_P = \r -> IdentityP (return_P r)
- -- return = P . return
-
-    m ?>= f = IdentityP (
-        runIdentityP m ?>= \x ->
-        runIdentityP (f x) )
 
     lift_P m = IdentityP (lift_P m)
  -- lift = P . lift

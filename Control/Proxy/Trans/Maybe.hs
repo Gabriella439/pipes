@@ -24,6 +24,14 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype MaybeP p a' a b' b (m :: * -> *) r
   = MaybeP { runMaybeP :: p a' a b' b m (Maybe r) }
 
+instance (MonadP p) => MonadP (MaybeP p) where
+    return_P = \r -> MaybeP (return_P (Just r))   -- just
+    m ?>= f = MaybeP (
+        runMaybeP m ?>= \ma ->
+        runMaybeP (case ma of
+            Nothing -> MaybeP (return_P Nothing)  -- nothing
+            Just a  -> f a ) )
+
 instance (Proxy           p, Monad m)
        => Functor (MaybeP p a' a b' b m) where
     fmap f p = MaybeP (
@@ -101,13 +109,6 @@ instance (Proxy         p )
 
     request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
     respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))
-
-    return_P = just
-    m ?>= f = MaybeP (
-        runMaybeP m ?>= \ma ->
-        runMaybeP (case ma of
-            Nothing -> nothing
-            Just a  -> f a ) )
 
     lift_P m = MaybeP (lift_P (m >>= \x -> return (Just x)))
  -- lift = MaybeP . lift . liftM Just

@@ -132,6 +132,10 @@ p0 `_bind` f = go p0 where
 = Respond b f
 -}
 
+instance MonadP ProxyFast where
+    return_P = return
+    (?>=)   = _bind
+
 -- | Only satisfies laws modulo 'observe'
 instance MonadTrans (ProxyFast a' a b' b) where
     lift = _lift
@@ -196,9 +200,6 @@ instance Proxy ProxyFast where
 
     request a' = Request a' Pure
     respond b  = Respond b  Pure
-
-    return_P = return
-    (?>=)   = _bind
 
     lift_P = _lift
 
