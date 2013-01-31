@@ -98,36 +98,22 @@ instance MonadIOP ProxyCorrect where
     liftIO_P = liftIO
 
 instance Proxy ProxyCorrect where
-    fb'_0 >-> fc' = \c' -> fb'_0 >-| fc' c' where
-        fb' >-| p1 = Proxy (do
-            x <- unProxy p1
-            case x of
-                Request b' fb  -> unProxy (fb' b' |-> fb)
-                Respond c  fc' -> return (Respond c (\c' -> fb' >-| fc' c'))
-                Pure       r   -> return (Pure r) )
-        p2 |-> fb = Proxy (do
-            x <- unProxy p2
-            case x of
-                Request a' fa  -> return (Request a' (\a -> fa a |-> fb))
-                Respond b  fb' -> unProxy (fb' >-| fb b)
-                Pure       r   -> return (Pure r) )
+    fb' ->> p1 = Proxy (do
+        x <- unProxy p1
+        case x of
+            Request b' fb  -> unProxy (fb' b' >>~ fb)
+            Respond c  fc' -> return (Respond c (\c' -> fb' ->> fc' c'))
+            Pure       r   -> return (Pure r) )
 
-    fa_0 >~> fb_0 = \a -> fa_0 a |-> fb_0 where
-        fb' >-| p1 = Proxy (do
-            x <- unProxy p1
-            case x of
-                Request b' fb  -> unProxy (fb' b' |-> fb)
-                Respond c  fc' -> return (Respond c (\c' -> fb' >-| fc' c'))
-                Pure       r   -> return (Pure r) )
-        p2 |-> fb = Proxy (do
-            x <- unProxy p2
-            case x of
-                Request a' fa  -> return (Request a' (\a -> fa a |-> fb))
-                Respond b  fb' -> unProxy (fb' >-| fb b)
-                Pure       r   -> return (Pure r) )
+    p2 >>~ fb = Proxy (do
+        x <- unProxy p2
+        case x of
+            Request a' fa  -> return (Request a' (\a -> fa a >>~ fb))
+            Respond b  fb' -> unProxy (fb' ->> fb b)
+            Pure       r   -> return (Pure r) )
 
-    request a' = Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
-    respond b  = Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
+    request = \a' -> Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
+    respond = \b  -> Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
 
 instance Interact ProxyCorrect where
     k2 \>\ k1 = \a' -> go (k1 a') where

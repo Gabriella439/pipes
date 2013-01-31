@@ -102,15 +102,9 @@ instance (Proxy              p )
 
 instance (Proxy           p )
        => Proxy (StateP s p) where
-    p1 >-> p2 = \c'1 -> StateP (\s ->
-        ((\b' -> unStateP (p1 b') s) >-> (\c'2 -> unStateP (p2 c'2) s)) c'1 )
- {- (p1 >-> p2) = \c' -> StateP $ \s ->
-        ((`unStateP` s) . p1 >-> (`unStateP` s) . p2) c' -}
+    fb' ->> p = StateP (\s -> (\b' -> unStateP (fb' b') s) ->> unStateP p s)
 
-    p1 >~> p2 = \c'1 -> StateP (\s ->
-        ((\b' -> unStateP (p1 b') s) >~> (\c'2 -> unStateP (p2 c'2) s)) c'1 )
- {- (p1 >~> p2) = \c' -> StateP $ \s ->
-        ((`unStateP` s) . p1 >~> (`unStateP` s) . p2) c' -}
+    p >>~ fb  = StateP (\s -> unStateP p s >>~ (\b -> unStateP (fb b) s))
 
     request = \a' -> StateP (\s -> request a' ?>= \a  -> return_P (a , s))
     respond = \b  -> StateP (\s -> respond b  ?>= \b' -> return_P (b', s))

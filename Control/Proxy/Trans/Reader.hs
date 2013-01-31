@@ -96,17 +96,9 @@ instance (Proxy               p )
 
 instance (Proxy            p  )
        => Proxy (ReaderP i p) where
-    p1 >-> p2 = \c'1 -> ReaderP (\i ->
-        ((\b'  -> unReaderP (p1 b' ) i)
-     >-> (\c'2 -> unReaderP (p2 c'2) i) ) c'1 )
- {- p1 >-> p2 = \c' -> ReaderP $ \i ->
-        ((`unReaderP` i) . p1 >-> (`unReaderP` i) . p2) c' -}
+    fb' ->> p = ReaderP (\i -> (\b' -> unReaderP (fb' b') i) ->> unReaderP p i)
 
-    p1 >~> p2 = \c'1 -> ReaderP (\i ->
-        ((\b'  -> unReaderP (p1 b' ) i)
-     >~> (\c'2 -> unReaderP (p2 c'2) i) ) c'1 )
- {- p1 >~> p2 = \c' -> ReaderP $ \i ->
-        ((`unReaderP` i) . p1 >~> (`unReaderP` i) . p2) c' -}
+    p >>~ fb  = ReaderP (\i -> unReaderP p i >>~ (\b -> unReaderP (fb b) i))
 
     request = \a -> ReaderP (\_ -> request a)
     respond = \a -> ReaderP (\_ -> respond a)

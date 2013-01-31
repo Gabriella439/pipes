@@ -177,32 +177,20 @@ instance MonadIOP ProxyFast where
     liftIO_P = liftIO
 
 instance Proxy ProxyFast where
-    fb'_0 >-> fc'_0 = \c' -> fb'_0 >-| fc'_0 c' where
-        p1 |-> fb = case p1 of
-            Request a' fa  -> Request a' (\a -> fa a |-> fb)
-            Respond b  fb' -> fb' >-| fb b
-            M          m   -> M (m >>= \p1' -> return (p1' |-> fb))
-            Pure       r   -> Pure r
-        fb' >-| p2 = case p2 of
-            Request b' fb  -> fb' b' |-> fb
-            Respond c  fc' -> Respond c (\c' -> fb' >-| fc' c')
-            M          m   -> M (m >>= \p2' -> return (fb' >-| p2'))
-            Pure       r   -> Pure r
+    fb' ->> p2 = case p2 of
+        Request b' fb  -> fb' b' >>~ fb
+        Respond c  fc' -> Respond c (\c' -> fb' ->> fc' c')
+        M          m   -> M (m >>= \p2' -> return (fb' ->> p2'))
+        Pure       r   -> Pure r
 
-    fa_0 >~> fb_0 = \a -> fa_0 a |-> fb_0 where
-        p1 |-> fb = case p1 of
-            Request a' fa  -> Request a' (\a -> fa a |-> fb)
-            Respond b  fb' -> fb' >-| fb b
-            M          m   -> M (m >>= \p1' -> return (p1' |-> fb))
-            Pure       r   -> Pure r
-        fb' >-| p2 = case p2 of
-            Request b' fb  -> fb' b' |-> fb
-            Respond c  fc' -> Respond c (\c' -> fb' >-| fc' c')
-            M          m   -> M (m >>= \p2' -> return (fb' >-| p2'))
-            Pure       r   -> Pure r
+    p1 >>~ fb = case p1 of
+        Request a' fa  -> Request a' (\a -> fa a >>~ fb)
+        Respond b  fb' -> fb' ->> fb b
+        M          m   -> M (m >>= \p1' -> return (p1' >>~ fb))
+        Pure       r   -> Pure r
 
-    request a' = Request a' Pure
-    respond b  = Respond b  Pure
+    request = \a' -> Request a' Pure
+    respond = \b  -> Respond b  Pure
 
 instance Interact ProxyFast where
     k2 \>\ k1 = \a' -> go (k1 a') where

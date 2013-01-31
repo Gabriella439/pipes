@@ -105,15 +105,9 @@ instance (Proxy               p )
 
 instance (Proxy            p )
        => Proxy (WriterP w p) where
-    p1 >-> p2 = \c'1 -> WriterP (\w ->
-        ((\b' -> unWriterP (p1 b') w) >-> (\c'2 -> unWriterP (p2 c'2) w)) c'1 )
- {- p1 >-> p2 = \c' -> WriterP $ \w ->
-        ((`unWriterP` w) . p1 >-> (`unWriterP` w) . p2) c' -}
+    fb' ->> p = WriterP (\w -> (\b' -> unWriterP (fb' b') w) ->> unWriterP p w)
 
-    p1 >~> p2 = \c'1 -> WriterP (\w ->
-        ((\b' -> unWriterP (p1 b') w) >~> (\c'2 -> unWriterP (p2 c'2) w)) c'1 )
- {- p1 >~> p2 = \c' -> WriterP $ \w ->
-        ((`unWriterP` w) . p1 >~> (`unWriterP` w) . p2) c' -}
+    p >>~ fb  = WriterP (\w -> unWriterP p w >>~ (\b -> unWriterP (fb b) w))
 
     request = \a' -> WriterP (\w -> request a' ?>= \a  -> return_P (a,  w))
     respond = \b  -> WriterP (\w -> respond b  ?>= \b' -> return_P (b', w))

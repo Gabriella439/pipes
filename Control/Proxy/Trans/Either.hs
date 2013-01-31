@@ -116,13 +116,9 @@ instance (Proxy               p )
 
 instance (Proxy            p )
        => Proxy (EitherP e p) where
-    p1 >-> p2 = \c'1 -> EitherP (
-        ((\b' -> runEitherP (p1 b')) >-> (\c'2 -> runEitherP (p2 c'2))) c'1 )
- -- p1 >-> p2 = (EitherP .) $ runEitherP . p1 >-> runEitherP . p2
+    fb' ->> p = EitherP ((\b' -> runEitherP (fb' b')) ->> runEitherP p)
 
-    p1 >~> p2 = \c'1 -> EitherP (
-        ((\b' -> runEitherP (p1 b')) >~> (\c'2 -> runEitherP (p2 c'2))) c'1 )
- -- p1 >~> p2 = (EitherP .) $ runEitherP . p1 >~> runEitherP . p2
+    p >>~ fb  = EitherP (runEitherP p >>~ (\b -> runEitherP (fb b)))
 
     request = \a' -> EitherP (request a' ?>= \a  -> return_P (Right a ))
     respond = \b  -> EitherP (respond b  ?>= \b' -> return_P (Right b'))

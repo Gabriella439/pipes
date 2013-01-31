@@ -95,21 +95,13 @@ instance (Proxy               p )
 
 instance (Proxy            p )
        => Proxy (IdentityP p) where
-    p1 >-> p2 = \c'1 -> IdentityP (
-        ((\c'2 -> runIdentityP (p1 c'2))
-     >-> (\b'  -> runIdentityP (p2 b' )) ) c'1 )
- -- p1 >-> p2 = (IdentityP .) $ runIdentityP . p1 >-> runIdentityP . p2
+    fb' ->> p = IdentityP ((\b' -> runIdentityP (fb' b')) ->> runIdentityP p)
 
-    p1 >~> p2 = \c'1 -> IdentityP (
-        ((\c'2 -> runIdentityP (p1 c'2))
-     >~> (\b'  -> runIdentityP (p2 b' )) ) c'1 )
- -- p1 >~> p2 = (IdentityP .) $ runIdentityP . p1 >~> runIdentityP . p2
+    p >>~ fb  = IdentityP (runIdentityP p >>~ (\b -> runIdentityP (fb b)))
 
     request = \a' -> IdentityP (request a')
- -- request = P . request
 
     respond = \b -> IdentityP (respond b)
- -- respond = P . respond
 
 instance (Interact            p )
       =>  Interact (IdentityP p) where

@@ -111,13 +111,9 @@ instance (Proxy            p )
 
 instance (Proxy         p )
        => Proxy (MaybeP p) where
-    p1 >-> p2 = \c'1 -> MaybeP (
-        ((\b' -> runMaybeP (p1 b')) >-> (\c'2 -> runMaybeP (p2 c'2))) c'1 )
- -- p1 >-> p2 = (MaybeP .) $ runMaybeP . p1 >-> runMaybeP . p2
+    fb' ->> p = MaybeP ((\b' -> runMaybeP (fb' b')) ->> runMaybeP p)
 
-    p1 >~> p2 = \c'1 -> MaybeP (
-        ((\b' -> runMaybeP (p1 b')) >~> (\c'2 -> runMaybeP (p2 c'2))) c'1 )
- -- p1 >~> p2 = (MaybeP .) $ runMaybeP . p1 >~> runMaybeP . p2
+    p >>~ fb  = MaybeP (runMaybeP p >>~ (\b -> runMaybeP (fb b)))
 
     request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
     respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))

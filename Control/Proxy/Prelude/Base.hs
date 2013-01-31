@@ -88,7 +88,6 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Writer.Lazy as W (
     WriterT(runWriterT), execWriterT, runWriter )
 import Control.Monad.Trans.Writer.Lazy (tell)
---------------------------------------------------------------------------------
 import Control.Monad.Trans.State.Strict (
     StateT(StateT, runStateT),
     execStateT,

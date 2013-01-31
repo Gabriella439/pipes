@@ -14,8 +14,12 @@ module Control.Proxy.Class (
     Proxy(..),
     idT,
     coidT,
+    (>->),
     (<-<),
+    (>~>),
     (<~<),
+    (<<-),
+    (~<<),
 
     -- * request/respond substitution
     Interact(..),
@@ -49,8 +53,10 @@ import Control.MFunctor(hoist)
 >
 > hoist f . k >-> p
 -}
-infixr 7 <-<
-infixl 7 >->
+infixr 7 <-<, ->>
+infixl 7 >->, <<-
+infixr 7 >~>, ~<<
+infixl 7 <~<, >>~
 infixr 8 /</
 infixl 8 \>\
 infixl 8 \<\
@@ -74,27 +80,88 @@ class (MonadP p, MonadTransP p, MFunctorP p) => Proxy p where
         argument of type @b'@ from the next 'request' as its return value. -}
     respond :: (Monad m) => b -> p a' a b' b m b'
 
-    {-| Compose two proxies blocked on a 'respond', generating a new proxy
-        blocked on a 'respond'
-
-        Begins from the downstream end and satisfies every 'request' with a
-        'respond' -}
-    (>->)
+    -- | Connect an upstream 'Proxy' that handles all 'request's
+    (->>)
      :: (Monad m)
-     => (b' -> p a' a b' b m r)
-     -> (c' -> p b' b c' c m r)
-     -> (c' -> p a' a c' c m r)
+     => (b'  -> p a' a b' b m r)
+     ->         p b' b c' c m r
+     ->         p a' a c' c m r
 
-    {-| Compose two proxies blocked on a 'request', generating a new proxy
-        blocked on a 'request'
-
-        Begins from the upstream end and satisfies every 'respond' with a
-        'request' -}
-    (>~>)
+    -- | Connect a downstream 'Proxy' that handles all 'respond's
+    (>>~)
      :: (Monad m)
-     => (a -> p a' a b' b m r)
-     -> (b -> p b' b c' c m r)
-     -> (a -> p a' a c' c m r)
+     =>        p a' a b' b m r
+     -> (b  -> p b' b c' c m r)
+     ->        p a' a c' c m r
+
+-- | Equivalent to ('->>') with the arguments flipped
+(<<-)
+ :: (Monad m, Proxy p)
+ =>         p b' b c' c m r
+ -> (b'  -> p a' a b' b m r)
+ ->         p a' a c' c m r
+k <<- p = p ->> k
+
+{-| Compose two proxies blocked on a 'respond', generating a new proxy blocked
+    on a 'respond'
+
+    Begins from the downstream end and satisfies every 'request' with a
+    'respond'
+
+> k1 >-> k2 = \c' -> k1 ->> k2 c'
+
+    ('>->') accepts arbitary Kleisli arrows for its downstream argument because
+    its inferred type is more general than composition requires.  This still
+    gives correct behavior.
+-}
+(>->)
+ :: (Monad m, Proxy p)
+ => (b'  -> p a' a b' b m r)
+ -> (c'_ -> p b' b c' c m r)
+ -> (c'_ -> p a' a c' c m r)
+k1 >-> k2 = \c' -> k1 ->> k2 c'
+
+-- | Equivalent to ('>->') with the arguments flipped
+(<-<)
+ :: (Monad m, Proxy p)
+ => (c' -> p b' b c' c m r)
+ -> (b' -> p a' a b' b m r)
+ -> (c' -> p a' a c' c m r)
+p1 <-< p2 = p2 >-> p1
+
+-- | Equivalent to ('>>~') with the arguments flipped
+(~<<)
+ :: (Monad m, Proxy p)
+ => (b  -> p b' b c' c m r)
+ ->        p a' a b' b m r
+ ->        p a' a c' c m r
+k ~<< p = p >>~ k
+
+{-| Compose two proxies blocked on a 'request', generating a new proxy blocked
+    on a 'request'
+
+    Begins from the upstream end and satisfies every 'respond' with a
+    'request'
+
+> k1 >~> k2 = \a -> k1 a >>~ k2
+
+    ('>~>') accepts arbitary Kleisli arrows for its upstream argument because
+    its inferred type is more general than composition requires.  This still
+    gives correct behavior. -}
+(>~>)
+ :: (Monad m, Proxy p)
+ => (a_ -> p a' a b' b m r)
+ -> (b  -> p b' b c' c m r)
+ -> (a_ -> p a' a c' c m r)
+k1 >~> k2 = \a -> k1 a >>~ k2
+
+-- | Equivalent to ('>~>') with the arguments flipped
+(<~<)
+ :: (Monad m, Proxy p)
+ => (b -> p b' b c' c m r)
+ -> (a -> p a' a b' b m r)
+ -> (a -> p a' a c' c m r)
+p1 <~< p2 = p2 >~> p1
 
 {-| 'idT' forwards requests followed by responses
 
@@ -119,31 +186,6 @@ coidT = go where
         request a' ?>= \a2 ->
         go a2
 -- coidT = foreverK $ respond >=> request
-
-{-| Compose two proxies blocked on a 'respond', generating a new proxy blocked
-    on a 'respond'
-
-    Begins from the downstream end and satisfies every 'request' with a
-    'respond' -}
-(<-<)
- :: (Monad m, Proxy p)
- => (c' -> p b' b c' c m r)
- -> (b' -> p a' a b' b m r)
- -> (c' -> p a' a c' c m r)
-p1 <-< p2 = p2 >-> p1
-
-{-| Compose two proxies blocked on a 'request', generating a new proxy blocked
-    on a 'request'
-
-    Begins from the upstream end and satisfies every 'respond' with a 'request'
-
-    You don't need to use this.  I include it only for symmetry. -}
-(<~<)
- :: (Monad m, Proxy p)
- => (b -> p b' b c' c m r)
- -> (a -> p a' a b' b m r)
- -> (a -> p a' a c' c m r)
-p1 <~< p2 = p2 >~> p1
 
 -- | Two extra Proxy categories of theoretical interest
 class (Proxy p) => Interact p where
@@ -209,6 +251,7 @@ p1 \<\ p2 = p2 />/ p1
     * ('>->') and 'idT' form the \"pull-based\" category:
 
 > Define: idT = request >=> respond >=> idT
+> Define: k1 >-> k2 = \c' -> k 
 >
 > idT >-> p = p
 >
