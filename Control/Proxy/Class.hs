@@ -169,7 +169,7 @@ p1 <-< p2 = p2 >-> p1
 p1 <~< p2 = p2 >~> p1
 
 -- | Two extra Proxy categories of theoretical interest
-class Interact p where
+class (Proxy p) => Interact p where
     -- | @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
     (\>\) :: (Monad m)
           => (b' -> p a' a x' x m b)
