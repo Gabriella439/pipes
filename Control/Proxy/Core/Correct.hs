@@ -98,15 +98,15 @@ instance MonadIOP ProxyCorrect where
     liftIO_P = liftIO
 
 instance Proxy ProxyCorrect where
-    fb' ->> p1 = Proxy (do
-        x <- unProxy p1
+    fb' ->> p = Proxy (do
+        x <- unProxy p
         case x of
             Request b' fb  -> unProxy (fb' b' >>~ fb)
             Respond c  fc' -> return (Respond c (\c' -> fb' ->> fc' c'))
             Pure       r   -> return (Pure r) )
 
-    p2 >>~ fb = Proxy (do
-        x <- unProxy p2
+    p >>~ fb = Proxy (do
+        x <- unProxy p
         case x of
             Request a' fa  -> return (Request a' (\a -> fa a >>~ fb))
             Respond b  fb' -> unProxy (fb' ->> fb b)

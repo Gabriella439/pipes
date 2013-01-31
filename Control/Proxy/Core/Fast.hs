@@ -177,16 +177,16 @@ instance MonadIOP ProxyFast where
     liftIO_P = liftIO
 
 instance Proxy ProxyFast where
-    fb' ->> p2 = case p2 of
+    fb' ->> p = case p of
         Request b' fb  -> fb' b' >>~ fb
         Respond c  fc' -> Respond c (\c' -> fb' ->> fc' c')
-        M          m   -> M (m >>= \p2' -> return (fb' ->> p2'))
+        M          m   -> M (m >>= \p' -> return (fb' ->> p'))
         Pure       r   -> Pure r
 
-    p1 >>~ fb = case p1 of
+    p >>~ fb = case p of
         Request a' fa  -> Request a' (\a -> fa a >>~ fb)
         Respond b  fb' -> fb' ->> fb b
-        M          m   -> M (m >>= \p1' -> return (p1' >>~ fb))
+        M          m   -> M (m >>= \p' -> return (p' >>~ fb))
         Pure       r   -> Pure r
 
     request = \a' -> Request a' Pure
