@@ -84,6 +84,11 @@ instance (MonadPlusP           p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
+instance (MonadTransP            p )
+       => MonadTransP (EitherP e p) where
+    lift_P m = EitherP (lift_P (m >>= \x -> return (Right x)))
+ -- lift = EitherP . lift . liftM Right
+
 instance (Proxy                 p )
        => MonadTrans (EitherP e p a' a b' b) where
     lift = lift_P
@@ -113,9 +118,6 @@ instance (Proxy            p )
 
     request = \a' -> EitherP (request a' ?>= \a  -> return_P (Right a ))
     respond = \b  -> EitherP (respond b  ?>= \b' -> return_P (Right b'))
-
-    lift_P m = EitherP (lift_P (m >>= \x -> return (Right x)))
- -- lift = EitherP . lift . liftM Right
 
     hoist_P nat p = EitherP (hoist_P nat (runEitherP p))
  -- hoist nat = EitherP . hoist nat . runEitherP

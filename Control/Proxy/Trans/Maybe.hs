@@ -80,6 +80,11 @@ instance (Proxy             p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
+instance (MonadTransP         p )
+       => MonadTransP (MaybeP p) where
+    lift_P m = MaybeP (lift_P (m >>= \x -> return (Just x)))
+ -- lift = MaybeP . lift . liftM Just
+
 instance (Proxy              p )
        => MonadTrans (MaybeP p a' a b' b) where
     lift = lift_P
@@ -109,9 +114,6 @@ instance (Proxy         p )
 
     request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
     respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))
-
-    lift_P m = MaybeP (lift_P (m >>= \x -> return (Just x)))
- -- lift = MaybeP . lift . liftM Just
 
     hoist_P nat p = MaybeP (hoist_P nat (runMaybeP p))
  -- hoist nat = MaybeP . hoist nat . runMaybeP

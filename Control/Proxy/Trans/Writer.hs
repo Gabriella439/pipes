@@ -76,6 +76,10 @@ instance (MonadPlusP           p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
+instance (MonadTransP            p )
+       => MonadTransP (WriterP w p) where
+    lift_P m = WriterP (\w -> lift_P (m >>= \r -> return (r, w)))
+
 instance (Proxy                 p )
        => MonadTrans (WriterP w p a' a b' b) where
     lift = lift_P
@@ -106,8 +110,6 @@ instance (Proxy            p )
 
     request = \a' -> WriterP (\w -> request a' ?>= \a  -> return_P (a,  w))
     respond = \b  -> WriterP (\w -> respond b  ?>= \b' -> return_P (b', w))
-
-    lift_P m = WriterP (\w -> lift_P (m >>= \r -> return (r, w)))
 
     hoist_P nat p = WriterP (\w -> hoist_P nat (unWriterP p w))
  -- hoist_P nat = WriterP . fmap (hoist_P nat) . unWriterP

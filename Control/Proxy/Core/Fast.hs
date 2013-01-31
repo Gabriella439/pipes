@@ -140,6 +140,9 @@ instance MonadP ProxyFast where
 instance MonadTrans (ProxyFast a' a b' b) where
     lift = _lift
 
+instance MonadTransP ProxyFast where
+    lift_P = _lift
+
 _lift :: (Monad m) => m r -> ProxyFast a' a b' b m r
 _lift m = M (m >>= \r -> return (Pure r))
 -- _lift = M . liftM Pure
@@ -200,8 +203,6 @@ instance Proxy ProxyFast where
 
     request a' = Request a' Pure
     respond b  = Respond b  Pure
-
-    lift_P = _lift
 
     hoist_P = hoist
 

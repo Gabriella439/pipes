@@ -67,6 +67,10 @@ instance (MonadPlusP           p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
+instance (MonadTransP            p )
+       => MonadTransP (ReaderP i p) where
+    lift_P m = ReaderP (\_ -> lift_P m)
+
 instance (Proxy                 p )
        => MonadTrans (ReaderP i p a' a b' b) where
     lift = lift_P
@@ -99,8 +103,6 @@ instance (Proxy            p  )
 
     request = \a -> ReaderP (\_ -> request a)
     respond = \a -> ReaderP (\_ -> respond a)
-
-    lift_P m = ReaderP (\_ -> lift_P m)
 
     hoist_P nat p = ReaderP (\i -> hoist_P nat (unReaderP p i))
  -- hoist_P nat = ReaderP . fmap (hoist_P nat) . unReaderP

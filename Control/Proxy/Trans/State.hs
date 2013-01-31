@@ -73,6 +73,10 @@ instance (MonadPlusP          p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
+instance (MonadTransP           p )
+       => MonadTransP (StateP s p) where
+    lift_P m = StateP (\s -> lift_P (m >>= \r -> return (r, s)))
+
 instance (Proxy                p )
        => MonadTrans (StateP s p a' a b' b) where
     lift = lift_P
@@ -103,8 +107,6 @@ instance (Proxy           p )
 
     request = \a' -> StateP (\s -> request a' ?>= \a  -> return_P (a , s))
     respond = \b  -> StateP (\s -> respond b  ?>= \b' -> return_P (b', s))
-
-    lift_P m = StateP (\s -> lift_P (m >>= \r -> return (r, s)))
 
     hoist_P nat p = StateP (\s -> hoist_P nat (unStateP p s))
  -- hoist nat = StateP . fmap (hoist nat) . unStateP

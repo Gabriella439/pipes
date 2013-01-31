@@ -28,6 +28,7 @@ module Control.Proxy.Class (
     -- * Polymorphic proxies
     -- $poly
     MonadP(..),
+    MonadTransP(..),
     MonadPlusP(..),
     MonadIOP(..)
     ) where
@@ -62,7 +63,7 @@ infixl 1 ?>= -- This should match the fixity of >>=
     I only provide ('>~>') for theoretical symmetry, and the remaining methods
     just implement internal type class plumbing.
 -}
-class (MonadP p) => Proxy p where
+class (MonadP p, MonadTransP p) => Proxy p where
     {-| 'request' input from upstream, passing an argument with the request
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
@@ -99,10 +100,6 @@ class (MonadP p) => Proxy p where
      => (a -> p a' a b' b m r)
      -> (b -> p b' b c' c m r)
      -> (a -> p a' a c' c m r)
-
-    {-| 'lift_P' is identical to 'lift', except with a more polymorphic
-        constraint. -}
-    lift_P :: (Monad m) => m r -> p a' a b' b m r
 
     {-| 'hoist_P' is identical to 'hoist', except with a more polymorphic
         constraint. -}
@@ -216,7 +213,8 @@ p1 \<\ p2 = p2 />/ p1
     These must satify the monad laws using @(>>=) = (?>=)@ and
     @return = return_P@.
 
-    Third, all proxies are monad transformers, defined by:
+    Third, all proxies are monad transformers, defined by their 'MonadTransP'
+    instance:
 
     * 'lift_P'
 
@@ -423,6 +421,13 @@ class MonadP p where
     (?>=)
      :: (Monad m)
      => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'
+
+{-| The @(MonadTrans p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b . MonadTrans (p a' a b' b)) => ...
+-}
+class MonadTransP p where
+    lift_P :: (Monad m) => m r -> p a' a b' b m r
 
 {-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
 

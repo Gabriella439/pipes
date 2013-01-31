@@ -66,6 +66,10 @@ instance (MonadPlusP           p, Monad m)
     mzero = mzero_P
     mplus = mplus_P
 
+instance (MonadTransP            p )
+       => MonadTransP (IdentityP p) where
+    lift_P m = IdentityP (lift_P m)
+
 instance (Proxy                 p )
        => MonadTrans (IdentityP p a' a b' b) where
     lift = lift_P
@@ -100,9 +104,6 @@ instance (Proxy            p )
 
     respond = \b -> IdentityP (respond b)
  -- respond = P . respond
-
-    lift_P m = IdentityP (lift_P m)
- -- lift = P . lift
 
     hoist_P nat p = IdentityP (hoist_P nat (runIdentityP p))
  -- hoist nat = IdentityP . hoist nat . runIdentityP

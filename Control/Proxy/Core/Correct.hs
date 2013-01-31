@@ -87,6 +87,9 @@ instance MonadP ProxyCorrect where
 instance MonadTrans (ProxyCorrect a' a b' b) where
     lift = lift_P
 
+instance MonadTransP ProxyCorrect where
+    lift_P m = Proxy (m >>= \r -> return (Pure r))
+
 instance (MonadIO m) => MonadIO (ProxyCorrect a' a b' b m) where
     liftIO m = Proxy (liftIO (m >>= \r -> return (Pure r)))
  -- liftIO = Proxy . liftIO . liftM Pure
@@ -125,8 +128,6 @@ instance Proxy ProxyCorrect where
 
     request a' = Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
     respond b  = Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
-
-    lift_P m = Proxy (m >>= \r -> return (Pure r))
 
     hoist_P = hoist
 
