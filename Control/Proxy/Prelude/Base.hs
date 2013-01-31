@@ -88,8 +88,14 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Writer.Lazy as W (
     WriterT(runWriterT), execWriterT, runWriter )
 import Control.Monad.Trans.Writer.Lazy (tell)
+--------------------------------------------------------------------------------
 import Control.Monad.Trans.State.Strict (
-    StateT(StateT, runStateT), execStateT, runState, execState )
+    StateT(StateT, runStateT),
+    execStateT,
+    evalStateT,
+    runState,
+    execState,
+    evalState )
 import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
