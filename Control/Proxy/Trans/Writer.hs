@@ -35,7 +35,8 @@ import Data.Monoid (Monoid(mempty, mappend))
 newtype WriterP w p a' a b' b (m :: * -> *) r
   = WriterP { unWriterP :: w -> p a' a b' b m (r, w) }
 
-instance (MonadP p) => MonadP (WriterP w p) where
+instance (MonadP            p )
+       => MonadP (WriterP w p) where
     return_P = \r -> WriterP (\w -> return_P (r, w))
     m ?>= f  = WriterP (\w ->
         unWriterP m w ?>= \(a, w') ->

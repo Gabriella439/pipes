@@ -25,7 +25,8 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype MaybeP p a' a b' b (m :: * -> *) r
   = MaybeP { runMaybeP :: p a' a b' b m (Maybe r) }
 
-instance (MonadP p) => MonadP (MaybeP p) where
+instance (MonadP         p )
+       => MonadP (MaybeP p) where
     return_P = \r -> MaybeP (return_P (Just r))   -- just
     m ?>= f = MaybeP (
         runMaybeP m ?>= \ma ->

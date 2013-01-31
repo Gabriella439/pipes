@@ -28,7 +28,8 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype ReaderP i p a' a b' b (m :: * -> *) r
   = ReaderP { unReaderP :: i -> p a' a b' b m r }
 
-instance (MonadP p) => MonadP (ReaderP i p) where
+instance (MonadP            p )
+       => MonadP (ReaderP i p) where
     return_P = \r -> ReaderP (\_ -> return_P r)
     m ?>= f  = ReaderP (\i ->
         unReaderP m i ?>= \a -> 

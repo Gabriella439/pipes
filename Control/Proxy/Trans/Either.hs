@@ -35,7 +35,8 @@ import Prelude hiding (catch)
 newtype EitherP e p a' a b' b (m :: * -> *) r
   = EitherP { runEitherP :: p a' a b' b m (Either e r) }
 
-instance (MonadP p) => MonadP (EitherP e p) where
+instance (MonadP            p )
+       => MonadP (EitherP e p) where
     return_P = \r -> EitherP (return_P (Right r))   -- right
     m ?>= f = EitherP (
         runEitherP m ?>= \e ->

@@ -22,7 +22,8 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype IdentityP p a' a b' b (m :: * -> *) r =
     IdentityP { runIdentityP :: p a' a b' b m r }
 
-instance (MonadP p) => MonadP (IdentityP p) where
+instance (MonadP            p )
+       => MonadP (IdentityP p) where
     return_P = \r -> IdentityP (return_P r)
 
     m ?>= f = IdentityP (

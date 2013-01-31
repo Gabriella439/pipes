@@ -32,7 +32,8 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype StateP s p a' a b' b (m :: * -> *) r
   = StateP { unStateP :: s -> p a' a b' b m (r, s) }
 
-instance (MonadP p) => MonadP (StateP s p) where
+instance (MonadP           p )
+       => MonadP (StateP s p) where
     return_P = \r -> StateP (\s -> return_P (r, s))
     m ?>= f  = StateP (\s ->
         unStateP m s ?>= \(a, s') ->
