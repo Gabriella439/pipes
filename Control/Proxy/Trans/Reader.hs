@@ -7,6 +7,7 @@ module Control.Proxy.Trans.Reader (
     ReaderP(..),
     runReaderP,
     runReaderK,
+
     -- * Reader operations
     ask,
     asks,

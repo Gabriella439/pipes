@@ -6,9 +6,11 @@ module Control.Proxy.Trans.Either (
     -- * EitherP
     EitherP(..),
     runEitherK,
+
     -- * Either operations
     left,
     right,
+
     -- * Symmetric monad
     -- $symmetry
     throw,

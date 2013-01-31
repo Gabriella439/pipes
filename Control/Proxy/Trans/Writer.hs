@@ -15,6 +15,7 @@ module Control.Proxy.Trans.Writer (
     runWriterK,
     execWriterP,
     execWriterK,
+
     -- * Writer operations
     tell,
     censor

@@ -11,6 +11,7 @@ module Control.Proxy.Trans.State (
     evalStateK,
     execStateP,
     execStateK,
+
     -- * State operations
     get,
     put,

@@ -6,6 +6,7 @@ module Control.Proxy.Trans.Maybe (
     -- * MaybeP
     MaybeP(..),
     runMaybeK,
+
     -- * Maybe operations
     nothing,
     just
