@@ -85,6 +85,11 @@ instance (MonadIOP           p, MonadIO m)
        => MonadIO (ReaderP i p a' a b' b m) where
     liftIO = liftIO_P
 
+instance (MFunctorP            p )
+       => MFunctorP (ReaderP i p) where
+    hoist_P nat p = ReaderP (\i -> hoist_P nat (unReaderP p i))
+ -- hoist_P nat = ReaderP . fmap (hoist_P nat) . unReaderP
+
 instance (Proxy               p )
        => MFunctor (ReaderP i p a' a b' b) where
     hoist = hoist_P
@@ -105,9 +110,6 @@ instance (Proxy            p  )
 
     request = \a -> ReaderP (\_ -> request a)
     respond = \a -> ReaderP (\_ -> respond a)
-
-    hoist_P nat p = ReaderP (\i -> hoist_P nat (unReaderP p i))
- -- hoist_P nat = ReaderP . fmap (hoist_P nat) . unReaderP
 
 instance (Interact            p)
        => Interact (ReaderP i p) where

@@ -29,6 +29,7 @@ module Control.Proxy.Class (
     -- $poly
     MonadP(..),
     MonadTransP(..),
+    MFunctorP(..),
     MonadPlusP(..),
     MonadIOP(..)
     ) where
@@ -56,14 +57,8 @@ infixl 8 \<\
 infixr 8 />/
 infixl 1 ?>= -- This should match the fixity of >>=
 
-{-| The core API for the @pipes@ library
-
-    You should only use 'request', 'respond', and ('>->')
-
-    I only provide ('>~>') for theoretical symmetry, and the remaining methods
-    just implement internal type class plumbing.
--}
-class (MonadP p, MonadTransP p) => Proxy p where
+-- | The core API for the @pipes@ library
+class (MonadP p, MonadTransP p, MFunctorP p) => Proxy p where
     {-| 'request' input from upstream, passing an argument with the request
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
@@ -100,12 +95,6 @@ class (MonadP p, MonadTransP p) => Proxy p where
      => (a -> p a' a b' b m r)
      -> (b -> p b' b c' c m r)
      -> (a -> p a' a c' c m r)
-
-    {-| 'hoist_P' is identical to 'hoist', except with a more polymorphic
-        constraint. -}
-    hoist_P
-     :: (Monad m)
-     => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')
 
 {-| 'idT' forwards requests followed by responses
 
@@ -204,31 +193,20 @@ p1 \<\ p2 = p2 />/ p1
     begins from the downstream end, whereas ('>~>') accepts proxies blocked on
     'request' and begins from the upstream end.
 
-    Second, all proxies are monads, defined by their 'MonadP' instance:
-
-    * 'return_P'
-
-    * ('?>=')
-
-    These must satify the monad laws using @(>>=) = (?>=)@ and
-    @return = return_P@.
+    Second, all proxies are monads, defined by their 'MonadP' instance, which
+    must satify the monad laws using @(>>=) = (?>=)@ and @return = return_P@.
 
     Third, all proxies are monad transformers, defined by their 'MonadTransP'
-    instance:
+    instance, which must satisfy the monad transformer laws, using
+    @lift = lift_P@.
 
-    * 'lift_P'
+    Fourth, all proxies are functors in the category of monads, defined by
+    their 'MFunctorP' instance, which must satisfy the functor laws, using
+    @hoist = hoist_P@.
 
-    This must satisfy the monad transformer laws, using @lift = lift_P@.
+    All 'Proxy's form two streaming categories:
 
-    Fourth, all proxies are functors in the category of monads, defined by:
-
-    * 'hoist_P'
-
-    This must satisfy the functor laws, using @hoist = hoist_P@.
-
-    All 'Proxy' instances must satisfy these additional laws:
-
-    * ('>->') and 'idT' form a category:
+    * ('>->') and 'idT' form the \"pull-based\" category:
 
 > Define: idT = request >=> respond >=> idT
 >
@@ -238,7 +216,7 @@ p1 \<\ p2 = p2 />/ p1
 >
 > (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
 
-    * ('>~>') and 'coidT' form a category:
+    * ('>~>') and 'coidT' form the \"push-based\" category:
 
 > Define: coidT = respond >=> request >=> coidT
 >
@@ -422,12 +400,21 @@ class MonadP p where
      :: (Monad m)
      => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'
 
-{-| The @(MonadTrans p)@ constraint is equivalent to the following constraint:
+{-| The @(MonadTransP p)@ constraint is equivalent to the following constraint:
 
 > (forall a' a b' b . MonadTrans (p a' a b' b)) => ...
 -}
 class MonadTransP p where
     lift_P :: (Monad m) => m r -> p a' a b' b m r
+
+{-| The @(MFunctorP p)@ constraint is equivalent to the following constraint:
+
+> (forall a' a b' b m . (Monad m) => MFunctor (p a' a b' b m)) => ...
+-}
+class MFunctorP p where
+    hoist_P
+     :: (Monad m)
+     => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')
 
 {-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
 

@@ -204,8 +204,6 @@ instance Proxy ProxyFast where
     request a' = Request a' Pure
     respond b  = Respond b  Pure
 
-    hoist_P = hoist
-
 instance Interact ProxyFast where
     k2 \>\ k1 = \a' -> go (k1 a') where
         go p = case p of
@@ -227,6 +225,9 @@ instance MFunctor (ProxyFast a' a b' b) where
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (nat (m >>= \p' -> return (go p')))
             Pure       r   -> Pure r
+
+instance MFunctorP ProxyFast where
+    hoist_P = hoist
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to

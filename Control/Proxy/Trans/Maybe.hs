@@ -100,6 +100,11 @@ instance (MonadIOP        p, MonadIO m)
        => MonadIO (MaybeP p a' a b' b m) where
     liftIO = liftIO_P
 
+instance (MFunctorP         p )
+       => MFunctorP (MaybeP p) where
+    hoist_P nat p = MaybeP (hoist_P nat (runMaybeP p))
+ -- hoist nat = MaybeP . hoist nat . runMaybeP
+
 instance (Proxy            p )
        => MFunctor (MaybeP p a' a b' b) where
     hoist = hoist_P
@@ -116,9 +121,6 @@ instance (Proxy         p )
 
     request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
     respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))
-
-    hoist_P nat p = MaybeP (hoist_P nat (runMaybeP p))
- -- hoist nat = MaybeP . hoist nat . runMaybeP
 
 instance ProxyTrans MaybeP where
     liftP p = MaybeP (p ?>= \x -> return_P (Just x))

@@ -105,6 +105,11 @@ instance (MonadIOP           p, MonadIO m)
        => MonadIO (EitherP e p a' a b' b m) where
     liftIO = liftIO_P
 
+instance (MFunctorP            p )
+       => MFunctorP (EitherP e p) where
+    hoist_P nat p = EitherP (hoist_P nat (runEitherP p))
+ -- hoist nat = EitherP . hoist nat . runEitherP
+
 instance (Proxy               p )
        => MFunctor (EitherP e p a' a b' b) where
     hoist = hoist_P
@@ -121,9 +126,6 @@ instance (Proxy            p )
 
     request = \a' -> EitherP (request a' ?>= \a  -> return_P (Right a ))
     respond = \b  -> EitherP (respond b  ?>= \b' -> return_P (Right b'))
-
-    hoist_P nat p = EitherP (hoist_P nat (runEitherP p))
- -- hoist nat = EitherP . hoist nat . runEitherP
 
 instance ProxyTrans (EitherP e) where
     liftP p = EitherP (p ?>= \x -> return_P (Right x))

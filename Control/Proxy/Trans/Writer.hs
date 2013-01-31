@@ -94,6 +94,11 @@ instance (MonadIOP           p, MonadIO m)
        => MonadIO (WriterP w p a' a b' b m) where
     liftIO = liftIO_P
 
+instance (MFunctorP            p )
+       => MFunctorP (WriterP w p) where
+    hoist_P nat p = WriterP (\w -> hoist_P nat (unWriterP p w))
+ -- hoist_P nat = WriterP . fmap (hoist_P nat) . unWriterP
+
 instance (Proxy               p )
        => MFunctor (WriterP w p a' a b' b) where
     hoist = hoist_P
@@ -112,9 +117,6 @@ instance (Proxy            p )
 
     request = \a' -> WriterP (\w -> request a' ?>= \a  -> return_P (a,  w))
     respond = \b  -> WriterP (\w -> respond b  ?>= \b' -> return_P (b', w))
-
-    hoist_P nat p = WriterP (\w -> hoist_P nat (unWriterP p w))
- -- hoist_P nat = WriterP . fmap (hoist_P nat) . unWriterP
 
 instance ProxyTrans (WriterP w) where
     liftP m = WriterP (\w -> m ?>= \r -> return_P (r, w))

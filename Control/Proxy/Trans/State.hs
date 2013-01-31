@@ -91,6 +91,11 @@ instance (MonadIOP          p, MonadIO m)
        => MonadIO (StateP s p a' a b' b m) where
     liftIO = liftIO_P
 
+instance (MFunctorP           p )
+       => MFunctorP (StateP s p) where
+    hoist_P nat p = StateP (\s -> hoist_P nat (unStateP p s))
+ -- hoist nat = StateP . fmap (hoist nat) . unStateP
+
 instance (Proxy              p )
        => MFunctor (StateP s p a' a b' b) where
     hoist = hoist_P
@@ -109,9 +114,6 @@ instance (Proxy           p )
 
     request = \a' -> StateP (\s -> request a' ?>= \a  -> return_P (a , s))
     respond = \b  -> StateP (\s -> respond b  ?>= \b' -> return_P (b', s))
-
-    hoist_P nat p = StateP (\s -> hoist_P nat (unStateP p s))
- -- hoist nat = StateP . fmap (hoist nat) . unStateP
 
 instance ProxyTrans (StateP s) where
     liftP m = StateP (\s -> m ?>= \r -> return_P (r, s))
