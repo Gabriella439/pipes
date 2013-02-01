@@ -193,16 +193,17 @@ instance Proxy ProxyFast where
     respond = \b  -> Respond b  Pure
 
 instance Interact ProxyFast where
-    k2 \>\ k1 = \a' -> go (k1 a') where
+    fb' >\\ p0 = go p0 where
         go p = case p of
-            Request b' fb  -> k2 b' >>= \b -> go (fb b)
+            Request b' fb  -> fb' b' >>= \b -> go (fb b)
             Respond x  fx' -> Respond x (\x' -> go (fx' x'))
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       a   -> Pure a
-    k2 />/ k1 = \a' -> go (k2 a') where
+
+    p0 //> fb = go p0 where
         go p = case p of
             Request x' fx  -> Request x' (\x -> go (fx x))
-            Respond b  fb' -> k1 b >>= \b' -> go (fb' b')
+            Respond b  fb' -> fb b >>= \b' -> go (fb' b')
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       a   -> Pure a
 

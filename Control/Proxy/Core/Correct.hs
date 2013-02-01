@@ -116,19 +116,20 @@ instance Proxy ProxyCorrect where
     respond = \b  -> Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
 
 instance Interact ProxyCorrect where
-    k2 \>\ k1 = \a' -> go (k1 a') where
+    fb' >\\ p0 = go p0 where
         go p = Proxy (do
             x <- unProxy p
             case x of
-                Request b' fb  -> unProxy (k2 b' >>= \b -> go (fb b))
+                Request b' fb  -> unProxy (fb' b' >>= \b -> go (fb b))
                 Respond x  fx' -> return (Respond x (\x' -> go (fx' x')))
                 Pure       a   -> return (Pure a) )
-    k2 />/ k1 = \a' -> go (k2 a') where
+
+    p0 //> fb = go p0 where
         go p = Proxy (do
             x <- unProxy p
             case x of
                 Request x' fx  -> return (Request x' (\x -> go (fx x)))
-                Respond b  fb' -> unProxy (k1 b >>= \b' -> go (fb' b'))
+                Respond b  fb' -> unProxy (fb b >>= \b' -> go (fb' b'))
                 Pure       a   -> return (Pure a) )
 
 instance MFunctor (ProxyCorrect a' a b' b) where

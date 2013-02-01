@@ -105,15 +105,9 @@ instance (Proxy            p )
 
 instance (Interact            p )
       =>  Interact (IdentityP p) where
-    p1 \>\ p2 = \c'1 -> IdentityP (
-        ((\b'  -> runIdentityP (p1 b' ))
-     \>\ (\c'2 -> runIdentityP (p2 c'2)) ) c'1 )
- -- p1 \>\ p2 = (IdentityP .) $ runIdentityP . p1 \>\ runIdentityP . p2
+    fb' >\\ p = IdentityP ((\b' -> runIdentityP (fb' b')) >\\ runIdentityP p)
 
-    p1 />/ p2 = \a1 -> IdentityP (
-        ((\a2 -> runIdentityP (p1 a2))
-     />/ (\b  -> runIdentityP (p2 b )) ) a1 )
- -- p1 />/ p2 = (IdentityP .) $ runIdentityP . p1 />/ runIdentityP . p2
+    p //> fb  = IdentityP (runIdentityP p //> (\b -> runIdentityP (fb b)))
 
 instance ProxyTrans IdentityP where
     liftP = IdentityP

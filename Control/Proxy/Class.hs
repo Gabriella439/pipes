@@ -23,8 +23,12 @@ module Control.Proxy.Class (
 
     -- * request/respond substitution
     Interact(..),
+    (\>\),
     (/</),
     (\<\),
+    (/>/),
+    (//<),
+    (<\\),
 
     -- * Laws
     -- $laws
@@ -57,10 +61,10 @@ infixr 7 <-<, ->>
 infixl 7 >->, <<-
 infixr 7 >~>, ~<<
 infixl 7 <~<, >>~
-infixr 8 /</
-infixl 8 \>\
-infixl 8 \<\
-infixr 8 />/
+infixr 8 /</, >\\
+infixl 8 \>\, //<
+infixl 8 \<\, //>
+infixr 8 />/, <\\
 infixl 1 ?>= -- This should match the fixity of >>=
 
 -- | The core API for the @pipes@ library
@@ -94,14 +98,6 @@ class (MonadP p, MonadTransP p, MFunctorP p) => Proxy p where
      -> (b  -> p b' b c' c m r)
      ->        p a' a c' c m r
 
--- | Equivalent to ('->>') with the arguments flipped
-(<<-)
- :: (Monad m, Proxy p)
- =>         p b' b c' c m r
- -> (b'  -> p a' a b' b m r)
- ->         p a' a c' c m r
-k <<- p = p ->> k
-
 {-| Compose two proxies blocked on a 'respond', generating a new proxy blocked
     on a 'respond'
 
@@ -129,14 +125,6 @@ k1 >-> k2 = \c' -> k1 ->> k2 c'
  -> (c' -> p a' a c' c m r)
 p1 <-< p2 = p2 >-> p1
 
--- | Equivalent to ('>>~') with the arguments flipped
-(~<<)
- :: (Monad m, Proxy p)
- => (b  -> p b' b c' c m r)
- ->        p a' a b' b m r
- ->        p a' a c' c m r
-k ~<< p = p >>~ k
-
 {-| Compose two proxies blocked on a 'request', generating a new proxy blocked
     on a 'request'
 
@@ -163,6 +151,22 @@ k1 >~> k2 = \a -> k1 a >>~ k2
  -> (a -> p a' a c' c m r)
 p1 <~< p2 = p2 >~> p1
 
+-- | Equivalent to ('->>') with the arguments flipped
+(<<-)
+ :: (Monad m, Proxy p)
+ =>         p b' b c' c m r
+ -> (b'  -> p a' a b' b m r)
+ ->         p a' a c' c m r
+k <<- p = p ->> k
+
+-- | Equivalent to ('>>~') with the arguments flipped
+(~<<)
+ :: (Monad m, Proxy p)
+ => (b  -> p b' b c' c m r)
+ ->        p a' a b' b m r
+ ->        p a' a c' c m r
+k ~<< p = p >>~ k
+
 {-| 'idT' forwards requests followed by responses
 
 > idT = request >=> respond >=> idT
@@ -187,26 +191,46 @@ coidT = go where
         go a2
 -- coidT = foreverK $ respond >=> request
 
--- | Two extra Proxy categories of theoretical interest
+-- | Two extra Proxy categories
 class (Proxy p) => Interact p where
-    -- | @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
-    (\>\) :: (Monad m)
+    -- | @f >\\\\ p@ replaces all 'request's in @p@ with @f@
+    (>\\) :: (Monad m)
           => (b' -> p a' a x' x m b)
-          -> (c' -> p b' b x' x m c)
-          -> (c' -> p a' a x' x m c)
+          ->        p b' b x' x m c
+          ->        p a' a x' x m c
 
-    -- | @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
-    (/>/) :: (Monad m)
-          => (a -> p x' x b' b m a')
+    -- | @p \/\/> f@ replaces all 'respond's in @p@ with @f@
+    (//>) :: (Monad m)
+          =>       p x' x b' b m a'
           -> (b -> p x' x c' c m b')
-          -> (a -> p x' x c' c m a')
+          ->       p x' x c' c m a'
 
--- | @f \/<\/ g@ replaces all 'request's in 'f' with 'g'.
+{-| @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
+
+    Point-free version of ('>\\')
+-}
+(\>\) :: (Monad m, Interact p)
+      => (b' -> p a' a x' x m b)
+      -> (c' -> p b' b x' x m c)
+      -> (c' -> p a' a x' x m c)
+f \>\ g = \c' -> f >\\ g c'
+
+-- | Equivalent to ('\>\') with the arguments flipped
 (/</) :: (Monad m, Interact p)
       => (c' -> p b' b x' x m c)
       -> (b' -> p a' a x' x m b)
       -> (c' -> p a' a x' x m c)
 p1 /</ p2 = p2 \>\ p1
+
+{-| @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
+
+    Point-free version of ('//>')
+-}
+(/>/) :: (Monad m, Interact p)
+      => (a -> p x' x b' b m a')
+      -> (b -> p x' x c' c m b')
+      -> (a -> p x' x c' c m a')
+f />/ g = \a -> f a //> g
 
 -- | @f \\<\\ g@ replaces all 'respond's in 'g' with 'f'.
 (\<\) :: (Monad m, Interact p)
@@ -214,6 +238,20 @@ p1 /</ p2 = p2 \>\ p1
       -> (a -> p x' x b' b m a')
       -> (a -> p x' x c' c m a')
 p1 \<\ p2 = p2 />/ p1
+
+-- | Equivalent to ('>\\') with the arguments flipped
+(//<) :: (Monad m, Interact p)
+      =>        p b' b x' x m c
+      -> (b' -> p a' a x' x m b)
+      ->        p a' a x' x m c
+p //< f = f >\\ p
+
+-- | Equivalent to ('//>') with the arguments flipped
+(<\\) :: (Monad m, Interact p)
+      => (b -> p x' x c' c m b')
+      ->       p x' x b' b m a'
+      ->       p x' x c' c m a'
+f <\\ p = p //> f
 
 {- $laws
     The 'Proxy' class defines an interface to all core proxy capabilities that
@@ -302,16 +340,32 @@ p1 \<\ p2 = p2 />/ p1
     
     Laws:
 
-    * ('\>\') and 'request' form a category:
+    * ('\>\') and 'request' form a Kleisli category:
 
+> return = request
+>
+> (>>=) = (//<)
+>
+> fmap f p = p //< (request . f)
+>
+> join p = p //< id
+>
 > request \>\ f = f
 >
 > f \>\ request = f
 >
 > (f \>\ g) \>\ h = f \>\ (g \>\ h)
 
-    * ('/>/') and 'respond' form a category:
+    * ('/>/') and 'respond' form a Kleisli category:
 
+> return = respond
+>
+> (>>=) = (//>)
+>
+> fmap f p = p //> (respond . f)
+>
+> join p = p //< id
+>
 > respond />/ f = f
 >
 > f />/ respond = f

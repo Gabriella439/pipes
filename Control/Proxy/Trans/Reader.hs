@@ -105,17 +105,9 @@ instance (Proxy            p  )
 
 instance (Interact            p)
        => Interact (ReaderP i p) where
-    p1 \>\ p2 = \c'1 -> ReaderP (\i ->
-        ((\b'  -> unReaderP (p1 b' ) i)
-     \>\ (\c'2 -> unReaderP (p2 c'2) i) ) c'1 )
- {- p1 \>\ p2 = \c' -> ReaderP $ \i ->
-        ((`unReaderP` i) . p1 \>\ (`unReaderP` i) . p2) c' -}
+    fb' >\\ p = ReaderP (\i -> (\b' -> unReaderP (fb' b') i) >\\ unReaderP p i)
 
-    p1 />/ p2 = \a1 -> ReaderP (\i ->
-        ((\b  -> unReaderP (p1 b ) i)
-     />/ (\a2 -> unReaderP (p2 a2) i) ) a1 )
- {- p1 />/ p2 = \a -> ReaderP $ \i ->
-        ((`unReaderP` i) . p1 />/ (`unReaderP` i) . p2) a -}
+    p //> fb  = ReaderP (\i -> unReaderP p i //> (\b -> unReaderP (fb b) i))
 
 instance ProxyTrans (ReaderP i) where
     liftP m = ReaderP (\_ -> m)
