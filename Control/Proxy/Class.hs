@@ -246,12 +246,12 @@ p1 \<\ p2 = p2 />/ p1
     their 'MFunctorP' instance, which must satisfy the functor laws, using
     @hoist = hoist_P@.
 
-    All 'Proxy's form two streaming categories:
+    Fifth, all proxies form two streaming categories:
 
     * ('>->') and 'idT' form the \"pull-based\" category:
 
 > Define: idT = request >=> respond >=> idT
-> Define: k1 >-> k2 = \c' -> k 
+> Define: k1 >-> k2 = \c' -> k1 ->> k2 c'
 >
 > idT >-> p = p
 >
@@ -262,6 +262,7 @@ p1 \<\ p2 = p2 />/ p1
     * ('>~>') and 'coidT' form the \"push-based\" category:
 
 > Define: coidT = respond >=> request >=> coidT
+> Define: k1 >~> k2 = \a -> k1 a >>~ k2
 >
 > coidT >~> p = p
 >
@@ -293,10 +294,6 @@ p1 \<\ p2 = p2 />/ p1
 > (liftK f >=> respond >=> p1) >~> (liftK g >=> respond >=> p2)
 >     = liftK (f >=> g) >=> (p1 >-> p2)
 
-    The 'Interact' class exists primarily for theoretical interest and to
-    justify some of the functor laws for the 'ProxyTrans' type class.  You will
-    probably never use it.
-
     The 'Interact' class defines the ability to:
     
     * Replace existing 'request' commands using ('\>\')
@@ -321,8 +318,8 @@ p1 \<\ p2 = p2 />/ p1
 >
 > (f />/ g) />/ h = f />/ (g />/ h)
 
-    Additionally, ('\>\') and ('/>/') distribute in one direction over Kleisli
-    composition:
+    Additionally, ('\>\') and ('/>/') both define functors between Kleisli
+    categories:
 
 > a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
 >
