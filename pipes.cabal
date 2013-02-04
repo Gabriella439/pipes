@@ -42,7 +42,7 @@ Source-Repository head
 Library
     Build-Depends:
         base >= 4 && < 5,
-        transformers >= 0.2.0.0
+        transformers >= 0.2.0.0 && < 0.4
     Exposed-Modules:
         Control.MFunctor,
         Control.PFunctor,
