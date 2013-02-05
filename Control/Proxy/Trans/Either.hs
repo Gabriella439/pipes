@@ -30,6 +30,7 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 #else
 import Prelude hiding (catch)
 #endif
+import Data.Monoid (Monoid(mempty, mappend))
 
 -- | The 'Either' proxy transformer
 newtype EitherP e p a' a b' b (m :: * -> *) r
@@ -72,17 +73,25 @@ instance (Proxy            p, Monad m)
     return = return_P
     (>>=) = (?>=)
 
-instance (MonadPlusP             p, Monad m)
+instance (Proxy                  p, Monad m, Monoid e)
        => Alternative (EitherP e p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (MonadPlusP            p )
+instance (Proxy                 p, Monoid e)
        => MonadPlusP (EitherP e p) where
-    mzero_P = EitherP mzero_P
-    mplus_P m1 m2 = EitherP (mplus_P (runEitherP m1) (runEitherP m2))
+    mzero_P = EitherP (return_P (Left mempty))
+    mplus_P p1 p2 = EitherP (
+        runEitherP p1 ?>= \e1 ->
+        case e1 of
+            Right r  -> return_P (Right r)
+            Left  l1 ->
+                runEitherP p2 ?>= \e2 ->
+                case e2 of
+                    Right r  -> return_P (Right r)
+                    Left  l2 -> return_P (Left (mappend l1 l2)) )
 
-instance (MonadPlusP           p, Monad m)
+instance (Proxy                p, Monad m, Monoid e)
        => MonadPlus (EitherP e p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
