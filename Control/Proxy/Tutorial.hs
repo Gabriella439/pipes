@@ -821,7 +821,7 @@ promptInt
 > upstream :: (Proxy p) => () -> Producer p () IO ()
 > upstream () = runIdentityP $ do
 >     lift $ print 2
->     respond () -- Switch to downstraem
+>     respond () -- Switch to downstream
 >     lift $ print 4
 
      "Control.Proxy.Class" enumerates the 'Proxy' laws, which equationally
