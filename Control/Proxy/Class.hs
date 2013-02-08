@@ -178,6 +178,7 @@ idT = go where
         respond a  ?>= \a'2 ->
         go a'2
 -- idT = foreverK $ request >=> respond
+{-# INLINABLE idT #-}
 
 {-| 'coidT' forwards responses followed by requests
 
@@ -190,6 +191,7 @@ coidT = go where
         request a' ?>= \a2 ->
         go a2
 -- coidT = foreverK $ respond >=> request
+{-# INLINABLE coidT #-}
 
 -- | Two extra Proxy categories
 class (Proxy p) => Interact p where

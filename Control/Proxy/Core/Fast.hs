@@ -22,8 +22,10 @@
     and with any proxy transformers. -}
 
 {-# LANGUAGE Trustworthy #-}
-{- The rewrite RULES require the 'TrustWorthy' annotation.  I've supplied the
-   correctness proof for each rewrite rule immediately below each rule. -}
+{- The rewrite RULES require the 'TrustWorthy' annotation.  Their proofs are
+   pretty trivial since they are just inlining the definition of _bind.  GHC
+   doesn't do this automatically because the @go@ helper function is recursive.
+-}
 
 module Control.Proxy.Core.Fast (
     -- * Types
@@ -102,72 +104,26 @@ p0 `_bind` f = go p0 where
         Pure       r   -> f r
 
 {-# RULES
-    "_bind (Request a' Pure) f" forall a' f .
-        _bind (Request a' Pure) f = Request a' f;
-    "_bind (Respond b  Pure) f" forall b  f .
-        _bind (Respond b  Pure) f = Respond b  f
+    "_bind (Request a' k) f" forall a' k f .
+        _bind (Request a' k) f = Request a' (\a  -> _bind (k a)  f);
+    "_bind (Respond b  k) f" forall b  k f .
+        _bind (Respond b  k) f = Respond b  (\b' -> _bind (k b') f);
+    "_bind (M          m) f" forall m    f .
+        _bind (M          m) f = M (m >>= \p -> return (_bind p f));
+    "_bind (Pure    r   ) f" forall r    f .
+        _bind (Pure       r) f = f r;
   #-}
-{- Proof that the rewrite rules are Trustworthy:
-
-  _bind (Request a' Pure) f
-= go (Request a' Pure) where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        M          m   -> M (m >>= \p' -> return (go p'))
-        Pure       r   -> f r
-= Request a' (\a -> go (Pure a))
-= Request a' (\a -> f a)
-= Request a' f
-
-  _bind (Respond b Pure) f
-= go (Respond b Pure) where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        M          m   -> M (m >>= \p' -> return (go p'))
-        Pure       r   -> f r
-= Respond b (\b' -> go (Pure b'))
-= Respond b (\b' -> f b')
-= Respond b f
--}
 
 instance MonadP ProxyFast where
-    return_P = return
+    return_P = Pure
     (?>=)   = _bind
 
 -- | Only satisfies laws modulo 'observe'
 instance MonadTrans (ProxyFast a' a b' b) where
-    lift = _lift
+    lift m = M (m >>= \r -> return (Pure r))
 
 instance MonadTransP ProxyFast where
-    lift_P = _lift
-
-_lift :: (Monad m) => m r -> ProxyFast a' a b' b m r
-_lift m = M (m >>= \r -> return (Pure r))
--- _lift = M . liftM Pure
-
-{- These never fire, for some reason, but keep them until I figure out how to
-   get them to work. -}
-{-# RULES
-    "_lift m ?>= f" forall m f .
-        _bind (_lift m) f = M (m >>= \r -> return (f r))
-  #-}
-{- Proof that the rewrite rule is Trustworthy:
-
-  _bind (_lift m) f
-= _bind (M (m >>= \r -> return (Pure r))) f
-= go (M (m >>= \r -> return (Pure r))) where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        M          m   -> M (m >>= \p' -> return (go p'))
-        Pure       r   -> f r
-= M ((m >>= \r -> return (Pure r)) >>= \p' -> return (go p'))
-= M (m >>= \r -> (return (Pure r) >>= \p' -> return (go p')))
-= M (m >>= \r -> return (go (Pure r)))
-= M (m >>= \r -> return (f r))
--}
+    lift_P = lift
 
 instance (MonadIO m) => MonadIO (ProxyFast a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
