@@ -15,7 +15,8 @@ module Control.Proxy.Trans.Either (
     -- $symmetry
     throw,
     catch,
-    handle
+    handle,
+    fmapL
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -195,3 +196,9 @@ handle
  -> EitherP f p a' a b' b m r        -- ^ Handled computation
 handle f m = catch m f
 -- handle = flip catch
+
+-- | 'fmap' over the \'@L@\' variable
+fmapL
+ :: (Monad m, Proxy p)
+ => (e -> f) -> EitherP e p a' a b' b m r -> EitherP f p a' a b' b m r
+fmapL f p = catch p (\e -> throw (f e))
