@@ -30,12 +30,18 @@ module Control.Proxy.Prelude.Base (
     -- * Lists
     fromListS,
     fromListC,
+    eachS,
+    eachC,
 
     -- * Enumerations
     enumFromS,
     enumFromC,
     enumFromToS,
     enumFromToC,
+    fromS,
+    fromC,
+    rangeS,
+    rangeC,
 
     -- * Folds
     foldD,
@@ -84,6 +90,8 @@ module Control.Proxy.Prelude.Base (
     ) where
 
 import Control.MFunctor (hoist)
+import Control.Monad.Trans.Interact (
+    RequestT(RequestT), RespondT(RespondT), ProduceT, CoProduceT )
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Writer.Lazy as W (
     WriterT(runWriterT), execWriterT, runWriter )
@@ -497,6 +505,14 @@ fromListC :: (Monad m, Proxy p) => [a'] -> () -> CoProducer p a' m ()
 fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 -- fromListC xs _ = mapM_ request xs
 
+-- | Convert a list into a 'ProduceT'
+eachS :: (Monad m, Interact p) => [b] -> ProduceT p m b
+eachS bs = RespondT (fromListS bs ())
+
+-- | Convert a list into a 'CoProduceT'
+eachC :: (Monad m, Interact p) => [a'] -> CoProduceT p m a'
+eachC a's = RequestT (fromListC a's ())
+
 -- | 'Producer' version of 'enumFrom'
 enumFromS :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
 enumFromS b0 = \_ -> runIdentityP (go b0) where
@@ -531,6 +547,19 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
         | otherwise = do
             request n
             go (succ n)
+
+fromS :: (Enum b, Monad m, Interact p) => b -> ProduceT p m b
+fromS b = RespondT (enumFromS b ())
+
+fromC :: (Enum a', Monad m, Interact p) => a' -> CoProduceT p m a'
+fromC a' = RequestT (enumFromC a' ())
+
+rangeS :: (Enum b, Ord b, Monad m, Interact p) => b -> b -> ProduceT p m b
+rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
+
+rangeC
+ :: (Enum a', Ord a', Monad m, Interact p) => a' -> a' -> CoProduceT p m a'
+rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 
 {-| Fold values flowing \'@D@\'ownstream
 

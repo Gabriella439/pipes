@@ -8,6 +8,7 @@ module Control.Proxy.Core (
     module Control.Proxy.Prelude,
     module Control.Proxy.Trans,
     module Control.Proxy.Trans.Identity,
+    module Control.Monad.Trans.Interact,
     module Control.Monad,
     module Control.Monad.Trans.Class,
     module Control.MFunctor,
@@ -21,6 +22,7 @@ import Control.Proxy.Class
 import Control.Proxy.Synonym
 import Control.Proxy.Trans
 import Control.Proxy.Trans.Identity
+import Control.Monad.Trans.Interact
 import Control.Proxy.Prelude
 import Control.PFunctor
 
@@ -38,6 +40,9 @@ import Control.PFunctor
 
     "Control.Proxy.Trans.Identity" exports 'runIdentityP', which substantially
     eases writing completely polymorphic proxies.
+
+    "Control.Monad.Trans.Interact" defines a generalized @ListT@ monad
+    transformer that compiles to proxies.
 
     "Control.Monad" exports 'forever', ('>=>'), and ('<=<').
 

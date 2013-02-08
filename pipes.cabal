@@ -45,6 +45,7 @@ Library
         transformers >= 0.2.0.0 && < 0.4
     Exposed-Modules:
         Control.MFunctor,
+        Control.Monad.Trans.Interact,
         Control.PFunctor,
         Control.Pipe,
         Control.Proxy,
