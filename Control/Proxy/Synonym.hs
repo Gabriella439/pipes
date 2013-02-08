@@ -57,7 +57,7 @@ type Server (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b = p C () b' b
     'Client's never 'respond'. -}
 type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
 
-{-| A self-contained 'Session', ready to be run by 'runSession'
+{-| A self-contained 'Session', ready to be run by 'runProxy'
 
     'Session's never 'request' or 'respond'. -}
 type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
