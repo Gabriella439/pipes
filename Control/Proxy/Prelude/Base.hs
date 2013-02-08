@@ -516,11 +516,21 @@ fromListC :: (Monad m, Proxy p) => [a'] -> () -> CoProducer p a' m ()
 fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 -- fromListC xs _ = mapM_ request xs
 
--- | Convert a list into a 'ProduceT'
+{-| Non-deterministically choose from all values in the given list
+
+> mappend <$> eachS xs <*> eachS ys = eachS (mappend <$> xs <*> ys)
+>
+> eachS (pure mempty) = pure mempty
+-}
 eachS :: (Monad m, Interact p) => [b] -> ProduceT p m b
 eachS bs = RespondT (fromListS bs ())
 
--- | Convert a list into a 'CoProduceT'
+{-| Non-deterministically choose from all values in the given list
+
+> mappend <$> eachC xs <*> eachC ys = eachC (mappend <$> xs <*> ys)
+>
+> eachC (pure mempty) = pure mempty
+-}
 eachC :: (Monad m, Interact p) => [a'] -> CoProduceT p m a'
 eachC a's = RequestT (fromListC a's ())
 
@@ -559,15 +569,19 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
             request n
             go (succ n)
 
+-- | Non-deterministically choose from all values starting from the given value
 fromS :: (Enum b, Monad m, Interact p) => b -> ProduceT p m b
 fromS b = RespondT (enumFromS b ())
 
+-- | Non-deterministically choose from all values starting from the given value
 fromC :: (Enum a', Monad m, Interact p) => a' -> CoProduceT p m a'
 fromC a' = RequestT (enumFromC a' ())
 
+-- | Non-deterministically choose from all values in the given range
 rangeS :: (Enum b, Ord b, Monad m, Interact p) => b -> b -> ProduceT p m b
 rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
 
+-- | Non-deterministically choose from all values in the given range
 rangeC
  :: (Enum a', Ord a', Monad m, Interact p) => a' -> a' -> CoProduceT p m a'
 rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
