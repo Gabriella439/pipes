@@ -23,8 +23,9 @@
 
 {-# LANGUAGE Trustworthy #-}
 {- The rewrite RULES require the 'TrustWorthy' annotation.  Their proofs are
-   pretty trivial since they are just inlining the definition of _bind.  GHC
-   doesn't do this automatically because the @go@ helper function is recursive.
+   pretty trivial since they are just inlining the definition of their
+   respective operators.  GHC doesn't do this inlining automatically because the
+   @go@ helper function is recursive.
 -}
 
 module Control.Proxy.Core.Fast (
@@ -98,7 +99,7 @@ _bind
  -> ProxyFast a' a b' b m r'
 p0 `_bind` f = go p0 where
     go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a))
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
         Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       r   -> f r
@@ -118,7 +119,7 @@ instance MonadP ProxyFast where
     return_P = Pure
     (?>=)   = _bind
 
--- | Only satisfies laws modulo 'observe'
+-- | Only satisfies monad transformer laws modulo 'observe'
 instance MonadTrans (ProxyFast a' a b' b) where
     lift m = M (m >>= \r -> return (Pure r))
 
@@ -127,7 +128,6 @@ instance MonadTransP ProxyFast where
 
 instance (MonadIO m) => MonadIO (ProxyFast a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
- -- liftIO = M . liftIO . liftM Pure
 
 instance MonadIOP ProxyFast where
     liftIO_P = liftIO
@@ -149,19 +149,54 @@ instance Proxy ProxyFast where
     respond = \b  -> Respond b  Pure
 
 instance Interact ProxyFast where
-    fb' >\\ p0 = go p0 where
+    (>\\) = _req
+    (//>) = _resp
+
+_req
+ :: (Monad m)
+ => (b' -> ProxyFast a' a x' x m b)
+ -> ProxyFast b' b x' x m c
+ -> ProxyFast a' a x' x m c
+fb' `_req` p0 = go p0 where
         go p = case p of
             Request b' fb  -> fb' b' >>= \b -> go (fb b)
             Respond x  fx' -> Respond x (\x' -> go (fx' x'))
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure       a   -> Pure a
 
-    p0 //> fb = go p0 where
-        go p = case p of
-            Request x' fx  -> Request x' (\x -> go (fx x))
-            Respond b  fb' -> fb b >>= \b' -> go (fb' b')
-            M          m   -> M (m >>= \p' -> return (go p'))
-            Pure       a   -> Pure a
+{-# RULES
+    "_req fb' (Request b' fb )" forall fb' b' fb  .
+        _req fb' (Request b' fb ) = _bind (fb' b') (\b -> _req fb' (fb b));
+    "_req fb' (Respond x  fx')" forall fb' x  fx' .
+        _req fb' (Respond x  fx') = Respond x (\x' -> _req fb' (fx' x'));
+    "_req fb' (M          m  )" forall fb'    m   .
+        _req fb' (M          m  ) = M (m >>= \p' -> return (_req fb' p'));
+    "_req fb' (Pure    a     )" forall fb' a      .
+        _req fb' (Pure    a     ) = Pure a;
+  #-}
+
+_resp
+ :: (Monad m)
+ => ProxyFast x' x b' b m a'
+ -> (b -> ProxyFast x' x c' c m b')
+ -> ProxyFast x' x c' c m a'
+p0 `_resp` fb = go p0 where
+    go p = case p of
+        Request x' fx  -> Request x' (\x -> go (fx x))
+        Respond b  fb' -> fb b >>= \b' -> go (fb' b')
+        M          m   -> M (m >>= \p' -> return (go p'))
+        Pure       a   -> Pure a
+
+{-# RULES
+    "_resp (Request x' fx ) fb" forall x' fx  fb .
+        _resp (Request x' fx ) fb = Request x' (\x -> _resp (fx  x) fb);
+    "_resp (Respond b  fb') fb" forall b  fb' fb .
+        _resp (Respond b  fb') fb = _bind (fb b) (\b' -> _resp (fb' b') fb);
+    "_resp (M          m  ) fb" forall    m   fb .
+        _resp (M          m  ) fb = M (m >>= \p' -> return (_resp p' fb));
+    "_resp (Pure    a     ) fb" forall a      fb .
+        _resp (Pure    a     ) fb = Pure a;
+  #-}
 
 instance MFunctor (ProxyFast a' a b' b) where
     hoist nat p0 = go (observe p0) where
