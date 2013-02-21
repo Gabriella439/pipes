@@ -539,14 +539,14 @@ enumFromS :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
 enumFromS b0 = \_ -> runIdentityP (go b0) where
     go b = do
         respond b
-        go (succ b)
+        go $! succ b
 
 -- | 'CoProducer' version of 'enumFrom'
 enumFromC :: (Enum a', Monad m, Proxy p) => a' -> () -> CoProducer p a' m r
 enumFromC a'0 = \_ -> runIdentityP (go a'0) where
     go a' = do
         request a'
-        go (succ a')
+        go $! succ a'
 
 -- | 'Producer' version of 'enumFromTo'
 enumFromToS
@@ -556,7 +556,7 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
         | b > b2    = return ()
         | otherwise = do
             respond b
-            go (succ b)
+            go $! succ b
 
 -- | 'CoProducer' version of 'enumFromTo'
 enumFromToC
@@ -567,7 +567,7 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
         | n > a2 = return ()
         | otherwise = do
             request n
-            go (succ n)
+            go $! succ n
 
 -- | Non-deterministically choose from all values starting from the given value
 fromS :: (Enum b, Monad m, Interact p) => b -> ProduceT p m b
