@@ -3,18 +3,14 @@
     The 'RespondT' monad transformer is the 'ListT' monad transformer over the
     downstream output type.  Each 'respond' corresponds to an element of the
     list.  The monad bind operation non-deterministically selects one of the
-    previous 'respond's as input.
+    previous 'respond's as input.  The 'RespondT' Kleisli category corresponds
+    to the \"respond\" category of the 'Interact' class.
 
     Symmetrically, the 'RequestT' monad transformer is the 'ListT' monad
     transformer over the upstream output type.  Each 'request' corresponds to an
     element of the list.  The monad bind operation non-deterministically selects
-    one of the previous 'request's as input.
-
-    The 'RespondT' Kleisli category corresponds to the \"respond category\" of
-    the 'Interact' class.  Symmetrically, the 'RequestT' Kleisli category
-    corresponds to the \"request category\" of the 'Interact' class.  These two
-    monad transformers let you use @do@ notation to sweeten manipulations in
-    the two 'Interact' categories.
+    one of the previous 'request's as input.  The 'RequestT' Kleisli category
+    corresponds to the \"request\" category of the 'Interact' class.
 
     Unlike 'ListT' from @transformers@, these monad transformers are correct by
     construction and do not assume the base monad is commutative.
@@ -26,12 +22,12 @@ module Control.Monad.Trans.Interact (
     -- * Respond Monad Transformer
     RespondT(..),
     ProduceT,
-    runProduceS,
+    runProduceT,
 
     -- * Request Monad Transformer
     RequestT(..),
     CoProduceT,
-    runCoProduceC
+    runCoProduceT
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
@@ -70,8 +66,8 @@ instance (MonadIO m, Interact p) => MonadIO (RespondT p a' a b' m) where
 type ProduceT p = RespondT p C () ()
 
 -- | Convert a 'ProduceT' into a 'Producer' suitable for composition
-runProduceS :: ProduceT p m b -> () -> Producer p b m ()
-runProduceS p () = runRespondT p
+runProduceT :: ProduceT p m b -> () -> Producer p b m ()
+runProduceT p () = runRespondT p
 
 -- | A monad transformer over a proxy's upstream end
 newtype RequestT (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b' b m a' =
@@ -103,5 +99,5 @@ instance (MonadIO m, Interact p) => MonadIO (RequestT p a b' b m) where
 type CoProduceT p = RequestT p () () C
 
 -- | Convert a 'CoProduceT' into a 'CoProducer' suitable for composition
-runCoProduceC :: CoProduceT p m a' -> () -> CoProducer p a' m ()
-runCoProduceC p () = runRequestT p
+runCoProduceT :: CoProduceT p m a' -> () -> CoProducer p a' m ()
+runCoProduceT p () = runRequestT p
