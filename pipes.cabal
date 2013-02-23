@@ -56,6 +56,7 @@ Library
         Control.Proxy.Pipe,
         Control.Proxy.Synonym,
         Control.Proxy.Trans,
+        Control.Proxy.Trans.Codensity,
         Control.Proxy.Trans.Either,
         Control.Proxy.Trans.Identity,
         Control.Proxy.Trans.Maybe,
