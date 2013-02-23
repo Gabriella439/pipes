@@ -57,19 +57,19 @@ newtype CodensityP p a' a b' b (m :: * -> *) r = CodensityP {
 instance (Proxy p) => MonadP (CodensityP p) where
     return_P = \r -> CodensityP (\k -> k r)
     m ?>= f  = CodensityP  (\k ->
-        unCodensityP  m   (\a ->
-        unCodensityP (f a)  k ) )
+        unCodensityP  m    (\a ->
+        unCodensityP (f a)   k ) )
 
 instance (Proxy p, Monad m) => Functor (CodensityP p a' a b' b m) where
     fmap f p = CodensityP (\k ->
-        unCodensityP p   (\a ->
+        unCodensityP p    (\a ->
         k (f a)) )
 
 instance (Proxy p, Monad m) => Applicative (CodensityP p a' a b' b m) where
     pure = return
     fp <*> xp = CodensityP (\k ->
-        unCodensityP fp   (\f ->
-        unCodensityP xp   (\x ->
+        unCodensityP fp    (\f ->
+        unCodensityP xp    (\x ->
         k (f x) ) ) )
 
 instance (Proxy p, Monad m) => Monad (CodensityP p a' a b' b m) where
