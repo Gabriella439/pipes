@@ -53,8 +53,8 @@ import Prelude hiding ((.), id)
 -}
 data Pipe a b m r
   = Await (a -> Pipe a b m r)
-  | Yield b    (Pipe a b m r)
-  | M       (m (Pipe a b m r))
+  | Yield  b   (Pipe a b m r)
+  | M     (m   (Pipe a b m r))
   | Pure r
 {-
 Technically, the correct implementation that satisfies the monad transformer
