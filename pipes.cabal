@@ -69,3 +69,4 @@ Library
         Control.Proxy.Prelude.IO,
         Control.Proxy.Prelude.Kleisli
     Default-Language: Haskell98
+    GHC-Options: -O2

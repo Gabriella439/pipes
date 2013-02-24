@@ -131,6 +131,7 @@ mapD f = runIdentityK go where
         x2 <- respond (f a)
         go x2
 -- mapD f = runIdentityK $ foreverK $ request >=> respond . f
+{-# INLINABLE mapD #-}
 
 {-| @(mapU g)@ applies @g@ to all values going \'@U@\'pstream.
 
@@ -145,6 +146,7 @@ mapU g = runIdentityK go where
         b'2 <- respond x
         go b'2
 -- mapU g = foreverK $ (request . g) >=> respond
+{-# INLINABLE mapU #-}
 
 {-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
     values going upstream.
@@ -162,6 +164,7 @@ mapB f g = runIdentityK go where
         b'2 <- respond (f a )
         go b'2
 -- mapB f g = foreverK $ request . g >=> respond . f
+{-# INLINABLE mapB #-}
 
 {-| @(mapMD f)@ applies the monadic function @f@ to all values going downstream
 
@@ -177,6 +180,7 @@ mapMD f = runIdentityK go where
         x2 <- respond b
         go x2
 -- mapMD f = foreverK $ request >=> lift . f >=> respond
+{-# INLINABLE mapMD #-}
 
 {-| @(mapMU g)@ applies the monadic function @g@ to all values going upstream
 
@@ -192,6 +196,7 @@ mapMU g = runIdentityK go where
         b'2 <- respond x
         go b'2
 -- mapMU g = foreverK $ lift . g >=> request >=> respond
+{-# INLINABLE mapMU #-}
 
 {-| @(mapMB f g)@ applies the monadic function @f@ to all values going
     downstream and the monadic function @g@ to all values going upstream.
@@ -210,6 +215,7 @@ mapMB f g = runIdentityK go where
         b'2 <- respond b
         go b'2
 -- mapMB f g = foreverK $ lift . g >=> request >=> lift . f >=> respond
+{-# INLINABLE mapMB #-}
 
 {-| @(useD f)@ executes the monadic function @f@ on all values flowing
     \'@D@\'ownstream
@@ -225,6 +231,7 @@ useD f = runIdentityK go where
         lift $ f a
         x2 <- respond a
         go x2
+{-# INLINABLE useD #-}
 
 {-| @(useU g)@ executes the monadic function @g@ on all values flowing
     \'@U@\'pstream
@@ -240,6 +247,7 @@ useU g = runIdentityK go where
         x   <- request a'
         a'2 <- respond x
         go a'2
+{-# INLINABLE useU #-}
 
 {-| @(useB f g)@ executes the monadic function @f@ on all values flowing
     downstream and the monadic function @g@ on all values flowing upstream
@@ -257,6 +265,7 @@ useB f g = runIdentityK go where
         lift $ f a
         a'2 <- respond a
         go a'2
+{-# INLINABLE useB #-}
 
 {-| @(execD md)@ executes @md@ every time values flow downstream through it.
 
@@ -367,6 +376,7 @@ takeWhileD p = runIdentityK go where
                 a'2 <- respond a
                 go a'2
             else return ()
+{-# INLINABLE takeWhileD #-}
 
 {-| @(takeWhileU p)@ allows values to pass upstream so long as they satisfy the
     predicate @p@.
@@ -384,6 +394,7 @@ takeWhileU p = runIdentityK go where
                 a'2 <- respond a
                 go a'2
             else return_P ()
+{-# INLINABLE takeWhileU #-}
 
 {-| @(dropD n)@ discards @n@ values going downstream
 
@@ -477,6 +488,7 @@ filterD p = \() -> runIdentityP go where
                 respond a
                 go
             else go
+{-# INLINABLE filterD #-}
 
 {-| @(filterU p)@ discards values going upstream if they fail the predicate @p@
 
@@ -495,6 +507,7 @@ filterU p = runIdentityK go where
         else do
             a'2 <- respond ()
             go a'2
+{-# INLINABLE filterU #-}
 
 {-| Convert a list into a 'Producer'
 
@@ -505,6 +518,7 @@ filterU p = runIdentityK go where
 fromListS :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
 fromListS xs = \_ -> foldr (\e a -> respond e ?>= \_ -> a) (return_P ()) xs
 -- fromListS xs _ = mapM_ respond xs
+{-# INLINABLE fromListS #-}
 
 {-| Convert a list into a 'CoProducer'
 
@@ -515,6 +529,7 @@ fromListS xs = \_ -> foldr (\e a -> respond e ?>= \_ -> a) (return_P ()) xs
 fromListC :: (Monad m, Proxy p) => [a'] -> () -> CoProducer p a' m ()
 fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 -- fromListC xs _ = mapM_ request xs
+{-# INLINABLE fromListC #-}
 
 {-| Non-deterministically choose from all values in the given list
 
@@ -524,6 +539,7 @@ fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 -}
 eachS :: (Monad m, Interact p) => [b] -> ProduceT p m b
 eachS bs = RespondT (fromListS bs ())
+{-# INLINABLE eachS #-}
 
 {-| Non-deterministically choose from all values in the given list
 
@@ -533,6 +549,7 @@ eachS bs = RespondT (fromListS bs ())
 -}
 eachC :: (Monad m, Interact p) => [a'] -> CoProduceT p m a'
 eachC a's = RequestT (fromListC a's ())
+{-# INLINABLE eachC #-}
 
 -- | 'Producer' version of 'enumFrom'
 enumFromS :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
@@ -540,6 +557,7 @@ enumFromS b0 = \_ -> runIdentityP (go b0) where
     go b = do
         respond b
         go $! succ b
+{-# INLINABLE enumFromS #-}
 
 -- | 'CoProducer' version of 'enumFrom'
 enumFromC :: (Enum a', Monad m, Proxy p) => a' -> () -> CoProducer p a' m r
@@ -547,6 +565,7 @@ enumFromC a'0 = \_ -> runIdentityP (go a'0) where
     go a' = do
         request a'
         go $! succ a'
+{-# INLINABLE enumFromC #-}
 
 -- | 'Producer' version of 'enumFromTo'
 enumFromToS
@@ -557,6 +576,7 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
         | otherwise = do
             respond b
             go $! succ b
+{-# INLINABLE enumFromToS #-}
 
 -- | 'CoProducer' version of 'enumFromTo'
 enumFromToC
@@ -568,23 +588,28 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
         | otherwise = do
             request n
             go $! succ n
+{-# INLINABLE enumFromToC #-}
 
 -- | Non-deterministically choose from all values starting from the given value
 fromS :: (Enum b, Monad m, Interact p) => b -> ProduceT p m b
 fromS b = RespondT (enumFromS b ())
+{-# INLINABLE fromS #-}
 
 -- | Non-deterministically choose from all values starting from the given value
 fromC :: (Enum a', Monad m, Interact p) => a' -> CoProduceT p m a'
 fromC a' = RequestT (enumFromC a' ())
+{-# INLINABLE fromC #-}
 
 -- | Non-deterministically choose from all values in the given range
 rangeS :: (Enum b, Ord b, Monad m, Interact p) => b -> b -> ProduceT p m b
 rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
+{-# INLINABLE rangeS #-}
 
 -- | Non-deterministically choose from all values in the given range
 rangeC
  :: (Enum a', Ord a', Monad m, Interact p) => a' -> a' -> CoProduceT p m a'
 rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
+{-# INLINABLE rangeC #-}
 
 {-| Fold values flowing \'@D@\'ownstream
 
@@ -617,17 +642,20 @@ foldU f = runIdentityK go where
         x <- request a'
         a'2 <- respond x
         go a'2
+{-# INLINABLE foldU #-}
 
 {-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
     predicate -}
 allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) r
 allD pred = foldD (All . pred)
+{-# INLINABLE allD #-}
 
 {-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
     predicate -}
 allU
  :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) r
 allU pred = foldU (All . pred)
+{-# INLINABLE allU #-}
 
 {-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
     predicate
@@ -642,6 +670,7 @@ allD_ pred = runIdentityK go where
                 x2 <- respond a
                 go x2
             else lift $ tell $ All False
+{-# INLINABLE allD_ #-}
 
 {-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
     predicate
@@ -657,17 +686,20 @@ allU_ pred = runIdentityK go where
                 a'2 <- respond x
                 go a'2
             else lift $ tell $ All False
+{-# INLINABLE allU_ #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies
     the predicate -}
 anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
 anyD pred = foldD (Any . pred)
+{-# INLINABLE anyD #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@U@\'pstream satisfies
     the predicate -}
 anyU
  :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) r
 anyU pred = foldU (Any . pred)
+{-# INLINABLE anyU #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies the
     predicate
@@ -682,6 +714,7 @@ anyD_ pred = runIdentityK go where
             else do
                 x2 <- respond a
                 go x2
+{-# INLINABLE anyD_ #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@U@\'pstream satisfies the
     predicate
@@ -697,6 +730,7 @@ anyU_ pred = runIdentityK go where
                 x   <- request a'
                 a'2 <- respond x
                 go a'2
+{-# INLINABLE anyU_ #-}
 
 -- | Compute the 'Sum' of all values that flow \'@D@\'ownstream
 sumD :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Sum a) m) r
@@ -742,6 +776,7 @@ headD_ :: (Monad m, Proxy p) => x -> p x a x a (WriterT (First a) m) ()
 headD_ x = runIdentityP $ do
     a <- request x
     lift $ tell $ First (Just a)
+{-# INLINABLE headD_ #-}
 
 -- | Retrieve the first value going \'@U@\'pstream
 headU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (First a') m) r
@@ -753,6 +788,7 @@ headU = foldU (First . Just)
     'headU_' terminates on the first value it receives -}
 headU_ :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (First a') m) ()
 headU_ a' = runIdentityP $ lift $ tell $ First (Just a')
+{-# INLINABLE headU_ #-}
 
 -- | Retrieve the last value going \'@D@\'ownstream
 lastD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Last a) m) r
@@ -825,6 +861,7 @@ zipD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
             b <- request ()
             lift $ respond (a, b)
         go
+{-# INLINABLE zipD #-}
 
 -- | Interleave values flowing downstream using simple alternation
 mergeD
@@ -838,6 +875,7 @@ mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
             a2 <- request ()
             lift $ respond a2
         go
+{-# INLINABLE mergeD #-}
 
 {- $open
     Use the @unit@ functions when you need to embed a proxy with a closed end
@@ -864,6 +902,7 @@ unitD _ = runIdentityP go where
     go = do
         respond ()
         go
+{-# INLINABLE unitD #-}
 
 -- | Compose 'unitU' with a closed downstream end to create a polymorphic end
 unitU :: (Monad m, Proxy p) => y' -> p () x y' y m r
@@ -871,6 +910,7 @@ unitU _ = runIdentityP go where
     go = do
         request ()
         go
+{-# INLINABLE unitU #-}
 
 {- $modules
     These modules help you build, run, and extract folds
