@@ -30,16 +30,16 @@ module Control.Proxy.Prelude.Base (
     -- * Lists
     fromListS,
     fromListC,
-    eachS,
-    eachC,
 
     -- * Enumerations
     enumFromS,
     enumFromC,
     enumFromToS,
     enumFromToC,
-    fromS,
-    fromC,
+
+    -- * ListT
+    eachS,
+    eachC,
     rangeS,
     rangeC,
 
@@ -531,26 +531,6 @@ fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 -- fromListC xs _ = mapM_ request xs
 {-# INLINABLE fromListC #-}
 
-{-| Non-deterministically choose from all values in the given list
-
-> mappend <$> eachS xs <*> eachS ys = eachS (mappend <$> xs <*> ys)
->
-> eachS (pure mempty) = pure mempty
--}
-eachS :: (Monad m, Interact p) => [b] -> ProduceT p m b
-eachS bs = RespondT (fromListS bs ())
-{-# INLINABLE eachS #-}
-
-{-| Non-deterministically choose from all values in the given list
-
-> mappend <$> eachC xs <*> eachC ys = eachC (mappend <$> xs <*> ys)
->
-> eachC (pure mempty) = pure mempty
--}
-eachC :: (Monad m, Interact p) => [a'] -> CoProduceT p m a'
-eachC a's = RequestT (fromListC a's ())
-{-# INLINABLE eachC #-}
-
 -- | 'Producer' version of 'enumFrom'
 enumFromS :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
 enumFromS b0 = \_ -> runIdentityP (go b0) where
@@ -590,15 +570,25 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
             go $! succ n
 {-# INLINABLE enumFromToC #-}
 
--- | Non-deterministically choose from all values starting from the given value
-fromS :: (Enum b, Monad m, Interact p) => b -> ProduceT p m b
-fromS b = RespondT (enumFromS b ())
-{-# INLINABLE fromS #-}
+{-| Non-deterministically choose from all values in the given list
 
--- | Non-deterministically choose from all values starting from the given value
-fromC :: (Enum a', Monad m, Interact p) => a' -> CoProduceT p m a'
-fromC a' = RequestT (enumFromC a' ())
-{-# INLINABLE fromC #-}
+> mappend <$> eachS xs <*> eachS ys = eachS (mappend <$> xs <*> ys)
+>
+> eachS (pure mempty) = pure mempty
+-}
+eachS :: (Monad m, Interact p) => [b] -> ProduceT p m b
+eachS bs = RespondT (fromListS bs ())
+{-# INLINABLE eachS #-}
+
+{-| Non-deterministically choose from all values in the given list
+
+> mappend <$> eachC xs <*> eachC ys = eachC (mappend <$> xs <*> ys)
+>
+> eachC (pure mempty) = pure mempty
+-}
+eachC :: (Monad m, Interact p) => [a'] -> CoProduceT p m a'
+eachC a's = RequestT (fromListC a's ())
+{-# INLINABLE eachC #-}
 
 -- | Non-deterministically choose from all values in the given range
 rangeS :: (Enum b, Ord b, Monad m, Interact p) => b -> b -> ProduceT p m b
