@@ -4,6 +4,9 @@
 {-# LANGUAGE KindSignatures #-}
 
 module Control.Proxy.Synonym (
+    -- * Closed
+    C,
+
     -- * Synonyms
     Pipe,
     Producer,
@@ -13,11 +16,11 @@ module Control.Proxy.Synonym (
     CoConsumer,
     Client,
     Server,
-    Session,
-
-    -- * Closed
-    C
+    Session
     ) where
+
+-- | The empty type, denoting a \'@C@\'losed end
+data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
 
 -- | A unidirectional 'Proxy'.
 type Pipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b = p () a () b
@@ -61,6 +64,3 @@ type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
 
     'Session's never 'request' or 'respond'. -}
 type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
-
--- | The empty type, denoting a \'@C@\'losed end
-data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls

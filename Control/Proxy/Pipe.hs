@@ -113,7 +113,7 @@ type Pipeline (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
     The change ensures that all your code now works in the 'ProxyFast' monad,
     which is the faster of the two proxy implementations.
 
-    Second, modify all your 'Pipe's to take an empty '()' as their final
+    Second, modify all your 'Pipe's to take an empty @()@ as their final
     argument, and translate the following functions:
 
     * ('<+<') to ('<-<')
