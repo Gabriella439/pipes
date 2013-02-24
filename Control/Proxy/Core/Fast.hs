@@ -47,6 +47,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
 import Control.Proxy.Class
+import Control.Proxy.ListT
 import Control.Proxy.Synonym (C)
 
 {-| A 'ProxyFast' communicates with an upstream interface and a downstream
@@ -156,7 +157,7 @@ instance Proxy ProxyFast where
     request = \a' -> Request a' Pure
     respond = \b  -> Respond b  Pure
 
-instance Interact ProxyFast where
+instance ListT ProxyFast where
     (>\\) = _req
     (//>) = _resp
 

@@ -46,6 +46,7 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
 import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
+import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Codensity' proxy transformer
@@ -115,7 +116,7 @@ instance (Proxy p) => Proxy (CodensityP p) where
     request = \a' -> CodensityP (\k -> request a' ?>= k)
     respond = \b  -> CodensityP (\k -> respond b  ?>= k)
 
-instance (Interact p) => Interact (CodensityP p) where
+instance (ListT p) => ListT (CodensityP p) where
     fb' >\\ p = CodensityP (\k ->
         ((\b' -> unCodensityP (fb' b') return_P) >\\ unCodensityP p return_P)
             ?>= k )

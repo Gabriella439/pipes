@@ -105,6 +105,7 @@ import Control.Monad.Trans.State.Strict (
     execState,
     evalState )
 import Control.Proxy.Class
+import Control.Proxy.ListT (ListT, RespondT(RespondT), RequestT(RequestT))
 import Control.Proxy.Prelude.Kleisli (replicateK, foreverK)
 import Control.Proxy.Synonym
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
@@ -576,7 +577,7 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
 >
 > eachS (pure mempty) = pure mempty
 -}
-eachS :: (Monad m, Interact p) => [b] -> ProduceT p m b
+eachS :: (Monad m, ListT p) => [b] -> ProduceT p m b
 eachS bs = RespondT (fromListS bs ())
 {-# INLINABLE eachS #-}
 
@@ -586,18 +587,18 @@ eachS bs = RespondT (fromListS bs ())
 >
 > eachC (pure mempty) = pure mempty
 -}
-eachC :: (Monad m, Interact p) => [a'] -> CoProduceT p m a'
+eachC :: (Monad m, ListT p) => [a'] -> CoProduceT p m a'
 eachC a's = RequestT (fromListC a's ())
 {-# INLINABLE eachC #-}
 
 -- | Non-deterministically choose from all values in the given range
-rangeS :: (Enum b, Ord b, Monad m, Interact p) => b -> b -> ProduceT p m b
+rangeS :: (Enum b, Ord b, Monad m, ListT p) => b -> b -> ProduceT p m b
 rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
 {-# INLINABLE rangeS #-}
 
 -- | Non-deterministically choose from all values in the given range
 rangeC
- :: (Enum a', Ord a', Monad m, Interact p) => a' -> a' -> CoProduceT p m a'
+ :: (Enum a', Ord a', Monad m, ListT p) => a' -> a' -> CoProduceT p m a'
 rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 {-# INLINABLE rangeC #-}
 

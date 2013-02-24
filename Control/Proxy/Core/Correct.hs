@@ -23,6 +23,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
 import Control.Proxy.Class
+import Control.Proxy.ListT
 import Control.Proxy.Synonym (C)
 
 {-| A 'ProxyCorrect' communicates with an upstream interface and a downstream
@@ -124,7 +125,7 @@ instance Proxy ProxyCorrect where
     respond = \b  -> Proxy (return (Respond b  (\b' ->
         Proxy (return (Pure b')))))
 
-instance Interact ProxyCorrect where
+instance ListT ProxyCorrect where
     fb' >\\ p0 = go p0 where
         go p = Proxy (do
             x <- unProxy p

@@ -22,6 +22,7 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
 import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
+import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Reader' proxy transformer
@@ -79,7 +80,7 @@ instance (Proxy p) => Proxy (ReaderP i p) where
     request = \a -> ReaderP (\_ -> request a)
     respond = \a -> ReaderP (\_ -> respond a)
 
-instance (Interact p) => Interact (ReaderP i p) where
+instance (ListT p) => ListT (ReaderP i p) where
     fb' >\\ p = ReaderP (\i -> (\b' -> unReaderP (fb' b') i) >\\ unReaderP p i)
     p //> fb  = ReaderP (\i -> unReaderP p i //> (\b -> unReaderP (fb b) i))
 

@@ -1,6 +1,6 @@
 {-| The 'Proxy' class defines the library's core API.  Everything else in this
-    library builds exclusively on top of the 'Proxy' type class so that all
-    proxy implementations and extensions can share the same standard library. -}
+    library builds on top of the 'Proxy' type class so that all proxy
+    implementations and extensions can share the same standard library. -}
 
 {-# LANGUAGE Rank2Types #-}
 
@@ -17,17 +17,6 @@ module Control.Proxy.Class (
     (<~<),
     (<<-),
     (~<<),
-
-    -- * request/respond substitution
-    Interact(..),
-    (\>\),
-    (/>/),
-
-    -- ** Flipped operators
-    (/</),
-    (\<\),
-    (//<),
-    (<\\),
 
     -- * Laws
     -- $laws
@@ -57,10 +46,6 @@ infixr 7 <-<, ->>
 infixl 7 >->, <<-
 infixr 7 >~>, ~<<
 infixl 7 <~<, >>~
-infixr 8 /</, >\\
-infixl 8 \>\, //<
-infixl 8 \<\, //>
-infixr 8 />/, <\\
 infixl 1 ?>=  -- This should match the fixity of >>=
 
 -- | The core API for the @pipes@ library
@@ -190,80 +175,6 @@ coidT = go where
 -- coidT = foreverK $ respond >=> request
 {-# INLINABLE coidT #-}
 
--- | The two \"ListT\" categories (see "Control.Proxy.ListT")
-class (Proxy p) => Interact p where
-    {-| @f >\\\\ p@ replaces all 'request's in @p@ with @f@.
-
-        Point-ful version of ('\>\')
-    -}
-    (>\\) :: (Monad m)
-          => (b' -> p a' a x' x m b)
-          ->        p b' b x' x m c
-          ->        p a' a x' x m c
-
-    {-| @p \/\/> f@ replaces all 'respond's in @p@ with @f@.
-
-        Point-ful version of ('/>/')
-    -}
-    (//>) :: (Monad m)
-          =>       p x' x b' b m a'
-          -> (b -> p x' x c' c m b')
-          ->       p x' x c' c m a'
-
-{-| @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
-
-    Point-free version of ('>\\')
--}
-(\>\) :: (Monad m, Interact p)
-      => (b' -> p a' a x' x m b)
-      -> (c' -> p b' b x' x m c)
-      -> (c' -> p a' a x' x m c)
-f \>\ g = \c' -> f >\\ g c'
-{-# INLINABLE (\>\) #-}
-
--- | Equivalent to ('\>\') with the arguments flipped
-(/</) :: (Monad m, Interact p)
-      => (c' -> p b' b x' x m c)
-      -> (b' -> p a' a x' x m b)
-      -> (c' -> p a' a x' x m c)
-p1 /</ p2 = p2 \>\ p1
-{-# INLINABLE (/</) #-}
-
-{-| @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
-
-    Point-free version of ('//>')
--}
-(/>/) :: (Monad m, Interact p)
-      => (a -> p x' x b' b m a')
-      -> (b -> p x' x c' c m b')
-      -> (a -> p x' x c' c m a')
-f />/ g = \a -> f a //> g
-{-# INLINABLE (/>/) #-}
-
--- | Equivalent to ('/>/') with the arguments flipped
-(\<\) :: (Monad m, Interact p)
-      => (b -> p x' x c' c m b')
-      -> (a -> p x' x b' b m a')
-      -> (a -> p x' x c' c m a')
-p1 \<\ p2 = p2 />/ p1
-{-# INLINABLE (\<\) #-}
-
--- | Equivalent to ('>\\') with the arguments flipped
-(//<) :: (Monad m, Interact p)
-      =>        p b' b x' x m c
-      -> (b' -> p a' a x' x m b)
-      ->        p a' a x' x m c
-p //< f = f >\\ p
-{-# INLINABLE (//<) #-}
-
--- | Equivalent to ('//>') with the arguments flipped
-(<\\) :: (Monad m, Interact p)
-      => (b -> p x' x c' c m b')
-      ->       p x' x b' b m a'
-      ->       p x' x c' c m a'
-f <\\ p = p //> f
-{-# INLINABLE (<\\) #-}
-
 {- $laws
     The 'Proxy' class defines an interface to all core proxy capabilities that
     all proxy-like types must implement.
@@ -340,39 +251,6 @@ f <\\ p = p //> f
 >
 > (liftK f >=> respond >=> p1) >~> (liftK g >=> respond >=> p2)
 >     = liftK (f >=> g) >=> (p1 >-> p2)
-
-    The 'Interact' class defines the ability to:
-    
-    * Replace existing 'request' commands using ('\>\')
-
-    * Replace existing 'respond' commands using ('/>/')
-    
-    Laws:
-
-    * ('\>\') and 'request' form a ListT Kleisli category (see
-      "Control.Proxy.ListT"):
-
-> return = request
->
-> (>>=) = (//<)
-
-    * ('/>/') and 'respond' form a ListT Kleisli category (see
-      "Control.Proxy.ListT"):
-
-> return = respond
->
-> (>=>) = (//>)
-
-    Additionally, ('\>\') and ('/>/') both define functors between Proxy Kleisli
-    categories:
-
-> a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
->
-> a \>\ return = return
-
-> (b >=> c) />/ a = (b />/ a) >=> (c />/ a)
->
-> return />/ a = return
 -}
 
 {- $poly

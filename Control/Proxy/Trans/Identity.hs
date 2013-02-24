@@ -16,6 +16,7 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.MFunctor (MFunctor(hoist))
 import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
+import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Identity' proxy transformer
@@ -74,7 +75,7 @@ instance (Proxy p) => Proxy (IdentityP p) where
     request = \a' -> IdentityP (request a')
     respond = \b  -> IdentityP (respond b )
 
-instance (Interact p) => Interact (IdentityP p) where
+instance (ListT p) => ListT (IdentityP p) where
     fb' >\\ p = IdentityP ((\b' -> runIdentityP (fb' b')) >\\ runIdentityP p)
     p //> fb  = IdentityP (runIdentityP p //> (\b -> runIdentityP (fb b)))
 
