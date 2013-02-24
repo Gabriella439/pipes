@@ -190,15 +190,21 @@ coidT = go where
 -- coidT = foreverK $ respond >=> request
 {-# INLINABLE coidT #-}
 
--- | The two \"ListT\" categories (see "Control.Monad.Trans.Interact")
+-- | The two \"ListT\" categories (see "Control.Proxy.ListT")
 class (Proxy p) => Interact p where
-    -- | @f >\\\\ p@ replaces all 'request's in @p@ with @f@.
+    {-| @f >\\\\ p@ replaces all 'request's in @p@ with @f@.
+
+        Point-ful version of ('\>\')
+    -}
     (>\\) :: (Monad m)
           => (b' -> p a' a x' x m b)
           ->        p b' b x' x m c
           ->        p a' a x' x m c
 
-    -- | @p \/\/> f@ replaces all 'respond's in @p@ with @f@.
+    {-| @p \/\/> f@ replaces all 'respond's in @p@ with @f@.
+
+        Point-ful version of ('/>/')
+    -}
     (//>) :: (Monad m)
           =>       p x' x b' b m a'
           -> (b -> p x' x c' c m b')
@@ -278,16 +284,14 @@ f <\\ p = p //> f
     begins from the downstream end, whereas ('>~>') accepts proxies blocked on
     'request' and begins from the upstream end.
 
-    Second, all proxies are monads, defined by their 'MonadP' instance, which
-    must satify the monad laws using @(>>=) = (?>=)@ and @return = return_P@.
+    Second, all proxies are monads and must satify the monad laws using
+    @(>>=) = (?>=)@ and @return = return_P@.
 
-    Third, all proxies are monad transformers, defined by their 'MonadTransP'
-    instance, which must satisfy the monad transformer laws, using
-    @lift = lift_P@.
+    Third, all proxies are monad transformers and must satisfy the monad
+    transformer laws, using @lift = lift_P@.
 
-    Fourth, all proxies are functors in the category of monads, defined by
-    their 'MFunctorP' instance, which must satisfy the functor laws, using
-    @hoist = hoist_P@.
+    Fourth, all proxies are functors in the category of monads and must satisfy
+    the functor laws, using @hoist = hoist_P@.
 
     Fifth, all proxies form two streaming categories:
 
@@ -345,39 +349,21 @@ f <\\ p = p //> f
     
     Laws:
 
-    * ('\>\') and 'request' form a Kleisli category:
+    * ('\>\') and 'request' form a ListT Kleisli category (see
+      "Control.Proxy.ListT"):
 
 > return = request
 >
 > (>>=) = (//<)
->
-> fmap f p = p //< (request . f)
->
-> join p = p //< id
->
-> request \>\ f = f
->
-> f \>\ request = f
->
-> (f \>\ g) \>\ h = f \>\ (g \>\ h)
 
-    * ('/>/') and 'respond' form a Kleisli category:
+    * ('/>/') and 'respond' form a ListT Kleisli category (see
+      "Control.Proxy.ListT"):
 
 > return = respond
 >
-> (>>=) = (//>)
->
-> fmap f p = p //> (respond . f)
->
-> join p = p //< id
->
-> respond />/ f = f
->
-> f />/ respond = f
->
-> (f />/ g) />/ h = f />/ (g />/ h)
+> (>=>) = (//>)
 
-    Additionally, ('\>\') and ('/>/') both define functors between Kleisli
+    Additionally, ('\>\') and ('/>/') both define functors between Proxy Kleisli
     categories:
 
 > a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
@@ -399,7 +385,7 @@ f <\\ p = p //> f
 
 > instance (forall a' a b' b . MonadTrans (p a' a b' b)) => ...
 
-      ... the instance can instead use the following Haskell98 constraint:
+    ... the instance can instead use the following Haskell98 constraint:
 
 > instance (Proxy p) => ...
 

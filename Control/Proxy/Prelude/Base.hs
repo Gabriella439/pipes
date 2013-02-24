@@ -91,7 +91,7 @@ module Control.Proxy.Prelude.Base (
 
 import Control.MFunctor (hoist)
 import Control.Monad ((>=>))
-import Control.Monad.Trans.Interact (
+import Control.Proxy.ListT (
     RequestT(RequestT), RespondT(RespondT), ProduceT, CoProduceT )
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Writer.Lazy as W (

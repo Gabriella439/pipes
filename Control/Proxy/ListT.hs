@@ -18,7 +18,7 @@
 
 {-# LANGUAGE KindSignatures #-}
 
-module Control.Monad.Trans.Interact (
+module Control.Proxy.ListT (
     -- * Respond Monad Transformer
     RespondT(..),
     ProduceT,
