@@ -35,13 +35,6 @@ import Data.Monoid (Monoid(mempty, mappend))
 newtype WriterP w p a' a b' b (m :: * -> *) r
   = WriterP { unWriterP :: w -> p a' a b' b m (r, w) }
 
-instance (Proxy p) => MonadP (WriterP w p) where
-    return_P = \r -> WriterP (\w -> return_P (r, w))
-    m ?>= f  = WriterP (\w ->
-        unWriterP m w ?>= \(a, w') ->
-        unWriterP (f a) w' )
-
-
 instance (Proxy p, Monad m) => Functor (WriterP w p a' a b' b m) where
     fmap f p = WriterP (\w0 ->
         unWriterP p w0 ?>= \(x, w1) ->
@@ -58,41 +51,44 @@ instance (Proxy p, Monad m) => Monad (WriterP w p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
+instance (Proxy p) => MonadTrans (WriterP w p a' a b' b) where
+    lift = lift_P
+
+instance (Proxy p) => MFunctor (WriterP w p a' a b' b) where
+    hoist = hoist_P
+
+instance (Proxy p, MonadIO m) => MonadIO (WriterP w p a' a b' b m) where
+    liftIO = liftIO_P
+
 instance (MonadPlusP p, Monad m) => Alternative (WriterP w p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
-
-instance (MonadPlusP p) => MonadPlusP (WriterP w p) where
-    mzero_P       = WriterP (\_ -> mzero_P)
-    mplus_P m1 m2 = WriterP (\w -> mplus_P (unWriterP m1 w) (unWriterP m2 w))
 
 instance (MonadPlusP p, Monad m) => MonadPlus (WriterP w p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 
-instance (Proxy p) => MonadTransP (WriterP w p) where
+instance (Proxy p) => ProxyInternal (WriterP w p) where
+    return_P = \r -> WriterP (\w -> return_P (r, w))
+    m ?>= f  = WriterP (\w ->
+        unWriterP m w ?>= \(a, w') ->
+        unWriterP (f a) w' )
+
     lift_P m = WriterP (\w -> lift_P (m >>= \r -> return (r, w)))
 
-instance (Proxy p) => MonadTrans (WriterP w p a' a b' b) where
-    lift = lift_P
-
-instance (MonadIOP p) => MonadIOP (WriterP w p) where
-    liftIO_P m = WriterP (\w -> liftIO_P (m >>= \r -> return (r, w)))
-
-instance (MonadIOP p, MonadIO m) => MonadIO (WriterP w p a' a b' b m) where
-    liftIO = liftIO_P
-
-instance (Proxy p) => MFunctorP (WriterP w p) where
     hoist_P nat p = WriterP (\w -> hoist_P nat (unWriterP p w))
 
-instance (Proxy p) => MFunctor (WriterP w p a' a b' b) where
-    hoist = hoist_P
+    liftIO_P m = WriterP (\w -> liftIO_P (m >>= \r -> return (r, w)))
 
 instance (Proxy p) => Proxy (WriterP w p) where
     fb' ->> p = WriterP (\w -> (\b' -> unWriterP (fb' b') w) ->> unWriterP p w)
     p >>~ fb  = WriterP (\w -> unWriterP p w >>~ (\b -> unWriterP (fb b) w))
     request = \a' -> WriterP (\w -> request a' ?>= \a  -> return_P (a,  w))
     respond = \b  -> WriterP (\w -> respond b  ?>= \b' -> return_P (b', w))
+
+instance (MonadPlusP p) => MonadPlusP (WriterP w p) where
+    mzero_P       = WriterP (\_ -> mzero_P)
+    mplus_P m1 m2 = WriterP (\w -> mplus_P (unWriterP m1 w) (unWriterP m2 w))
 
 instance ProxyTrans (WriterP w) where
     liftP m = WriterP (\w -> m ?>= \r -> return_P (r, w))

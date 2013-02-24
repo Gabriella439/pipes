@@ -28,12 +28,6 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype ReaderP i p a' a b' b (m :: * -> *) r
   = ReaderP { unReaderP :: i -> p a' a b' b m r }
 
-instance (Proxy p) => MonadP (ReaderP i p) where
-    return_P = \r -> ReaderP (\_ -> return_P r)
-    m ?>= f  = ReaderP (\i ->
-        unReaderP m i ?>= \a -> 
-        unReaderP (f a) i )
-
 instance (Proxy p, Monad m) => Functor (ReaderP i p a' a b' b m) where
     fmap f p = ReaderP (\i ->
         unReaderP p i ?>= \x ->
@@ -50,35 +44,34 @@ instance (Proxy p, Monad m) => Monad (ReaderP i p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
+instance (Proxy p) => MonadTrans (ReaderP i p a' a b' b) where
+    lift = lift_P
+
+instance (Proxy p) => MFunctor (ReaderP i p a' a b' b) where
+    hoist = hoist_P
+
+instance (Proxy p, MonadIO m) => MonadIO (ReaderP i p a' a b' b m) where
+    liftIO = liftIO_P
+
 instance (MonadPlusP p, Monad m) => Alternative (ReaderP i p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
-
-instance (MonadPlusP p) => MonadPlusP (ReaderP i p) where
-    mzero_P       = ReaderP (\_ -> mzero_P)
-    mplus_P m1 m2 = ReaderP (\i -> mplus_P (unReaderP m1 i) (unReaderP m2 i))
 
 instance (MonadPlusP p, Monad m) => MonadPlus (ReaderP i p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 
-instance (Proxy p) => MonadTransP (ReaderP i p) where
+instance (Proxy p) => ProxyInternal (ReaderP i p) where
+    return_P = \r -> ReaderP (\_ -> return_P r)
+    m ?>= f  = ReaderP (\i ->
+        unReaderP m i ?>= \a -> 
+        unReaderP (f a) i )
+
     lift_P m = ReaderP (\_ -> lift_P m)
 
-instance (Proxy p) => MonadTrans (ReaderP i p a' a b' b) where
-    lift = lift_P
-
-instance (MonadIOP p) => MonadIOP (ReaderP i p) where
-    liftIO_P m = ReaderP (\_ -> liftIO_P m)
-
-instance (MonadIOP p, MonadIO m) => MonadIO (ReaderP i p a' a b' b m) where
-    liftIO = liftIO_P
-
-instance (Proxy p) => MFunctorP (ReaderP i p) where
     hoist_P nat p = ReaderP (\i -> hoist_P nat (unReaderP p i))
 
-instance (Proxy p) => MFunctor (ReaderP i p a' a b' b) where
-    hoist = hoist_P
+    liftIO_P m = ReaderP (\_ -> liftIO_P m)
 
 instance (Proxy p) => Proxy (ReaderP i p) where
     fb' ->> p = ReaderP (\i -> (\b' -> unReaderP (fb' b') i) ->> unReaderP p i)
@@ -89,6 +82,10 @@ instance (Proxy p) => Proxy (ReaderP i p) where
 instance (Interact p) => Interact (ReaderP i p) where
     fb' >\\ p = ReaderP (\i -> (\b' -> unReaderP (fb' b') i) >\\ unReaderP p i)
     p //> fb  = ReaderP (\i -> unReaderP p i //> (\b -> unReaderP (fb b) i))
+
+instance (MonadPlusP p) => MonadPlusP (ReaderP i p) where
+    mzero_P       = ReaderP (\_ -> mzero_P)
+    mplus_P m1 m2 = ReaderP (\i -> mplus_P (unReaderP m1 i) (unReaderP m2 i))
 
 instance ProxyTrans (ReaderP i) where
     liftP m = ReaderP (\_ -> m)

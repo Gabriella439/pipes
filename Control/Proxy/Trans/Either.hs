@@ -37,14 +37,6 @@ import Data.Monoid (Monoid(mempty, mappend))
 newtype EitherP e p a' a b' b (m :: * -> *) r
   = EitherP { runEitherP :: p a' a b' b m (Either e r) }
 
-instance (Proxy p) => MonadP (EitherP e p) where
-    return_P = \r -> EitherP (return_P (Right r))
-    m ?>= f = EitherP (
-        runEitherP m ?>= \e ->
-        case e of
-            Left  l -> return_P (Left l)
-            Right r -> runEitherP (f r) )
-
 instance (Proxy p, Monad m) => Functor (EitherP e p a' a b' b m) where
     fmap f p = EitherP (
         runEitherP p ?>= \e ->
@@ -68,10 +60,44 @@ instance (Proxy p, Monad m) => Monad (EitherP e p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
+instance (Proxy p) => MonadTrans (EitherP e p a' a b' b) where
+    lift = lift_P
+
+instance (Proxy p) => MFunctor (EitherP e p a' a b' b) where
+    hoist = hoist_P
+
+instance (Proxy p, MonadIO m) => MonadIO (EitherP e p a' a b' b m) where
+    liftIO = liftIO_P
+
 instance (Proxy p, Monad m, Monoid e)
        => Alternative (EitherP e p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
+
+instance (Proxy p, Monad m, Monoid e)
+       => MonadPlus (EitherP e p a' a b' b m) where
+    mzero = mzero_P
+    mplus = mplus_P
+
+instance (Proxy p) => ProxyInternal (EitherP e p) where
+    return_P = \r -> EitherP (return_P (Right r))
+    m ?>= f = EitherP (
+        runEitherP m ?>= \e ->
+        case e of
+            Left  l -> return_P (Left l)
+            Right r -> runEitherP (f r) )
+
+    lift_P m = EitherP (lift_P (m >>= \x -> return (Right x)))
+
+    hoist_P nat p = EitherP (hoist_P nat (runEitherP p))
+
+    liftIO_P m = EitherP (liftIO_P (m >>= \x -> return (Right x)))
+
+instance (Proxy p) => Proxy (EitherP e p) where
+    fb' ->> p = EitherP ((\b' -> runEitherP (fb' b')) ->> runEitherP p)
+    p >>~ fb  = EitherP (runEitherP p >>~ (\b -> runEitherP (fb b)))
+    request = \a' -> EitherP (request a' ?>= \a  -> return_P (Right a ))
+    respond = \b  -> EitherP (respond b  ?>= \b' -> return_P (Right b'))
 
 instance (Proxy p, Monoid e) => MonadPlusP (EitherP e p) where
     mzero_P = EitherP (return_P (Left mempty))
@@ -84,35 +110,6 @@ instance (Proxy p, Monoid e) => MonadPlusP (EitherP e p) where
                 case e2 of
                     Right r  -> return_P (Right r)
                     Left  l2 -> return_P (Left (mappend l1 l2)) )
-
-instance (Proxy p, Monad m, Monoid e)
-       => MonadPlus (EitherP e p a' a b' b m) where
-    mzero = mzero_P
-    mplus = mplus_P
-
-instance (Proxy p) => MonadTransP (EitherP e p) where
-    lift_P m = EitherP (lift_P (m >>= \x -> return (Right x)))
-
-instance (Proxy p) => MonadTrans (EitherP e p a' a b' b) where
-    lift = lift_P
-
-instance (MonadIOP p) => MonadIOP (EitherP e p) where
-    liftIO_P m = EitherP (liftIO_P (m >>= \x -> return (Right x)))
-
-instance (MonadIOP p, MonadIO m) => MonadIO (EitherP e p a' a b' b m) where
-    liftIO = liftIO_P
-
-instance (Proxy p) => MFunctorP (EitherP e p) where
-    hoist_P nat p = EitherP (hoist_P nat (runEitherP p))
-
-instance (Proxy p) => MFunctor (EitherP e p a' a b' b) where
-    hoist = hoist_P
-
-instance (Proxy p) => Proxy (EitherP e p) where
-    fb' ->> p = EitherP ((\b' -> runEitherP (fb' b')) ->> runEitherP p)
-    p >>~ fb  = EitherP (runEitherP p >>~ (\b -> runEitherP (fb b)))
-    request = \a' -> EitherP (request a' ?>= \a  -> return_P (Right a ))
-    respond = \b  -> EitherP (respond b  ?>= \b' -> return_P (Right b'))
 
 instance ProxyTrans (EitherP e) where
     liftP p = EitherP (p ?>= \x -> return_P (Right x))

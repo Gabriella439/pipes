@@ -32,12 +32,6 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype StateP s p a' a b' b (m :: * -> *) r
   = StateP { unStateP :: s -> p a' a b' b m (r, s) }
 
-instance (Proxy p) => MonadP (StateP s p) where
-    return_P = \r -> StateP (\s -> return_P (r, s))
-    m ?>= f  = StateP (\s ->
-        unStateP m s ?>= \(a, s') ->
-        unStateP (f a) s' )
-
 instance (Proxy p, Monad m) => Functor (StateP s p a' a b' b m) where
        fmap f p = StateP (\s0 ->
            unStateP p s0 ?>= \(x, s1) ->
@@ -54,41 +48,44 @@ instance (Proxy p, Monad m) => Monad (StateP s p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
+instance (Proxy p) => MonadTrans (StateP s p a' a b' b) where
+    lift = lift_P
+
+instance (Proxy p) => MFunctor (StateP s p a' a b' b) where
+    hoist = hoist_P
+
+instance (Proxy p, MonadIO m) => MonadIO (StateP s p a' a b' b m) where
+    liftIO = liftIO_P
+
 instance (MonadPlusP p, Monad m) => Alternative (StateP s p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
-
-instance (MonadPlusP p) => MonadPlusP (StateP s p) where
-    mzero_P       = StateP (\_ -> mzero_P)
-    mplus_P m1 m2 = StateP (\s -> mplus_P (unStateP m1 s) (unStateP m2 s))
 
 instance (MonadPlusP p, Monad m) => MonadPlus (StateP s p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 
-instance (Proxy p) => MonadTransP (StateP s p) where
+instance (Proxy p) => ProxyInternal (StateP s p) where
+    return_P = \r -> StateP (\s -> return_P (r, s))
+    m ?>= f  = StateP (\s ->
+        unStateP m s ?>= \(a, s') ->
+        unStateP (f a) s' )
+
     lift_P m = StateP (\s -> lift_P (m >>= \r -> return (r, s)))
 
-instance (Proxy p) => MonadTrans (StateP s p a' a b' b) where
-    lift = lift_P
-
-instance (MonadIOP p) => MonadIOP (StateP s p) where
-    liftIO_P m = StateP (\s -> liftIO_P (m >>= \r -> return (r, s)))
-
-instance (MonadIOP p, MonadIO m) => MonadIO (StateP s p a' a b' b m) where
-    liftIO = liftIO_P
-
-instance (Proxy p) => MFunctorP (StateP s p) where
     hoist_P nat p = StateP (\s -> hoist_P nat (unStateP p s))
 
-instance (Proxy p) => MFunctor (StateP s p a' a b' b) where
-    hoist = hoist_P
+    liftIO_P m = StateP (\s -> liftIO_P (m >>= \r -> return (r, s)))
 
 instance (Proxy p) => Proxy (StateP s p) where
     fb' ->> p = StateP (\s -> (\b' -> unStateP (fb' b') s) ->> unStateP p s)
     p >>~ fb  = StateP (\s -> unStateP p s >>~ (\b -> unStateP (fb b) s))
     request = \a' -> StateP (\s -> request a' ?>= \a  -> return_P (a , s))
     respond = \b  -> StateP (\s -> respond b  ?>= \b' -> return_P (b', s))
+
+instance (MonadPlusP p) => MonadPlusP (StateP s p) where
+    mzero_P       = StateP (\_ -> mzero_P)
+    mplus_P m1 m2 = StateP (\s -> mplus_P (unStateP m1 s) (unStateP m2 s))
 
 instance ProxyTrans (StateP s) where
     liftP m = StateP (\s -> m ?>= \r -> return_P (r, s))

@@ -54,12 +54,6 @@ newtype CodensityP p a' a b' b (m :: * -> *) r = CodensityP {
      :: forall x . (Monad m, Proxy p)
      => (r -> p a' a b' b m x) -> p a' a b' b m x }
 
-instance (Proxy p) => MonadP (CodensityP p) where
-    return_P = \r -> CodensityP (\k -> k r)
-    m ?>= f  = CodensityP  (\k ->
-        unCodensityP  m    (\a ->
-        unCodensityP (f a)   k ) )
-
 instance (Proxy p, Monad m) => Functor (CodensityP p a' a b' b m) where
     fmap f p = CodensityP (\k ->
         unCodensityP p    (\a ->
@@ -76,37 +70,40 @@ instance (Proxy p, Monad m) => Monad (CodensityP p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
+instance (Proxy p) => MonadTrans (CodensityP p a' a b' b) where
+    lift = lift_P
+
+instance (Proxy p) => MFunctor (CodensityP p a' a b' b) where
+    hoist = hoist_P
+
+instance (Proxy p, MonadIO m) => MonadIO (CodensityP p a' a b' b m) where
+    liftIO = liftIO_P
+
 instance (MonadPlusP p, Monad m) => Alternative (CodensityP p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
-
-instance (MonadPlusP p) => MonadPlusP (CodensityP p) where
-    mzero_P       = CodensityP (\_ -> mzero_P)
-    mplus_P m1 m2 = CodensityP (\k ->
-        mplus_P (unCodensityP m1 k) (unCodensityP m2 k) )
 
 instance (MonadPlusP p, Monad m) => MonadPlus (CodensityP p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 
-instance (Proxy p) => MonadTransP (CodensityP p) where
+instance (Proxy p) => ProxyInternal (CodensityP p) where
+    return_P = \r -> CodensityP (\k -> k r)
+    m ?>= f  = CodensityP  (\k ->
+        unCodensityP  m    (\a ->
+        unCodensityP (f a)   k ) )
+
     lift_P m = CodensityP (\k -> lift_P m ?>= k)
 
-instance (Proxy p) => MonadTrans (CodensityP p a' a b' b) where
-    lift = lift_P
-
-instance (MonadIOP p) => MonadIOP (CodensityP p) where
-    liftIO_P m = CodensityP (\k -> liftIO_P m ?>= k)
-
-instance (MonadIOP p, MonadIO m) => MonadIO (CodensityP p a' a b' b m) where
-    liftIO = liftIO_P
-
-instance (Proxy p) => MFunctorP (CodensityP p) where
     hoist_P nat p = CodensityP (\k ->
         hoist_P nat (unCodensityP p return_P) ?>= k)
 
-instance (Proxy p) => MFunctor (CodensityP p a' a b' b) where
-    hoist = hoist_P
+    liftIO_P m = CodensityP (\k -> liftIO_P m ?>= k)
+
+instance (MonadPlusP p) => MonadPlusP (CodensityP p) where
+    mzero_P       = CodensityP (\_ -> mzero_P)
+    mplus_P m1 m2 = CodensityP (\k ->
+        mplus_P (unCodensityP m1 k) (unCodensityP m2 k) )
 
 instance (Proxy p) => Proxy (CodensityP p) where
     fb' ->> p = CodensityP (\k ->

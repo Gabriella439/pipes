@@ -115,22 +115,30 @@ p0 `_bind` f = go p0 where
         _bind (Pure       r) f = f r;
   #-}
 
-instance MonadP ProxyFast where
-    return_P = Pure
-    (?>=)   = _bind
-
 -- | Only satisfies monad transformer laws modulo 'observe'
 instance MonadTrans (ProxyFast a' a b' b) where
     lift m = M (m >>= \r -> return (Pure r))
 
-instance MonadTransP ProxyFast where
-    lift_P = lift
+instance MFunctor (ProxyFast a' a b' b) where
+    hoist nat p0 = go (observe p0) where
+        go p = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ))
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+            M          m   -> M (nat (m >>= \p' -> return (go p')))
+            Pure       r   -> Pure r
 
 instance (MonadIO m) => MonadIO (ProxyFast a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
 
-instance MonadIOP ProxyFast where
+instance ProxyInternal ProxyFast where
+    return_P = Pure
+    (?>=)    = _bind
+
+    lift_P   = lift
+
     liftIO_P = liftIO
+
+    hoist_P  = hoist
 
 instance Proxy ProxyFast where
     fb' ->> p = case p of
@@ -197,17 +205,6 @@ p0 `_resp` fb = go p0 where
     "_resp (Pure    a     ) fb" forall a      fb .
         _resp (Pure    a     ) fb = Pure a;
   #-}
-
-instance MFunctor (ProxyFast a' a b' b) where
-    hoist nat p0 = go (observe p0) where
-        go p = case p of
-            Request a' fa  -> Request a' (\a  -> go (fa  a ))
-            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (nat (m >>= \p' -> return (go p')))
-            Pure       r   -> Pure r
-
-instance MFunctorP ProxyFast where
-    hoist_P = hoist
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to

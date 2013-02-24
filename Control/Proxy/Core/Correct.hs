@@ -80,57 +80,8 @@ instance (Monad m) => Monad (ProxyCorrect a' a b' b m) where
                 Respond b  fb' -> return (Respond b  (\b' -> go (fb' b')))
                 Pure       r   -> unProxy (f r) )
 
-instance MonadP ProxyCorrect where
-    return_P = return
-    (?>=)   = (>>=)
-
 instance MonadTrans (ProxyCorrect a' a b' b) where
-    lift = lift_P
-
-instance MonadTransP ProxyCorrect where
-    lift_P m = Proxy (m >>= \r -> return (Pure r))
-
-instance (MonadIO m) => MonadIO (ProxyCorrect a' a b' b m) where
-    liftIO m = Proxy (liftIO (m >>= \r -> return (Pure r)))
- -- liftIO = Proxy . liftIO . liftM Pure
-
-instance MonadIOP ProxyCorrect where
-    liftIO_P = liftIO
-
-instance Proxy ProxyCorrect where
-    fb' ->> p = Proxy (do
-        x <- unProxy p
-        case x of
-            Request b' fb  -> unProxy (fb' b' >>~ fb)
-            Respond c  fc' -> return (Respond c (\c' -> fb' ->> fc' c'))
-            Pure       r   -> return (Pure r) )
-
-    p >>~ fb = Proxy (do
-        x <- unProxy p
-        case x of
-            Request a' fa  -> return (Request a' (\a -> fa a >>~ fb))
-            Respond b  fb' -> unProxy (fb' ->> fb b)
-            Pure       r   -> return (Pure r) )
-
-    request = \a' -> Proxy (return (Request a' (\a  -> Proxy (return (Pure a )))))
-    respond = \b  -> Proxy (return (Respond b  (\b' -> Proxy (return (Pure b')))))
-
-instance Interact ProxyCorrect where
-    fb' >\\ p0 = go p0 where
-        go p = Proxy (do
-            x <- unProxy p
-            case x of
-                Request b' fb  -> unProxy (fb' b' >>= \b -> go (fb b))
-                Respond x  fx' -> return (Respond x (\x' -> go (fx' x')))
-                Pure       a   -> return (Pure a) )
-
-    p0 //> fb = go p0 where
-        go p = Proxy (do
-            x <- unProxy p
-            case x of
-                Request x' fx  -> return (Request x' (\x -> go (fx x)))
-                Respond b  fb' -> unProxy (fb b >>= \b' -> go (fb' b'))
-                Pure       a   -> return (Pure a) )
+    lift m = Proxy (m >>= \r -> return (Pure r))
 
 instance MFunctor (ProxyCorrect a' a b' b) where
     hoist nat p0 = go p0 where
@@ -141,8 +92,53 @@ instance MFunctor (ProxyCorrect a' a b' b) where
                 Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
                 Pure       r   -> Pure r )))
 
-instance MFunctorP ProxyCorrect where
-    hoist_P = hoist
+instance (MonadIO m) => MonadIO (ProxyCorrect a' a b' b m) where
+    liftIO m = Proxy (liftIO (m >>= \r -> return (Pure r)))
+
+instance ProxyInternal ProxyCorrect where
+    return_P = return
+    (?>=)    = (>>=)
+
+    lift_P   = lift
+
+    hoist_P  = hoist
+
+    liftIO_P = liftIO
+
+instance Proxy ProxyCorrect where
+    fb' ->> p = Proxy (do
+        x <- unProxy p
+        case x of
+            Request b' fb  -> unProxy (fb' b' >>~ fb)
+            Respond c  fc' -> return (Respond c (\c' -> fb' ->> fc' c'))
+            Pure       r   -> return (Pure r) )
+    p >>~ fb = Proxy (do
+        x <- unProxy p
+        case x of
+            Request a' fa  -> return (Request a' (\a -> fa a >>~ fb))
+            Respond b  fb' -> unProxy (fb' ->> fb b)
+            Pure       r   -> return (Pure r) )
+
+    request = \a' -> Proxy (return (Request a' (\a  ->
+        Proxy (return (Pure a )))))
+    respond = \b  -> Proxy (return (Respond b  (\b' ->
+        Proxy (return (Pure b')))))
+
+instance Interact ProxyCorrect where
+    fb' >\\ p0 = go p0 where
+        go p = Proxy (do
+            x <- unProxy p
+            case x of
+                Request b' fb  -> unProxy (fb' b' >>= \b -> go (fb b))
+                Respond x  fx' -> return (Respond x (\x' -> go (fx' x')))
+                Pure       a   -> return (Pure a) )
+    p0 //> fb = go p0 where
+        go p = Proxy (do
+            x <- unProxy p
+            case x of
+                Request x' fx  -> return (Request x' (\x -> go (fx x)))
+                Respond b  fb' -> unProxy (fb b >>= \b' -> go (fb' b'))
+                Pure       a   -> return (Pure a) )
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to

@@ -22,19 +22,13 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype IdentityP p a' a b' b (m :: * -> *) r =
     IdentityP { runIdentityP :: p a' a b' b m r }
 
-instance (Proxy p) => MonadP (IdentityP p) where
-    return_P = \r -> IdentityP (return_P r)
-    m ?>= f  = IdentityP (
-        runIdentityP m ?>= \x ->
-        runIdentityP (f x) )
-
 instance (Proxy p, Monad m) => Functor (IdentityP p a' a b' b m) where
     fmap f p = IdentityP (
         runIdentityP p ?>= \x ->
         return_P (f x) )
 
 instance (Proxy p, Monad m) => Applicative (IdentityP p a' a b' b m) where
-    pure = return
+    pure      = return
     fp <*> xp = IdentityP (
         runIdentityP fp ?>= \f ->
         runIdentityP xp ?>= \x ->
@@ -44,45 +38,49 @@ instance (Proxy p, Monad m) => Monad (IdentityP p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
+instance (Proxy p) => MonadTrans (IdentityP p a' a b' b) where
+    lift = lift_P
+
+instance (Proxy p) => MFunctor (IdentityP p a' a b' b) where
+    hoist = hoist_P
+
+instance (Proxy p, MonadIO m) => MonadIO (IdentityP p a' a b' b m) where
+    liftIO = liftIO_P
+
 instance (MonadPlusP p, Monad m) => Alternative (IdentityP p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
-
-instance (MonadPlusP p) => MonadPlusP (IdentityP p) where
-    mzero_P       = IdentityP  mzero_P
-    mplus_P m1 m2 = IdentityP (mplus_P (runIdentityP m1) (runIdentityP m2))
 
 instance (MonadPlusP p, Monad m) => MonadPlus (IdentityP p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 
-instance (Proxy p) => MonadTransP (IdentityP p) where
+instance (Proxy p) => ProxyInternal (IdentityP p) where
+    return_P = \r -> IdentityP (return_P r)
+    m ?>= f  = IdentityP (
+        runIdentityP m ?>= \x ->
+        runIdentityP (f x) )
+
     lift_P m = IdentityP (lift_P m)
 
-instance (Proxy p) => MonadTrans (IdentityP p a' a b' b) where
-    lift = lift_P
-
-instance (MonadIOP p) => MonadIOP (IdentityP p) where
-    liftIO_P m = IdentityP (liftIO_P m)
-
-instance (MonadIOP p, MonadIO m) => MonadIO (IdentityP p a' a b' b m) where
-    liftIO = liftIO_P
-
-instance (Proxy p) => MFunctorP (IdentityP p) where
     hoist_P nat p = IdentityP (hoist_P nat (runIdentityP p))
 
-instance (Proxy p) => MFunctor (IdentityP p a' a b' b) where
-    hoist = hoist_P
+    liftIO_P m = IdentityP (liftIO_P m)
 
 instance (Proxy p) => Proxy (IdentityP p) where
     fb' ->> p = IdentityP ((\b' -> runIdentityP (fb' b')) ->> runIdentityP p)
     p >>~ fb  = IdentityP (runIdentityP p >>~ (\b -> runIdentityP (fb b)))
+
     request = \a' -> IdentityP (request a')
     respond = \b  -> IdentityP (respond b )
 
 instance (Interact p) => Interact (IdentityP p) where
     fb' >\\ p = IdentityP ((\b' -> runIdentityP (fb' b')) >\\ runIdentityP p)
     p //> fb  = IdentityP (runIdentityP p //> (\b -> runIdentityP (fb b)))
+
+instance (MonadPlusP p) => MonadPlusP (IdentityP p) where
+    mzero_P       = IdentityP  mzero_P
+    mplus_P m1 m2 = IdentityP (mplus_P (runIdentityP m1) (runIdentityP m2))
 
 instance ProxyTrans IdentityP where
     liftP = IdentityP

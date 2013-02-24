@@ -1,22 +1,19 @@
 {-| The 'Proxy' class defines the library's core API.  Everything else in this
     library builds exclusively on top of the 'Proxy' type class so that all
-    proxy implementations and extensions can share the same standard library.
-
-    Several of these type classes duplicate methods from familiar type-classes
-    (such as ('?>=') duplicating ('>>=')).  You do NOT need to use these
-    duplicate methods.  Instead, read the \"Polymorphic proxies\" section below
-    which explains their purpose and how they help clean up type signatures. -}
+    proxy implementations and extensions can share the same standard library. -}
 
 {-# LANGUAGE Rank2Types #-}
 
 module Control.Proxy.Class (
     -- * Core proxy class
     Proxy(..),
-    idT,
-    coidT,
     (>->),
-    (<-<),
+    idT,
     (>~>),
+    coidT,
+
+    -- ** Flipped operators
+    (<-<),
     (<~<),
     (<<-),
     (~<<),
@@ -24,9 +21,11 @@ module Control.Proxy.Class (
     -- * request/respond substitution
     Interact(..),
     (\>\),
+    (/>/),
+
+    -- ** Flipped operators
     (/</),
     (\<\),
-    (/>/),
     (//<),
     (<\\),
 
@@ -35,11 +34,8 @@ module Control.Proxy.Class (
 
     -- * Polymorphic proxies
     -- $poly
-    MonadP(..),
-    MonadTransP(..),
-    MFunctorP(..),
-    MonadPlusP(..),
-    MonadIOP(..)
+    ProxyInternal(..),
+    MonadPlusP(..)
     ) where
 
 import Control.Monad.IO.Class (MonadIO)
@@ -65,10 +61,10 @@ infixr 8 /</, >\\
 infixl 8 \>\, //<
 infixl 8 \<\, //>
 infixr 8 />/, <\\
-infixl 1 ?>= -- This should match the fixity of >>=
+infixl 1 ?>=  -- This should match the fixity of >>=
 
 -- | The core API for the @pipes@ library
-class (MonadP p, MonadTransP p, MFunctorP p) => Proxy p where
+class (ProxyInternal p) => Proxy p where
     {-| 'request' input from upstream, passing an argument with the request
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
@@ -84,38 +80,36 @@ class (MonadP p, MonadTransP p, MFunctorP p) => Proxy p where
         argument of type @b'@ from the next 'request' as its return value. -}
     respond :: (Monad m) => b -> p a' a b' b m b'
 
-    -- | Connect an upstream 'Proxy' that handles all 'request's
+    {-| Connect an upstream 'Proxy' that handles all 'request's
+
+        Point-ful version of ('>->') -}
     (->>)
      :: (Monad m)
      => (b'  -> p a' a b' b m r)
      ->         p b' b c' c m r
      ->         p a' a c' c m r
 
-    -- | Connect a downstream 'Proxy' that handles all 'respond's
+    {-| Connect a downstream 'Proxy' that handles all 'respond's
+
+        Point-ful version of ('>~>') -}
     (>>~)
      :: (Monad m)
      =>        p a' a b' b m r
      -> (b  -> p b' b c' c m r)
      ->        p a' a c' c m r
 
-{-| Compose two proxies blocked on a 'respond', generating a new proxy blocked
-    on a 'respond'
+{-| Pull-based composition
 
-    Begins from the downstream end and satisfies every 'request' with a
-    'respond'
-
-> k1 >-> k2 = \c' -> k1 ->> k2 c'
-
-    ('>->') accepts arbitary Kleisli arrows for its downstream argument because
-    its inferred type is more general than composition requires.  This still
-    gives correct behavior.
--}
+    Compose two proxies blocked on a 'respond', generating a new proxy blocked
+    on a 'respond'.  Begins from the downstream end and satisfies every
+    'request' with a 'respond'. -}
 (>->)
  :: (Monad m, Proxy p)
  => (b'  -> p a' a b' b m r)
  -> (c'_ -> p b' b c' c m r)
  -> (c'_ -> p a' a c' c m r)
 k1 >-> k2 = \c' -> k1 ->> k2 c'
+{-# INLINABLE (>->) #-}
 
 -- | Equivalent to ('>->') with the arguments flipped
 (<-<)
@@ -124,24 +118,20 @@ k1 >-> k2 = \c' -> k1 ->> k2 c'
  -> (b' -> p a' a b' b m r)
  -> (c' -> p a' a c' c m r)
 p1 <-< p2 = p2 >-> p1
+{-# INLINABLE (<-<) #-}
 
-{-| Compose two proxies blocked on a 'request', generating a new proxy blocked
-    on a 'request'
+{-| Push-based composition
 
-    Begins from the upstream end and satisfies every 'respond' with a
-    'request'
-
-> k1 >~> k2 = \a -> k1 a >>~ k2
-
-    ('>~>') accepts arbitary Kleisli arrows for its upstream argument because
-    its inferred type is more general than composition requires.  This still
-    gives correct behavior. -}
+    Compose two proxies blocked on a 'request', generating a new proxy blocked
+    on a 'request'.  Begins from the upstream end and satisfies every 'respond'
+    with a 'request' -}
 (>~>)
  :: (Monad m, Proxy p)
  => (a_ -> p a' a b' b m r)
  -> (b  -> p b' b c' c m r)
  -> (a_ -> p a' a c' c m r)
 k1 >~> k2 = \a -> k1 a >>~ k2
+{-# INLINABLE (>~>) #-}
 
 -- | Equivalent to ('>~>') with the arguments flipped
 (<~<)
@@ -150,6 +140,7 @@ k1 >~> k2 = \a -> k1 a >>~ k2
  -> (a -> p a' a b' b m r)
  -> (a -> p a' a c' c m r)
 p1 <~< p2 = p2 >~> p1
+{-# INLINABLE (<~<) #-}
 
 -- | Equivalent to ('->>') with the arguments flipped
 (<<-)
@@ -158,6 +149,7 @@ p1 <~< p2 = p2 >~> p1
  -> (b'  -> p a' a b' b m r)
  ->         p a' a c' c m r
 k <<- p = p ->> k
+{-# INLINABLE (<<-) #-}
 
 -- | Equivalent to ('>>~') with the arguments flipped
 (~<<)
@@ -166,8 +158,11 @@ k <<- p = p ->> k
  ->        p a' a b' b m r
  ->        p a' a c' c m r
 k ~<< p = p >>~ k
+{-# INLINABLE (~<<) #-}
 
-{-| 'idT' forwards requests followed by responses
+{-| Pull-based identity
+
+    'idT' forwards requests followed by responses
 
 > idT = request >=> respond >=> idT
 -}
@@ -180,7 +175,9 @@ idT = go where
 -- idT = foreverK $ request >=> respond
 {-# INLINABLE idT #-}
 
-{-| 'coidT' forwards responses followed by requests
+{-| Push-based identity
+
+    'coidT' forwards responses followed by requests
 
 > coidT = respond >=> request >=> coidT
 -}
@@ -193,15 +190,15 @@ coidT = go where
 -- coidT = foreverK $ respond >=> request
 {-# INLINABLE coidT #-}
 
--- | Two extra Proxy categories
+-- | The two \"ListT\" categories (see "Control.Monad.Trans.Interact")
 class (Proxy p) => Interact p where
-    -- | @f >\\\\ p@ replaces all 'request's in @p@ with @f@
+    -- | @f >\\\\ p@ replaces all 'request's in @p@ with @f@.
     (>\\) :: (Monad m)
           => (b' -> p a' a x' x m b)
           ->        p b' b x' x m c
           ->        p a' a x' x m c
 
-    -- | @p \/\/> f@ replaces all 'respond's in @p@ with @f@
+    -- | @p \/\/> f@ replaces all 'respond's in @p@ with @f@.
     (//>) :: (Monad m)
           =>       p x' x b' b m a'
           -> (b -> p x' x c' c m b')
@@ -216,6 +213,7 @@ class (Proxy p) => Interact p where
       -> (c' -> p b' b x' x m c)
       -> (c' -> p a' a x' x m c)
 f \>\ g = \c' -> f >\\ g c'
+{-# INLINABLE (\>\) #-}
 
 -- | Equivalent to ('\>\') with the arguments flipped
 (/</) :: (Monad m, Interact p)
@@ -223,6 +221,7 @@ f \>\ g = \c' -> f >\\ g c'
       -> (b' -> p a' a x' x m b)
       -> (c' -> p a' a x' x m c)
 p1 /</ p2 = p2 \>\ p1
+{-# INLINABLE (/</) #-}
 
 {-| @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
 
@@ -233,13 +232,15 @@ p1 /</ p2 = p2 \>\ p1
       -> (b -> p x' x c' c m b')
       -> (a -> p x' x c' c m a')
 f />/ g = \a -> f a //> g
+{-# INLINABLE (/>/) #-}
 
--- | @f \\<\\ g@ replaces all 'respond's in 'g' with 'f'.
+-- | Equivalent to ('/>/') with the arguments flipped
 (\<\) :: (Monad m, Interact p)
       => (b -> p x' x c' c m b')
       -> (a -> p x' x b' b m a')
       -> (a -> p x' x c' c m a')
 p1 \<\ p2 = p2 />/ p1
+{-# INLINABLE (\<\) #-}
 
 -- | Equivalent to ('>\\') with the arguments flipped
 (//<) :: (Monad m, Interact p)
@@ -247,6 +248,7 @@ p1 \<\ p2 = p2 />/ p1
       -> (b' -> p a' a x' x m b)
       ->        p a' a x' x m c
 p //< f = f >\\ p
+{-# INLINABLE (//<) #-}
 
 -- | Equivalent to ('//>') with the arguments flipped
 (<\\) :: (Monad m, Interact p)
@@ -254,6 +256,7 @@ p //< f = f >\\ p
       ->       p x' x b' b m a'
       ->       p x' x c' c m a'
 f <\\ p = p //> f
+{-# INLINABLE (<\\) #-}
 
 {- $laws
     The 'Proxy' class defines an interface to all core proxy capabilities that
@@ -387,8 +390,8 @@ f <\\ p = p //> f
 -}
 
 {- $poly
-    Many of these type classes contain methods which copy methods from more
-    familiar type classes.  These duplicate methods serve two purposes.
+    The 'ProxyInternal' and 'MonadPlusP' type classes duplicate methods from
+    more familiar type classes.  These duplicate methods serve two purposes.
 
     First, this library requires type class instances that would otherwise be
     impossible to define without providing higher-kinded constraints.  Rather
@@ -398,7 +401,7 @@ f <\\ p = p //> f
 
       ... the instance can instead use the following Haskell98 constraint:
 
-> instance (MonadTransP p) => ...
+> instance (Proxy p) => ...
 
     Second, these type classes don't require the @FlexibleContexts@ extension
     to use and substantially clean up constraints in type signatures.  They
@@ -408,14 +411,15 @@ f <\\ p = p //> f
 
       .. into cleaner and more general constraints like this:
 
-> P :: (Proxy p) => ...
+> p :: (Proxy p) => ...
 
-    These type classes exist solely for internal plumbing and you should never
-    directly use the duplicate methods from them.  Instead, you can use all the
-    original type classes as long as you embed your proxy code within at least
-    one proxy transformer (or 'IdentityP' if don't use any transformers).  The
-    type-class machinery will then automatically convert the messier and less
-    polymorphic constraints to the simpler and more general constraints.
+    'ProxyInternal' and 'MonadPlusP' exist solely for internal type class
+    plumbing and I discourage you from using the methods in these classes
+    unless you enjoy making your code less readable.  Instead, you can use all
+    the original type classes as long as you embed your proxy code within at
+    least one proxy transformer (or 'IdentityP' if don't use any transformers).
+    The type-class machinery will then automatically convert the messier and
+    less polymorphic constraints to the simpler and more general constraints.
 
     For example, consider the following almost-correct definition for @mapMD@
     (from "Control.Proxy.Prelude.Base"):
@@ -486,33 +490,32 @@ f <\\ p = p //> f
 >     respond c
 -}
 
-{-| The @(MonadP p)@ constraint is equivalent to the following constraint:
+{-| The @(ProxyInternal p)@ constraint is equivalent to the following
+    polymorphic constraint:
 
-> (forall a' a b' b m . (Monad m) => Monad (p a' a b' b m)) => ...
+> (forall a' a b' b m . (MonadIO m)
+>     => Monad      (p a' a b' b m)
+>     ,  MonadTrans (p a' a b' b  )
+>     ,  MFunctor   (p a' a b' b m)
+>     ,  MonadIO    (p a' a b' b m)
+>     ) => ...
 -}
-class MonadP p where
+class ProxyInternal p where
     return_P :: (Monad m) => r -> p a' a b' b m r
     (?>=)
      :: (Monad m)
      => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'
 
-{-| The @(MonadTransP p)@ constraint is equivalent to the following constraint:
-
-> (forall a' a b' b . MonadTrans (p a' a b' b)) => ...
--}
-class MonadTransP p where
     lift_P :: (Monad m) => m r -> p a' a b' b m r
 
-{-| The @(MFunctorP p)@ constraint is equivalent to the following constraint:
-
-> (forall a' a b' b m . (Monad m) => MFunctor (p a' a b' b m)) => ...
--}
-class MFunctorP p where
     hoist_P
      :: (Monad m)
      => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')
 
-{-| The @(MonadPlusP p)@ constraint is equivalent to the following constraint:
+    liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r
+
+{-| The @(MonadPlusP p)@ constraint is equivalent to the following polymorphic
+    constraint:
 
 > (forall a' a b' b m . (Monad m) => MonadPlus (p a' a b' b m)) => ...
 -}
@@ -520,10 +523,3 @@ class (Proxy p) => MonadPlusP p where
     mzero_P :: (Monad m) => p a' a b' b m r
     mplus_P
      :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r
-
-{-| The @(MonadIOP p)@ constraint is equivalent to the following constraint:
-
-> (forall a' a b' b m . (MonadIO m) => MonadIO (p a' a b' b m)) => ...
--}
-class (Proxy p) => MonadIOP p where
-    liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r

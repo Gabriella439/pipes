@@ -25,14 +25,6 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype MaybeP p a' a b' b (m :: * -> *) r
   = MaybeP { runMaybeP :: p a' a b' b m (Maybe r) }
 
-instance (Proxy p) => MonadP (MaybeP p) where
-    return_P = \r -> MaybeP (return_P (Just r))
-    m ?>= f  = MaybeP (
-        runMaybeP m ?>= \ma ->
-        runMaybeP (case ma of
-            Nothing -> MaybeP (return_P Nothing)
-            Just a  -> f a ) )
-
 instance (Proxy p, Monad m) => Functor (MaybeP p a' a b' b m) where
     fmap f p = MaybeP (
         runMaybeP p ?>= \m ->
@@ -56,9 +48,42 @@ instance (Proxy p, Monad m) => Monad (MaybeP p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
+instance (Proxy p) => MonadTrans (MaybeP p a' a b' b) where
+    lift = lift_P
+
+instance (Proxy p) => MFunctor (MaybeP p a' a b' b) where
+    hoist = hoist_P
+
+instance (Proxy p, MonadIO m) => MonadIO (MaybeP p a' a b' b m) where
+    liftIO = liftIO_P
+
 instance (Proxy p, Monad m) => Alternative (MaybeP p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
+
+instance (Proxy p, Monad m) => MonadPlus (MaybeP p a' a b' b m) where
+    mzero = mzero_P
+    mplus = mplus_P
+
+instance (Proxy p) => ProxyInternal (MaybeP p) where
+    return_P = \r -> MaybeP (return_P (Just r))
+    m ?>= f  = MaybeP (
+        runMaybeP m ?>= \ma ->
+        runMaybeP (case ma of
+            Nothing -> MaybeP (return_P Nothing)
+            Just a  -> f a ) )
+
+    lift_P m = MaybeP (lift_P (m >>= \x -> return (Just x)))
+
+    hoist_P nat p = MaybeP (hoist_P nat (runMaybeP p))
+
+    liftIO_P m = MaybeP (liftIO_P (m >>= \x -> return (Just x)))
+
+instance (Proxy p) => Proxy (MaybeP p) where
+    fb' ->> p = MaybeP ((\b' -> runMaybeP (fb' b')) ->> runMaybeP p)
+    p >>~ fb  = MaybeP (runMaybeP p >>~ (\b -> runMaybeP (fb b)))
+    request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
+    respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))
 
 instance (Proxy p) => MonadPlusP (MaybeP p) where
     mzero_P       = MaybeP (return_P Nothing)
@@ -67,34 +92,6 @@ instance (Proxy p) => MonadPlusP (MaybeP p) where
         case ma of
             Nothing -> runMaybeP m2
             Just a  -> return_P (Just a) )
-
-instance (Proxy p, Monad m) => MonadPlus (MaybeP p a' a b' b m) where
-    mzero = mzero_P
-    mplus = mplus_P
-
-instance (Proxy p) => MonadTransP (MaybeP p) where
-    lift_P m = MaybeP (lift_P (m >>= \x -> return (Just x)))
-
-instance (Proxy p) => MonadTrans (MaybeP p a' a b' b) where
-    lift = lift_P
-
-instance (MonadIOP p) => MonadIOP (MaybeP p) where
-    liftIO_P m = MaybeP (liftIO_P (m >>= \x -> return (Just x)))
-
-instance (MonadIOP p, MonadIO m) => MonadIO (MaybeP p a' a b' b m) where
-    liftIO = liftIO_P
-
-instance (Proxy p) => MFunctorP (MaybeP p) where
-    hoist_P nat p = MaybeP (hoist_P nat (runMaybeP p))
-
-instance (Proxy p) => MFunctor (MaybeP p a' a b' b) where
-    hoist = hoist_P
-
-instance (Proxy p) => Proxy (MaybeP p) where
-    fb' ->> p = MaybeP ((\b' -> runMaybeP (fb' b')) ->> runMaybeP p)
-    p >>~ fb  = MaybeP (runMaybeP p >>~ (\b -> runMaybeP (fb b)))
-    request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
-    respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))
 
 instance ProxyTrans MaybeP where
     liftP p = MaybeP (p ?>= \x -> return_P (Just x))
