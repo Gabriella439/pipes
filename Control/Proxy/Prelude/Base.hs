@@ -897,7 +897,7 @@ mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
 -}
 
 -- | Compose 'unitD' with a closed upstream end to create a polymorphic end
-unitD :: (Monad m, Proxy p) => y' -> p x' x y' () m r
+unitD :: (Monad m, Proxy p) => q -> p x' x y' () m r
 unitD _ = runIdentityP go where
     go = do
         respond ()
@@ -905,7 +905,7 @@ unitD _ = runIdentityP go where
 {-# INLINABLE unitD #-}
 
 -- | Compose 'unitU' with a closed downstream end to create a polymorphic end
-unitU :: (Monad m, Proxy p) => y' -> p () x y' y m r
+unitU :: (Monad m, Proxy p) => q -> p () x y' y m r
 unitU _ = runIdentityP go where
     go = do
         request ()
