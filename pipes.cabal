@@ -30,9 +30,13 @@ Description:
   .
   * /Extensive Documentation/: Second to none!
   .
-  Import "Control.Proxy" to use the library.
+  Import
+  @<http://hackage.haskell.org/packages/archive/pipes/latest/doc/html/Control-Proxy.html Control.Proxy>@
+  to use the library.
   .
-  Read "Control.Proxy.Tutorial" for a really extensive tutorial.
+  Read
+  @<http://hackage.haskell.org/packages/archive/pipes/latest/doc/html/Control-Proxy-Tutorial.html Control.Proxy.Tutorial>@
+  for a really extensive tutorial.
 Category: Control, Pipes, Proxies
 Tested-With: GHC ==7.4.1
 Source-Repository head
