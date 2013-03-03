@@ -34,7 +34,7 @@
 
 module Control.Proxy.Trans.Codensity (
     -- * Codensity Proxy Transformer
-    CodensityP(..),
+    CodensityP,
     runCodensityP,
     runCodensityK
     ) where
@@ -54,6 +54,16 @@ newtype CodensityP p a' a b' b (m :: * -> *) r = CodensityP {
     unCodensityP
      :: forall x . (Monad m, Proxy p)
      => (r -> p a' a b' b m x) -> p a' a b' b m x }
+{- The type class instances only satisfy their laws if you hide the constructor
+   for 'CodensityP'.
+
+   Normally you would not have to hide it and you could rely on parametricity to
+   guarantee that 'CodensityP p' is isomorphic to 'p'.  However, the 'MFunctor'
+   and 'PFunctor' type classes require including class constraints within the
+   constructor, which breaks parametricity and makes it possible to define
+   'CodensityP' values which break the laws for the following type class
+   instances.
+-}
 
 instance (Proxy p, Monad m) => Functor (CodensityP p a' a b' b m) where
     fmap f p = CodensityP (\k ->
