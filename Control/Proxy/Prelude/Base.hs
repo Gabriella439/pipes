@@ -73,6 +73,13 @@ module Control.Proxy.Prelude.Base (
     foldlD',
     foldlU',
 
+    -- * ArrowChoice
+    -- $choice
+    leftD,
+    rightD,
+    leftU,
+    rightU,
+
     -- * Zips and Merges
     zipD,
     mergeD,
@@ -85,18 +92,18 @@ module Control.Proxy.Prelude.Base (
     -- * Modules
     -- $modules
     module Control.Monad.Trans.State.Strict,
-    module W,
+    module Control.Monad.Trans.Writer.Lazy,
     module Data.Monoid
     ) where
 
 import Control.MFunctor (hoist)
 import Control.Monad ((>=>))
 import Control.Proxy.ListT (
-    RequestT(RequestT), RespondT(RespondT), ProduceT, CoProduceT )
+    RequestT(RequestT), RespondT(RespondT), ProduceT, CoProduceT, (\>\), (/>/) )
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Writer.Lazy as W (
-    WriterT(runWriterT), execWriterT, runWriter )
-import Control.Monad.Trans.Writer.Lazy (tell)
+import Control.Monad.Trans.Writer.Lazy (
+    WriterT(runWriterT), execWriterT, runWriter, execWriter )
+import qualified Control.Monad.Trans.Writer.Lazy as W (tell)
 import Control.Monad.Trans.State.Strict (
     StateT(StateT, runStateT),
     execStateT,
@@ -108,7 +115,7 @@ import Control.Proxy.Class
 import Control.Proxy.ListT (ListT, RespondT(RespondT), RequestT(RequestT))
 import Control.Proxy.Prelude.Kleisli (replicateK, foreverK)
 import Control.Proxy.Synonym
-import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
+import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK, identityK)
 import Data.Monoid (
     Monoid,
     Endo(Endo, appEndo),
@@ -613,7 +620,7 @@ foldD
 foldD f = runIdentityK go where
     go x = do
         a <- request x
-        lift $ tell $ f a
+        lift $ W.tell $ f a
         x2 <- respond a
         go x2
 {-# INLINABLE foldD #-}
@@ -629,7 +636,7 @@ foldU
  => (a' -> w) -> a' -> p a' x a' x (WriterT w m) r
 foldU f = runIdentityK go where
     go a' = do
-        lift $ tell $ f a'
+        lift $ W.tell $ f a'
         x <- request a'
         a'2 <- respond x
         go a'2
@@ -660,7 +667,7 @@ allD_ pred = runIdentityK go where
             then do
                 x2 <- respond a
                 go x2
-            else lift $ tell $ All False
+            else lift $ W.tell $ All False
 {-# INLINABLE allD_ #-}
 
 {-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
@@ -676,7 +683,7 @@ allU_ pred = runIdentityK go where
                 x   <- request a'
                 a'2 <- respond x
                 go a'2
-            else lift $ tell $ All False
+            else lift $ W.tell $ All False
 {-# INLINABLE allU_ #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies
@@ -701,7 +708,7 @@ anyD_ pred = runIdentityK go where
     go x = do
         a <- request x
         if (pred a)
-            then lift $ tell $ Any True
+            then lift $ W.tell $ Any True
             else do
                 x2 <- respond a
                 go x2
@@ -716,7 +723,7 @@ anyU_
 anyU_ pred = runIdentityK go where
     go a' =
         if (pred a')
-            then lift $ tell $ Any True
+            then lift $ W.tell $ Any True
             else do
                 x   <- request a'
                 a'2 <- respond x
@@ -766,7 +773,7 @@ headD = foldD (First . Just)
 headD_ :: (Monad m, Proxy p) => x -> p x a x a (WriterT (First a) m) ()
 headD_ x = runIdentityP $ do
     a <- request x
-    lift $ tell $ First (Just a)
+    lift $ W.tell $ First (Just a)
 {-# INLINABLE headD_ #-}
 
 -- | Retrieve the first value going \'@U@\'pstream
@@ -778,7 +785,7 @@ headU = foldU (First . Just)
 
     'headU_' terminates on the first value it receives -}
 headU_ :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (First a') m) ()
-headU_ a' = runIdentityP $ lift $ tell $ First (Just a')
+headU_ a' = runIdentityP $ lift $ W.tell $ First (Just a')
 {-# INLINABLE headU_ #-}
 
 -- | Retrieve the last value going \'@D@\'ownstream
@@ -840,6 +847,80 @@ foldlU' f = runIdentityK go where
         a'2 <- respond x
         go a'2
 {-# INLINABLE foldlU' #-}
+
+{- $choice
+    'leftD' and 'rightD' satisfy the 'ArrowChoice' laws using @arr = mapD@.
+
+    'leftU' and 'rightU' satisfy the 'ArrowChoice' laws using @arr = mapU@.
+-}
+
+{-| Lift a proxy to operate only on 'Left' values flowing \'@D@\'ownstream and
+    forward 'Right' values -}
+leftD
+    :: (Monad m, ListT p)
+    => (q -> p x a x b m r) -> (q -> p x (Either a e) x (Either b e) m r)
+leftD k = runIdentityK (up \>\ (identityK k />/ dn))
+  where
+    dn b = respond (Left b)
+    up x = do
+        ma <- request x
+        case ma of
+            Left  a -> return a
+            Right e -> do
+                x2 <- respond (Right e)
+                up x2 
+{-# INLINABLE leftD #-}
+
+{-| Lift a proxy to operate only on 'Right' values flowing \'@D@\'ownstream and
+    forward 'Left' values -}
+rightD
+    :: (Monad m, ListT p)
+    => (q -> p x a x b m r) -> (q -> p x (Either e a) x (Either e b) m r)
+rightD k = runIdentityK (up \>\ (identityK k />/ dn))
+  where
+    dn b = respond (Right b)
+    up x = do
+        ma <- request x
+        case ma of
+            Left  e -> do
+                x2 <- respond (Left e)
+                up x2 
+            Right a -> return a
+{-# INLINABLE rightD #-}
+
+{-| Lift a proxy to operate only on 'Left' values flowing \'@U@\'pstream and
+    forward 'Right' values -}
+leftU
+    :: (Monad m, ListT p)
+    => (q -> p a' x b' x m r) -> (q -> p (Either a' e) x (Either b' e) x m r)
+leftU k = runIdentityK ((up \>\ identityK k) />/ dn)
+  where
+    up a' = request (Left a')
+    dn x = do
+        mb' <- respond x
+        case mb' of
+            Left  b' -> return b'
+            Right e  -> do
+                x2 <- request (Right e)
+                dn x2 
+{-# INLINABLE leftU #-}
+
+{-| Lift a proxy to operate only on 'Right' values flowing \'@D@\'ownstream and
+    forward 'Left' values -}
+rightU
+    :: (Monad m, ListT p)
+    => (q -> p a' x b' x m r) -> (q -> p (Either e a') x (Either e b') x m r)
+rightU k = runIdentityK ((up \>\ identityK k) />/ dn)
+  where
+    up a' = request (Right a')
+    dn x = do
+        mb' <- respond x
+        case mb' of
+            Left  e  -> do
+                x2 <- request (Left e)
+                dn x2 
+            Right b' -> return b'
+{-# INLINABLE rightU #-}
 
 -- | Zip values flowing downstream
 zipD
