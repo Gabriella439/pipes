@@ -42,10 +42,8 @@ await = request ()
 {-| Deliver output downstream
 
     'yield' restores control back downstream and binds its value to 'await'. -}
-yield :: (Monad m, Proxy p) => b -> p a' a () b m ()
-yield b = runIdentityP $ do
-    respond b
-    return ()
+yield :: (Monad m, Proxy p) => b -> p a' a b' b m b'
+yield = respond
 
 -- | Convert a pure function into a pipe
 pipe :: (Monad m, Proxy p) => (a -> b) -> Pipe p a b m r
@@ -58,13 +56,19 @@ infixl 9 >+>
 
 -- | Corresponds to ('<<<')/('.') from @Control.Category@
 (<+<)
- :: (Monad m, Proxy p) => Pipe p b c m r -> Pipe p a b m r -> Pipe p a c m r
+ :: (Monad m, Proxy p)
+ => p b' b c' c m r
+ -> p a' a b' b m r
+ -> p a' a c' c m r
 p1 <+< p2 = p2 >+> p1
 
 -- | Corresponds to ('>>>') from @Control.Category@
 (>+>)
- :: (Monad m, Proxy p) => Pipe p a b m r -> Pipe p b c m r -> Pipe p a c m r
-p1 >+> p2 = ((\() -> p1) >-> (\() -> p2)) ()
+ :: (Monad m, Proxy p)
+ => p a' a b' b m r
+ -> p b' b c' c m r
+ -> p a' a c' c m r
+p1 >+> p2 = (\_ -> p1) ->> p2
 
 -- | Corresponds to 'id' from @Control.Category@
 idP :: (Monad m, Proxy p) => Pipe p a a m r
