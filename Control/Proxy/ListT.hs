@@ -50,7 +50,10 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
 import Control.Proxy.Synonym (C, Producer, CoProducer)
 
--- | A monad transformer over a proxy's downstream end
+-- For documentation
+import Control.Monad ((>=>), (<=<))
+
+-- | A monad transformer over a proxy's downstream output
 newtype RespondT (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a b' m b =
     RespondT { runRespondT :: p a' a b' b m b' }
 
@@ -83,7 +86,7 @@ type ProduceT p = RespondT p C () ()
 runProduceT :: ProduceT p m b -> () -> Producer p b m ()
 runProduceT p () = runRespondT p
 
--- | A monad transformer over a proxy's upstream end
+-- | A monad transformer over a proxy's upstream output
 newtype RequestT (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b' b m a' =
     RequestT { runRequestT :: p a' a b' b m a }
 
@@ -134,6 +137,8 @@ infixr 8 />/, <\\
 class (Proxy p) => ListT p where
     {-| @f >\\\\ p@ replaces all 'request's in @p@ with @f@.
 
+        Equivalent to to ('=<<') for 'RequestT'
+
         Point-ful version of ('\>\')
     -}
     (>\\) :: (Monad m)
@@ -142,6 +147,8 @@ class (Proxy p) => ListT p where
           ->        p a' a x' x m c
 
     {-| @p \/\/> f@ replaces all 'respond's in @p@ with @f@.
+
+        Equivalent to ('>>=') for 'RespondT'
 
         Point-ful version of ('/>/')
     -}
@@ -152,6 +159,8 @@ class (Proxy p) => ListT p where
 
 {-| @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
 
+    Equivalent to ('<=<') for 'RequestT'
+
     Point-free version of ('>\\')
 -}
 (\>\) :: (Monad m, ListT p)
@@ -161,15 +170,9 @@ class (Proxy p) => ListT p where
 f \>\ g = \c' -> f >\\ g c'
 {-# INLINABLE (\>\) #-}
 
--- | Equivalent to ('\>\') with the arguments flipped
-(/</) :: (Monad m, ListT p)
-      => (_c' -> p b' b x' x m c)
-      -> ( b' -> p a' a x' x m b)
-      -> (_c' -> p a' a x' x m c)
-p1 /</ p2 = p2 \>\ p1
-{-# INLINABLE (/</) #-}
-
 {-| @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
+
+    Equivalent to ('>=>') for 'RespondT'
 
     Point-free version of ('//>')
 -}
@@ -179,6 +182,14 @@ p1 /</ p2 = p2 \>\ p1
       -> (_a -> p x' x c' c m a')
 f />/ g = \a -> f a //> g
 {-# INLINABLE (/>/) #-}
+
+-- | Equivalent to ('\>\') with the arguments flipped
+(/</) :: (Monad m, ListT p)
+      => (_c' -> p b' b x' x m c)
+      -> ( b' -> p a' a x' x m b)
+      -> (_c' -> p a' a x' x m c)
+p1 /</ p2 = p2 \>\ p1
+{-# INLINABLE (/</) #-}
 
 -- | Equivalent to ('/>/') with the arguments flipped
 (\<\) :: (Monad m, ListT p)
