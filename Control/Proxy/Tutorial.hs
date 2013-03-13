@@ -60,8 +60,8 @@ module Control.Proxy.Tutorial (
 
 -- For documentation
 import Control.Category
+import Control.Monad.Morph
 import Control.Monad.Trans.Class
-import Control.MFunctor
 import Control.PFunctor
 import Control.Proxy
 import Control.Proxy.Core.Correct (ProxyCorrect)
@@ -923,11 +923,9 @@ promptInt
     base monad, but @printer@ uses 'IO' for its base monad, so composition can't
     interleave their effects.
 
-    You can easily fix this using the 'hoist' function from the 'MFunctor' type
-    class in "Control.MFunctor", which transforms the base monad of any monad
-    transformer, including the 'Proxy' monad transformer.  "Control.MFunctor"
-    really belongs in the @transformers@ package, however it currently resides
-    here because it requires the @Rank2Types@ extension.
+    You can easily fix this using the 'hoist' function from the @mmorph@
+    package, which transforms the base monad of any monad transformer that
+    implements 'MFunctor', including the 'Proxy' monad transformer.
 
     You will commonly use 'hoist' to 'lift' one proxy's base monad to match
     another proxy's base monad, like so:
@@ -946,16 +944,16 @@ Left "Could not read Integer"
 >>> runEitherT $ runProxy $ promptInt2 >-> hoist lift . printer
 ...
 
-    Second, "lift" is such a common argument to 'hoist' that "Control.MFunctor"
-    provides the 'raise' function:
+    Second, 'lift' is such a common argument to 'hoist' that I provide the
+    'raise' function:
 
 > raise = hoist lift
 
 >>> runEitherT $ runProxy $ promptInt2 >-> raise . printer
 ...
 
-    Third, "Control.Proxy.Prelude.Kleisli" provides the 'hoistK' and 'raiseK'
-    functions in case you think composition looks ugly:
+    Third, I provide the 'hoistK' and 'raiseK' functions in case you think
+    composition looks ugly:
 
 > hoistK f = (hoist f .)
 >
@@ -964,24 +962,8 @@ Left "Could not read Integer"
 >>> runEitherT $ runProxy $ promptInt2 >-> raiseK printer
 ...
 
-    Note that "Control.MFunctor" also provides 'MFunctor' instances for all the
-    monad transformers in the @transformers@ package.  This means that you can
-    fix any incompatibility between two monad transformer stacks just using
-    various combinations of 'hoist' and 'lift'.
-
-    To see how, consider the following contrived pathological example where I
-    want to mix two very different monad transformer stacks:
-
-> m1 :: StateT s (ReaderT i IO) r
-> m2 :: MaybeT   (WriterT w IO) r
-
-    I can interleave their transformers through judicious use of 'hoist' and
-    'lift'
-
-> mBoth :: StateT s (MaybeT (ReaderT i (WriterT w IO))) r
-> mBoth = do
->     hoist (lift . hoist lift) m1
->     lift (hoist lift m2)
+    For more information on using 'MFunctor, consult the tutorial in the
+    @Control.Monad.Morph@ module from the @mmorph@ package.
 -}
 
 {- $utilities

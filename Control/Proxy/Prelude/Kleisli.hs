@@ -7,9 +7,12 @@ module Control.Proxy.Prelude.Kleisli (
     foreverK,
     replicateK,
     liftK,
+    hoistK,
+    raise,
+    raiseK
     ) where
 
-import Control.MFunctor (MFunctor(hoist))
+import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 
 {-| Compose a \'@K@\'leisli arrow with itself forever
@@ -49,3 +52,27 @@ replicateK n0 k = go n0 where
 liftK :: (Monad m, MonadTrans t) => (a -> m b) -> (a -> t m b)
 liftK k a = lift (k a)
 -- liftK = (lift .)
+
+-- | Convenience function equivalent to @(hoist f .)@
+hoistK
+ :: (Monad m, MFunctor t)
+ => (forall a . m a -> n a)  -- ^ Monad morphism
+ -> (b' -> t m b)            -- ^ Kleisli arrow
+ -> (b' -> t n b)
+hoistK k p a' = hoist k (p a')
+-- hoistK k = (hoist k .)
+
+{-| Lift the base monad
+
+> raise = hoist lift
+-}
+raise :: (Monad m, MFunctor t1, MonadTrans t2) => t1 m r -> t1 (t2 m) r
+raise = hoist lift
+
+{-| Lift the base monad of a \'@K@\'leisli arrow
+
+> raiseK = hoistK lift
+-}
+raiseK
+ :: (Monad m, MFunctor t1, MonadTrans t2) => (q -> t1 m r) -> (q -> t1 (t2 m) r)
+raiseK = (hoist lift .)

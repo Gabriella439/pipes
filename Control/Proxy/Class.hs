@@ -30,8 +30,8 @@ module Control.Proxy.Class (
 import Control.Monad.IO.Class (MonadIO)
 
 -- Documentation imports
+import Control.Monad.Morph (hoist)
 import Control.Monad.Trans.Class (lift)
-import Control.MFunctor(hoist)
 
 {- * I make educated guesses about which associativy is most efficient for each
      operator.

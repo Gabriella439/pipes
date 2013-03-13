@@ -41,10 +41,10 @@ Source-Repository head
 
 Library
     Build-Depends:
-        base >= 4 && < 5,
+        base         >= 4       && < 5  ,
+        mmorph       >= 1.0.0   && < 1.1,
         transformers >= 0.2.0.0 && < 0.4
     Exposed-Modules:
-        Control.MFunctor,
         Control.PFunctor,
         Control.Pipe,
         Control.Proxy,

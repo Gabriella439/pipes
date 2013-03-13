@@ -11,11 +11,11 @@ module Control.Proxy.Core (
     module Control.Proxy.ListT,
     module Control.Monad,
     module Control.Monad.Trans.Class,
-    module Control.MFunctor,
+    module Control.Monad.Morph,
     module Control.PFunctor
     ) where
 
-import Control.MFunctor
+import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad (forever, (>=>), (<=<))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
@@ -48,7 +48,7 @@ import Control.PFunctor
 
     "Control.Monad.Trans.Class" exports 'lift'.
 
-    "Control.MFunctor" exports 'hoist'.
+    "Control.Monad.Morph" exports 'hoist'.
 
     "Control.PFunctor" exports 'hoistP'.
 -}

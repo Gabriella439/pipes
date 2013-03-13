@@ -20,8 +20,8 @@ module Control.Proxy.Core.Correct (
 
 import Control.Applicative (Applicative(pure, (<*>)))
 import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.MFunctor (MFunctor(hoist))
 import Control.Proxy.Class
 import Control.Proxy.ListT
 import Control.Proxy.Synonym (C)
