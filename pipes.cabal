@@ -1,6 +1,6 @@
 Name: pipes
 Version: 3.2.0
-Cabal-Version: >=1.14.0
+Cabal-Version: >=1.8.0.2
 Build-Type: Simple
 License: BSD3
 License-File: LICENSE
@@ -34,7 +34,6 @@ Description:
   .
   Read "Control.Proxy.Tutorial" for a really extensive tutorial.
 Category: Control, Pipes, Proxies
-Tested-With: GHC ==7.4.1
 Source-Repository head
     Type: git
     Location: https://github.com/Gabriel439/Haskell-Pipes-Library
@@ -68,5 +67,4 @@ Library
         Control.Proxy.Prelude.Base,
         Control.Proxy.Prelude.IO,
         Control.Proxy.Prelude.Kleisli
-    Default-Language: Haskell98
     GHC-Options: -O2
