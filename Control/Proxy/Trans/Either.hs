@@ -115,7 +115,7 @@ instance ProxyTrans (EitherP e) where
     liftP p = EitherP (p ?>= \x -> return_P (Right x))
 
 instance PFunctor (EitherP e) where
-    hoistP nat = EitherP . nat . runEitherP
+    hoistP nat p = EitherP (nat (runEitherP p))
 
 -- | Run an 'EitherP' \'@K@\'leisi arrow, returning either a 'Left' or 'Right'
 runEitherK
