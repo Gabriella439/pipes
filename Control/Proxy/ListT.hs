@@ -44,11 +44,13 @@ module Control.Proxy.ListT (
     -- $laws
     ) where
 
-import Control.Applicative (Applicative(pure, (<*>)))
+import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
+import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
 import Control.Proxy.Synonym (C, Producer, CoProducer)
+import Data.Monoid (Monoid(mempty, mappend))
 
 -- For documentation
 import Control.Monad ((>=>), (<=<))
@@ -78,6 +80,18 @@ instance (ListT p) => MonadTrans (RespondT p a' a b') where
 
 instance (MonadIO m, ListT p) => MonadIO (RespondT p a' a b' m) where
     liftIO m = lift (liftIO m)
+
+instance (Monad m, ListT p, Monoid b')
+       => Alternative (RespondT p a' a b' m) where
+    empty = RespondT (return_P mempty)
+    p1 <|> p2 = RespondT (
+        runRespondT p1 ?>= \r1 ->
+        runRespondT p2 ?>= \r2 ->
+        return_P (mappend r1 r2) )
+
+instance (Monad m, ListT p, Monoid b') => MonadPlus (RespondT p a' a b' m) where
+    mzero = empty
+    mplus = (<|>)
 
 -- | 'ProduceT' is isomorphic to \"ListT done right\"
 type ProduceT p = RespondT p C () ()
@@ -111,6 +125,18 @@ instance (ListT p) => MonadTrans (RequestT p a' a b') where
 
 instance (MonadIO m, ListT p) => MonadIO (RequestT p a b' b m) where
     liftIO m = lift (liftIO m)
+
+instance (Monad m, ListT p, Monoid a)
+       => Alternative (RequestT p a b' b m) where
+    empty = RequestT (return_P mempty)
+    p1 <|> p2 = RequestT (
+        runRequestT p1 ?>= \r1 ->
+        runRequestT p2 ?>= \r2 ->
+        return_P (mappend r1 r2) )
+
+instance (Monad m, ListT p, Monoid a) => MonadPlus (RequestT p a b' b m) where
+    mzero = empty
+    mplus = (<|>)
 
 -- | 'CoProduceT' is isomorphic to \"ListT done right\"
 type CoProduceT p = RequestT p () () C
