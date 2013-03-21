@@ -27,6 +27,7 @@ class ProxyTrans t where
 mapP :: (Monad m, Proxy p, ProxyTrans t)
      => (q -> p a' a b' b m r) -> (q -> t p a' a b' b m r)
 mapP = (liftP .)
+{-# INLINABLE mapP #-}
 
 {- $laws
      'mapP' defines a functor that preserves five categories:

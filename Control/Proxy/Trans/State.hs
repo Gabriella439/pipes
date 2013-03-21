@@ -99,45 +99,55 @@ instance PFunctor (StateP s) where
 -- | Run a 'StateP' computation, producing the final result and state
 runStateP :: s -> StateP s p a' a b' b m r -> p a' a b' b m (r, s)
 runStateP s m = unStateP m s
+{-# INLINABLE runStateP #-}
 
 -- | Run a 'StateP' \'@K@\'leisli arrow, procuding the final result and state
 runStateK :: s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m (r, s))
 runStateK s k q = unStateP (k q) s
+{-# INLINABLE runStateK #-}
 
 -- | Evaluate a 'StateP' computation, but discard the final state
 evalStateP
     :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m r
 evalStateP s p = unStateP p s ?>= \x -> return_P (fst x)
+{-# INLINABLE evalStateP #-}
 
 -- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final state
 evalStateK
     :: (Proxy p, Monad m)
     => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m r)
 evalStateK s k q = evalStateP s (k q)
+{-# INLINABLE evalStateK #-}
 
 -- | Evaluate a 'StateP' computation, but discard the final result
 execStateP
     :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m s
 execStateP s p = unStateP p s ?>= \x -> return_P (snd x)
+{-# INLINABLE execStateP #-}
 
 -- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final result
 execStateK
     :: (Proxy p, Monad m)
     => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m s)
 execStateK s k q = execStateP s (k q)
+{-# INLINABLE execStateK #-}
 
 -- | Get the current state
 get :: (Proxy p, Monad m) => StateP s p a' a b' b m s
 get = StateP (\s -> return_P (s, s))
+{-# INLINABLE get #-}
 
 -- | Set the current state
 put :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m ()
 put s = StateP (\_ -> return_P ((), s))
+{-# INLINABLE put #-}
 
 -- | Modify the current state using a function
 modify :: (Proxy p, Monad m) => (s -> s) -> StateP s p a' a b' b m ()
 modify f = StateP (\s -> return_P ((), f s))
+{-# INLINABLE modify #-}
 
 -- | Get the state filtered through a function
 gets :: (Proxy p, Monad m) => (s -> r) -> StateP s p a' a b' b m r
 gets f = StateP (\s -> return_P (f s, s))
+{-# INLINABLE gets #-}

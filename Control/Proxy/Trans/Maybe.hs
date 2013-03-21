@@ -113,11 +113,14 @@ instance PMonad MaybeP where
 -- | Run a 'MaybeP' \'@K@\'leisli arrow, returning the result or 'Nothing'
 runMaybeK :: (q -> MaybeP p a' a b' b m r) -> (q -> p a' a b' b m (Maybe r))
 runMaybeK p q = runMaybeP (p q)
+{-# INLINABLE runMaybeK #-}
 
 -- | A synonym for 'mzero'
 nothing :: (Monad m, Proxy p) => MaybeP p a' a b' b m r
 nothing = MaybeP (return_P Nothing)
+{-# INLINABLE nothing #-}
 
 -- | A synonym for 'return'
 just :: (Monad m, Proxy p) => r -> MaybeP p a' a b' b m r
 just r = MaybeP (return_P (Just r))
+{-# INLINABLE just #-}

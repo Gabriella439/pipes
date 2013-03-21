@@ -231,16 +231,19 @@ runProxy k = go (k ()) where
         Respond _ fb' -> go (fb' ())
         M         m   -> m >>= go
         Pure      r   -> return r
+{-# INLINABLE runProxy #-}
 
 {-| Run a self-sufficient 'ProxyFast' Kleisli arrow, converting it back to a
     Kleisli arrow in the base monad
 -}
 runProxyK :: (Monad m) => (() -> ProxyFast a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
+{-# INLINABLE runProxyK #-}
 
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
 runPipe :: (Monad m) => ProxyFast a' () () b m r -> m r
 runPipe p = runProxy (\_ -> p)
+{-# INLINABLE runPipe #-}
 
 {-| The monad transformer laws are correct when viewed through the 'observe'
     function:
@@ -264,3 +267,4 @@ observe p = M (go p) where
         Pure       r   -> return (Pure r)
         Request a' fa  -> return (Request a' (\a  -> observe (fa  a )))
         Respond b  fb' -> return (Respond b  (\b' -> observe (fb' b')))
+{-# INLINABLE observe #-}

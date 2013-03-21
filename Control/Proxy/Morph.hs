@@ -114,3 +114,4 @@ squashP
     :: (Monad m, Proxy p, PMonad t)
     => t (t p) a' a b' b m r -> t p a' a b' b m r
 squashP = embedP id
+{-# INLINABLE squashP #-}

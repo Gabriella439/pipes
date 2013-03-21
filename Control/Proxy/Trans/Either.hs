@@ -132,14 +132,17 @@ instance PMonad (EitherP e) where
 runEitherK
     :: (q -> EitherP e p a' a b' b m r) -> (q -> p a' a b' b m (Either e r))
 runEitherK p q = runEitherP (p q)
+{-# INLINABLE runEitherK #-}
 
 -- | Abort the computation and return a 'Left' result
 left :: (Monad m, Proxy p) => e -> EitherP e p a' a b' b m r
 left e = EitherP (return_P (Left e))
+{-# INLINABLE left #-}
 
 -- | Synonym for 'return'
 right :: (Monad m, Proxy p) => r -> EitherP e p a' a b' b m r
 right r = EitherP (return_P (Right r))
+{-# INLINABLE right #-}
 
 {- $symmetry
     'EitherP' forms a second symmetric monad over the left type variable.
@@ -160,6 +163,7 @@ right r = EitherP (return_P (Right r))
 -- | Synonym for 'left'
 throw :: (Monad m, Proxy p) => e -> EitherP e p a' a b' b m r
 throw = left
+{-# INLINABLE throw #-}
 
 -- | Resume from an aborted operation
 catch
@@ -172,6 +176,7 @@ catch m f = EitherP (
     runEitherP (case e of
         Left  l -> f     l
         Right r -> right r ))
+{-# INLINABLE catch #-}
 
 -- | 'catch' with the arguments flipped
 handle
@@ -180,9 +185,11 @@ handle
     -> EitherP e p a' a b' b m r        -- ^ Original computation
     -> EitherP f p a' a b' b m r        -- ^ Handled computation
 handle f m = catch m f
+{-# INLINABLE handle #-}
 
 -- | 'fmap' over the \'@L@\' variable
 fmapL
     :: (Monad m, Proxy p)
     => (e -> f) -> EitherP e p a' a b' b m r -> EitherP f p a' a b' b m r
 fmapL f p = catch p (\e -> throw (f e))
+{-# INLINABLE fmapL #-}

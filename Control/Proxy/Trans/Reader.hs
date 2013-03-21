@@ -103,24 +103,30 @@ instance PMonad (ReaderP i) where
 -- | Run a 'ReaderP' computation, supplying the environment
 runReaderP :: i -> ReaderP i p a' a b' b m r -> p a' a b' b m r
 runReaderP i m = unReaderP m i
+{-# INLINABLE runReaderP #-}
 
 -- | Run a 'ReaderP' \'@K@\'leisli arrow, supplying the environment
 runReaderK :: i -> (q -> ReaderP i p a' a b' b m r) -> (q -> p a' a b' b m r)
 runReaderK i p q = runReaderP i (p q)
+{-# INLINABLE runReaderK #-}
 
 -- | Get the environment
 ask :: (Proxy p, Monad m) => ReaderP i p a' a b' b m i
 ask = ReaderP return_P
+{-# INLINABLE ask #-}
 
 -- | Get a function of the environment
 asks :: (Proxy p, Monad m) => (i -> r) -> ReaderP i p a' a b' b m r
 asks f = ReaderP (\i -> return_P (f i))
+{-# INLINABLE asks #-}
 
 -- | Modify a computation's environment (a specialization of 'withReaderP')
 local :: (i -> i) -> ReaderP i p a' a b' b m r -> ReaderP i p a' a b' b m r
 local = withReaderP
+{-# INLINABLE local #-}
 
 -- | Modify a computation's environment (a more general version of 'local')
 withReaderP
     :: (j -> i) -> ReaderP i p a' a b' b m r -> ReaderP j p a' a b' b m r
 withReaderP f p = ReaderP (\i -> unReaderP p (f i))
+{-# INLINABLE withReaderP #-}

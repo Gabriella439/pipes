@@ -166,13 +166,16 @@ runProxy k = go (k ()) where
             Request _ fa  -> go (fa  ())
             Respond _ fb' -> go (fb' ())
             Pure      r   -> return r
+{-# INLINABLE runProxy #-}
 
 {-| Run a self-sufficient 'ProxyCorrect' Kleisli arrow, converting it back to a
     Kleisli arrow in the base monad
 -}
 runProxyK :: (Monad m) => (() -> ProxyCorrect a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
+{-# INLINABLE runProxyK #-}
 
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
 runPipe :: (Monad m) => ProxyCorrect a' () () b m r -> m r
 runPipe p = runProxy (\_ -> p)
+{-# INLINABLE runPipe #-}

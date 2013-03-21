@@ -39,6 +39,7 @@ import Control.Proxy.Trans.Identity (runIdentityP)
 -}
 await :: (Monad m, Proxy p) => Pipe p a b m a
 await = request ()
+{-# INLINABLE await #-}
 
 {-| Deliver output downstream
 
@@ -46,12 +47,14 @@ await = request ()
 -}
 yield :: (Monad m, Proxy p) => b -> p a' a b' b m b'
 yield = respond
+{-# INLINABLE yield #-}
 
 -- | Convert a pure function into a pipe
 pipe :: (Monad m, Proxy p) => (a -> b) -> Pipe p a b m r
 pipe f = runIdentityP $ forever $ do
     a <- request ()
     respond (f a)
+{-# INLINABLE pipe #-}
 
 infixr 7 <+<
 infixl 7 >+>
@@ -63,6 +66,7 @@ infixl 7 >+>
     -> p a' a b' b m r
     -> p a' a c' c m r
 p1 <+< p2 = p2 >+> p1
+{-# INLINABLE (<+<) #-}
 
 -- | Corresponds to ('>>>') from @Control.Category@
 (>+>)
@@ -71,12 +75,14 @@ p1 <+< p2 = p2 >+> p1
     -> p b' b c' c m r
     -> p a' a c' c m r
 p1 >+> p2 = (\_ -> p1) ->> p2
+{-# INLINABLE (>+>) #-}
 
 -- | Corresponds to 'id' from @Control.Category@
 idP :: (Monad m, Proxy p) => Pipe p a a m r
 idP = runIdentityP $ forever $ do
     a <- request ()
     respond a
+{-# INLINABLE idP #-}
 
 {-| A self-contained 'Pipeline' that is ready to be run
 

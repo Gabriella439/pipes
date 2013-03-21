@@ -51,34 +51,40 @@ import qualified System.IO as IO
 -- | Synonym for 'getLineS'
 stdinS :: (Proxy p) => () -> Producer p String IO r
 stdinS = getLineS
+{-# INLINABLE stdinS #-}
 
 -- | A 'Producer' that sends lines from 'stdin' downstream
 getLineS :: (Proxy p) => () -> Producer p String IO r
 getLineS () = runIdentityP $ forever $ do
     str <- lift getLine
     respond str
+{-# INLINABLE getLineS #-}
 
 -- | A 'CoProducer' that sends lines from 'stdin' upstream
 getLineC :: (Proxy p) => () -> CoProducer p String IO r
 getLineC () = runIdentityP $ forever $ do
     str <- lift getLine
     request str
+{-# INLINABLE getLineC #-}
 
 -- | 'read' input from 'stdin' one line at a time and send \'@D@\'ownstream
 readLnS :: (Read b, Proxy p) => () -> Producer p b IO r
 readLnS () = runIdentityP $ forever $ do
     a <- lift readLn
     respond a
+{-# INLINABLE readLnS #-}
 
 -- | 'read' input from 'stdin' one line at a time and send \'@U@\'pstream
 readLnC :: (Read a', Proxy p) => () -> CoProducer p a' IO r
 readLnC () = runIdentityP $ forever $ do
     a <- lift readLn
     request a
+{-# INLINABLE readLnC #-}
 
 -- | Synonym for 'putStrLnD'
 stdoutD :: (Proxy p) => x -> p x String x String IO r
 stdoutD = putStrLnD
+{-# INLINABLE stdoutD #-}
 
 -- | 'putStrLn's all values flowing \'@D@\'ownstream to 'stdout'
 putStrLnD :: (Proxy p) => x -> p x String x String IO r
@@ -86,6 +92,7 @@ putStrLnD = runIdentityK $ foreverK $ \x -> do
     a <- request x
     lift $ putStrLn a
     respond a
+{-# INLINABLE putStrLnD #-}
 
 -- | 'putStrLn's all values flowing \'@U@\'pstream to 'stdout'
 putStrLnU :: (Proxy p) => String -> p String x String x IO r
@@ -93,6 +100,7 @@ putStrLnU = runIdentityK $ foreverK $ \a' -> do
     lift $ putStrLn a'
     x <- request a'
     respond x
+{-# INLINABLE putStrLnU #-}
 
 {-| 'putStrLn's all values flowing through it to 'stdout'
 
@@ -108,6 +116,7 @@ putStrLnB = runIdentityK $ foreverK $ \a' -> do
         putStr "D: "
         putStrLn a
     respond a
+{-# INLINABLE putStrLnB #-}
 
 -- | 'print's all values flowing \'@D@\'ownstream to 'stdout'
 printD :: (Show a, Proxy p) => x -> p x a x a IO r
@@ -115,6 +124,7 @@ printD = runIdentityK $ foreverK $ \x -> do
     a <- request x
     lift $ print a
     respond a
+{-# INLINABLE printD #-}
 
 -- | 'print's all values flowing \'@U@\'pstream to 'stdout'
 printU :: (Show a', Proxy p) => a' -> p a' x a' x IO r
@@ -122,6 +132,7 @@ printU = runIdentityK $ foreverK $ \a' -> do
     lift $ print a'
     x <- request a'
     respond x
+{-# INLINABLE printU #-}
 
 {-| 'print's all values flowing through it to 'stdout'
 
@@ -137,6 +148,7 @@ printB = runIdentityK $ foreverK $ \a' -> do
         putStr "D: "
         print a
     respond a
+{-# INLINABLE printB #-}
 
 -- | A 'Producer' that sends lines from a handle downstream
 hGetLineS :: (Proxy p) => IO.Handle -> () -> Producer p String IO ()
@@ -149,6 +161,7 @@ hGetLineS h () = runIdentityP go where
                 str <- lift $ IO.hGetLine h
                 respond str
                 go
+{-# INLINABLE hGetLineS #-}
 
 -- | A 'CoProducer' that sends lines from a 'Handle' upstream
 hGetLineC :: (Proxy p) => IO.Handle -> () -> CoProducer p String IO ()
@@ -161,6 +174,7 @@ hGetLineC h () = runIdentityP go where
                 str <- lift $ IO.hGetLine h
                 request str
                 go
+{-# INLINABLE hGetLineC #-}
 
 -- | 'print's all values flowing \'@D@\'ownstream to a 'Handle'
 hPrintD :: (Show a, Proxy p) => IO.Handle -> x -> p x a x a IO r
@@ -168,6 +182,7 @@ hPrintD h = runIdentityK $ foreverK $ \x -> do
     a <- request x
     lift $ IO.hPrint h a
     respond a
+{-# INLINABLE hPrintD #-}
 
 -- | 'print's all values flowing \'@U@\'pstream to a 'Handle'
 hPrintU :: (Show a', Proxy p) => IO.Handle -> a' -> p a' x a' x IO r
@@ -175,6 +190,7 @@ hPrintU h = runIdentityK $ foreverK $ \a' -> do
     lift $ IO.hPrint h a'
     x <- request a'
     respond x
+{-# INLINABLE hPrintU #-}
 
 {-| 'print's all values flowing through it to a 'Handle'
 
@@ -190,6 +206,7 @@ hPrintB h = runIdentityK $ foreverK $ \a' -> do
         IO.hPutStr h "D: "
         IO.hPrint h a
     respond a
+{-# INLINABLE hPrintB #-}
 
 -- | 'putStrLn's all values flowing \'@D@\'ownstream to a 'Handle'
 hPutStrLnD :: (Proxy p) => IO.Handle -> x -> p x String x String IO r
@@ -197,6 +214,7 @@ hPutStrLnD h = runIdentityK $ foreverK $ \x -> do
     a <- request x
     lift $ IO.hPutStrLn h a
     respond a
+{-# INLINABLE hPutStrLnD #-}
 
 -- | 'putStrLn's all values flowing \'@U@\'pstream to a 'Handle'
 hPutStrLnU :: (Proxy p) => IO.Handle -> String -> p String x String x IO r
@@ -204,6 +222,7 @@ hPutStrLnU h = runIdentityK $ foreverK $ \a' -> do
     lift $ IO.hPutStrLn h a'
     x <- request a'
     respond x
+{-# INLINABLE hPutStrLnU #-}
 
 {-| 'putStrLn's all values flowing through it to a 'Handle'
 
@@ -220,3 +239,4 @@ hPutStrLnB h = runIdentityK $ foreverK $ \a' -> do
         IO.hPutStr h "D: "
         IO.hPutStrLn h a
     respond a
+{-# INLINABLE hPutStrLnB #-}

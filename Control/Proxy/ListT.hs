@@ -94,6 +94,7 @@ instance (Monad m, ListT p, Monoid b') => MonadPlus (RespondT p a' a b' m) where
 -- | Convert a 'RespondT' \'@K@\'leisli arrow into a proxy
 runRespondK :: (q -> RespondT p a' a b' m b) -> (q -> p a' a b' b m b')
 runRespondK k q = runRespondT (k q)
+{-# INLINABLE runRespondK #-}
 
 -- | 'ProduceT' is isomorphic to \"ListT done right\"
 type ProduceT p = RespondT p C () ()
@@ -137,6 +138,7 @@ instance (Monad m, ListT p, Monoid a) => MonadPlus (RequestT p a b' b m) where
 -- | Convert a 'RequestT' \'@K@\'leisli arrow into a proxy
 runRequestK :: (q -> RequestT p a b' b m a') -> (q -> p a' a b' b m a)
 runRequestK k q = runRequestT (k q)
+{-# INLINABLE runRequestK #-}
 
 -- | 'CoProduceT' is isomorphic to \"ListT done right\"
 type CoProduceT p = RequestT p () () C

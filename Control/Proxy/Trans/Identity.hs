@@ -24,8 +24,7 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Identity' proxy transformer
 newtype IdentityP p a' a b' b (m :: * -> *) r
-    = IdentityP { runIdentityP :: p a' a b' b m r }
-
+    = IdentityP { runIdentityP :: p a' a b' b m r } 
 instance (Proxy p, Monad m) => Functor (IdentityP p a' a b' b m) where
     fmap f p = IdentityP (
         runIdentityP p ?>= \x ->
@@ -98,7 +97,9 @@ instance PMonad IdentityP where
 -- | Wrap a \'@K@\'leisli arrow in 'IdentityP'
 identityK :: (q -> p a' a b' b m r) -> (q -> IdentityP p a' a b' b m r)
 identityK k q = IdentityP (k q)
+{-# INLINABLE identityK #-}
 
 -- | Run an 'P' \'@K@\'leisli arrow
 runIdentityK :: (q -> IdentityP p a' a b' b m r) -> (q -> p a' a b' b m r)
 runIdentityK k q = runIdentityP (k q)
+{-# INLINABLE runIdentityK #-}

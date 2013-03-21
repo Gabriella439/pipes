@@ -41,6 +41,7 @@ foreverK k = let r = \a -> k a >>= r in r
 {- foreverK uses 'let' to avoid a space leak.
    See: http://hackage.haskell.org/trac/ghc/ticket/5205
 -}
+{-# INLINABLE foreverK #-}
 
 -- | Repeat a \'@K@\'leisli arrow multiple times
 replicateK :: (Monad m) => Int -> (a -> m a) -> (a -> m a)
@@ -49,6 +50,7 @@ replicateK n0 k = go n0 where
         | n < 1     = return
         | n == 1    = k
         | otherwise = \a -> k a >>= go (n - 1)
+{-# INLINABLE replicateK #-}
 
 {-| Convenience function equivalent to @(lift .)@
 
@@ -59,6 +61,7 @@ replicateK n0 k = go n0 where
 liftK :: (Monad m, MonadTrans t) => (a -> m b) -> (a -> t m b)
 liftK k a = lift (k a)
 -- liftK = (lift .)
+{-# INLINABLE liftK #-}
 
 -- | Convenience function equivalent to @(hoist f .)@
 hoistK
@@ -68,6 +71,7 @@ hoistK
     -> (b' -> t n b)
 hoistK k p a' = hoist k (p a')
 -- hoistK k = (hoist k .)
+{-# INLINABLE hoistK #-}
 
 {-| Lift the base monad
 
@@ -75,6 +79,7 @@ hoistK k p a' = hoist k (p a')
 -}
 raise :: (Monad m, MFunctor t1, MonadTrans t2) => t1 m r -> t1 (t2 m) r
 raise = hoist lift
+{-# INLINABLE raise #-}
 
 {-| Lift the base monad of a \'@K@\'leisli arrow
 
@@ -84,6 +89,7 @@ raiseK
     :: (Monad m, MFunctor t1, MonadTrans t2)
     => (q -> t1 m r) -> (q -> t1 (t2 m) r)
 raiseK = (hoist lift .)
+{-# INLINABLE raiseK #-}
 
 -- | Convenience function equivalent to @(hoistP f .)@
 hoistPK
@@ -92,6 +98,7 @@ hoistPK
     -> (q -> t p1 a' a b' b m r2) -- ^ Proxy Kleisli arrow
     -> (q -> t p2 a' a b' b n r2)
 hoistPK f = (hoistP f .)
+{-# INLINABLE hoistPK #-}
 
 {-| Lift the base proxy
 
@@ -102,6 +109,7 @@ raiseP
     => t1 p a' a b' b m r -- ^ Proxy
     -> t1 (t2 p) a' a b' b m r
 raiseP = hoistP liftP
+{-# INLINABLE raiseP #-}
 
 {-| Lift the base proxy of a \'@K@\'leisli arrow
 
@@ -112,3 +120,4 @@ raisePK
     => (q -> t1 p a' a b' b m r) -- ^ Proxy Kleisli arrow
     -> (q -> t1 (t2 p) a' a b' b m r)
 raisePK = hoistPK liftP
+{-# INLINABLE raisePK #-}
