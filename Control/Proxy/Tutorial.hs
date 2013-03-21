@@ -1194,12 +1194,12 @@ Received a value:
 {- $listT
     Proxies generalize lists by allowing you to interleave effects between list
     elements, but you might be surprised to learn that they also generalize the
-    list monad, too! "Control.Proxy.ListT" provides the machinery necessary to
+    list monad, too!  "Control.Proxy.ListT" provides the machinery necessary to
     convert back and forth between proxies and a @ListT@-like monad transformer
     that binds proxy outputs.
 
     For example, let's say that we want to select elements from two separate
-    lists, like in the list monad, except interleaving side effects, too:
+    lists, except interleaving side effects, too:
 
 > --                          +-- ListT that will compile to a 'Producer'
 > --                          |
@@ -1214,13 +1214,14 @@ Received a value:
     We can compile the above 'ProduceT' code to a 'Producer' using
     'runRespondK':
 
+> -- runRespondK's type is actually more general
 > runRespondK :: (() -> ProduceT p m b) -> () -> Producer p b m ()
 >
 > runRespondK pairs :: (ListT p) => () -> Producer p (Int, Int) IO ()
 
-    The return value of the 'ProduceT' becomes the output of the 'Producer',
-    which generates one output for each permutation of elements that we could
-    have selected:
+    The return value of the 'ProduceT' becomes the output of the corresponding
+    'Producer', which produces one output for each permutation of elements that
+    we could have selected:
 
 >>> runProxy $ runRespondK pairs >-> printD
 Currently using: 1
@@ -1236,26 +1237,8 @@ Currently using: 3
 (3,6)
 (3,8)
 
-    Proxies actually form two separate 'ListT' monad transformers: one selects
-    elements output from the proxy's downstream interface and one selects
-    elements output from the proxy's upstream interface.  To distinguish them,
-    I call the downstream one 'RespondT' (which generalizes 'ProduceT') and the
-    upstream one 'RequestT' (which generalizes 'CoProduceT').
-
-    "Control.Proxy.ListT" defines the 'ListT' class, which provides the two
-    bind operators for 'RespondT' and 'RequestT':
-
-    * ('>\\'): Equivalent to ('=<<') for 'RequestT'
-
-    * ('//>'): Equivalent to ('>>=') for 'RespondT'
-
-    Note that you don't need to use these bind operators directly.  You can
-    wrap any proxy in the 'RespondT' newtype to automatically use the
-    downstream @ListT@ monad or wrap it in the 'RequestT' newtype to
-    automatically use the upstream @ListT@ monad.
-
-    The 'RespondT' \/ 'RequestT' newtypes let you build your own custom 'ListT'
-    actions simply by wrapping proxies:
+    This works the other way around, too!  You can wrap any 'Producer' in the
+    'RespondT' newtype to bind its output in the 'ProduceT' monad:
 
 > pairs2 :: (ListT p) => () -> ProduceT p IO (Int, Int)
 > pairs2 () = do
@@ -1269,10 +1252,6 @@ Currently using: 3
 >         respond 4
 >     return (x, y)
 
-    Binding a proxy in the 'RespondT' monad behaves like binding a list in the
-    list monad: the return value selects one of the proxy's downstream outputs,
-    interleaving side effects as necessary:
-
 >>> runProxy $ runRespondK pairs2 >-> printD
 (1,3)
 There
@@ -1282,13 +1261,21 @@ Here
 There
 (2,4)
 
-    Dually, binding a proxy in the 'RequestT' monad selects one of the proxy's
-    upstream outputs.
+    In fact, this is how 'eachS' and 'rangeS' are implemented:
 
-    'RespondT' can do more than build 'Producer's: it can build arbitrary
-    proxies.  We can modify the above example so that the 'RespondT' actions can
-    'request' input from upstream, as long as we generalize 'ProduceT' to the
-    more powerful 'RespondT' type:
+> eachS :: (Monad m, ListT p) => [b] -> ProduceT p m b
+> eachS xs = RespondT (fromList xs ())
+>
+> rangeS :: (Enum b, Monad m, Ord b, ListT p) => b -> b -> ProduceT p m b
+> rangeS n1 n2 = RespondT (enumFromS n1 n2 ())
+
+    'ProduceT' is actually a special case of 'RespondT', related by the
+    following type synonym:
+
+> type ProduceT p = RespondT p C () ()
+
+    Moreover, you can bind anything within 'RespondT', not just 'Producer's.
+    For example, you can bind 'Pipe's within the more general 'RespondT' monad:
 
 > pairs3 :: (ListT p) => () -> RespondT p () Int () IO (Int, Int)
 > pairs3 () = do
@@ -1301,6 +1288,10 @@ There
 >         lift $ putStrLn $ "Received " ++ show a
 >         respond a
 >     return (x, y)
+
+    ... and you will get a 'Pipe' back when you 'runRespondK' the final result:
+
+> runRespondK pairs3 :: ListT p => () -> Pipe p Int (Int, Int) IO ()
 
 >>> runProxy $ enumFromS 1 >-> runRespondK pairs3 >-> printD
 Received 1
@@ -1318,9 +1309,45 @@ Received 7
 Received 8
 (5,8)
 
-    'Request' and 'RespondT' are correct by construction, meaning that they
-    always satisfy the monad and monad transformer laws no matter what, unlike
-    @ListT@ from @transformers@.
+    Proxies actually form two symmetric 'ListT'-like monad transformers: one
+    binds elements output from the proxy's downstream interface and one binds
+    elements output from the proxy's upstream interface.  To distinguish them,
+    I call the downstream one 'RespondT' and the upstream one 'RequestT'.
+
+    "Control.Proxy.ListT" contains the 'ListT' class, which provides the the
+    underlying operators for both 'RespondT' and 'RequestT':
+
+    * ('>\\'): Equivalent to ('=<<') for 'RequestT'
+
+    * ('//>'): Equivalent to ('>>=') for 'RespondT'
+
+    You don't need to use these operators directly, since you can instead just
+    wrap your proxies in the 'RespondT' or 'RequestT' monad transformers and
+    they will translate the binds in those monads to the above operators under
+    the hood.
+
+    If those are the bind operators, though, then where are the corresponding
+    'return' equivalents?  Why, they are just 'respond' and 'request'!
+
+> -- return for 'RespondT'
+> return b  = RespondT (respond b)
+
+> -- return for 'RequestT'
+> return a' = RequestT (request a')
+
+    Therefore, we can use the monad laws to reason about how 'respond' interacts
+    with 'RespondT' (and, dually, how 'request' interacts with 'RequestT'):
+
+> do x' <- RespondT (respond x)  =  do f x
+>    f x'
+>
+> do x <- m                      =  do m
+>    RespondT (respond x)
+
+    'RequestT' and 'RespondT' are correct by construction, meaning that they
+    always satisfy the monad and monad transformer without exception, unlike
+    @ListT@ from @transformers@.  In other words, they behave like two
+    symmetric implementations of \"ListT done right\".
 -}
 
 {- $folds
@@ -2204,7 +2231,19 @@ Left "Could not read an Integer"
 -- >         lift $ putStrLn "There"
 -- >         respond 4
 -- >     return (x, y)
--- > 
+-- >
+-- > pairs3 :: (ListT p) => () -> RespondT p () Int () IO (Int, Int)
+-- > pairs3 () = do
+-- >     x <- RespondT $ runIdentityP $ replicateM_ 2 $ do
+-- >         a <- request ()
+-- >         lift $ putStrLn $ "Received " ++ show a
+-- >         respond a
+-- >     y <- RespondT $ runIdentityP $ replicateM_ 3 $ do
+-- >         a <- request ()
+-- >         lift $ putStrLn $ "Received " ++ show a
+-- >         respond a
+-- >     return (x, y)
+-- >
 -- > readFileS :: (Proxy p) => FilePath -> () -> Producer p String IO ()
 -- > readFileS file () = runIdentityP $ do
 -- >     h <- lift $ openFile file ReadMode

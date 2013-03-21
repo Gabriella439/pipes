@@ -42,7 +42,7 @@ import Control.Proxy.Prelude
     eases writing completely polymorphic proxies.
 
     "Control.Proxy.ListT" defines a generalized @ListT@ monad transformer that
-    compiles to proxies.
+    can interconvert with proxies.
 
     "Control.Proxy.Morph" exports 'hoistP'.
 
