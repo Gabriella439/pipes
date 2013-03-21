@@ -13,7 +13,7 @@
     corresponds to the \"request\" category of the 'ListT' class.
 
     Unlike 'ListT' from @transformers@, these monad transformers are correct by
-    construction and do not assume the base monad is commutative.
+    construction and always satisfy the monad and monad transformer laws.
 -}
 
 {-# LANGUAGE KindSignatures #-}
@@ -21,13 +21,13 @@
 module Control.Proxy.ListT (
     -- * Respond Monad Transformer
     RespondT(..),
+    runRespondK,
     ProduceT,
-    runProduceT,
 
     -- * Request Monad Transformer
     RequestT(..),
+    runRequestK,
     CoProduceT,
-    runCoProduceT,
 
     -- * ListT
     ListT(..),
@@ -93,12 +93,12 @@ instance (Monad m, ListT p, Monoid b') => MonadPlus (RespondT p a' a b' m) where
     mzero = empty
     mplus = (<|>)
 
+-- | Convert a 'RespondT' \'@K@\'leisli arrow into a proxy
+runRespondK :: (q -> RespondT p a' a b' m b) -> (q -> p a' a b' b m b')
+runRespondK k q = runRespondT (k q)
+
 -- | 'ProduceT' is isomorphic to \"ListT done right\"
 type ProduceT p = RespondT p C () ()
-
--- | Convert a 'ProduceT' into a 'Producer' suitable for composition
-runProduceT :: ProduceT p m b -> () -> Producer p b m ()
-runProduceT p () = runRespondT p
 
 -- | A monad transformer over a proxy's upstream output
 newtype RequestT (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b' b m a' =
@@ -138,12 +138,12 @@ instance (Monad m, ListT p, Monoid a) => MonadPlus (RequestT p a b' b m) where
     mzero = empty
     mplus = (<|>)
 
+-- | Convert a 'RequestT' \'@K@\'leisli arrow into a proxy
+runRequestK :: (q -> RequestT p a b' b m a') -> (q -> p a' a b' b m a)
+runRequestK k q = runRequestT (k q)
+
 -- | 'CoProduceT' is isomorphic to \"ListT done right\"
 type CoProduceT p = RequestT p () () C
-
--- | Convert a 'CoProduceT' into a 'CoProducer' suitable for composition
-runCoProduceT :: CoProduceT p m a' -> () -> CoProducer p a' m ()
-runCoProduceT p () = runRequestT p
 
 {- * I make educated guesses about which associativy is most efficient for each
      operator.
