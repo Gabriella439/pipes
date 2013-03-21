@@ -29,7 +29,7 @@ module Control.Proxy.Pipe (
     ) where
 
 import Control.Monad (forever)
-import Control.Proxy.Class
+import Control.Proxy.Class (Proxy, respond, request, (->>))
 import Control.Proxy.Synonym (Pipe, Consumer, Producer, C)
 import Control.Proxy.Trans.Identity (runIdentityP)
 

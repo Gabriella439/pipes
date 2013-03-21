@@ -96,7 +96,6 @@ module Control.Proxy.Prelude.Base (
     module Data.Monoid
     ) where
 
-import Control.Monad ((>=>))
 import Control.Monad.Morph (hoist)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Writer.Lazy (
@@ -110,9 +109,16 @@ import Control.Monad.Trans.State.Strict (
     execState,
     evalState )
 import Control.Proxy.Class
-import Control.Proxy.ListT
+import Control.Proxy.ListT (
+    ListT,
+    (\>\),
+    (/>/),
+    RespondT(RespondT),
+    RequestT(RequestT),
+    ProduceT,
+    CoProduceT )
 import Control.Proxy.Prelude.Kleisli (replicateK, foreverK)
-import Control.Proxy.Synonym
+import Control.Proxy.Synonym (Producer, Consumer, Pipe, CoProducer, CoPipe)
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK, identityK)
 import Data.Monoid (
     Monoid,

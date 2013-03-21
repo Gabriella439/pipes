@@ -14,7 +14,7 @@ module Control.Proxy.Trans (
     -- $laws
     ) where
 
-import Control.Proxy.Class
+import Control.Proxy.Class (Proxy)
 
 -- | Uniform interface to lifting proxies
 class ProxyTrans t where

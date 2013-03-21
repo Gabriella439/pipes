@@ -24,7 +24,10 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.Proxy.Class
+import Control.Proxy.Class (
+    Proxy(request, respond, (->>), (>>~)),
+    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P),
+    MonadPlusP(mzero_P, mplus_P) )
 import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 

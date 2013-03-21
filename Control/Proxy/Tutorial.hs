@@ -74,9 +74,9 @@ module Control.Proxy.Tutorial (
     ) where
 
 -- For documentation
-import Control.Category
-import Control.Monad.Morph
-import Control.Monad.Trans.Class
+import Control.Category (Category)
+import Control.Monad.Morph (MFunctor(hoist))
+import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy
 import Control.Proxy.Morph
 import Control.Proxy.Core.Correct (ProxyCorrect)

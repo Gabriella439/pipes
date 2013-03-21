@@ -45,7 +45,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Proxy.Prelude.Kleisli (foreverK)
 import Control.Proxy.Class (Proxy(request, respond))
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
-import Control.Proxy.Synonym (Client, Server, Producer, CoProducer)
+import Control.Proxy.Synonym (Producer, CoProducer)
 import qualified System.IO as IO
 
 -- | Synonym for 'getLineS'

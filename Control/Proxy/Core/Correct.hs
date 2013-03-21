@@ -22,9 +22,10 @@ import Control.Applicative (Applicative(pure, (<*>)))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.Proxy.Class
-import Control.Proxy.ListT
-import Control.Proxy.Synonym (C)
+import Control.Proxy.Class (
+    Proxy(request, respond, (->>), (>>~)),
+    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P) )
+import Control.Proxy.ListT (ListT((//>), (>\\)))
 
 {-| A 'ProxyCorrect' communicates with an upstream interface and a downstream
     interface.
