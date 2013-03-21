@@ -20,8 +20,8 @@ import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Identity' proxy transformer
-newtype IdentityP p a' a b' b (m :: * -> *) r =
-    IdentityP { runIdentityP :: p a' a b' b m r }
+newtype IdentityP p a' a b' b (m :: * -> *) r
+    = IdentityP { runIdentityP :: p a' a b' b m r }
 
 instance (Proxy p, Monad m) => Functor (IdentityP p a' a b' b m) where
     fmap f p = IdentityP (

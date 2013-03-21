@@ -13,17 +13,20 @@ module Control.Pipe (
     Producer,
     Consumer,
     Pipeline,
+
     -- * Create Pipes
     -- $create
     await,
     yield,
     pipe,
+
     -- * Compose Pipes
     -- $category
     (<+<),
     (>+>),
     idP,
     PipeC(..),
+
     -- * Run Pipes
     runPipe
     ) where
@@ -52,17 +55,16 @@ import Prelude hiding ((.), id)
     * @r@ - The type of the return value
 -}
 data Pipe a b m r
-  = Await (a -> Pipe a b m r)
-  | Yield  b   (Pipe a b m r)
-  | M     (m   (Pipe a b m r))
-  | Pure r
-{-
-Technically, the correct implementation that satisfies the monad transformer
-laws is:
+     = Await (a -> Pipe a b m r)
+     | Yield  b   (Pipe a b m r)
+     | M     (m   (Pipe a b m r))
+     | Pure r
+{- Technically, the correct implementation that satisfies the monad transformer
+   laws is:
 
-type PipeF a b x = Await (a -> x) | Yield b x deriving (Functor)
-
-type Pipe a b = FreeT (PipeF a b)
+> data PipeF a b x = Await (a -> x) | Yield b x deriving (Functor)
+> 
+> type Pipe a b = FreeT (PipeF a b)
 -}
 
 instance (Monad m) => Functor (Pipe a b m) where
@@ -119,24 +121,21 @@ type Pipeline m r = Pipe () C m r
 >     when ok (yield x)
 -}
 
-{-|
-    Wait for input from upstream.
+{-| Wait for input from upstream.
 
     'await' blocks until input is available from upstream.
 -}
 await :: Pipe a b m a
 await = Await Pure
 
-{-|
-    Deliver output downstream.
+{-| Deliver output downstream.
 
     'yield' restores control back upstream and binds its value to 'await'.
 -}
 yield :: b -> Pipe a b m ()
 yield b = Yield b (Pure ())
 
-{-|
-    Convert a pure function into a pipe
+{-| Convert a pure function into a pipe
 
 > pipe f = forever $ do
 >     x <- await
@@ -182,8 +181,8 @@ _  <+< (Pure  r) = Pure r
 (>+>) :: (Monad m) => Pipe a b m r -> Pipe b c m r -> Pipe a c m r
 p2 >+> p1 = p1 <+< p2
 
-infixr 8 <+<
-infixl 8 >+>
+infixr 7 <+<
+infixl 7 >+>
 
 -- | Corresponds to 'id' from @Control.Category@
 idP :: (Monad m) => Pipe a a m r

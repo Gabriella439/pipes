@@ -3,8 +3,8 @@
     Note that 'String's are very inefficient, and I will release future separate
     packages with 'ByteString' and 'Text' operations.  I only provide these to
     allow users to test simple I/O without requiring additional library
-    dependencies. -}
-
+    dependencies.
+-}
 module Control.Proxy.Prelude.IO (
     -- * Standard I/O
 
@@ -210,7 +210,7 @@ hPutStrLnU h = runIdentityK $ foreverK $ \a' -> do
     Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
 -}
 hPutStrLnB
- :: (Proxy p) => IO.Handle -> String -> p String String String String IO r
+    :: (Proxy p) => IO.Handle -> String -> p String String String String IO r
 hPutStrLnB h = runIdentityK $ foreverK $ \a' -> do
     lift $ do
         IO.hPutStr h "U: "

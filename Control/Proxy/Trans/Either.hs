@@ -35,7 +35,7 @@ import Data.Monoid (Monoid(mempty, mappend))
 
 -- | The 'Either' proxy transformer
 newtype EitherP e p a' a b' b (m :: * -> *) r
-  = EitherP { runEitherP :: p a' a b' b m (Either e r) }
+    = EitherP { runEitherP :: p a' a b' b m (Either e r) }
 
 instance (Proxy p, Monad m) => Functor (EitherP e p a' a b' b m) where
     fmap f p = EitherP (
@@ -127,7 +127,7 @@ instance PMonad (EitherP e) where
 
 -- | Run an 'EitherP' \'@K@\'leisi arrow, returning either a 'Left' or 'Right'
 runEitherK
- :: (q -> EitherP e p a' a b' b m r) -> (q -> p a' a b' b m (Either e r))
+    :: (q -> EitherP e p a' a b' b m r) -> (q -> p a' a b' b m (Either e r))
 runEitherK p q = runEitherP (p q)
 
 -- | Abort the computation and return a 'Left' result
@@ -160,10 +160,10 @@ throw = left
 
 -- | Resume from an aborted operation
 catch
- :: (Monad m, Proxy p)
- => EitherP e p a' a b' b m r        -- ^ Original computation
- -> (e -> EitherP f p a' a b' b m r) -- ^ Handler
- -> EitherP f p a' a b' b m r        -- ^ Handled computation
+    :: (Monad m, Proxy p)
+    => EitherP e p a' a b' b m r        -- ^ Original computation
+    -> (e -> EitherP f p a' a b' b m r) -- ^ Handler
+    -> EitherP f p a' a b' b m r        -- ^ Handled computation
 catch m f = EitherP (
     runEitherP m ?>= \e ->
     runEitherP (case e of
@@ -172,14 +172,14 @@ catch m f = EitherP (
 
 -- | 'catch' with the arguments flipped
 handle
- :: (Monad m, Proxy p)
- => (e -> EitherP f p a' a b' b m r) -- ^ Handler
- -> EitherP e p a' a b' b m r        -- ^ Original computation
- -> EitherP f p a' a b' b m r        -- ^ Handled computation
+    :: (Monad m, Proxy p)
+    => (e -> EitherP f p a' a b' b m r) -- ^ Handler
+    -> EitherP e p a' a b' b m r        -- ^ Original computation
+    -> EitherP f p a' a b' b m r        -- ^ Handled computation
 handle f m = catch m f
 
 -- | 'fmap' over the \'@L@\' variable
 fmapL
- :: (Monad m, Proxy p)
- => (e -> f) -> EitherP e p a' a b' b m r -> EitherP f p a' a b' b m r
+    :: (Monad m, Proxy p)
+    => (e -> f) -> EitherP e p a' a b' b m r -> EitherP f p a' a b' b m r
 fmapL f p = catch p (\e -> throw (f e))

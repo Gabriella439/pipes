@@ -64,7 +64,6 @@ instance (Monad m, ListT p) => Functor (RespondT p a' a b' m) where
 
 instance (Monad m, ListT p) => Applicative (RespondT p a' a b' m) where
     pure a = RespondT (respond a)
-
     mf <*> mx = RespondT (
         runRespondT mf //> \f ->
         runRespondT mx //> \x ->
@@ -72,7 +71,6 @@ instance (Monad m, ListT p) => Applicative (RespondT p a' a b' m) where
 
 instance (Monad m, ListT p) => Monad (RespondT p a' a b' m) where
     return a = RespondT (respond a)
-
     m >>= f  = RespondT (runRespondT m //> \a -> runRespondT (f a))
 
 instance (ListT p) => MonadTrans (RespondT p a' a b') where
@@ -109,7 +107,6 @@ instance (Monad m, ListT p) => Functor (RequestT p a b' b m) where
 
 instance (Monad m, ListT p) => Applicative (RequestT p a b' b m) where
     pure a = RequestT (request a)
-
     mf <*> mx = RequestT (
         runRequestT mf //< \f ->
         runRequestT mx //< \x ->
@@ -117,7 +114,6 @@ instance (Monad m, ListT p) => Applicative (RequestT p a b' b m) where
 
 instance (Monad m, ListT p) => Monad (RequestT p a b' b m) where
     return a = RequestT (request a)
-
     m >>= f  = RequestT (runRequestT m //< \a -> runRequestT (f a))
 
 instance (ListT p) => MonadTrans (RequestT p a' a b') where
@@ -167,10 +163,11 @@ class (Proxy p) => ListT p where
 
         Point-ful version of ('\>\')
     -}
-    (>\\) :: (Monad m)
-          => (b' -> p a' a x' x m b)
-          ->        p b' b x' x m c
-          ->        p a' a x' x m c
+    (>\\)
+        :: (Monad m)
+        => (b' -> p a' a x' x m b)
+        ->        p b' b x' x m c
+        ->        p a' a x' x m c
 
     {-| @p \/\/> f@ replaces all 'respond's in @p@ with @f@.
 
@@ -178,10 +175,11 @@ class (Proxy p) => ListT p where
 
         Point-ful version of ('/>/')
     -}
-    (//>) :: (Monad m)
-          =>       p x' x b' b m a'
-          -> (b -> p x' x c' c m b')
-          ->       p x' x c' c m a'
+    (//>)
+        :: (Monad m)
+        =>       p x' x b' b m a'
+        -> (b -> p x' x c' c m b')
+        ->       p x' x c' c m a'
 
 {-| @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
 
@@ -189,10 +187,11 @@ class (Proxy p) => ListT p where
 
     Point-free version of ('>\\')
 -}
-(\>\) :: (Monad m, ListT p)
-      => ( b' -> p a' a x' x m b)
-      -> (_c' -> p b' b x' x m c)
-      -> (_c' -> p a' a x' x m c)
+(\>\)
+    :: (Monad m, ListT p)
+    => ( b' -> p a' a x' x m b)
+    -> (_c' -> p b' b x' x m c)
+    -> (_c' -> p a' a x' x m c)
 f \>\ g = \c' -> f >\\ g c'
 {-# INLINABLE (\>\) #-}
 
@@ -202,42 +201,47 @@ f \>\ g = \c' -> f >\\ g c'
 
     Point-free version of ('//>')
 -}
-(/>/) :: (Monad m, ListT p)
-      => (_a -> p x' x b' b m a')
-      -> ( b -> p x' x c' c m b')
-      -> (_a -> p x' x c' c m a')
+(/>/)
+    :: (Monad m, ListT p)
+    => (_a -> p x' x b' b m a')
+    -> ( b -> p x' x c' c m b')
+    -> (_a -> p x' x c' c m a')
 f />/ g = \a -> f a //> g
 {-# INLINABLE (/>/) #-}
 
 -- | Equivalent to ('\>\') with the arguments flipped
-(/</) :: (Monad m, ListT p)
-      => (_c' -> p b' b x' x m c)
-      -> ( b' -> p a' a x' x m b)
-      -> (_c' -> p a' a x' x m c)
+(/</)
+    :: (Monad m, ListT p)
+    => (_c' -> p b' b x' x m c)
+    -> ( b' -> p a' a x' x m b)
+    -> (_c' -> p a' a x' x m c)
 p1 /</ p2 = p2 \>\ p1
 {-# INLINABLE (/</) #-}
 
 -- | Equivalent to ('/>/') with the arguments flipped
-(\<\) :: (Monad m, ListT p)
-      => ( b -> p x' x c' c m b')
-      -> (_a -> p x' x b' b m a')
-      -> (_a -> p x' x c' c m a')
+(\<\)
+    :: (Monad m, ListT p)
+    => ( b -> p x' x c' c m b')
+    -> (_a -> p x' x b' b m a')
+    -> (_a -> p x' x c' c m a')
 p1 \<\ p2 = p2 />/ p1
 {-# INLINABLE (\<\) #-}
 
 -- | Equivalent to ('>\\') with the arguments flipped
-(//<) :: (Monad m, ListT p)
-      =>        p b' b x' x m c
-      -> (b' -> p a' a x' x m b)
-      ->        p a' a x' x m c
+(//<)
+    :: (Monad m, ListT p)
+    =>        p b' b x' x m c
+    -> (b' -> p a' a x' x m b)
+    ->        p a' a x' x m c
 p //< f = f >\\ p
 {-# INLINABLE (//<) #-}
 
 -- | Equivalent to ('//>') with the arguments flipped
-(<\\) :: (Monad m, ListT p)
-      => (b -> p x' x c' c m b')
-      ->       p x' x b' b m a'
-      ->       p x' x c' c m a'
+(<\\)
+    :: (Monad m, ListT p)
+    => (b -> p x' x c' c m b')
+    ->       p x' x b' b m a'
+    ->       p x' x c' c m a'
 f <\\ p = p //> f
 {-# INLINABLE (<\\) #-}
 

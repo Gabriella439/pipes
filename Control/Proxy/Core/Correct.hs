@@ -4,8 +4,8 @@
 
     However, I advise that you stick to the 'Proxy' type class API rather than
     import this module so that your code works with both 'Proxy' implementations
-    and also works with all proxy transformers. -}
-
+    and also works with all proxy transformers.
+-}
 module Control.Proxy.Core.Correct (
     -- * Types
     ProxyCorrect(..),
@@ -42,15 +42,16 @@ import Control.Proxy.Synonym (C)
 
     * @m     @ - The base monad
 
-    * @r     @ - The final return value -}
+    * @r     @ - The final return value
+-}
 data ProxyCorrect a' a b' b m  r =
     Proxy { unProxy :: m (ProxyF a' a b' b r (ProxyCorrect a' a b' b m r)) }
 
 -- | The base functor for the 'ProxyCorrect' type
 data ProxyF a' a b' b r x
-  = Request a' (a  -> x)
-  | Respond b  (b' -> x)
-  | Pure    r
+    = Request a' (a  -> x)
+    | Respond b  (b' -> x)
+    | Pure    r
 
 instance (Monad m) => Functor (ProxyCorrect a' a b' b m) where
     fmap f p0 = go p0 where
@@ -150,10 +151,12 @@ instance ListT ProxyCorrect where
 
     Use 'runProxyK' if you are running proxies nested within proxies.  It
     provides a Kleisli arrow as its result that you can pass to another
-    'runProxy' / 'runProxyK' command. -}
+    'runProxy' / 'runProxyK' command.
+-}
 
 {-| Run a self-sufficient 'ProxyCorrect' Kleisli arrow, converting it back to
-    the base monad -}
+    the base monad
+-}
 runProxy :: (Monad m) => (() -> ProxyCorrect a' () () b m r) -> m r
 runProxy k = go (k ()) where
     go p = do
@@ -164,7 +167,8 @@ runProxy k = go (k ()) where
             Pure      r   -> return r
 
 {-| Run a self-sufficient 'ProxyCorrect' Kleisli arrow, converting it back to a
-    Kleisli arrow in the base monad -}
+    Kleisli arrow in the base monad
+-}
 runProxyK :: (Monad m) => (() -> ProxyCorrect a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
 

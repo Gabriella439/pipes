@@ -612,10 +612,10 @@ Client Receives: False
     and returns a new 'Proxy' blocked on a 'request':
 
 > (>~>)
->  :: (Monad m, Proxy p)
->  => (a -> p a' a b' b m r)
->  -> (b -> p b' b c' c m r)
->  -> (a -> p a' a c' c m r)
+>     :: (Monad m, Proxy p)
+>     => (a -> p a' a b' b m r)
+>     -> (b -> p b' b c' c m r)
+>     -> (a -> p a' a c' c m r)
 
     Conceptually, ('>->') composes pull-based systems and ('>~>') composes
     push-based systems.
@@ -647,10 +647,11 @@ Client Receives: False
     interface matches @p2@'s upstream interface.  This follows from the type of
     ('>->'):
 
-> (>->) :: (Monad m, Proxy p)
->  => (b' -> p a' a b' b m r)
->  -> (c' -> p b' b c' c m r)
->  -> (c' -> p a' a c' c m r)
+> (>->)
+>     :: (Monad m, Proxy p)
+>     => (b' -> p a' a b' b m r)
+>     -> (c' -> p b' b c' c m r)
+>     -> (c' -> p a' a c' c m r)
 
     Diagramatically, this looks like:
 
@@ -1074,7 +1075,7 @@ Received a value:
 
     What about our original @lines'@ function?  That's just 'stdinS':
 
-> stdinS:: (Proxy p) => () -> Producer p String IO ()
+> stdinS :: (Proxy p) => () -> Producer p String IO ()
 
     You could hand-write loops that accomplish these same tasks, but proxies let
     you:
@@ -1360,12 +1361,14 @@ Received 8
     * 'foldlD'': Strictly fold values flowing downstream
 
 > foldlD'
->  :: (Monad m, Proxy p) => (b -> a -> b) -> x -> p x a x a (StateT b m) r
+>     :: (Monad m, Proxy p)
+>     => (b -> a -> b) -> x -> p x a x a (StateT b m) r
 
     * 'foldlU'': Strictly fold values flowing upstream
 
 > foldU'
->  :: (Monad m, Proxy p) => (b -> a' -> b) -> a' -> p a' x a' x (StateT b m) r
+>     :: (Monad m, Proxy p)
+>     => (b -> a' -> b) -> a' -> p a' x a' x (StateT b m) r
 
     Now, let's try these folds out and see if we can build a list from user
     input:
@@ -1568,7 +1571,7 @@ Opening file
     first to unwrap the 'EitherP' followed by 'runProxy'.
 
 > runEitherK
->  :: (q -> EitherP p a' a b' b m r) -> (q -> p a' a b' b m (Either e r))
+>     :: (q -> EitherP p a' a b' b m r) -> (q -> p a' a b' b m (Either e r))
 
 >>> runProxy $ E.runEitherK $ promptInt3 >-> printer :: IO (Either String r)
 Enter an Integer:
@@ -1593,9 +1596,9 @@ Left "Could not read an Integer"
     a given proxy each time it raises an error:
 
 > heartbeat
->  :: (Proxy p)
->  => E.EitherP String p a' a b' b IO r
->  -> E.EitherP String p a' a b' b IO r
+>     :: (Proxy p)
+>     => E.EitherP String p a' a b' b IO r
+>     -> E.EitherP String p a' a b' b IO r
 > heartbeat p = p `E.catch` \err -> do
 >     lift $ putStrLn err  -- Print the error
 >     heartbeat p          -- Restart 'p'
@@ -1685,8 +1688,8 @@ Received a value:
     triply nested proxy:
 
 > zipD
->  :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
->  => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
+>     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
+>     => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
 > zipD () =
 >     runIdentityP . hoist (runIdentityP . hoist runIdentityP) $ forever $ do
 >     -- Yes, this 'runIdentityP' mess is necessary.  Sorry!
@@ -1715,8 +1718,8 @@ Received a value:
     You can use this trick to fork output, too:
 
 > fork
->  :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
->  => () -> Consumer p1 a (Producer p2 a (Producer p3 a m)) r
+>     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
+>     => () -> Consumer p1 a (Producer p2 a (Producer p3 a m)) r
 > fork () =
 >     runIdentityP . hoist (runIdentityP . hoist runIdentityP) $ forever $ do
 >         a <- request ()          -- Request output from the 'Consumer'
@@ -1776,10 +1779,10 @@ Left ()
       following form:
 
 > zip'  -- You can't define this
->  :: (Monad m, Proxy p)
->  => (() -> Producer p a      m r)
->  -> (() -> Producer p b      m r)
->  -> (() -> Producer p (a, b) m r)
+>     :: (Monad m, Proxy p)
+>     => (() -> Producer p a      m r)
+>     -> (() -> Producer p b      m r)
+>     -> (() -> Producer p (a, b) m r)
 
     Partial application requires selecting a 'Proxy' instance, which is why you
     cannot define @zip'@.  You /can/ define a @zip'@ specialized to a concrete
@@ -1823,13 +1826,13 @@ Left ()
 
 > class ProxyTrans t where
 >     liftP
->       :: (Monad m, Proxy p)
->       => p a' a b' b m r -> t p a' a b' b m r
+>          :: (Monad m, Proxy p)
+>          => p a' a b' b m r -> t p a' a b' b m r
 >
 > -- mapP is slightly more elegant
 > mapP
->  :: (Monad m, Proxy p, ProxyTrans t)
->  => (q -> p a' a b' b m r) -> (q -> t p a' a b' b m r)
+>     :: (Monad m, Proxy p, ProxyTrans t)
+>     => (q -> p a' a b' b m r) -> (q -> t p a' a b' b m r)
 > mapP = (liftP .)
 
     It's very easy to use.  Just use 'mapP' to lift one proxy transformer to
@@ -2226,9 +2229,9 @@ Left "Could not read an Integer"
 -- >         Just n  -> respond n
 -- > 
 -- > heartbeat
--- >  :: (Proxy p)
--- >  => E.EitherP String p a' a b' b IO r
--- >  -> E.EitherP String p a' a b' b IO r
+-- >     :: (Proxy p)
+-- >     => E.EitherP String p a' a b' b IO r
+-- >     -> E.EitherP String p a' a b' b IO r
 -- > heartbeat p = p `E.catch` \err -> do
 -- >     lift $ putStrLn err  -- Print the error
 -- >     heartbeat p          -- Restart 'p'
@@ -2252,8 +2255,8 @@ Left "Could not read an Integer"
 -- >     S.put (nOurs + 2)
 -- > 
 -- > zipD
--- >  :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
--- >  => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
+-- >     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
+-- >     => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
 -- > zipD () =
 -- >     runIdentityP . hoist (runIdentityP . hoist runIdentityP) $ forever $ do
 -- >     -- Yes, this 'runIdentityP' mess is necessary.  Sorry!
@@ -2267,8 +2270,8 @@ Left "Could not read an Integer"
 -- > p3 = runProxy $ printD <-< p2
 -- > 
 -- > fork
--- >  :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
--- >  => () -> Consumer p1 a (Producer p2 a (Producer p3 a m)) r
+-- >     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
+-- >     => () -> Consumer p1 a (Producer p2 a (Producer p3 a m)) r
 -- > fork () =
 -- >     runIdentityP . hoist (runIdentityP . hoist runIdentityP) $ forever $ do
 -- >         a <- request ()          -- Request output from the 'Consumer'

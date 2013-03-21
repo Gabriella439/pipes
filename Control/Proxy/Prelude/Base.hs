@@ -212,7 +212,7 @@ mapMU g = runIdentityK go where
 > mapMB return return = idT
 -}
 mapMB
- :: (Monad m, Proxy p) => (a -> m b) -> (b' -> m a') -> b' -> p a' a b' b m r
+    :: (Monad m, Proxy p) => (a -> m b) -> (b' -> m a') -> b' -> p a' a b' b m r
 mapMB f g = runIdentityK go where
     go b' = do
         a'  <- lift (g b')
@@ -263,7 +263,8 @@ useU g = runIdentityK go where
 > useB (\_ -> return ()) (\_ -> return ()) = idT
 -}
 useB
- :: (Monad m, Proxy p) => (a -> m r1) -> (a' -> m r2) -> a' -> p a' a a' a m r
+    :: (Monad m, Proxy p)
+    => (a -> m r1) -> (a' -> m r2) -> a' -> p a' a a' a m r
 useB f g = runIdentityK go where
     go a' = do
         lift $ g a'
@@ -555,7 +556,7 @@ enumFromC a'0 = \_ -> runIdentityP (go a'0) where
 
 -- | 'Producer' version of 'enumFromTo'
 enumFromToS
- :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> () -> Producer p b m ()
+    :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> () -> Producer p b m ()
 enumFromToS b1 b2 _ = runIdentityP (go b1) where
     go b
         | b > b2    = return ()
@@ -566,7 +567,7 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
 
 -- | 'CoProducer' version of 'enumFromTo'
 enumFromToC
- :: (Enum a', Ord a', Monad m, Proxy p)
+    :: (Enum a', Ord a', Monad m, Proxy p)
  => a' -> a' -> () -> CoProducer p a' m ()
 enumFromToC a1 a2 _ = runIdentityP (go a1) where
     go n
@@ -603,7 +604,7 @@ rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
 
 -- | Non-deterministically choose from all values in the given range
 rangeC
- :: (Enum a', Ord a', Monad m, ListT p) => a' -> a' -> CoProduceT p m a'
+    :: (Enum a', Ord a', Monad m, ListT p) => a' -> a' -> CoProduceT p m a'
 rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 {-# INLINABLE rangeC #-}
 
@@ -614,7 +615,8 @@ rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 > foldD mempty = idT
 -}
 foldD
- :: (Monad m, Proxy p, Monoid w) => (a -> w) -> x -> p x a x a (WriterT w m) r
+    :: (Monad m, Proxy p, Monoid w)
+    => (a -> w) -> x -> p x a x a (WriterT w m) r
 foldD f = runIdentityK go where
     go x = do
         a <- request x
@@ -630,7 +632,7 @@ foldD f = runIdentityK go where
 > foldU mempty = idT
 -}
 foldU
- :: (Monad m, Proxy p, Monoid w)
+    :: (Monad m, Proxy p, Monoid w)
  => (a' -> w) -> a' -> p a' x a' x (WriterT w m) r
 foldU f = runIdentityK go where
     go a' = do
@@ -641,22 +643,25 @@ foldU f = runIdentityK go where
 {-# INLINABLE foldU #-}
 
 {-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
-    predicate -}
+    predicate
+-}
 allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) r
 allD pred = foldD (All . pred)
 {-# INLINABLE allD #-}
 
 {-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
-    predicate -}
+    predicate
+-}
 allU
- :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) r
+    :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) r
 allU pred = foldU (All . pred)
 {-# INLINABLE allU #-}
 
 {-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
     predicate
 
-    'allD_' terminates on the first value that fails the predicate -}
+    'allD_' terminates on the first value that fails the predicate
+-}
 allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) ()
 allD_ pred = runIdentityK go where
     go x = do
@@ -671,9 +676,11 @@ allD_ pred = runIdentityK go where
 {-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
     predicate
 
-    'allU_' terminates on the first value that fails the predicate -}
+    'allU_' terminates on the first value that fails the predicate
+-}
 allU_
- :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) ()
+    :: (Monad m, Proxy p)
+    => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) ()
 allU_ pred = runIdentityK go where
     go a' =
         if (pred a')
@@ -685,22 +692,25 @@ allU_ pred = runIdentityK go where
 {-# INLINABLE allU_ #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies
-    the predicate -}
+    the predicate
+-}
 anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
 anyD pred = foldD (Any . pred)
 {-# INLINABLE anyD #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@U@\'pstream satisfies
-    the predicate -}
+    the predicate
+-}
 anyU
- :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) r
+    :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) r
 anyU pred = foldU (Any . pred)
 {-# INLINABLE anyU #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies the
     predicate
 
-    'anyD_' terminates on the first value that satisfies the predicate -}
+    'anyD_' terminates on the first value that satisfies the predicate
+-}
 anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) ()
 anyD_ pred = runIdentityK go where
     go x = do
@@ -715,9 +725,11 @@ anyD_ pred = runIdentityK go where
 {-| Fold that returns whether 'Any' value flowing \'@U@\'pstream satisfies the
     predicate
 
-    'anyU_' terminates on the first value that satisfies the predicate -}
+    'anyU_' terminates on the first value that satisfies the predicate
+-}
 anyU_
- :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) ()
+    :: (Monad m, Proxy p)
+    => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) ()
 anyU_ pred = runIdentityK go where
     go a' =
         if (pred a')
@@ -740,13 +752,14 @@ sumU = foldU Sum
 
 -- | Compute the 'Product' of all values that flow \'@D@\'ownstream
 productD
- :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Product a) m) r
+    :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Product a) m) r
 productD = foldD Product
 {-# INLINABLE productD #-}
 
 -- | Compute the 'Product' of all values that flow \'@U@\'pstream
 productU
- :: (Monad m, Proxy p, Num a') => a' -> p a' x a' x (WriterT (Product a') m) r
+    :: (Monad m, Proxy p, Num a')
+    => a' -> p a' x a' x (WriterT (Product a') m) r
 productU = foldU Product
 {-# INLINABLE productU #-}
 
@@ -767,7 +780,8 @@ headD = foldD (First . Just)
 
 {-| Retrieve the first value going \'@D@\'ownstream
 
-    'headD_' terminates on the first value it receives -}
+    'headD_' terminates on the first value it receives
+-}
 headD_ :: (Monad m, Proxy p) => x -> p x a x a (WriterT (First a) m) ()
 headD_ x = runIdentityP $ do
     a <- request x
@@ -781,7 +795,8 @@ headU = foldU (First . Just)
 
 {-| Retrieve the first value going \'@U@\'pstream
 
-    'headU_' terminates on the first value it receives -}
+    'headU_' terminates on the first value it receives
+-}
 headU_ :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (First a') m) ()
 headU_ a' = runIdentityP $ lift $ W.tell $ First (Just a')
 {-# INLINABLE headU_ #-}
@@ -813,20 +828,21 @@ toListU = foldU (\x -> [x])
 > foldr :: (a -> b -> b) -> [a] -> Endo b
 -}
 foldrD
- :: (Monad m, Proxy p) => (a -> b -> b) -> x -> p x a x a (WriterT (Endo b) m) r
+    :: (Monad m, Proxy p)
+    => (a -> b -> b) -> x -> p x a x a (WriterT (Endo b) m) r
 foldrD step = foldD (Endo . step)
 {-# INLINABLE foldrD #-}
 
 -- | Fold equivalent to 'foldr'
 foldrU
- :: (Monad m, Proxy p)
- => (a' -> b -> b) -> a' -> p a' x a' x (WriterT (Endo b) m) r
+    :: (Monad m, Proxy p)
+    => (a' -> b -> b) -> a' -> p a' x a' x (WriterT (Endo b) m) r
 foldrU step = foldU (Endo . step)
 {-# INLINABLE foldrU #-}
 
 -- | Left strict fold over \'@D@\'ownstream values
 foldlD'
- :: (Monad m, Proxy p) => (b -> a -> b) -> x -> p x a x a (StateT b m) r
+    :: (Monad m, Proxy p) => (b -> a -> b) -> x -> p x a x a (StateT b m) r
 foldlD' f = runIdentityK go where
     go x = do
         a  <- request x
@@ -837,7 +853,7 @@ foldlD' f = runIdentityK go where
 
 -- | Left strict fold over \'@U@\'pstream values
 foldlU'
- :: (Monad m, Proxy p) => (b -> a' -> b) -> a' -> p a' x a' x (StateT b m) r
+    :: (Monad m, Proxy p) => (b -> a' -> b) -> a' -> p a' x a' x (StateT b m) r
 foldlU' f = runIdentityK go where
     go a' = do
         lift $ StateT $ \b -> let b' = f b a' in b' `seq` return ((), b')
@@ -853,7 +869,8 @@ foldlU' f = runIdentityK go where
 -}
 
 {-| Lift a proxy to operate only on 'Left' values flowing \'@D@\'ownstream and
-    forward 'Right' values -}
+    forward 'Right' values
+-}
 leftD
     :: (Monad m, ListT p)
     => (q -> p x a x b m r) -> (q -> p x (Either a e) x (Either b e) m r)
@@ -870,7 +887,8 @@ leftD k = runIdentityK (up \>\ (identityK k />/ dn))
 {-# INLINABLE leftD #-}
 
 {-| Lift a proxy to operate only on 'Right' values flowing \'@D@\'ownstream and
-    forward 'Left' values -}
+    forward 'Left' values
+-}
 rightD
     :: (Monad m, ListT p)
     => (q -> p x a x b m r) -> (q -> p x (Either e a) x (Either e b) m r)
@@ -887,7 +905,8 @@ rightD k = runIdentityK (up \>\ (identityK k />/ dn))
 {-# INLINABLE rightD #-}
 
 {-| Lift a proxy to operate only on 'Left' values flowing \'@U@\'pstream and
-    forward 'Right' values -}
+    forward 'Right' values
+-}
 leftU
     :: (Monad m, ListT p)
     => (q -> p a' x b' x m r) -> (q -> p (Either a' e) x (Either b' e) x m r)
@@ -904,7 +923,8 @@ leftU k = runIdentityK ((up \>\ identityK k) />/ dn)
 {-# INLINABLE leftU #-}
 
 {-| Lift a proxy to operate only on 'Right' values flowing \'@D@\'ownstream and
-    forward 'Left' values -}
+    forward 'Left' values
+-}
 rightU
     :: (Monad m, ListT p)
     => (q -> p a' x b' x m r) -> (q -> p (Either e a') x (Either e b') x m r)
@@ -922,8 +942,8 @@ rightU k = runIdentityK ((up \>\ identityK k) />/ dn)
 
 -- | Zip values flowing downstream
 zipD
- :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
- => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
+    :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
+    => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
 zipD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
     go = do
         a <- request ()
@@ -935,8 +955,8 @@ zipD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
 
 -- | Interleave values flowing downstream using simple alternation
 mergeD
- :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
- => () -> Consumer p1 a (Consumer p2 a (Producer p3 a m)) r
+    :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
+    => () -> Consumer p1 a (Consumer p2 a (Producer p3 a m)) r
 mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
     go = do
         a1 <- request ()

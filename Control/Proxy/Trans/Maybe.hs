@@ -23,7 +23,7 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Maybe' proxy transformer
 newtype MaybeP p a' a b' b (m :: * -> *) r
-  = MaybeP { runMaybeP :: p a' a b' b m (Maybe r) }
+    = MaybeP { runMaybeP :: p a' a b' b m (Maybe r) }
 
 instance (Proxy p, Monad m) => Functor (MaybeP p a' a b' b m) where
     fmap f p = MaybeP (

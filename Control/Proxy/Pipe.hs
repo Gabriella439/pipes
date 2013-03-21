@@ -3,8 +3,8 @@
 
     This module differs slightly from "Control.Pipe" in order to promote
     seamless interoperability with both pipes and proxies.  See the \"Upgrade
-    Pipes to Proxies\" section below for details. -}
-
+    Pipes to Proxies\" section below for details.
+-}
 {-# LANGUAGE KindSignatures #-}
 
 module Control.Proxy.Pipe (
@@ -35,13 +35,15 @@ import Control.Proxy.Trans.Identity (runIdentityP)
 
 {-| Wait for input from upstream
 
-    'await' blocks until input is available from upstream. -}
+    'await' blocks until input is available from upstream.
+-}
 await :: (Monad m, Proxy p) => Pipe p a b m a
 await = request ()
 
 {-| Deliver output downstream
 
-    'yield' restores control back downstream and binds its value to 'await'. -}
+    'yield' restores control back downstream and binds its value to 'await'.
+-}
 yield :: (Monad m, Proxy p) => b -> p a' a b' b m b'
 yield = respond
 
@@ -51,8 +53,8 @@ pipe f = runIdentityP $ forever $ do
     a <- request ()
     respond (f a)
 
-infixr 9 <+<
-infixl 9 >+>
+infixr 7 <+<
+infixl 7 >+>
 
 -- | Corresponds to ('<<<')/('.') from @Control.Category@
 (<+<)
@@ -88,7 +90,8 @@ type Pipeline (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
     Each implementation must supply its own 'runPipe' function since it is
     the only non-polymorphic 'Pipe' function and the compiler uses it to
-    select which underlying proxy implementation to use. -}
+    select which underlying proxy implementation to use.
+-}
 
 {- $upgrade
     You can upgrade classic 'Pipe' code to work with the proxy ecosystem in
@@ -198,5 +201,4 @@ type Pipeline (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 >     if (n == 0)
 >         then E.throw "Error: received 0"
 >         else lift $ print n
-
 -}

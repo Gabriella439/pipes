@@ -30,7 +30,7 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'State' proxy transformer
 newtype StateP s p a' a b' b (m :: * -> *) r
-  = StateP { unStateP :: s -> p a' a b' b m (r, s) }
+    = StateP { unStateP :: s -> p a' a b' b m (r, s) }
 
 instance (Proxy p, Monad m) => Functor (StateP s p a' a b' b m) where
        fmap f p = StateP (\s0 ->
@@ -103,24 +103,24 @@ runStateK s k q = unStateP (k q) s
 
 -- | Evaluate a 'StateP' computation, but discard the final state
 evalStateP
- :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m r
+    :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m r
 evalStateP s p = unStateP p s ?>= \x -> return_P (fst x)
 
 -- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final state
 evalStateK
- :: (Proxy p, Monad m)
- => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m r)
+    :: (Proxy p, Monad m)
+    => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m r)
 evalStateK s k q = evalStateP s (k q)
 
 -- | Evaluate a 'StateP' computation, but discard the final result
 execStateP
- :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m s
+    :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m s
 execStateP s p = unStateP p s ?>= \x -> return_P (snd x)
 
 -- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final result
 execStateK
- :: (Proxy p, Monad m)
- => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m s)
+    :: (Proxy p, Monad m)
+    => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m s)
 execStateK s k q = execStateP s (k q)
 
 -- | Get the current state

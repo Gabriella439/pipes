@@ -27,7 +27,7 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Reader' proxy transformer
 newtype ReaderP i p a' a b' b (m :: * -> *) r
-  = ReaderP { unReaderP :: i -> p a' a b' b m r }
+    = ReaderP { unReaderP :: i -> p a' a b' b m r }
 
 instance (Proxy p, Monad m) => Functor (ReaderP i p a' a b' b m) where
     fmap f p = ReaderP (\i ->
@@ -119,5 +119,5 @@ local = withReaderP
 
 -- | Modify a computation's environment (a more general version of 'local')
 withReaderP
- :: (j -> i) -> ReaderP i p a' a b' b m r -> ReaderP j p a' a b' b m r
+    :: (j -> i) -> ReaderP i p a' a b' b m r -> ReaderP j p a' a b' b m r
 withReaderP f p = ReaderP (\i -> unReaderP p (f i))

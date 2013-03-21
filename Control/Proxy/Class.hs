@@ -54,7 +54,8 @@ class (ProxyInternal p) => Proxy p where
 
         @request a'@ passes @a'@ as a parameter to upstream that upstream may
         use to decide what response to return.  'request' binds the upstream's
-        response of type @a@ to its own return value. -}
+        response of type @a@ to its own return value.
+    -}
     request :: (Monad m) => a' -> p a' a b' b m a
 
     {-| 'respond' with an output for downstream and bind downstream's next
@@ -62,48 +63,58 @@ class (ProxyInternal p) => Proxy p where
           
         @respond b@ satisfies a downstream 'request' by supplying the value @b@.
         'respond' blocks until downstream 'request's a new value and binds the
-        argument of type @b'@ from the next 'request' as its return value. -}
+        argument of type @b'@ from the next 'request' as its return value.
+    -}
     respond :: (Monad m) => b -> p a' a b' b m b'
 
     {-| Connect an upstream 'Proxy' that handles all 'request's
 
-        Point-ful version of ('>->') -}
+        Point-ful version of ('>->')
+    -}
     (->>)
-     :: (Monad m)
-     => (b'  -> p a' a b' b m r)
-     ->         p b' b c' c m r
-     ->         p a' a c' c m r
+        :: (Monad m)
+        => (b'  -> p a' a b' b m r)
+        ->         p b' b c' c m r
+        ->         p a' a c' c m r
 
     {-| Connect a downstream 'Proxy' that handles all 'respond's
 
-        Point-ful version of ('>~>') -}
+        Point-ful version of ('>~>')
+    -}
     (>>~)
-     :: (Monad m)
-     =>        p a' a b' b m r
-     -> (b  -> p b' b c' c m r)
-     ->        p a' a c' c m r
+        :: (Monad m)
+        =>        p a' a b' b m r
+        -> (b  -> p b' b c' c m r)
+        ->        p a' a c' c m r
 
 {-| Pull-based composition
 
     Compose two proxies blocked on a 'respond', generating a new proxy blocked
     on a 'respond'.  Begins from the downstream end and satisfies every
-    'request' with a 'respond'. -}
+    'request' with a 'respond'.
+-}
 (>->)
- :: (Monad m, Proxy p)
- => (b'  -> p a' a b' b m r)
- -> (c'_ -> p b' b c' c m r)
- -> (c'_ -> p a' a c' c m r)
+    :: (Monad m, Proxy p)
+    => (b'  -> p a' a b' b m r)
+    -> (c'_ -> p b' b c' c m r)
+    -> (c'_ -> p a' a c' c m r)
 k1 >-> k2 = \c' -> k1 ->> k2 c'
 {-# INLINABLE (>->) #-}
 
--- | Equivalent to ('>->') with the arguments flipped
-(<-<)
- :: (Monad m, Proxy p)
- => (c' -> p b' b c' c m r)
- -> (b' -> p a' a b' b m r)
- -> (c' -> p a' a c' c m r)
-p1 <-< p2 = p2 >-> p1
-{-# INLINABLE (<-<) #-}
+{-| Pull-based identity
+
+    'idT' forwards requests followed by responses
+
+> idT = request >=> respond >=> idT
+-}
+idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+idT = go where
+    go a' =
+        request a' ?>= \a   ->
+        respond a  ?>= \a'2 ->
+        go a'2
+-- idT = foreverK $ request >=> respond
+{-# INLINABLE idT #-}
 
 {-| Push-based composition
 
@@ -111,12 +122,36 @@ p1 <-< p2 = p2 >-> p1
     on a 'request'.  Begins from the upstream end and satisfies every 'respond'
     with a 'request' -}
 (>~>)
- :: (Monad m, Proxy p)
- => (a_ -> p a' a b' b m r)
- -> (b  -> p b' b c' c m r)
- -> (a_ -> p a' a c' c m r)
+    :: (Monad m, Proxy p)
+    => (a_ -> p a' a b' b m r)
+    -> (b  -> p b' b c' c m r)
+    -> (a_ -> p a' a c' c m r)
 k1 >~> k2 = \a -> k1 a >>~ k2
 {-# INLINABLE (>~>) #-}
+
+{-| Push-based identity
+
+    'coidT' forwards responses followed by requests
+
+> coidT = respond >=> request >=> coidT
+-}
+coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
+coidT = go where
+    go a =
+        respond a  ?>= \a' ->
+        request a' ?>= \a2 ->
+        go a2
+-- coidT = foreverK $ respond >=> request
+{-# INLINABLE coidT #-}
+
+-- | Equivalent to ('>->') with the arguments flipped
+(<-<)
+    :: (Monad m, Proxy p)
+    => (c' -> p b' b c' c m r)
+    -> (b' -> p a' a b' b m r)
+    -> (c' -> p a' a c' c m r)
+p1 <-< p2 = p2 >-> p1
+{-# INLINABLE (<-<) #-}
 
 -- | Equivalent to ('>~>') with the arguments flipped
 (<~<)
@@ -144,36 +179,6 @@ k <<- p = p ->> k
  ->        p a' a c' c m r
 k ~<< p = p >>~ k
 {-# INLINABLE (~<<) #-}
-
-{-| Pull-based identity
-
-    'idT' forwards requests followed by responses
-
-> idT = request >=> respond >=> idT
--}
-idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
-idT = go where
-    go a' =
-        request a' ?>= \a   ->
-        respond a  ?>= \a'2 ->
-        go a'2
--- idT = foreverK $ request >=> respond
-{-# INLINABLE idT #-}
-
-{-| Push-based identity
-
-    'coidT' forwards responses followed by requests
-
-> coidT = respond >=> request >=> coidT
--}
-coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
-coidT = go where
-    go a =
-        respond a  ?>= \a' ->
-        request a' ?>= \a2 ->
-        go a2
--- coidT = foreverK $ respond >=> request
-{-# INLINABLE coidT #-}
 
 {- $laws
     The 'Proxy' class defines an interface to all core proxy capabilities that
@@ -354,10 +359,10 @@ coidT = go where
 >     respond c
 -}
 
-{-| The @(ProxyInternal p)@ constraint is equivalent to the following
-    polymorphic constraint:
+{-| The @(ProxyInternal p)@ constraint is (basically) equivalent to the
+    following polymorphic constraint:
 
-> (forall a' a b' b m . (MonadIO m)
+> (forall a' a b' b m . (Monad m)
 >     => Monad      (p a' a b' b m)
 >     ,  MonadTrans (p a' a b' b  )
 >     ,  MFunctor   (p a' a b' b m)
@@ -367,14 +372,14 @@ coidT = go where
 class ProxyInternal p where
     return_P :: (Monad m) => r -> p a' a b' b m r
     (?>=)
-     :: (Monad m)
-     => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'
+        :: (Monad m)
+        => p a' a b' b m r -> (r -> p a' a b' b m r') -> p a' a b' b m r'
 
     lift_P :: (Monad m) => m r -> p a' a b' b m r
 
     hoist_P
-     :: (Monad m)
-     => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')
+        :: (Monad m)
+        => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')
 
     liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r
 
@@ -386,4 +391,4 @@ class ProxyInternal p where
 class (Proxy p) => MonadPlusP p where
     mzero_P :: (Monad m) => p a' a b' b m r
     mplus_P
-     :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r
+        :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r

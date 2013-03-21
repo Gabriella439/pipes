@@ -50,10 +50,10 @@ import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Codensity' proxy transformer
-newtype CodensityP p a' a b' b (m :: * -> *) r = CodensityP {
-    unCodensityP
-     :: forall x . (Monad m, Proxy p)
-     => (r -> p a' a b' b m x) -> p a' a b' b m x }
+newtype CodensityP p a' a b' b (m :: * -> *) r
+    = CodensityP { unCodensityP
+        :: forall x . (Monad m, Proxy p)
+         => (r -> p a' a b' b m x) -> p a' a b' b m x }
 {- The type class instances only satisfy their laws if you hide the constructor
    for 'CodensityP'.
 
@@ -142,12 +142,12 @@ instance PFunctor CodensityP where
 
 -- | Run a 'CodensityP' proxy, converting, converting it back to the base proxy
 runCodensityP
- :: (Monad m, Proxy p) => CodensityP p a' a b' b m r -> p a' a b' b m r
+    :: (Monad m, Proxy p) => CodensityP p a' a b' b m r -> p a' a b' b m r
 runCodensityP p = unCodensityP p return_P
 
 {-| Run a 'CodensityP' \'@K@\'leisli arrow, converting it back to the base proxy
 -}
 runCodensityK
- :: (Monad m, Proxy p)
- => (q -> CodensityP p a' a b' b m r) -> (q -> p a' a b' b m r)
+    :: (Monad m, Proxy p)
+    => (q -> CodensityP p a' a b' b m r) -> (q -> p a' a b' b m r)
 runCodensityK k q = runCodensityP (k q)

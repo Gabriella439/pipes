@@ -19,7 +19,8 @@
     concrete type and instead you should stick to the 'Proxy' type class API.
     This not only ensures that your code does not violate the monad transformer
     laws, but also guarantees that it works with the other proxy implementations
-    and with any proxy transformers. -}
+    and with any proxy transformers.
+-}
 
 {-# LANGUAGE Trustworthy #-}
 {- The rewrite RULES require the 'TrustWorthy' annotation.  Their proofs are
@@ -65,12 +66,13 @@ import Control.Proxy.Synonym (C)
 
     * @m     @ - The base monad
 
-    * @r     @ - The final return value -}
+    * @r     @ - The final return value
+-}
 data ProxyFast a' a b' b m r
-  = Request a' (a  -> ProxyFast a' a b' b m r )
-  | Respond b  (b' -> ProxyFast a' a b' b m r )
-  | M          (m    (ProxyFast a' a b' b m r))
-  | Pure    r
+    = Request a' (a  -> ProxyFast a' a b' b m r )
+    | Respond b  (b' -> ProxyFast a' a b' b m r )
+    | M          (m    (ProxyFast a' a b' b m r))
+    | Pure    r
 
 instance (Monad m) => Functor (ProxyFast a' a b' b m) where
     fmap f p0 = go p0 where
@@ -94,10 +96,10 @@ instance (Monad m) => Monad (ProxyFast a' a b' b m) where
     (>>=)  = _bind
 
 _bind
- :: (Monad m)
- => ProxyFast a' a b' b m r
- -> (r -> ProxyFast a' a b' b m r')
- -> ProxyFast a' a b' b m r'
+    :: (Monad m)
+    => ProxyFast a' a b' b m r
+    -> (r -> ProxyFast a' a b' b m r')
+    -> ProxyFast a' a b' b m r'
 p0 `_bind` f = go p0 where
     go p = case p of
         Request a' fa  -> Request a' (\a  -> go (fa  a ))
@@ -162,16 +164,16 @@ instance ListT ProxyFast where
     (//>) = _resp
 
 _req
- :: (Monad m)
- => (b' -> ProxyFast a' a x' x m b)
- -> ProxyFast b' b x' x m c
- -> ProxyFast a' a x' x m c
+    :: (Monad m)
+    => (b' -> ProxyFast a' a x' x m b)
+    -> ProxyFast b' b x' x m c
+    -> ProxyFast a' a x' x m c
 fb' `_req` p0 = go p0 where
-        go p = case p of
-            Request b' fb  -> fb' b' >>= \b -> go (fb b)
-            Respond x  fx' -> Respond x (\x' -> go (fx' x'))
-            M          m   -> M (m >>= \p' -> return (go p'))
-            Pure       a   -> Pure a
+    go p = case p of
+        Request b' fb  -> fb' b' >>= \b -> go (fb b)
+        Respond x  fx' -> Respond x (\x' -> go (fx' x'))
+        M          m   -> M (m >>= \p' -> return (go p'))
+        Pure       a   -> Pure a
 
 {-# RULES
     "_req fb' (Request b' fb )" forall fb' b' fb  .
