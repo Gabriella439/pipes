@@ -58,18 +58,18 @@ infixl 7 >+>
 
 -- | Corresponds to ('<<<')/('.') from @Control.Category@
 (<+<)
- :: (Monad m, Proxy p)
- => p b' b c' c m r
- -> p a' a b' b m r
- -> p a' a c' c m r
+    :: (Monad m, Proxy p)
+    => p b' b c' c m r
+    -> p a' a b' b m r
+    -> p a' a c' c m r
 p1 <+< p2 = p2 >+> p1
 
 -- | Corresponds to ('>>>') from @Control.Category@
 (>+>)
- :: (Monad m, Proxy p)
- => p a' a b' b m r
- -> p b' b c' c m r
- -> p a' a c' c m r
+    :: (Monad m, Proxy p)
+    => p a' a b' b m r
+    -> p b' b c' c m r
+    -> p a' a c' c m r
 p1 >+> p2 = (\_ -> p1) ->> p2
 
 -- | Corresponds to 'id' from @Control.Category@
@@ -80,7 +80,8 @@ idP = runIdentityP $ forever $ do
 
 {-| A self-contained 'Pipeline' that is ready to be run
 
-    'Pipeline's never 'request' nor 'respond'. -}
+    'Pipeline's never 'request' nor 'respond'.
+-}
 type Pipeline (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
 {- $run

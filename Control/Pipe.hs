@@ -4,8 +4,8 @@
     implementation.
 
     The 'Pipe' type is a monad transformer that enriches the base monad with the
-    ability to 'await' or 'yield' data to and from other 'Pipe's. -}
-
+    ability to 'await' or 'yield' data to and from other 'Pipe's.
+-}
 module Control.Pipe (
     -- * Types
     -- $types

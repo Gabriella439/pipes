@@ -4,7 +4,8 @@
     being strict in the accumulated monoid. 
 
     The underlying implementation uses the state monad to avoid quadratic blowup
-    from left-associative binds. -}
+    from left-associative binds.
+-}
 
 {-# LANGUAGE KindSignatures #-}
 

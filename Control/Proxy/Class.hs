@@ -1,6 +1,7 @@
 {-| The 'Proxy' class defines the library's core API.  Everything else in this
     library builds on top of the 'Proxy' type class so that all proxy
-    implementations and extensions can share the same standard library. -}
+    implementations and extensions can share the same standard library.
+-}
 
 {-# LANGUAGE Rank2Types #-}
 
@@ -120,7 +121,8 @@ idT = go where
 
     Compose two proxies blocked on a 'request', generating a new proxy blocked
     on a 'request'.  Begins from the upstream end and satisfies every 'respond'
-    with a 'request' -}
+    with a 'request'
+-}
 (>~>)
     :: (Monad m, Proxy p)
     => (a_ -> p a' a b' b m r)
@@ -155,28 +157,28 @@ p1 <-< p2 = p2 >-> p1
 
 -- | Equivalent to ('>~>') with the arguments flipped
 (<~<)
- :: (Monad m, Proxy p)
- => (b -> p b' b c' c m r)
- -> (a -> p a' a b' b m r)
- -> (a -> p a' a c' c m r)
+    :: (Monad m, Proxy p)
+    => (b -> p b' b c' c m r)
+    -> (a -> p a' a b' b m r)
+    -> (a -> p a' a c' c m r)
 p1 <~< p2 = p2 >~> p1
 {-# INLINABLE (<~<) #-}
 
 -- | Equivalent to ('->>') with the arguments flipped
 (<<-)
- :: (Monad m, Proxy p)
- =>         p b' b c' c m r
- -> (b'  -> p a' a b' b m r)
- ->         p a' a c' c m r
+    :: (Monad m, Proxy p)
+    =>         p b' b c' c m r
+    -> (b'  -> p a' a b' b m r)
+    ->         p a' a c' c m r
 k <<- p = p ->> k
 {-# INLINABLE (<<-) #-}
 
 -- | Equivalent to ('>>~') with the arguments flipped
 (~<<)
- :: (Monad m, Proxy p)
- => (b  -> p b' b c' c m r)
- ->        p a' a b' b m r
- ->        p a' a c' c m r
+    :: (Monad m, Proxy p)
+    => (b  -> p b' b c' c m r)
+    ->        p a' a b' b m r
+    ->        p a' a c' c m r
 k ~<< p = p >>~ k
 {-# INLINABLE (~<<) #-}
 

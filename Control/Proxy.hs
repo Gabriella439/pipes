@@ -1,6 +1,7 @@
 {-| Recommended entry import for this library
 
-    Read "Control.Proxy.Tutorial" for an extended proxy tutorial. -}
+    Read "Control.Proxy.Tutorial" for an extended proxy tutorial.
+-}
 
 module Control.Proxy (
     -- * Modules

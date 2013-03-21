@@ -187,10 +187,10 @@ fb' `_req` p0 = go p0 where
   #-}
 
 _resp
- :: (Monad m)
- => ProxyFast x' x b' b m a'
- -> (b -> ProxyFast x' x c' c m b')
- -> ProxyFast x' x c' c m a'
+    :: (Monad m)
+    => ProxyFast x' x b' b m a'
+    -> (b -> ProxyFast x' x c' c m b')
+    -> ProxyFast x' x c' c m a'
 p0 `_resp` fb = go p0 where
     go p = case p of
         Request x' fx  -> Request x' (\x -> go (fx x))
@@ -218,10 +218,12 @@ p0 `_resp` fb = go p0 where
 
     Use 'runProxyK' if you are running proxies nested within proxies.  It
     provides a Kleisli arrow as its result that you can pass to another
-    'runProxy' / 'runProxyK' command. -}
+    'runProxy' / 'runProxyK' command.
+-}
 
 {-| Run a self-sufficient 'ProxyFast' Kleisli arrow, converting it back to the
-    base monad -}
+    base monad
+-}
 runProxy :: (Monad m) => (() -> ProxyFast a' () () b m r) -> m r
 runProxy k = go (k ()) where
     go p = case p of
@@ -231,7 +233,8 @@ runProxy k = go (k ()) where
         Pure      r   -> return r
 
 {-| Run a self-sufficient 'ProxyFast' Kleisli arrow, converting it back to a
-    Kleisli arrow in the base monad -}
+    Kleisli arrow in the base monad
+-}
 runProxyK :: (Monad m) => (() -> ProxyFast a' () () b m r) -> (() -> m r)
 runProxyK p = \() -> runProxy p
 

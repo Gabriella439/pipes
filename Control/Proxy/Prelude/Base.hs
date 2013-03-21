@@ -568,7 +568,7 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
 -- | 'CoProducer' version of 'enumFromTo'
 enumFromToC
     :: (Enum a', Ord a', Monad m, Proxy p)
- => a' -> a' -> () -> CoProducer p a' m ()
+    => a' -> a' -> () -> CoProducer p a' m ()
 enumFromToC a1 a2 _ = runIdentityP (go a1) where
     go n
         | n > a2 = return ()
@@ -633,7 +633,7 @@ foldD f = runIdentityK go where
 -}
 foldU
     :: (Monad m, Proxy p, Monoid w)
- => (a' -> w) -> a' -> p a' x a' x (WriterT w m) r
+    => (a' -> w) -> a' -> p a' x a' x (WriterT w m) r
 foldU f = runIdentityK go where
     go a' = do
         lift $ W.tell $ f a'
