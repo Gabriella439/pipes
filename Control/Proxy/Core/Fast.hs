@@ -121,7 +121,7 @@ instance MonadTrans (ProxyFast a' a b' b) where
     lift m = M (m >>= \r -> return (Pure r))
 
 instance MFunctor (ProxyFast a' a b' b) where
-    hoist nat p0 = go p0 where
+    hoist nat p0 = go (observe p0) where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
