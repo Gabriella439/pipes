@@ -9,11 +9,17 @@ module Control.Proxy.Prelude.Kleisli (
     liftK,
     hoistK,
     raise,
-    raiseK
+    raiseK,
+    hoistPK,
+    raiseP,
+    raisePK
     ) where
 
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
+import Control.Proxy.Class (Proxy)
+import Control.Proxy.Morph (PFunctor(hoistP))
+import Control.Proxy.Trans (ProxyTrans(liftP))
 
 {-| Compose a \'@K@\'leisli arrow with itself forever
 
@@ -76,3 +82,31 @@ raise = hoist lift
 raiseK
  :: (Monad m, MFunctor t1, MonadTrans t2) => (q -> t1 m r) -> (q -> t1 (t2 m) r)
 raiseK = (hoist lift .)
+
+-- | Convenience function equivalent to @(hoistP f .)@
+hoistPK
+ :: (Monad m, Proxy p1, PFunctor t)
+ => (forall r1 . p1 a' a b' b m r1 -> p2 a' a b' b n r1) -- ^ Proxy morphism
+ -> (q -> t p1 a' a b' b m r2) -- ^ Proxy Kleisli arrow
+ -> (q -> t p2 a' a b' b n r2)
+hoistPK f = (hoistP f .)
+
+{-| Lift the base proxy
+
+> raiseP = hoistP liftP
+-}
+raiseP
+ :: (Monad m, Proxy p, PFunctor t1, ProxyTrans t2)
+ => t1 p a' a b' b m r -- ^ Proxy
+ -> t1 (t2 p) a' a b' b m r
+raiseP = hoistP liftP
+
+{-| Lift the base proxy of a \'@K@\'leisli arrow
+
+> raisePK = hoistPK liftP
+-}
+raisePK
+ :: (Monad m, Proxy p, PFunctor t1, ProxyTrans t2)
+ => (q -> t1 p a' a b' b m r) -- ^ Proxy Kleisli arrow
+ -> (q -> t1 (t2 p) a' a b' b m r)
+raisePK = hoistPK liftP

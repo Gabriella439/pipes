@@ -21,7 +21,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
-import Control.Proxy.Morph (PFunctor(hoistP))
+import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
 import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -93,6 +93,9 @@ instance ProxyTrans (ReaderP i) where
 
 instance PFunctor (ReaderP i) where
     hoistP nat p = ReaderP (\i -> nat (unReaderP p i))
+
+instance PMonad (ReaderP i) where
+    embedP nat p = ReaderP (\i -> unReaderP (nat (unReaderP p i)) i)
 
 -- | Run a 'ReaderP' computation, supplying the environment
 runReaderP :: i -> ReaderP i p a' a b' b m r -> p a' a b' b m r

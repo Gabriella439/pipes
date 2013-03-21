@@ -15,7 +15,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
-import Control.Proxy.Morph (PFunctor(hoistP))
+import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
 import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -88,6 +88,9 @@ instance ProxyTrans IdentityP where
 
 instance PFunctor IdentityP where
     hoistP nat p = IdentityP (nat (runIdentityP p))
+
+instance PMonad IdentityP where
+    embedP nat p = nat (runIdentityP p)
 
 -- | Wrap a \'@K@\'leisli arrow in 'IdentityP'
 identityK :: (q -> p a' a b' b m r) -> (q -> IdentityP p a' a b' b m r)

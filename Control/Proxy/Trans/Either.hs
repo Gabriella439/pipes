@@ -25,7 +25,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
-import Control.Proxy.Morph (PFunctor(hoistP))
+import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 #if MIN_VERSION_base(4,6,0)
 #else
@@ -116,6 +116,14 @@ instance ProxyTrans (EitherP e) where
 
 instance PFunctor (EitherP e) where
     hoistP nat p = EitherP (nat (runEitherP p))
+
+instance PMonad (EitherP e) where
+    embedP nat p = EitherP (
+        runEitherP (nat (runEitherP p)) ?>= \x ->
+        return_P (case x of
+            Left         e  -> Left e
+            Right (Left  e) -> Left e
+            Right (Right a) -> Right a ) )
 
 -- | Run an 'EitherP' \'@K@\'leisi arrow, returning either a 'Left' or 'Right'
 runEitherK

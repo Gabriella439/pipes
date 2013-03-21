@@ -18,7 +18,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
-import Control.Proxy.Morph (PFunctor(hoistP))
+import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Maybe' proxy transformer
@@ -98,6 +98,14 @@ instance ProxyTrans MaybeP where
 
 instance PFunctor MaybeP where
     hoistP nat p = MaybeP (nat (runMaybeP p))
+
+instance PMonad MaybeP where
+    embedP nat p = MaybeP (
+        runMaybeP (nat (runMaybeP p)) ?>= \x ->
+        return_P (case x of
+            Nothing       -> Nothing
+            Just Nothing  -> Nothing
+            Just (Just a) -> Just a ) )
 
 -- | Run a 'MaybeP' \'@K@\'leisli arrow, returning the result or 'Nothing'
 runMaybeK :: (q -> MaybeP p a' a b' b m r) -> (q -> p a' a b' b m (Maybe r))

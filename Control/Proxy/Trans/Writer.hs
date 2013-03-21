@@ -10,7 +10,8 @@
 
 module Control.Proxy.Trans.Writer (
     -- * WriterP
-    WriterP(..),
+    WriterP,
+    writerP,
     runWriterP,
     runWriterK,
     execWriterP,
@@ -27,7 +28,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
-import Control.Proxy.Morph (PFunctor(hoistP))
+import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Data.Monoid (Monoid(mempty, mappend))
 
@@ -95,6 +96,20 @@ instance ProxyTrans (WriterP w) where
 
 instance PFunctor (WriterP w) where
     hoistP nat p = WriterP (\s -> nat (unWriterP p s))
+
+instance (Monoid w) => PMonad (WriterP w) where
+    embedP nat p = writerP (
+        runWriterP (nat (runWriterP p)) ?>= \((r, w1), w2) ->
+        return_P (r, mappend w1 w2) )
+
+-- | Create a 'WriterP' from a proxy that generates a result and a monoid
+writerP
+    :: (Monad m, Proxy p, Monoid w)
+    => p a' a b' b m (r, w) -> WriterP w p a' a b' b m r
+writerP p = WriterP (\w ->
+    p ?>= \(r, w') ->
+    let w'' = mappend w w'
+    in w'' `seq` return_P (r, w'') )
 
 -- | Run a 'WriterP' computation, producing the final result and monoid
 runWriterP :: (Monoid w) => WriterP w p a' a b' b m r -> p a' a b' b m (r, w)
