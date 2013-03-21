@@ -2,7 +2,7 @@
 
 {-# LANGUAGE KindSignatures, Rank2Types #-}
 
-module Control.PFunctor (
+module Control.Proxy.Morph (
     -- * Functors over Proxies
     PFunctor(..),
     hoistPK,

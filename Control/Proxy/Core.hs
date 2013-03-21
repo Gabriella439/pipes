@@ -9,10 +9,10 @@ module Control.Proxy.Core (
     module Control.Proxy.Trans,
     module Control.Proxy.Trans.Identity,
     module Control.Proxy.ListT,
+    module Control.Proxy.Morph,
     module Control.Monad,
     module Control.Monad.Trans.Class,
     module Control.Monad.Morph,
-    module Control.PFunctor
     ) where
 
 import Control.Monad.Morph (MFunctor(hoist))
@@ -20,11 +20,11 @@ import Control.Monad (forever, (>=>), (<=<))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
 import Control.Proxy.ListT
+import Control.Proxy.Morph
 import Control.Proxy.Synonym
 import Control.Proxy.Trans
 import Control.Proxy.Trans.Identity
 import Control.Proxy.Prelude
-import Control.PFunctor
 
 {- $modules
     "Control.Proxy.Class" defines the 'Proxy' type class that lets you program
@@ -44,11 +44,11 @@ import Control.PFunctor
     "Control.Proxy.ListT" defines a generalized @ListT@ monad transformer that
     compiles to proxies.
 
+    "Control.Proxy.Morph" exports 'hoistP'.
+
     "Control.Monad" exports 'forever', ('>=>'), and ('<=<').
 
     "Control.Monad.Trans.Class" exports 'lift'.
 
     "Control.Monad.Morph" exports 'hoist'.
-
-    "Control.PFunctor" exports 'hoistP'.
 -}

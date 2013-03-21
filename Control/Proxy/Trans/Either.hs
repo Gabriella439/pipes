@@ -24,8 +24,8 @@ import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.PFunctor (PFunctor(hoistP))
 import Control.Proxy.Class
+import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 #if MIN_VERSION_base(4,6,0)
 #else

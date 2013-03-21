@@ -44,14 +44,14 @@ Library
         mmorph       >= 1.0.0   && < 1.1,
         transformers >= 0.2.0.0 && < 0.4
     Exposed-Modules:
-        Control.PFunctor,
         Control.Pipe,
         Control.Proxy,
         Control.Proxy.Class,
         Control.Proxy.Core,
         Control.Proxy.Core.Fast,
         Control.Proxy.Core.Correct,
-        Control.Proxy.ListT
+        Control.Proxy.ListT,
+        Control.Proxy.Morph,
         Control.Proxy.Pipe,
         Control.Proxy.Synonym,
         Control.Proxy.Trans,

@@ -77,8 +77,8 @@ module Control.Proxy.Tutorial (
 import Control.Category
 import Control.Monad.Morph
 import Control.Monad.Trans.Class
-import Control.PFunctor
 import Control.Proxy
+import Control.Proxy.Morph
 import Control.Proxy.Core.Correct (ProxyCorrect)
 import Control.Proxy.Trans.Either
 
@@ -2005,7 +2005,8 @@ Left "Could not read an Integer"
 
 {- $proxyfunctor
     Proxy transformers also implement 'hoistP' from the 'PFunctor' class in
-    "Control.PFunctor".  This exactly parallels 'hoist' for monad transformers.
+    "Control.Proxy.Morph".  This exactly parallels 'hoist' from
+    @Control.Monad.Morph@.
 
     You will most commonly use 'hoistP' to insert arbitrary proxy transformer
     layers to get two mismatched proxy transformer stacks to type-check.
