@@ -7,12 +7,14 @@
 
 module Control.Proxy.Prelude.IO (
     -- * Standard I/O
+
     -- ** Input
     stdinS,
     getLineS,
     getLineC,
     readLnS,
     readLnC,
+
     -- ** Output
     stdoutD,
     putStrLnD,
@@ -21,13 +23,14 @@ module Control.Proxy.Prelude.IO (
     printD,
     printU,
     printB,
-    -- ** Interaction
-    promptS,
-    promptC,
+
     -- * Handle I/O
+
     -- ** Input
+
     hGetLineS,
     hGetLineC,
+
     -- ** Output
     hPrintD,
     hPrintU,
@@ -134,21 +137,6 @@ printB = runIdentityK $ foreverK $ \a' -> do
         putStr "D: "
         print a
     respond a
-
--- | Convert 'stdin'/'stdout' into a line-based 'Server'
-promptS :: (Proxy p) => String -> Server p String String IO r
-promptS = runIdentityK $ foreverK $ \send -> do
-    recv <- lift $ do
-        putStrLn send
-        getLine
-    respond recv
-
--- | Convert 'stdin'/'stdout' into a line-based 'Client'
-promptC :: (Proxy p) => () -> Client p String String IO r
-promptC () = runIdentityP $ forever $ do
-    send <- lift getLine
-    recv <- request send
-    lift $ putStrLn recv
 
 -- | A 'Producer' that sends lines from a handle downstream
 hGetLineS :: (Proxy p) => IO.Handle -> () -> Producer p String IO ()
