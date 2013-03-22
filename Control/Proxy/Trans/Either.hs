@@ -187,7 +187,7 @@ handle
 handle f m = catch m f
 {-# INLINABLE handle #-}
 
--- | 'fmap' over the \'@L@\' variable
+-- | 'fmap' over the \'@L@\'eft variable
 fmapL
     :: (Monad m, Proxy p)
     => (e -> f) -> EitherP e p a' a b' b m r -> EitherP f p a' a b' b m r
