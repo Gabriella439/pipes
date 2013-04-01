@@ -121,7 +121,10 @@ p0 `_bind` f = go p0 where
 
 -- | Only satisfies monad transformer laws modulo 'observe'
 instance MonadTrans (ProxyFast a' a b' b) where
-    lift m = M (m >>= \r -> return (Pure r))
+    lift = _lift
+
+_lift :: (Monad m) => m r -> ProxyFast a' a b' b m r
+_lift = \m -> M (m >>= \r -> return (Pure r))
 
 instance MFunctor (ProxyFast a' a b' b) where
     hoist nat p0 = go (observe p0) where
@@ -138,7 +141,7 @@ instance ProxyInternal ProxyFast where
     return_P = Pure
     (?>=)    = _bind
 
-    lift_P   = lift
+    lift_P   = _lift
 
     liftIO_P = liftIO
 
