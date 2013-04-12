@@ -15,7 +15,7 @@ module Control.Proxy.Core (
     module Control.Monad.Morph,
     ) where
 
-import Control.Monad.Morph (MFunctor(hoist))
+import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
 import Control.Monad (forever, (>=>), (<=<))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
