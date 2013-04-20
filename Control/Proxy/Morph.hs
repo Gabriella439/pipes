@@ -83,9 +83,10 @@ class PFunctor (t
         @(t p1)@ to @(t p2)@
     -}
     hoistP
-        :: (Monad m, Proxy p1)
-        => (forall r1 . p1 a' a b' b m r1 ->   p2 a' a b' b n r1) -- ^ Proxy morphism
-        -> (          t p1 a' a b' b m r2 -> t p2 a' a b' b n r2)
+        :: (Monad m1, Proxy p1)
+        => (forall x . p1 a1' a1 b1' b1 m1 x ->   p2 a2' a2 b2' b2 m2 x)
+        -- ^ Proxy morphism
+        -> (         t p1 a1' a1 b1' b1 m1 r -> t p2 a2' a2 b2' b2 m2 r)
 
 {-| A monad in the category of monads, using 'liftP' from 'ProxyTrans' as the
     analog of 'return' and 'embedP' as the analog of ('=<<'):
@@ -102,9 +103,9 @@ class (PFunctor t, ProxyTrans t) => PMonad t where
         'embedP' is analogous to ('=<<')
     -}
     embedP
-        :: (Monad n, Proxy p2)
-        => (forall r1 . p1 a' a b' b m r1 -> t p2 a' a b' b n r1)
-        -> (          t p1 a' a b' b m r2 -> t p2 a' a b' b n r2)
+        :: (Monad m2, Proxy p2)
+        => (forall x . p1 a1' a1 b1' b1 m1 x -> t p2 a2' a2 b2' b2 m2 x)
+        -> (         t p1 a1' a1 b1' b1 m1 r -> t p2 a2' a2 b2' b2 m2 r)
 
 {-| Squash to 'PMonad' layers into a single layer
 
