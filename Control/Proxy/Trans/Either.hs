@@ -28,6 +28,7 @@ import Control.Proxy.Class (
     Proxy(request, respond, (->>), (>>~)),
     ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P),
     MonadPlusP(mzero_P, mplus_P) )
+import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 #if MIN_VERSION_base(4,6,0)
@@ -101,6 +102,28 @@ instance (Proxy p) => Proxy (EitherP e p) where
     p >>~ fb  = EitherP (runEitherP p >>~ (\b -> runEitherP (fb b)))
     request = \a' -> EitherP (request a' ?>= \a  -> return_P (Right a ))
     respond = \b  -> EitherP (respond b  ?>= \b' -> return_P (Right b'))
+
+instance (ListT p) => ListT (EitherP e p) where
+    p //> fb = EitherP (
+        (runEitherP p >>~ absorb) //> \b -> runEitherP (fb b) )
+      where
+        absorb b =
+            respond b ?>= \x ->
+            case x of
+                Left  e  -> return_P (Left e)
+                Right b' ->
+                    request b' ?>= \b2 ->
+                    absorb b2
+    fb' >\\ p = EitherP (
+        (\b' -> runEitherP (fb' b')) >\\ (absorb ->> runEitherP p) )
+      where
+        absorb b' =
+            request b' ?>= \x ->
+            case x of
+                Left  e -> return_P (Left e)
+                Right b ->
+                    respond b ?>= \b'2 ->
+                    absorb b'2
 
 instance (Proxy p, Monoid e) => MonadPlusP (EitherP e p) where
     mzero_P = EitherP (return_P (Left mempty))
