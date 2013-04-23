@@ -191,9 +191,9 @@ class (Proxy p) => ListT p where
 -}
 (\>\)
     :: (Monad m, ListT p)
-    => ( b' -> p a' a x' x m b)
-    -> (_c' -> p b' b x' x m c)
-    -> (_c' -> p a' a x' x m c)
+    => (b' -> p a' a x' x m b)
+    -> (c' -> p b' b x' x m c)
+    -> (c' -> p a' a x' x m c)
 f \>\ g = \c' -> f >\\ g c'
 {-# INLINABLE (\>\) #-}
 
@@ -205,27 +205,27 @@ f \>\ g = \c' -> f >\\ g c'
 -}
 (/>/)
     :: (Monad m, ListT p)
-    => (_a -> p x' x b' b m a')
-    -> ( b -> p x' x c' c m b')
-    -> (_a -> p x' x c' c m a')
+    => (a -> p x' x b' b m a')
+    -> (b -> p x' x c' c m b')
+    -> (a -> p x' x c' c m a')
 f />/ g = \a -> f a //> g
 {-# INLINABLE (/>/) #-}
 
 -- | Equivalent to ('\>\') with the arguments flipped
 (/</)
     :: (Monad m, ListT p)
-    => (_c' -> p b' b x' x m c)
-    -> ( b' -> p a' a x' x m b)
-    -> (_c' -> p a' a x' x m c)
+    => (c' -> p b' b x' x m c)
+    -> (b' -> p a' a x' x m b)
+    -> (c' -> p a' a x' x m c)
 p1 /</ p2 = p2 \>\ p1
 {-# INLINABLE (/</) #-}
 
 -- | Equivalent to ('/>/') with the arguments flipped
 (\<\)
     :: (Monad m, ListT p)
-    => ( b -> p x' x c' c m b')
-    -> (_a -> p x' x b' b m a')
-    -> (_a -> p x' x c' c m a')
+    => (b -> p x' x c' c m b')
+    -> (a -> p x' x b' b m a')
+    -> (a -> p x' x c' c m a')
 p1 \<\ p2 = p2 />/ p1
 {-# INLINABLE (\<\) #-}
 
