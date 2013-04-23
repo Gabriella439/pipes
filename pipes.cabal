@@ -28,7 +28,7 @@ Description:
   * /ListT/: Correct implementation of ListT that interconverts with pipes
   .
   * /Lightweight Dependency/: @pipes@ depends only on @transformers@ and
-    compiles rapidly
+    @mmorph@ and compiles rapidly
   .
   * /Extensive Documentation/: Second to none!
   .
