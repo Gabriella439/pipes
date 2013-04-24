@@ -110,9 +110,6 @@ import Control.Monad.Trans.State.Strict (
     evalState )
 import Control.Proxy.Class
 import Control.Proxy.ListT (
-    ListT,
-    (\>\),
-    (/>/),
     RespondT(RespondT),
     RequestT(RequestT),
     ProduceT,
@@ -589,7 +586,7 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
 >
 > eachS (pure mempty) = pure mempty
 -}
-eachS :: (Monad m, ListT p) => [b] -> ProduceT p m b
+eachS :: (Monad m, Proxy p) => [b] -> ProduceT p m b
 eachS bs = RespondT (fromListS bs ())
 {-# INLINABLE eachS #-}
 
@@ -599,18 +596,18 @@ eachS bs = RespondT (fromListS bs ())
 >
 > eachC (pure mempty) = pure mempty
 -}
-eachC :: (Monad m, ListT p) => [a'] -> CoProduceT p m a'
+eachC :: (Monad m, Proxy p) => [a'] -> CoProduceT p m a'
 eachC a's = RequestT (fromListC a's ())
 {-# INLINABLE eachC #-}
 
 -- | Non-deterministically choose from all values in the given range
-rangeS :: (Enum b, Ord b, Monad m, ListT p) => b -> b -> ProduceT p m b
+rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ProduceT p m b
 rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
 {-# INLINABLE rangeS #-}
 
 -- | Non-deterministically choose from all values in the given range
 rangeC
-    :: (Enum a', Ord a', Monad m, ListT p) => a' -> a' -> CoProduceT p m a'
+    :: (Enum a', Ord a', Monad m, Proxy p) => a' -> a' -> CoProduceT p m a'
 rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 {-# INLINABLE rangeC #-}
 
@@ -878,7 +875,7 @@ foldlU' f = runIdentityK go where
     forward 'Right' values
 -}
 leftD
-    :: (Monad m, ListT p)
+    :: (Monad m, Proxy p)
     => (q -> p x a x b m r) -> (q -> p x (Either a e) x (Either b e) m r)
 leftD k = runIdentityK (up \>\ (identityK k />/ dn))
   where
@@ -896,7 +893,7 @@ leftD k = runIdentityK (up \>\ (identityK k />/ dn))
     forward 'Left' values
 -}
 rightD
-    :: (Monad m, ListT p)
+    :: (Monad m, Proxy p)
     => (q -> p x a x b m r) -> (q -> p x (Either e a) x (Either e b) m r)
 rightD k = runIdentityK (up \>\ (identityK k />/ dn))
   where
@@ -914,7 +911,7 @@ rightD k = runIdentityK (up \>\ (identityK k />/ dn))
     forward 'Right' values
 -}
 leftU
-    :: (Monad m, ListT p)
+    :: (Monad m, Proxy p)
     => (q -> p a' x b' x m r) -> (q -> p (Either a' e) x (Either b' e) x m r)
 leftU k = runIdentityK ((up \>\ identityK k) />/ dn)
   where
@@ -932,7 +929,7 @@ leftU k = runIdentityK ((up \>\ identityK k) />/ dn)
     forward 'Left' values
 -}
 rightU
-    :: (Monad m, ListT p)
+    :: (Monad m, Proxy p)
     => (q -> p a' x b' x m r) -> (q -> p (Either e a') x (Either e b') x m r)
 rightU k = runIdentityK ((up \>\ identityK k) />/ dn)
   where

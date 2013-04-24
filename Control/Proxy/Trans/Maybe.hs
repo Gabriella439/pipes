@@ -11,17 +11,15 @@ module Control.Proxy.Trans.Maybe (
     nothing,
     just
     ) where
-
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~)),
-    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P),
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
     MonadPlusP(mzero_P, mplus_P) )
-import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -83,13 +81,18 @@ instance (Proxy p) => ProxyInternal (MaybeP p) where
 
     liftIO_P m = MaybeP (liftIO_P (m >>= \x -> return (Just x)))
 
+    thread_P p s = MaybeP (
+        thread_P (runMaybeP p) s ?>= \(x, s') ->
+        return_P (case x of
+            Nothing -> Nothing
+            Just r  -> Just (r, s') ) )
+
 instance (Proxy p) => Proxy (MaybeP p) where
     fb' ->> p = MaybeP ((\b' -> runMaybeP (fb' b')) ->> runMaybeP p)
     p >>~ fb  = MaybeP (runMaybeP p >>~ (\b -> runMaybeP (fb b)))
     request = \a' -> MaybeP (request a' ?>= \a  -> return_P (Just a ))
     respond = \b  -> MaybeP (respond b  ?>= \b' -> return_P (Just b'))
 
-instance (ListT p) => ListT (MaybeP p) where
     p //> fb = MaybeP (
         (runMaybeP p >>~ absorb) //> \b -> runMaybeP (fb b) )
       where

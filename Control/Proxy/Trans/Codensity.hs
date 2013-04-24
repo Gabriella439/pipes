@@ -45,11 +45,10 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~)),
-    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P),
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
     MonadPlusP(mzero_P, mplus_P) )
 import Control.Proxy.Morph (PFunctor(hoistP))
-import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'Codensity' proxy transformer
@@ -114,6 +113,8 @@ instance (Proxy p) => ProxyInternal (CodensityP p) where
 
     liftIO_P m = CodensityP (\k -> liftIO_P m ?>= k)
 
+    thread_P p s = CodensityP (\k -> thread_P (unCodensityP p return_P) s ?>= k)
+
 instance (MonadPlusP p) => MonadPlusP (CodensityP p) where
     mzero_P       = CodensityP (\_ -> mzero_P)
     mplus_P m1 m2 = CodensityP (\k ->
@@ -129,7 +130,6 @@ instance (Proxy p) => Proxy (CodensityP p) where
     request = \a' -> CodensityP (\k -> request a' ?>= k)
     respond = \b  -> CodensityP (\k -> respond b  ?>= k)
 
-instance (ListT p) => ListT (CodensityP p) where
     fb' >\\ p = CodensityP (\k ->
         ((\b' -> unCodensityP (fb' b') return_P) >\\ unCodensityP p return_P)
             ?>= k )

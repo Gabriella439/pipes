@@ -84,9 +84,9 @@ class PFunctor (t
     -}
     hoistP
         :: (Monad m1, Proxy p1)
-        => (forall x . p1 a1' a1 b1' b1 m1 x ->   p2 a2' a2 b2' b2 m2 x)
+        => (forall a' a b' b x . p1 a' a b' b m1 x ->   p2 a' a b' b m2 x)
         -- ^ Proxy morphism
-        -> (         t p1 a1' a1 b1' b1 m1 r -> t p2 a2' a2 b2' b2 m2 r)
+        -> (                   t p1 a' a b' b m1 r -> t p2 a' a b' b m2 r)
 
 {-| A monad in the category of monads, using 'liftP' from 'ProxyTrans' as the
     analog of 'return' and 'embedP' as the analog of ('=<<'):

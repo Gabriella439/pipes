@@ -94,10 +94,10 @@ raiseK = (hoist lift .)
 -- | Convenience function equivalent to @(hoistP f .)@
 hoistPK
     :: (Monad m1, Proxy p1, PFunctor t)
-    => (forall x . p1 a1' a1 b1' b1 m1 x -> p2 a2' a2 b2' b2 m2 x)
+    => (forall a' a b' b x . p1 a' a b' b m1 x -> p2 a' a b' b m2 x)
     -- ^ Proxy morphism
-    -> (q -> t p1 a1' a1 b1' b1 m1 r) -- ^ Proxy Kleisli arrow
-    -> (q -> t p2 a2' a2 b2' b2 m2 r)
+    -> (q -> t p1 a' a b' b m1 r) -- ^ Proxy Kleisli arrow
+    -> (q -> t p2 a' a b' b m2 r)
 hoistPK f = (hoistP f .)
 {-# INLINABLE hoistPK #-}
 

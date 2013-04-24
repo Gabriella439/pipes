@@ -12,12 +12,18 @@ module Control.Proxy.Class (
     idT,
     (>~>),
     coidT,
+    (\>\),
+    (/>/),
 
     -- ** Flipped operators
     (<-<),
     (<~<),
+    (/</),
+    (\<\),
     (<<-),
     (~<<),
+    (//<),
+    (<\\),
 
     -- * Laws
     -- $laws
@@ -30,19 +36,37 @@ module Control.Proxy.Class (
 
 import Control.Monad.IO.Class (MonadIO)
 
-{- * I make educated guesses about which associativy is most efficient for each
-     operator.
-   * Keep proxy composition lower in precedence than function composition, which
+{- * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
 
 > lift . k >-> p
 >
 > hoist f . k >-> p
+
+   * Keep the priorities different so that users can mix composition operators
+     like:
+
+> up \>\ p />/ dn
+>
+> up >~> p >-> dn
+
+   * Keep 'request' and 'respond' composition lower in precedence than 'pull'
+     and 'push' composition, so that users can do:
+
+> read \>\ idT >-> writer
+
+   * I arbitrarily choose a lower priority for downstream operators so that lazy
+     pull-based computations need not evaluate upstream stages unless absolutely
+     necessary.
 -}
-infixr 7 <-<, ->>
-infixl 7 >->, <<-
-infixr 7 >~>, ~<<
-infixl 7 <~<, >>~
+infixr 5 <-<, ->>
+infixl 5 >->, <<-
+infixr 6 >~>, ~<<
+infixl 6 <~<, >>~
+infixl 7 \<\, //>
+infixr 7 />/, <\\
+infixr 8 /</, >\\
+infixl 8 \>\, //<
 infixl 1 ?>=  -- This should match the fixity of >>=
 
 -- | The core API for the @pipes@ library
@@ -83,6 +107,30 @@ class (ProxyInternal p) => Proxy p where
         =>        p a' a b' b m r
         -> (b  -> p b' b c' c m r)
         ->        p a' a c' c m r
+
+    {-| @f >\\\\ p@ replaces all 'request's in @p@ with @f@.
+
+        Equivalent to to ('=<<') for 'RequestT'
+
+        Point-ful version of ('\>\')
+    -}
+    (>\\)
+        :: (Monad m)
+        => (b' -> p a' a x' x m b)
+        ->        p b' b x' x m c
+        ->        p a' a x' x m c
+
+    {-| @p \/\/> f@ replaces all 'respond's in @p@ with @f@.
+
+        Equivalent to ('>>=') for 'RespondT'
+
+        Point-ful version of ('/>/')
+    -}
+    (//>)
+        :: (Monad m)
+        =>       p x' x b' b m a'
+        -> (b -> p x' x c' c m b')
+        ->       p x' x c' c m a'
 
 {-| Pull-based composition
 
@@ -142,6 +190,34 @@ coidT = go where
 -- coidT = foreverK $ respond >=> request
 {-# INLINABLE coidT #-}
 
+{-| @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
+
+    Equivalent to ('<=<') for 'RequestT'
+
+    Point-free version of ('>\\')
+-}
+(\>\)
+    :: (Monad m, Proxy p)
+    => (b' -> p a' a x' x m b)
+    -> (c' -> p b' b x' x m c)
+    -> (c' -> p a' a x' x m c)
+f \>\ g = \c' -> f >\\ g c'
+{-# INLINABLE (\>\) #-}
+
+{-| @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
+
+    Equivalent to ('>=>') for 'RespondT'
+
+    Point-free version of ('//>')
+-}
+(/>/)
+    :: (Monad m, Proxy p)
+    => (a -> p x' x b' b m a')
+    -> (b -> p x' x c' c m b')
+    -> (a -> p x' x c' c m a')
+f />/ g = \a -> f a //> g
+{-# INLINABLE (/>/) #-}
+
 -- | Equivalent to ('>->') with the arguments flipped
 (<-<)
     :: (Monad m, Proxy p)
@@ -160,6 +236,24 @@ p1 <-< p2 = p2 >-> p1
 p1 <~< p2 = p2 >~> p1
 {-# INLINABLE (<~<) #-}
 
+-- | Equivalent to ('\>\') with the arguments flipped
+(/</)
+    :: (Monad m, Proxy p)
+    => (c' -> p b' b x' x m c)
+    -> (b' -> p a' a x' x m b)
+    -> (c' -> p a' a x' x m c)
+p1 /</ p2 = p2 \>\ p1
+{-# INLINABLE (/</) #-}
+
+-- | Equivalent to ('/>/') with the arguments flipped
+(\<\)
+    :: (Monad m, Proxy p)
+    => (b -> p x' x c' c m b')
+    -> (a -> p x' x b' b m a')
+    -> (a -> p x' x c' c m a')
+p1 \<\ p2 = p2 />/ p1
+{-# INLINABLE (\<\) #-}
+
 -- | Equivalent to ('->>') with the arguments flipped
 (<<-)
     :: (Monad m, Proxy p)
@@ -177,6 +271,24 @@ k <<- p = p ->> k
     ->        p a' a c' c m r
 k ~<< p = p >>~ k
 {-# INLINABLE (~<<) #-}
+
+-- | Equivalent to ('>\\') with the arguments flipped
+(//<)
+    :: (Monad m, Proxy p)
+    =>        p b' b x' x m c
+    -> (b' -> p a' a x' x m b)
+    ->        p a' a x' x m c
+p //< f = f >\\ p
+{-# INLINABLE (//<) #-}
+
+-- | Equivalent to ('//>') with the arguments flipped
+(<\\)
+    :: (Monad m, Proxy p)
+    => (b -> p x' x c' c m b')
+    ->       p x' x b' b m a'
+    ->       p x' x c' c m a'
+f <\\ p = p //> f
+{-# INLINABLE (<\\) #-}
 
 {- $laws
     The 'Proxy' class defines an interface to all core proxy capabilities that
@@ -231,6 +343,29 @@ k ~<< p = p >>~ k
 >
 > (p1 >~> p2) >~> p3 = p1 >~> (p2 >~> p3)
 
+    * ('/>/') and 'respond' form a downstream ListT Kleisli category:
+
+> return = respond
+>
+> (>=>) = (//>)
+
+    * ('\>\') and 'request' form an upstream ListT Kleisli category:
+
+> return = request
+>
+> (>>=) = (//<)
+
+    Additionally, ('\>\') and ('/>/') both define functors between Proxy Kleisli
+    categories:
+
+> a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
+>
+> a \>\ return = return
+
+> (b >=> c) />/ a = (b />/ a) >=> (c />/ a)
+>
+> return />/ a = return
+
     Also, all proxies must satisfy the following 'Proxy' laws:
 
 > -- Define: liftK = (lift .)
@@ -254,6 +389,7 @@ k ~<< p = p >>~ k
 >
 > (liftK f >=> respond >=> p1) >~> (liftK g >=> respond >=> p2)
 >     = liftK (f >=> g) >=> (p1 >-> p2)
+
 -}
 
 {- $poly
@@ -380,6 +516,10 @@ class ProxyInternal p where
         => (forall r . m r  -> n r) -> (p a' a b' b m r' -> p a' a b' b n r')
 
     liftIO_P :: (MonadIO m) => IO r -> p a' a b' b m r
+
+    thread_P
+        :: (Monad m)
+        => p a' a b' b m r -> s -> p (a', s) (a, s) (b', s) (b, s) m (r, s)
 
 {-| The @(MonadPlusP p)@ constraint is equivalent to the following polymorphic
     constraint:

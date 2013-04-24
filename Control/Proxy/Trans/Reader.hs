@@ -21,10 +21,9 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~)),
-    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P),
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
     MonadPlusP(mzero_P, mplus_P) )
-import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -77,13 +76,15 @@ instance (Proxy p) => ProxyInternal (ReaderP i p) where
 
     liftIO_P m = ReaderP (\_ -> liftIO_P m)
 
+    thread_P p s = ReaderP (\i -> thread_P (unReaderP p i) s)
+
 instance (Proxy p) => Proxy (ReaderP i p) where
     fb' ->> p = ReaderP (\i -> (\b' -> unReaderP (fb' b') i) ->> unReaderP p i)
     p >>~ fb  = ReaderP (\i -> unReaderP p i >>~ (\b -> unReaderP (fb b) i))
+
     request = \a -> ReaderP (\_ -> request a)
     respond = \a -> ReaderP (\_ -> respond a)
 
-instance (ListT p) => ListT (ReaderP i p) where
     fb' >\\ p = ReaderP (\i -> (\b' -> unReaderP (fb' b') i) >\\ unReaderP p i)
     p //> fb  = ReaderP (\i -> unReaderP p i //> (\b -> unReaderP (fb b) i))
 

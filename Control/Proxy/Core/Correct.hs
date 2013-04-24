@@ -23,9 +23,8 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~)),
-    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P) )
-import Control.Proxy.ListT (ListT((//>), (>\\)))
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P) )
 
 {-| A 'ProxyCorrect' communicates with an upstream interface and a downstream
     interface.
@@ -108,6 +107,16 @@ instance ProxyInternal ProxyCorrect where
 
     liftIO_P = liftIO
 
+    thread_P p s = Proxy (do
+        x <- unProxy p
+        return (case x of
+            Request a' fa  ->
+                Request (a', s) (\(a , s') -> thread_P (fa  a ) s')
+            Respond b  fb' ->
+                Respond (b , s) (\(b', s') -> thread_P (fb' b') s')
+            Pure       r   ->
+                Pure (r, s) ) )
+
 instance Proxy ProxyCorrect where
     fb' ->> p = Proxy (do
         x <- unProxy p
@@ -127,7 +136,6 @@ instance Proxy ProxyCorrect where
     respond = \b  -> Proxy (return (Respond b  (\b' ->
         Proxy (return (Pure b')))))
 
-instance ListT ProxyCorrect where
     fb' >\\ p0 = go p0 where
         go p = Proxy (do
             x <- unProxy p

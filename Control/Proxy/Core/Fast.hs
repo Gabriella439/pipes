@@ -48,9 +48,8 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~)),
-    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P))
-import Control.Proxy.ListT (ListT((//>), (>\\)))
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P))
 
 {-| A 'ProxyFast' communicates with an upstream interface and a downstream
     interface.
@@ -147,6 +146,12 @@ instance ProxyInternal ProxyFast where
 
     hoist_P  = hoist
 
+    thread_P p s = case p of
+        Request a' fa  -> Request (a', s) (\(a , s') -> thread_P (fa  a ) s')
+        Respond b  fb' -> Respond (b,  s) (\(b', s') -> thread_P (fb' b') s')
+        M          m   -> M (m >>= \p' -> return (thread_P p' s))
+        Pure       r   -> Pure (r, s)
+
 instance Proxy ProxyFast where
     fb' ->> p = case p of
         Request b' fb  -> fb' b' >>~ fb
@@ -162,7 +167,6 @@ instance Proxy ProxyFast where
     request = \a' -> Request a' Pure
     respond = \b  -> Respond b  Pure
 
-instance ListT ProxyFast where
     (>\\) = _req
     (//>) = _resp
 

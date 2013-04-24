@@ -25,10 +25,9 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~)),
-    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P),
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
     MonadPlusP(mzero_P, mplus_P) )
-import Control.Proxy.ListT (ListT((>\\), (//>)))
 import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 #if MIN_VERSION_base(4,6,0)
@@ -97,13 +96,18 @@ instance (Proxy p) => ProxyInternal (EitherP e p) where
 
     liftIO_P m = EitherP (liftIO_P (m >>= \x -> return (Right x)))
 
+    thread_P p s = EitherP (
+        thread_P (runEitherP p) s ?>= \(x, s') ->
+        return_P (case x of
+            Left  e -> Left e
+            Right r -> Right (r, s') ) )
+
 instance (Proxy p) => Proxy (EitherP e p) where
     fb' ->> p = EitherP ((\b' -> runEitherP (fb' b')) ->> runEitherP p)
     p >>~ fb  = EitherP (runEitherP p >>~ (\b -> runEitherP (fb b)))
     request = \a' -> EitherP (request a' ?>= \a  -> return_P (Right a ))
     respond = \b  -> EitherP (respond b  ?>= \b' -> return_P (Right b'))
 
-instance (ListT p) => ListT (EitherP e p) where
     p //> fb = EitherP (
         (runEitherP p >>~ absorb) //> \b -> runEitherP (fb b) )
       where

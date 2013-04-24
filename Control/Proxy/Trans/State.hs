@@ -25,15 +25,15 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~)),
-    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P),
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
     MonadPlusP(mzero_P, mplus_P) )
 import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 -- | The 'State' proxy transformer
 newtype StateP s p a' a b' b (m :: * -> *) r
-    = StateP { unStateP :: s -> p a' a b' b m (r, s) }
+    = StateP { unStateP :: s -> p (a', s) (a, s) (b', s) (b, s) m (r, s) }
 
 instance (Proxy p, Monad m) => Functor (StateP s p a' a b' b m) where
        fmap f p = StateP (\s0 ->
@@ -80,36 +80,65 @@ instance (Proxy p) => ProxyInternal (StateP s p) where
 
     liftIO_P m = StateP (\s -> liftIO_P (m >>= \r -> return (r, s)))
 
+    thread_P p s = StateP (\s' ->
+        ((up ->> thread_P (unStateP p s') s) >>~ dn) ?>= next )
+      where
+        up ((a', s1), s2) =
+            request ((a', s2 ), s1 ) ?>= \((a , s1'), s2') ->
+            respond ((a , s2'), s1') ?>= up
+        dn ((b , s1), s2) =
+            respond ((b , s2 ), s1 ) ?>= \((b', s1'), s2') ->
+            request ((b', s2'), s1') ?>= dn
+        next ((r, s1), s2) = return_P ((r, s2), s1)
+
 instance (Proxy p) => Proxy (StateP s p) where
-    fb' ->> p = StateP (\s -> (\b' -> unStateP (fb' b') s) ->> unStateP p s)
-    p >>~ fb  = StateP (\s -> unStateP p s >>~ (\b -> unStateP (fb b) s))
-    request = \a' -> StateP (\s -> request a' ?>= \a  -> return_P (a , s))
-    respond = \b  -> StateP (\s -> respond b  ?>= \b' -> return_P (b', s))
+    fb' ->> p = StateP (\s ->
+        (\(b', s') -> unStateP (fb' b') s') ->> unStateP p s)
+    p >>~ fb  = StateP (\s ->
+        unStateP p s >>~ (\(b, s') -> unStateP (fb b) s') )
+    request = \a' -> StateP (\s -> request (a', s))
+    respond = \b  -> StateP (\s -> respond (b , s))
+
+    fb' >\\ p = StateP (\s ->
+        (\(b', s') -> unStateP (fb' b') s') >\\ unStateP p s)
+    p //> fb  = StateP (\s ->
+        unStateP p s //> (\(b, s') -> unStateP (fb b) s') )
 
 instance (MonadPlusP p) => MonadPlusP (StateP s p) where
     mzero_P       = StateP (\_ -> mzero_P)
     mplus_P m1 m2 = StateP (\s -> mplus_P (unStateP m1 s) (unStateP m2 s))
 
 instance ProxyTrans (StateP s) where
-    liftP m = StateP (\s -> m ?>= \r -> return_P (r, s))
+    liftP m = StateP (thread_P m)
 
 instance PFunctor (StateP s) where
     hoistP nat p = StateP (\s -> nat (unStateP p s))
 
 -- | Run a 'StateP' computation, producing the final result and state
-runStateP :: s -> StateP s p a' a b' b m r -> p a' a b' b m (r, s)
-runStateP s m = unStateP m s
+runStateP
+    :: (Monad m, Proxy p)
+    => s -> StateP s p a' a b' b m r -> p a' a b' b m (r, s)
+runStateP s m = up >\\ unStateP m s //> dn
+  where
+    up (a', s) =
+        request a' ?>= \a  ->
+        return_P (a , s)
+    dn (b , s) =
+        respond b  ?>= \b' ->
+        return_P (b', s)
 {-# INLINABLE runStateP #-}
 
 -- | Run a 'StateP' \'@K@\'leisli arrow, procuding the final result and state
-runStateK :: s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m (r, s))
-runStateK s k q = unStateP (k q) s
+runStateK
+    :: (Monad m, Proxy p)
+    => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m (r, s))
+runStateK s k q = runStateP s (k q)
 {-# INLINABLE runStateK #-}
 
 -- | Evaluate a 'StateP' computation, but discard the final state
 evalStateP
     :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m r
-evalStateP s p = unStateP p s ?>= \x -> return_P (fst x)
+evalStateP s p = runStateP s p ?>= \(r, _) -> return_P r
 {-# INLINABLE evalStateP #-}
 
 -- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final state
@@ -122,7 +151,7 @@ evalStateK s k q = evalStateP s (k q)
 -- | Evaluate a 'StateP' computation, but discard the final result
 execStateP
     :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m s
-execStateP s p = unStateP p s ?>= \x -> return_P (snd x)
+execStateP s p = runStateP s p ?>= \(_, s) -> return_P s
 {-# INLINABLE execStateP #-}
 
 -- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final result
