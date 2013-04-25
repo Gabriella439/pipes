@@ -92,15 +92,16 @@ module Control.Proxy.Prelude.Base (
     -- * Modules
     -- $modules
     module Control.Monad.Trans.State.Strict,
-    module Control.Monad.Trans.Writer.Lazy,
+    module Control.Proxy.Trans.Writer,
     module Data.Monoid
     ) where
 
 import Control.Monad.Morph (hoist)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Writer.Lazy (
-    WriterT(runWriterT), execWriterT, runWriter, execWriter )
-import qualified Control.Monad.Trans.Writer.Lazy as W (tell)
+
+import Control.Proxy.Trans.Writer (
+    WriterP, runWriterP, runWriterK, execWriterP, execWriterK )
+import qualified Control.Proxy.Trans.Writer as W
 import Control.Monad.Trans.State.Strict (
     StateT(StateT, runStateT),
     execStateT,
@@ -618,11 +619,11 @@ rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 -}
 foldD
     :: (Monad m, Proxy p, Monoid w)
-    => (a -> w) -> x -> p x a x a (WriterT w m) r
-foldD f = runIdentityK go where
+    => (a -> w) -> x -> WriterP w p x a x a m r
+foldD f = go where
     go x = do
         a <- request x
-        lift $ W.tell $ f a
+        W.tell (f a)
         x2 <- respond a
         go x2
 {-# INLINABLE foldD #-}
@@ -635,10 +636,10 @@ foldD f = runIdentityK go where
 -}
 foldU
     :: (Monad m, Proxy p, Monoid w)
-    => (a' -> w) -> a' -> p a' x a' x (WriterT w m) r
-foldU f = runIdentityK go where
+    => (a' -> w) -> a' -> WriterP w p a' x a' x m r
+foldU f = go where
     go a' = do
-        lift $ W.tell $ f a'
+        W.tell (f a')
         x <- request a'
         a'2 <- respond x
         go a'2
@@ -647,15 +648,14 @@ foldU f = runIdentityK go where
 {-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
     predicate
 -}
-allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) r
+allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP All p x a x a m r
 allD predicate = foldD (All . predicate)
 {-# INLINABLE allD #-}
 
 {-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
     predicate
 -}
-allU
-    :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) r
+allU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> WriterP All p a' x a' x m r
 allU predicate = foldU (All . predicate)
 {-# INLINABLE allU #-}
 
@@ -664,15 +664,15 @@ allU predicate = foldU (All . predicate)
 
     'allD_' terminates on the first value that fails the predicate
 -}
-allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) ()
-allD_ predicate = runIdentityK go where
+allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP All p x a x a m ()
+allD_ predicate = go where
     go x = do
         a <- request x
         if (predicate a)
             then do
                 x2 <- respond a
                 go x2
-            else lift $ W.tell $ All False
+            else W.tell (All False)
 {-# INLINABLE allD_ #-}
 
 {-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
@@ -682,29 +682,28 @@ allD_ predicate = runIdentityK go where
 -}
 allU_
     :: (Monad m, Proxy p)
-    => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) ()
-allU_ predicate = runIdentityK go where
+    => (a' -> Bool) -> a' -> WriterP All p a' x a' x m ()
+allU_ predicate = go where
     go a' =
         if (predicate a')
             then do
                 x   <- request a'
                 a'2 <- respond x
                 go a'2
-            else lift $ W.tell $ All False
+            else W.tell (All False)
 {-# INLINABLE allU_ #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies
     the predicate
 -}
-anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
+anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP Any p x a x a m r
 anyD predicate = foldD (Any . predicate)
 {-# INLINABLE anyD #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@U@\'pstream satisfies
     the predicate
 -}
-anyU
-    :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) r
+anyU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> WriterP Any p a' x a' x m r
 anyU predicate = foldU (Any . predicate)
 {-# INLINABLE anyU #-}
 
@@ -713,12 +712,12 @@ anyU predicate = foldU (Any . predicate)
 
     'anyD_' terminates on the first value that satisfies the predicate
 -}
-anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) ()
-anyD_ predicate = runIdentityK go where
+anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP Any p x a x a m ()
+anyD_ predicate = go where
     go x = do
         a <- request x
         if (predicate a)
-            then lift $ W.tell $ Any True
+            then W.tell (Any True)
             else do
                 x2 <- respond a
                 go x2
@@ -731,11 +730,11 @@ anyD_ predicate = runIdentityK go where
 -}
 anyU_
     :: (Monad m, Proxy p)
-    => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) ()
-anyU_ predicate = runIdentityK go where
+    => (a' -> Bool) -> a' -> WriterP Any p a' x a' x m ()
+anyU_ predicate = go where
     go a' =
         if (predicate a')
-            then lift $ W.tell $ Any True
+            then W.tell (Any True)
             else do
                 x   <- request a'
                 a'2 <- respond x
@@ -743,40 +742,40 @@ anyU_ predicate = runIdentityK go where
 {-# INLINABLE anyU_ #-}
 
 -- | Compute the 'Sum' of all values that flow \'@D@\'ownstream
-sumD :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Sum a) m) r
+sumD :: (Monad m, Proxy p, Num a) => x -> WriterP (Sum a) p x a x a m r
 sumD = foldD Sum
 {-# INLINABLE sumD #-}
 
 -- | Compute the 'Sum' of all values that flow \'@U@\'pstream
-sumU :: (Monad m, Proxy p, Num a') => a' -> p a' x a' x (WriterT (Sum a') m) r
+sumU :: (Monad m, Proxy p, Num a') => a' -> WriterP (Sum a') p a' x a' x m r
 sumU = foldU Sum
 {-# INLINABLE sumU #-}
 
 -- | Compute the 'Product' of all values that flow \'@D@\'ownstream
 productD
-    :: (Monad m, Proxy p, Num a) => x -> p x a x a (WriterT (Product a) m) r
+    :: (Monad m, Proxy p, Num a) => x -> WriterP (Product a) p x a x a m r
 productD = foldD Product
 {-# INLINABLE productD #-}
 
 -- | Compute the 'Product' of all values that flow \'@U@\'pstream
 productU
     :: (Monad m, Proxy p, Num a')
-    => a' -> p a' x a' x (WriterT (Product a') m) r
+    => a' -> WriterP (Product a') p a' x a' x m r
 productU = foldU Product
 {-# INLINABLE productU #-}
 
 -- | Count how many values flow \'@D@\'ownstream
-lengthD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Sum Int) m) r
+lengthD :: (Monad m, Proxy p) => x -> WriterP (Sum Int) p x a x a m r
 lengthD = foldD (\_ -> Sum 1)
 {-# INLINABLE lengthD #-}
 
 -- | Count how many values flow \'@U@\'pstream
-lengthU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (Sum Int) m) r
+lengthU :: (Monad m, Proxy p) => a' -> WriterP (Sum Int) p a' x a' x m r
 lengthU = foldU (\_ -> Sum 1)
 {-# INLINABLE lengthU #-}
 
 -- | Retrieve the first value going \'@D@\'ownstream
-headD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (First a) m) r
+headD :: (Monad m, Proxy p) => x -> WriterP (First a) p x a x a m r
 headD = foldD (First . Just)
 {-# INLINABLE headD #-}
 
@@ -784,14 +783,14 @@ headD = foldD (First . Just)
 
     'headD_' terminates on the first value it receives
 -}
-headD_ :: (Monad m, Proxy p) => x -> p x a x a (WriterT (First a) m) ()
-headD_ x = runIdentityP $ do
+headD_ :: (Monad m, Proxy p) => x -> WriterP (First a) p x a x a m ()
+headD_ x = do
     a <- request x
-    lift $ W.tell $ First (Just a)
+    W.tell $ First (Just a)
 {-# INLINABLE headD_ #-}
 
 -- | Retrieve the first value going \'@U@\'pstream
-headU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (First a') m) r
+headU :: (Monad m, Proxy p) => a' -> WriterP (First a') p a' x a' x m r
 headU = foldU (First . Just)
 {-# INLINABLE headU #-}
 
@@ -799,27 +798,27 @@ headU = foldU (First . Just)
 
     'headU_' terminates on the first value it receives
 -}
-headU_ :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (First a') m) ()
-headU_ a' = runIdentityP $ lift $ W.tell $ First (Just a')
+headU_ :: (Monad m, Proxy p) => a' -> WriterP (First a') p a' x a' x m ()
+headU_ a' = W.tell $ First (Just a')
 {-# INLINABLE headU_ #-}
 
 -- | Retrieve the last value going \'@D@\'ownstream
-lastD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Last a) m) r
+lastD :: (Monad m, Proxy p) => x -> WriterP (Last a) p x a x a m r
 lastD = foldD (Last . Just)
 {-# INLINABLE lastD #-}
 
 -- | Retrieve the last value going \'@U@\'pstream
-lastU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT (Last a') m) r
+lastU :: (Monad m, Proxy p) => a' -> WriterP (Last a') p a' x a' x m r
 lastU = foldU (Last . Just)
 {-# INLINABLE lastU #-}
 
 -- | Fold the values flowing \'@D@\'ownstream into a list
-toListD :: (Monad m, Proxy p) => x -> p x a x a (WriterT [a] m) r
+toListD :: (Monad m, Proxy p) => x -> WriterP [a] p x a x a m r
 toListD = foldD (\x -> [x])
 {-# INLINABLE toListD #-}
 
 -- | Fold the values flowing \'@U@\'pstream into a list
-toListU :: (Monad m, Proxy p) => a' -> p a' x a' x (WriterT [a'] m) r
+toListU :: (Monad m, Proxy p) => a' -> WriterP [a'] p a' x a' x m r
 toListU = foldU (\x -> [x])
 {-# INLINABLE toListU #-}
 
@@ -831,14 +830,14 @@ toListU = foldU (\x -> [x])
 -}
 foldrD
     :: (Monad m, Proxy p)
-    => (a -> b -> b) -> x -> p x a x a (WriterT (Endo b) m) r
+    => (a -> b -> b) -> x -> WriterP (Endo b) p x a x a m r
 foldrD step = foldD (Endo . step)
 {-# INLINABLE foldrD #-}
 
 -- | Fold equivalent to 'foldr'
 foldrU
     :: (Monad m, Proxy p)
-    => (a' -> b -> b) -> a' -> p a' x a' x (WriterT (Endo b) m) r
+    => (a' -> b -> b) -> a' -> WriterP (Endo b) p a' x a' x m r
 foldrU step = foldU (Endo . step)
 {-# INLINABLE foldrU #-}
 
@@ -885,7 +884,7 @@ leftD k = runIdentityK (up \>\ (identityK k />/ dn))
             Left  a -> return a
             Right e -> do
                 x2 <- respond (Right e)
-                up x2 
+                up x2
 {-# INLINABLE leftD #-}
 
 {-| Lift a proxy to operate only on 'Right' values flowing \'@D@\'ownstream and
@@ -902,7 +901,7 @@ rightD k = runIdentityK (up \>\ (identityK k />/ dn))
         case ma of
             Left  e -> do
                 x2 <- respond (Left e)
-                up x2 
+                up x2
             Right a -> return a
 {-# INLINABLE rightD #-}
 
@@ -921,7 +920,7 @@ leftU k = runIdentityK ((up \>\ identityK k) />/ dn)
             Left  b' -> return b'
             Right e  -> do
                 x2 <- request (Right e)
-                dn x2 
+                dn x2
 {-# INLINABLE leftU #-}
 
 {-| Lift a proxy to operate only on 'Right' values flowing \'@D@\'ownstream and
@@ -938,7 +937,7 @@ rightU k = runIdentityK ((up \>\ identityK k) />/ dn)
         case mb' of
             Left  e  -> do
                 x2 <- request (Left e)
-                dn x2 
+                dn x2
             Right b' -> return b'
 {-# INLINABLE rightU #-}
 
