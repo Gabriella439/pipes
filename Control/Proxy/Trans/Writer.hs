@@ -19,6 +19,8 @@ module Control.Proxy.Trans.Writer (
     execWriterK,
 
     -- * Writer operations
+    writer,
+    writerT,
     tell,
     censor
     ) where
@@ -40,19 +42,19 @@ import Data.Monoid (Monoid(mempty, mappend))
 newtype WriterP w p a' a b' b (m :: * -> *) r
     = WriterP { unWriterP :: w -> p (a', w) (a, w) (b', w) (b, w) m (r, w) }
 
-instance (Proxy p, Monad m) => Functor (WriterP w p a' a b' b m) where
+instance (Monad m, Proxy p) => Functor (WriterP w p a' a b' b m) where
     fmap f p = WriterP (\w0 ->
         unWriterP p w0 ?>= \(x, w1) ->
         return_P (f x, w1) )
 
-instance (Proxy p, Monad m) => Applicative (WriterP w p a' a b' b m) where
+instance (Monad m, Proxy p) => Applicative (WriterP w p a' a b' b m) where
     pure      = return
     fp <*> xp = WriterP (\w0 ->
         unWriterP fp w0 ?>= \(f, w1) ->
         unWriterP xp w1 ?>= \(x, w2) ->
         return_P (f x, w2) )
 
-instance (Proxy p, Monad m) => Monad (WriterP w p a' a b' b m) where
+instance (Monad m, Proxy p) => Monad (WriterP w p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
@@ -153,7 +155,7 @@ runWriterK k q = runWriterP (k q)
 
 -- | Evaluate a 'WriterP' computation, but discard the final result
 execWriterP
-    :: (Proxy p, Monad m, Monoid w)
+    :: (Monad m, Proxy p, Monoid w)
     => WriterP w p a' a b' b m r -> p a' a b' b m w
 execWriterP m = runWriterP m ?>= \(_, w) -> return_P w
 {-# INLINABLE execWriterP #-}
@@ -165,6 +167,14 @@ execWriterK
 execWriterK k q= execWriterP (k q)
 {-# INLINABLE execWriterK #-}
 
+-- | Convert a Writer to a 'WriterP'
+writer :: (Monad m, Proxy p, Monoid w) => (r, w) -> WriterP w p a' a b' b m r
+writer x = writerP (return_P x)
+
+-- | Convert a WriterT to a 'WriterP'
+writerT :: (Monad m, Proxy p, Monoid w) => m (r, w) -> WriterP w p a' a b' b m r
+writerT m = writerP (lift_P m)
+
 -- | Add a value to the monoid
 tell :: (Proxy p, Monad m, Monoid w) => w -> WriterP w p a' a b' b m ()
 tell w' = WriterP (\w -> let w'' = mappend w w' in w'' `seq` return_P ((), w''))
@@ -172,7 +182,7 @@ tell w' = WriterP (\w -> let w'' = mappend w w' in w'' `seq` return_P ((), w''))
 
 -- | Modify the result of a writer computation
 censor
-    :: (Proxy p, Monad m, Monoid w)
+    :: (Monad m, Proxy p, Monoid w)
     => (w -> w) -> WriterP w p a' a b' b m r -> WriterP w p a' a b' b m r
 censor f p = WriterP (\w0 ->
     unWriterP p w0 ?>= \(r, w1) ->
