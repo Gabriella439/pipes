@@ -31,7 +31,11 @@ module Control.Proxy.Class (
     -- * Polymorphic proxies
     -- $poly
     ProxyInternal(..),
-    MonadPlusP(..)
+    MonadPlusP(..),
+
+    -- * Deprecated
+    idT,
+    coidT
     ) where
 
 import Control.Monad.IO.Class (MonadIO)
@@ -53,7 +57,7 @@ import Control.Monad.IO.Class (MonadIO)
    * Keep 'request' and 'respond' composition lower in precedence than 'pull'
      and 'push' composition, so that users can do:
 
-> read \>\ idT >-> writer
+> read \>\ idPull >-> writer
 
    * I arbitrarily choose a lower priority for downstream operators so that lazy
      pull-based computations need not evaluate upstream stages unless absolutely
@@ -69,89 +73,75 @@ infixr 8 /</, >\\
 infixl 8 \>\, //<
 infixl 1 ?>=  -- This should match the fixity of >>=
 
--- | The core API for the @pipes@ library
-class (ProxyInternal p) => Proxy p where
-    {-| 'request' input from upstream, passing an argument with the request
+{-| The core API for the @pipes@ library
 
-        @request a'@ passes @a'@ as a parameter to upstream that upstream may
-        use to decide what response to return.  'request' binds the upstream's
-        response of type @a@ to its own return value.
+    Minimal definition:
+
+    * 'request'
+
+    * 'respond'
+
+    * ('->>')
+
+    * ('>>~')
+
+    * ('>\\')
+
+    * ('//>')
+-}
+class (ProxyInternal p) => Proxy p where
+    {-| 'request' sends a value of type @a'@ upstream and receives a value of
+        type @a@.
     -}
     request :: (Monad m) => a' -> p a' a b' b m a
 
-    {-| @f >\\\\ p@ replaces all 'request's in @p@ with @f@.
-
-        Equivalent to to ('=<<') for 'RequestT'
-
-        Point-ful version of ('\>\')
-    -}
+    -- | @(f >\\\\ p)@ replaces each 'request' in @p@ with @f@.
     (>\\)
         :: (Monad m)
         => (b' -> p a' a x' x m b)
         ->        p b' b x' x m c
         ->        p a' a x' x m c
 
-    {-| 'respond' with an output for downstream and bind downstream's next
-        'request'
-          
-        @respond b@ satisfies a downstream 'request' by supplying the value @b@.
-        'respond' blocks until downstream 'request's a new value and binds the
-        argument of type @b'@ from the next 'request' as its return value.
+    {-| 'respond' sends a value of type @b@ downstream and receives a value of
+        type @b'@.
     -}
     respond :: (Monad m) => b -> p a' a b' b m b'
 
-    {-| @p \/\/> f@ replaces all 'respond's in @p@ with @f@.
-
-        Equivalent to ('>>=') for 'RespondT'
-
-        Point-ful version of ('/>/')
-    -}
+    -- | @(p \/\/> f)@ replaces each 'respond' in @p@ with @f@.
     (//>)
         :: (Monad m)
         =>       p x' x b' b m a'
         -> (b -> p x' x c' c m b')
         ->       p x' x c' c m a'
 
-    {-| Pull-based identity
-    
-        'idT' forwards requests followed by responses
-    
-    > idT = request >=> respond >=> idT
-    -}
-    idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
-    idT = go where
+    -- | @idPull = request >=> respond >=> idT@
+    idPull :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+    idPull = go where
       go a' =
         request a' ?>= \a   ->
         respond a  ?>= \a'2 ->
         go a'2
+    {- DO NOT replace 'go' with 'idPull' or ghc-7.4.2 will not terminate while
+       compiling `pipes` -}
 
-    {-| Connect an upstream 'Proxy' that handles all 'request's
-
-        Point-ful version of ('>->')
-    -}
+    -- | @(f ->> p)@ pairs each 'request' in @p@ with a 'respond' in @f@.
     (->>)
         :: (Monad m)
         => (b'  -> p a' a b' b m r)
         ->         p b' b c' c m r
         ->         p a' a c' c m r
 
-    {-| Push-based identity
-    
-        'coidT' forwards responses followed by requests
-    
-    > coidT = respond >=> request >=> coidT
-    -}
-    coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
-    coidT = go where
+    -- | @coidT = respond >=> request >=> idT@
+    idPush :: (Monad m, Proxy p) => a -> p a' a a' a m r
+    idPush = go where
       go a =
         respond a  ?>= \a' ->
         request a' ?>= \a2 ->
         go a2
+    {- DO NOT replace 'go' with 'idPush' or ghc-7.4.2 will not terminate while
+       compiling `pipes` -}
 
-    {-| Connect a downstream 'Proxy' that handles all 'respond's
-
-        Point-ful version of ('>~>')
-    -}
+    -- | @(p >>~ f)@ pairs each 'respond' in @p@ with a 'request' in @f@.
     (>>~)
         :: (Monad m)
         =>        p a' a b' b m r
@@ -160,23 +150,25 @@ class (ProxyInternal p) => Proxy p where
 
 {-| Pull-based composition
 
+> (f >-> g) x = f ->> g x
+
     Compose two proxies blocked on a 'respond', generating a new proxy blocked
-    on a 'respond'.  Begins from the downstream end and satisfies every
-    'request' with a 'respond'.
+    on a 'respond'
 -}
 (>->)
     :: (Monad m, Proxy p)
     => (b'  -> p a' a b' b m r)
     -> (c'_ -> p b' b c' c m r)
     -> (c'_ -> p a' a c' c m r)
-k1 >-> k2 = \c' -> k1 ->> k2 c'
+f >-> g = \c' -> f ->> g c'
 {-# INLINABLE (>->) #-}
 
-{-| Push-based composition: point-free version of ('>>~')
+{-| Push-based composition
+
+> (f >~> g) x = f x >>~ g
 
     Compose two proxies blocked on a 'request', generating a new proxy blocked
-    on a 'request'.  Begins from the upstream end and satisfies every 'respond'
-    with a 'request'
+    on a 'request'
 -}
 (>~>)
     :: (Monad m, Proxy p)
@@ -186,11 +178,11 @@ k1 >-> k2 = \c' -> k1 ->> k2 c'
 k1 >~> k2 = \a -> k1 a >>~ k2
 {-# INLINABLE (>~>) #-}
 
-{-| \"request\" composition: point-free version of ('>\\')
+{-| \"request\" composition
 
-    @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
+> (f \>\ g) x = f >\\ g x
 
-    Equivalent to ('<=<') for 'RequestT'
+    Compose two folds, generating a new fold
 -}
 (\>\)
     :: (Monad m, Proxy p)
@@ -200,11 +192,11 @@ k1 >~> k2 = \a -> k1 a >>~ k2
 f \>\ g = \c' -> f >\\ g c'
 {-# INLINABLE (\>\) #-}
 
-{-| \"respond\" composition: point-free version of ('//>')
+{-| \"respond\" composition
 
-    @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
+> (f />/ g) x = f x //> g
 
-    Equivalent to ('>=>') for 'RespondT'
+    Compose two unfolds, generating a new unfold
 -}
 (/>/)
     :: (Monad m, Proxy p)
@@ -287,71 +279,52 @@ f <\\ p = p //> f
 {-# INLINABLE (<\\) #-}
 
 {- $laws
-    The 'Proxy' class defines an interface to all core proxy capabilities that
-    all proxy-like types must implement.
+    First, all proxies are monads and must satify the monad laws using:
+    
+    * @(>>=) = (?>=)@
 
-    First, all proxies must support a bidirectional flow of information, defined
-    by:
+    * @return = return_P@
 
-    * ('>->')
+    Second, all proxies are monad transformers and must satisfy the monad
+    transformer laws, using:
 
-    * ('>~>')
+    * @lift = lift_P@
 
-    * 'request'
+    Third, all proxies are functors in the category of monads and must satisfy
+    the functor laws, using:
 
-    * 'respond'
+    *  @hoist = hoist_P@
 
-    Intuitively, both @p1 >-> p2@ and @p1 >~> p2@ pair each 'request' in @p2@
-    with a 'respond' in @p1@.  ('>->') accepts proxies blocked on 'respond' and
-    begins from the downstream end, whereas ('>~>') accepts proxies blocked on
-    'request' and begins from the upstream end.
+    Fourth , all proxies form a \"pull-based\" category and must satisfy the
+    category laws using:
 
-    Second, all proxies are monads and must satify the monad laws using
-    @(>>=) = (?>=)@ and @return = return_P@.
+    * @(.) = (>->)@
 
-    Third, all proxies are monad transformers and must satisfy the monad
-    transformer laws, using @lift = lift_P@.
+    * @id = idPull@
 
-    Fourth, all proxies are functors in the category of monads and must satisfy
-    the functor laws, using @hoist = hoist_P@.
 
-    Fifth, all proxies form two streaming categories:
+    Fifth, all proxies form a \"push-based\" category and must satisfy the
+    category laws using:
 
-    * ('>->') and 'idT' form the \"pull-based\" category:
+    * @(.) = (>~>)@
 
-> Define: idT = request >=> respond >=> idT
-> Define: k1 >-> k2 = \c' -> k1 ->> k2 c'
->
-> idT >-> p = p
->
-> p >-> idT = p
->
-> (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
+    * @id = idPush@
 
-    * ('>~>') and 'coidT' form the \"push-based\" category:
+    Sixth, all proxies form a \"request\" category and must satisfy the category
+    laws using:
 
-> Define: coidT = respond >=> request >=> coidT
-> Define: k1 >~> k2 = \a -> k1 a >>~ k2
->
-> coidT >~> p = p
->
-> p >~> coidT = p
->
-> (p1 >~> p2) >~> p3 = p1 >~> (p2 >~> p3)
+    * @(.) = (\\>\\)@
 
-    * ('/>/') and 'respond' form a downstream ListT Kleisli category:
+    * @id = request@
 
-> return = respond
->
-> (>=>) = (//>)
+    Seventh, all proxies form a \"respond\" category and must satisfy the
+    category laws using:
 
-    * ('\>\') and 'request' form an upstream ListT Kleisli category:
+    * @(.) = (\/>\/)@
 
-> return = request
->
-> (>>=) = (//<)
+    * @id = respond@
 
-    Additionally, ('\>\') and ('/>/') both define functors between Proxy Kleisli
+    Eighth, ('\>\') and ('/>/') both define functors between Proxy Kleisli
     categories:
 
 > a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
@@ -362,9 +335,11 @@ f <\\ p = p //> f
 >
 > return />/ a = return
 
-    Also, all proxies must satisfy the following 'Proxy' laws:
+    Finally, all proxies must satisfy the following 'Proxy' laws:
 
-> -- Define: liftK = (lift .)
+> idPull = request >=> respond >=> idPull
+>
+> idPush = respond >=> request >=> idPush
 >
 > p1 >-> liftK f = liftK f
 >
@@ -526,3 +501,14 @@ class (Proxy p) => MonadPlusP p where
     mzero_P :: (Monad m) => p a' a b' b m r
     mplus_P
         :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r
+
+{-# DEPRECATED   idT "Use 'idPull' instead of 'idT'"   #-}
+{-# DEPRECATED coidT "Use 'idPush' instead of 'coidT'" #-}
+
+-- | For backwards compatibility, and will be deprecated in @pipes-4.0.0@
+idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+idT = idPull
+
+-- | For backwards compatibility, and will be deprecated in @pipes-4.0.0@
+coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
+coidT = idPush

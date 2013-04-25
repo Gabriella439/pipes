@@ -28,6 +28,9 @@ module Control.Proxy.ListT (
     RequestT(..),
     runRequestK,
     CoProduceT,
+
+    -- * ListT
+    ListT(..)
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -129,3 +132,6 @@ runRequestK k q = runRequestT (k q)
 
 -- | 'CoProduceT' is isomorphic to \"ListT done right\"
 type CoProduceT p = RequestT p () () C
+
+-- | For backwards compatibility, and will be deprecated in @pipes-4.0.0@
+class (Proxy p) => ListT p
