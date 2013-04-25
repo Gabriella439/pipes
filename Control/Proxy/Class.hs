@@ -8,10 +8,10 @@
 module Control.Proxy.Class (
     -- * Core proxy class
     Proxy(..),
+
+    -- * Composition operators
     (>->),
-    idT,
     (>~>),
-    coidT,
     (\>\),
     (/>/),
 
@@ -79,35 +79,6 @@ class (ProxyInternal p) => Proxy p where
     -}
     request :: (Monad m) => a' -> p a' a b' b m a
 
-    {-| 'respond' with an output for downstream and bind downstream's next
-        'request'
-          
-        @respond b@ satisfies a downstream 'request' by supplying the value @b@.
-        'respond' blocks until downstream 'request's a new value and binds the
-        argument of type @b'@ from the next 'request' as its return value.
-    -}
-    respond :: (Monad m) => b -> p a' a b' b m b'
-
-    {-| Connect an upstream 'Proxy' that handles all 'request's
-
-        Point-ful version of ('>->')
-    -}
-    (->>)
-        :: (Monad m)
-        => (b'  -> p a' a b' b m r)
-        ->         p b' b c' c m r
-        ->         p a' a c' c m r
-
-    {-| Connect a downstream 'Proxy' that handles all 'respond's
-
-        Point-ful version of ('>~>')
-    -}
-    (>>~)
-        :: (Monad m)
-        =>        p a' a b' b m r
-        -> (b  -> p b' b c' c m r)
-        ->        p a' a c' c m r
-
     {-| @f >\\\\ p@ replaces all 'request's in @p@ with @f@.
 
         Equivalent to to ('=<<') for 'RequestT'
@@ -120,6 +91,15 @@ class (ProxyInternal p) => Proxy p where
         ->        p b' b x' x m c
         ->        p a' a x' x m c
 
+    {-| 'respond' with an output for downstream and bind downstream's next
+        'request'
+          
+        @respond b@ satisfies a downstream 'request' by supplying the value @b@.
+        'respond' blocks until downstream 'request's a new value and binds the
+        argument of type @b'@ from the next 'request' as its return value.
+    -}
+    respond :: (Monad m) => b -> p a' a b' b m b'
+
     {-| @p \/\/> f@ replaces all 'respond's in @p@ with @f@.
 
         Equivalent to ('>>=') for 'RespondT'
@@ -131,6 +111,52 @@ class (ProxyInternal p) => Proxy p where
         =>       p x' x b' b m a'
         -> (b -> p x' x c' c m b')
         ->       p x' x c' c m a'
+
+    {-| Pull-based identity
+    
+        'idT' forwards requests followed by responses
+    
+    > idT = request >=> respond >=> idT
+    -}
+    idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+    idT = go where
+      go a' =
+        request a' ?>= \a   ->
+        respond a  ?>= \a'2 ->
+        go a'2
+
+    {-| Connect an upstream 'Proxy' that handles all 'request's
+
+        Point-ful version of ('>->')
+    -}
+    (->>)
+        :: (Monad m)
+        => (b'  -> p a' a b' b m r)
+        ->         p b' b c' c m r
+        ->         p a' a c' c m r
+
+    {-| Push-based identity
+    
+        'coidT' forwards responses followed by requests
+    
+    > coidT = respond >=> request >=> coidT
+    -}
+    coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
+    coidT = go where
+      go a =
+        respond a  ?>= \a' ->
+        request a' ?>= \a2 ->
+        go a2
+
+    {-| Connect a downstream 'Proxy' that handles all 'respond's
+
+        Point-ful version of ('>~>')
+    -}
+    (>>~)
+        :: (Monad m)
+        =>        p a' a b' b m r
+        -> (b  -> p b' b c' c m r)
+        ->        p a' a c' c m r
 
 {-| Pull-based composition
 
@@ -146,22 +172,7 @@ class (ProxyInternal p) => Proxy p where
 k1 >-> k2 = \c' -> k1 ->> k2 c'
 {-# INLINABLE (>->) #-}
 
-{-| Pull-based identity
-
-    'idT' forwards requests followed by responses
-
-> idT = request >=> respond >=> idT
--}
-idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
-idT = go where
-    go a' =
-        request a' ?>= \a   ->
-        respond a  ?>= \a'2 ->
-        go a'2
--- idT = foreverK $ request >=> respond
-{-# INLINABLE idT #-}
-
-{-| Push-based composition
+{-| Push-based composition: point-free version of ('>>~')
 
     Compose two proxies blocked on a 'request', generating a new proxy blocked
     on a 'request'.  Begins from the upstream end and satisfies every 'respond'
@@ -175,26 +186,11 @@ idT = go where
 k1 >~> k2 = \a -> k1 a >>~ k2
 {-# INLINABLE (>~>) #-}
 
-{-| Push-based identity
+{-| \"request\" composition: point-free version of ('>\\')
 
-    'coidT' forwards responses followed by requests
-
-> coidT = respond >=> request >=> coidT
--}
-coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
-coidT = go where
-    go a =
-        respond a  ?>= \a' ->
-        request a' ?>= \a2 ->
-        go a2
--- coidT = foreverK $ respond >=> request
-{-# INLINABLE coidT #-}
-
-{-| @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
+    @f \\>\\ g@ replaces all 'request's in 'g' with 'f'.
 
     Equivalent to ('<=<') for 'RequestT'
-
-    Point-free version of ('>\\')
 -}
 (\>\)
     :: (Monad m, Proxy p)
@@ -204,11 +200,11 @@ coidT = go where
 f \>\ g = \c' -> f >\\ g c'
 {-# INLINABLE (\>\) #-}
 
-{-| @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
+{-| \"respond\" composition: point-free version of ('//>')
+
+    @f \/>\/ g@ replaces all 'respond's in 'f' with 'g'.
 
     Equivalent to ('>=>') for 'RespondT'
-
-    Point-free version of ('//>')
 -}
 (/>/)
     :: (Monad m, Proxy p)

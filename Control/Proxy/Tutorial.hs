@@ -78,7 +78,6 @@ import Control.Category (Category)
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy
-import Control.Proxy.Morph
 import Control.Proxy.Core.Correct (ProxyCorrect)
 import Control.Proxy.Trans.Either
 
