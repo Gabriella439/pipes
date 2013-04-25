@@ -31,19 +31,19 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype ReaderP i p a' a b' b (m :: * -> *) r
     = ReaderP { unReaderP :: i -> p a' a b' b m r }
 
-instance (Proxy p, Monad m) => Functor (ReaderP i p a' a b' b m) where
+instance (Monad m, Proxy p) => Functor (ReaderP i p a' a b' b m) where
     fmap f p = ReaderP (\i ->
         unReaderP p i ?>= \x ->
         return_P (f x) )
 
-instance (Proxy p, Monad m) => Applicative (ReaderP i p a' a b' b m) where
+instance (Monad m, Proxy p) => Applicative (ReaderP i p a' a b' b m) where
     pure = return
     p1 <*> p2 = ReaderP (\i ->
         unReaderP p1 i ?>= \f -> 
         unReaderP p2 i ?>= \x -> 
         return_P (f x) )
 
-instance (Proxy p, Monad m) => Monad (ReaderP i p a' a b' b m) where
+instance (Monad m, Proxy p) => Monad (ReaderP i p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
@@ -53,14 +53,14 @@ instance (Proxy p) => MonadTrans (ReaderP i p a' a b' b) where
 instance (Proxy p) => MFunctor (ReaderP i p a' a b' b) where
     hoist = hoist_P
 
-instance (Proxy p, MonadIO m) => MonadIO (ReaderP i p a' a b' b m) where
+instance (MonadIO m, Proxy p) => MonadIO (ReaderP i p a' a b' b m) where
     liftIO = liftIO_P
 
-instance (MonadPlusP p, Monad m) => Alternative (ReaderP i p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => Alternative (ReaderP i p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (MonadPlusP p, Monad m) => MonadPlus (ReaderP i p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => MonadPlus (ReaderP i p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 
@@ -112,12 +112,12 @@ runReaderK i p q = runReaderP i (p q)
 {-# INLINABLE runReaderK #-}
 
 -- | Get the environment
-ask :: (Proxy p, Monad m) => ReaderP i p a' a b' b m i
+ask :: (Monad m, Proxy p) => ReaderP i p a' a b' b m i
 ask = ReaderP return_P
 {-# INLINABLE ask #-}
 
 -- | Get a function of the environment
-asks :: (Proxy p, Monad m) => (i -> r) -> ReaderP i p a' a b' b m r
+asks :: (Monad m, Proxy p) => (i -> r) -> ReaderP i p a' a b' b m r
 asks f = ReaderP (\i -> return_P (f i))
 {-# INLINABLE asks #-}
 

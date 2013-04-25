@@ -27,14 +27,14 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype MaybeP p a' a b' b (m :: * -> *) r
     = MaybeP { runMaybeP :: p a' a b' b m (Maybe r) }
 
-instance (Proxy p, Monad m) => Functor (MaybeP p a' a b' b m) where
+instance (Monad m, Proxy p) => Functor (MaybeP p a' a b' b m) where
     fmap f p = MaybeP (
         runMaybeP p ?>= \m ->
         return_P (case m of
             Nothing -> Nothing
             Just x  -> Just (f x) ) )
 
-instance (Proxy p, Monad m) => Applicative (MaybeP p a' a b' b m) where
+instance (Monad m, Proxy p) => Applicative (MaybeP p a' a b' b m) where
     pure      = return
     fp <*> xp = MaybeP (
         runMaybeP fp ?>= \m1 ->
@@ -46,7 +46,7 @@ instance (Proxy p, Monad m) => Applicative (MaybeP p a' a b' b m) where
                     Nothing -> return_P  Nothing
                     Just x  -> return_P (Just (f x)) )
 
-instance (Proxy p, Monad m) => Monad (MaybeP p a' a b' b m) where
+instance (Monad m, Proxy p) => Monad (MaybeP p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
@@ -56,14 +56,14 @@ instance (Proxy p) => MonadTrans (MaybeP p a' a b' b) where
 instance (Proxy p) => MFunctor (MaybeP p a' a b' b) where
     hoist = hoist_P
 
-instance (Proxy p, MonadIO m) => MonadIO (MaybeP p a' a b' b m) where
+instance (MonadIO m, Proxy p) => MonadIO (MaybeP p a' a b' b m) where
     liftIO = liftIO_P
 
-instance (Proxy p, Monad m) => Alternative (MaybeP p a' a b' b m) where
+instance (Monad m, Proxy p) => Alternative (MaybeP p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (Proxy p, Monad m) => MonadPlus (MaybeP p a' a b' b m) where
+instance (Monad m, Proxy p) => MonadPlus (MaybeP p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 

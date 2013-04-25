@@ -67,19 +67,19 @@ newtype CodensityP p a' a b' b (m :: * -> *) r
    instances.
 -}
 
-instance (Proxy p, Monad m) => Functor (CodensityP p a' a b' b m) where
+instance (Monad m, Proxy p) => Functor (CodensityP p a' a b' b m) where
     fmap f p = CodensityP (\k ->
         unCodensityP p    (\a ->
         k (f a)) )
 
-instance (Proxy p, Monad m) => Applicative (CodensityP p a' a b' b m) where
+instance (Monad m, Proxy p) => Applicative (CodensityP p a' a b' b m) where
     pure = return
     fp <*> xp = CodensityP (\k ->
         unCodensityP fp    (\f ->
         unCodensityP xp    (\x ->
         k (f x) ) ) )
 
-instance (Proxy p, Monad m) => Monad (CodensityP p a' a b' b m) where
+instance (Monad m, Proxy p) => Monad (CodensityP p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
@@ -89,14 +89,14 @@ instance (Proxy p) => MonadTrans (CodensityP p a' a b' b) where
 instance (Proxy p) => MFunctor (CodensityP p a' a b' b) where
     hoist = hoist_P
 
-instance (Proxy p, MonadIO m) => MonadIO (CodensityP p a' a b' b m) where
+instance (MonadIO m, Proxy p) => MonadIO (CodensityP p a' a b' b m) where
     liftIO = liftIO_P
 
-instance (MonadPlusP p, Monad m) => Alternative (CodensityP p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => Alternative (CodensityP p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (MonadPlusP p, Monad m) => MonadPlus (CodensityP p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => MonadPlus (CodensityP p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 

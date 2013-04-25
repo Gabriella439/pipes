@@ -24,19 +24,19 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 -- | The 'Identity' proxy transformer
 newtype IdentityP p a' a b' b (m :: * -> *) r
     = IdentityP { runIdentityP :: p a' a b' b m r } 
-instance (Proxy p, Monad m) => Functor (IdentityP p a' a b' b m) where
+instance (Monad m, Proxy p) => Functor (IdentityP p a' a b' b m) where
     fmap f p = IdentityP (
         runIdentityP p ?>= \x ->
         return_P (f x) )
 
-instance (Proxy p, Monad m) => Applicative (IdentityP p a' a b' b m) where
+instance (Monad m, Proxy p) => Applicative (IdentityP p a' a b' b m) where
     pure      = return
     fp <*> xp = IdentityP (
         runIdentityP fp ?>= \f ->
         runIdentityP xp ?>= \x ->
         return_P (f x) )
 
-instance (Proxy p, Monad m) => Monad (IdentityP p a' a b' b m) where
+instance (Monad m, Proxy p) => Monad (IdentityP p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
@@ -46,14 +46,14 @@ instance (Proxy p) => MonadTrans (IdentityP p a' a b' b) where
 instance (Proxy p) => MFunctor (IdentityP p a' a b' b) where
     hoist = hoist_P
 
-instance (Proxy p, MonadIO m) => MonadIO (IdentityP p a' a b' b m) where
+instance (MonadIO m, Proxy p) => MonadIO (IdentityP p a' a b' b m) where
     liftIO = liftIO_P
 
-instance (MonadPlusP p, Monad m) => Alternative (IdentityP p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => Alternative (IdentityP p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (MonadPlusP p, Monad m) => MonadPlus (IdentityP p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => MonadPlus (IdentityP p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 

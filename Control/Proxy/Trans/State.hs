@@ -37,19 +37,19 @@ import Control.Proxy.Trans (ProxyTrans(liftP))
 newtype StateP s p a' a b' b (m :: * -> *) r
     = StateP { unStateP :: s -> p (a', s) (a, s) (b', s) (b, s) m (r, s) }
 
-instance (Proxy p, Monad m) => Functor (StateP s p a' a b' b m) where
+instance (Monad m, Proxy p) => Functor (StateP s p a' a b' b m) where
        fmap f p = StateP (\s0 ->
            unStateP p s0 ?>= \(x, s1) ->
            return_P (f x, s1) )
 
-instance (Proxy p, Monad m) => Applicative (StateP s p a' a b' b m) where
+instance (Monad m, Proxy p) => Applicative (StateP s p a' a b' b m) where
     pure      = return
     p1 <*> p2 = StateP (\s0 ->
         unStateP p1 s0 ?>= \(f, s1) ->
         unStateP p2 s1 ?>= \(x, s2) ->
         return_P (f x, s2) )
 
-instance (Proxy p, Monad m) => Monad (StateP s p a' a b' b m) where
+instance (Monad m, Proxy p) => Monad (StateP s p a' a b' b m) where
     return = return_P
     (>>=)  = (?>=)
 
@@ -59,14 +59,14 @@ instance (Proxy p) => MonadTrans (StateP s p a' a b' b) where
 instance (Proxy p) => MFunctor (StateP s p a' a b' b) where
     hoist = hoist_P
 
-instance (Proxy p, MonadIO m) => MonadIO (StateP s p a' a b' b m) where
+instance (MonadIO m, Proxy p) => MonadIO (StateP s p a' a b' b m) where
     liftIO = liftIO_P
 
-instance (MonadPlusP p, Monad m) => Alternative (StateP s p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => Alternative (StateP s p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (MonadPlusP p, Monad m) => MonadPlus (StateP s p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => MonadPlus (StateP s p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 
@@ -139,26 +139,26 @@ runStateK s k q = runStateP s (k q)
 
 -- | Evaluate a 'StateP' computation, but discard the final state
 evalStateP
-    :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m r
+    :: (Monad m, Proxy p) => s -> StateP s p a' a b' b m r -> p a' a b' b m r
 evalStateP s p = runStateP s p ?>= \(r, _) -> return_P r
 {-# INLINABLE evalStateP #-}
 
 -- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final state
 evalStateK
-    :: (Proxy p, Monad m)
+    :: (Monad m, Proxy p)
     => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m r)
 evalStateK s k q = evalStateP s (k q)
 {-# INLINABLE evalStateK #-}
 
 -- | Evaluate a 'StateP' computation, but discard the final result
 execStateP
-    :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m s
+    :: (Monad m, Proxy p) => s -> StateP s p a' a b' b m r -> p a' a b' b m s
 execStateP s p = runStateP s p ?>= \(_, s') -> return_P s'
 {-# INLINABLE execStateP #-}
 
 -- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final result
 execStateK
-    :: (Proxy p, Monad m)
+    :: (Monad m, Proxy p)
     => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m s)
 execStateK s k q = execStateP s (k q)
 {-# INLINABLE execStateK #-}
@@ -172,21 +172,21 @@ stateT :: (Monad m, Proxy p) => (s -> m (r, s)) -> StateP s p a' a b' b m r
 stateT f = StateP (\s -> lift_P (f s))
 
 -- | Get the current state
-get :: (Proxy p, Monad m) => StateP s p a' a b' b m s
+get :: (Monad m, Proxy p) => StateP s p a' a b' b m s
 get = StateP (\s -> return_P (s, s))
 {-# INLINABLE get #-}
 
 -- | Set the current state
-put :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m ()
+put :: (Monad m, Proxy p) => s -> StateP s p a' a b' b m ()
 put s = StateP (\_ -> return_P ((), s))
 {-# INLINABLE put #-}
 
 -- | Modify the current state using a function
-modify :: (Proxy p, Monad m) => (s -> s) -> StateP s p a' a b' b m ()
+modify :: (Monad m, Proxy p) => (s -> s) -> StateP s p a' a b' b m ()
 modify f = StateP (\s -> return_P ((), f s))
 {-# INLINABLE modify #-}
 
 -- | Get the state filtered through a function
-gets :: (Proxy p, Monad m) => (s -> r) -> StateP s p a' a b' b m r
+gets :: (Monad m, Proxy p) => (s -> r) -> StateP s p a' a b' b m r
 gets f = StateP (\s -> return_P (f s, s))
 {-# INLINABLE gets #-}

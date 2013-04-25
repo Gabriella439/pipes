@@ -64,14 +64,14 @@ instance (Proxy p) => MonadTrans (WriterP w p a' a b' b) where
 instance (Proxy p) => MFunctor (WriterP w p a' a b' b) where
     hoist = hoist_P
 
-instance (Proxy p, MonadIO m) => MonadIO (WriterP w p a' a b' b m) where
+instance (MonadIO m, Proxy p) => MonadIO (WriterP w p a' a b' b m) where
     liftIO = liftIO_P
 
-instance (MonadPlusP p, Monad m) => Alternative (WriterP w p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => Alternative (WriterP w p a' a b' b m) where
     empty = mzero
     (<|>) = mplus
 
-instance (MonadPlusP p, Monad m) => MonadPlus (WriterP w p a' a b' b m) where
+instance (Monad m, MonadPlusP p) => MonadPlus (WriterP w p a' a b' b m) where
     mzero = mzero_P
     mplus = mplus_P
 
@@ -162,7 +162,7 @@ execWriterP m = runWriterP m ?>= \(_, w) -> return_P w
 
 -- | Evaluate a 'WriterP' \'@K@\'leisli arrow, but discard the final result
 execWriterK
-    :: (Proxy p, Monad m, Monoid w)
+    :: (Monad m, Proxy p, Monoid w)
     => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m w)
 execWriterK k q= execWriterP (k q)
 {-# INLINABLE execWriterK #-}
@@ -176,7 +176,7 @@ writerT :: (Monad m, Proxy p, Monoid w) => m (r, w) -> WriterP w p a' a b' b m r
 writerT m = writerP (lift_P m)
 
 -- | Add a value to the monoid
-tell :: (Proxy p, Monad m, Monoid w) => w -> WriterP w p a' a b' b m ()
+tell :: (Monad m, Proxy p, Monoid w) => w -> WriterP w p a' a b' b m ()
 tell w' = WriterP (\w -> let w'' = mappend w w' in w'' `seq` return_P ((), w''))
 {-# INLINABLE tell #-}
 
