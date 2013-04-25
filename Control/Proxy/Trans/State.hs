@@ -163,11 +163,11 @@ execStateK
 execStateK s k q = execStateP s (k q)
 {-# INLINABLE execStateK #-}
 
--- | Conversion from a stateful function to 'StateP'
+-- | Convert a State to a 'StateP'
 state :: (Monad m, Proxy p) => (s -> (r, s)) -> StateP s p a' a b' b m r
 state f = StateP (\s -> return_P (f s))
 
--- | Conversion from a stateful Kleisli arrow to 'StateP'
+-- | Convert a StateT to a 'StateP'
 stateT :: (Monad m, Proxy p) => (s -> m (r, s)) -> StateP s p a' a b' b m r
 stateT f = StateP (\s -> lift_P (f s))
 
