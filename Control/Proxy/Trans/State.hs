@@ -13,6 +13,8 @@ module Control.Proxy.Trans.State (
     execStateK,
 
     -- * State operations
+    state,
+    stateT,
     get,
     put,
     modify,
@@ -160,6 +162,14 @@ execStateK
     => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m s)
 execStateK s k q = execStateP s (k q)
 {-# INLINABLE execStateK #-}
+
+-- | Conversion from a stateful function to 'StateP'
+state :: (Monad m, Proxy p) => (s -> (r, s)) -> StateP s p a' a b' b m r
+state f = StateP (\s -> return_P (f s))
+
+-- | Conversion from a stateful Kleisli arrow to 'StateP'
+stateT :: (Monad m, Proxy p) => (s -> m (r, s)) -> StateP s p a' a b' b m r
+stateT f = StateP (\s -> lift_P (f s))
 
 -- | Get the current state
 get :: (Proxy p, Monad m) => StateP s p a' a b' b m s
