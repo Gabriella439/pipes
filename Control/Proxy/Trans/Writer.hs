@@ -32,7 +32,7 @@ import Control.Proxy.Class (
     Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
     ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
     MonadPlusP(mzero_P, mplus_P) )
-import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
+import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Data.Monoid (Monoid(mempty, mappend))
 

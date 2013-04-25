@@ -118,7 +118,7 @@ instance PFunctor (StateP s) where
 runStateP
     :: (Monad m, Proxy p)
     => s -> StateP s p a' a b' b m r -> p a' a b' b m (r, s)
-runStateP s m = up >\\ unStateP m s //> dn
+runStateP s0 m = up >\\ unStateP m s0 //> dn
   where
     up (a', s) =
         request a' ?>= \a  ->
@@ -151,7 +151,7 @@ evalStateK s k q = evalStateP s (k q)
 -- | Evaluate a 'StateP' computation, but discard the final result
 execStateP
     :: (Proxy p, Monad m) => s -> StateP s p a' a b' b m r -> p a' a b' b m s
-execStateP s p = runStateP s p ?>= \(_, s) -> return_P s
+execStateP s p = runStateP s p ?>= \(_, s') -> return_P s'
 {-# INLINABLE execStateP #-}
 
 -- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final result

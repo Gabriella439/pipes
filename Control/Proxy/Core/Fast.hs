@@ -228,25 +228,25 @@ p0 `_resp` fb = go p0 where
     'runProxy' / 'runProxyK' command.
 -}
 
-go :: (Monad m) => ProxyFast a' () () b m r -> m r
-go p = case p of
-    Request _ fa  -> go (fa  ())
-    Respond _ fb' -> go (fb' ())
-    M         m   -> m >>= go
+run :: (Monad m) => ProxyFast a' () () b m r -> m r
+run p = case p of
+    Request _ fa  -> run (fa  ())
+    Respond _ fb' -> run (fb' ())
+    M         m   -> m >>= run
     Pure      r   -> return r
 
 {-| Run a self-sufficient 'ProxyFast' Kleisli arrow, converting it back to the
     base monad
 -}
 runProxy :: (Monad m) => (() -> ProxyFast a' () () b m r) -> m r
-runProxy k = go (k ())
+runProxy k = run (k ())
 {-# INLINABLE runProxy #-}
 
 {-| Run a self-sufficient 'ProxyFast' Kleisli arrow, converting it back to a
     Kleisli arrow in the base monad
 -}
 runProxyK :: (Monad m) => (q -> ProxyFast a' () () b m r) -> (q -> m r)
-runProxyK k q = go (k q)
+runProxyK k q = run (k q)
 {-# INLINABLE runProxyK #-}
 
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad
@@ -270,7 +270,7 @@ runPipe p = runProxy (\_ -> p)
     can violate the monad transformer laws.
 -}
 observe :: (Monad m) => ProxyFast a' a b' b m r -> ProxyFast a' a b' b m r
-observe p = M (go p) where
+observe p0 = M (go p0) where
     go p = case p of
         M          m'  -> m' >>= go
         Pure       r   -> return (Pure r)

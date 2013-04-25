@@ -5,6 +5,8 @@
     Appendix section that you can use to follow along.
 -}
 
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+
 module Control.Proxy.Tutorial (
     -- * Introduction
     -- $intro

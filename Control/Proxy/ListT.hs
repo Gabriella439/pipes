@@ -30,7 +30,7 @@ module Control.Proxy.ListT (
     CoProduceT,
 
     -- * ListT
-    ListT(..)
+    ListT
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))

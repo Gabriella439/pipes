@@ -67,6 +67,8 @@ module Control.Proxy.Morph (
     ) where
 
 import Control.Proxy.Class (Proxy)
+
+-- For documentation
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
 {-| A functor in the category of proxies, using 'hoistP' as the analog of
@@ -84,7 +86,8 @@ class PFunctor (t
     -}
     hoistP
         :: (Monad m1, Proxy p1)
-        => (forall a' a b' b x . p1 a' a b' b m1 x ->   p2 a' a b' b m2 x)
+        => (forall _a' _a _b' _b _r .
+                p1 _a' _a _b' _b m1 _r ->   p2 _a' _a _b' _b m2 _r)
         -- ^ Proxy morphism
         -> (                   t p1 a' a b' b m1 r -> t p2 a' a b' b m2 r)
 

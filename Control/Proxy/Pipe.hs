@@ -30,8 +30,11 @@ module Control.Proxy.Pipe (
 
 import Control.Monad (forever)
 import Control.Proxy.Class (Proxy, respond, request, (->>))
-import Control.Proxy.Synonym (Pipe, Consumer, Producer, C)
+import Control.Proxy.Synonym (Pipe, C)
 import Control.Proxy.Trans.Identity (runIdentityP)
+
+-- For documentation
+import Control.Proxy.Synonym (Consumer, Producer)
 
 {-| Wait for input from upstream
 

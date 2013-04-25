@@ -136,17 +136,19 @@ instance Proxy ProxyCorrect where
     respond = \b  -> Proxy (return (Respond b  (\b' ->
         Proxy (return (Pure b')))))
 
-    fb' >\\ p0 = go p0 where
+    fb' >\\ p0 = go p0
+      where
         go p = Proxy (do
-            x <- unProxy p
-            case x of
+            y <- unProxy p
+            case y of
                 Request b' fb  -> unProxy (fb' b' >>= \b -> go (fb b))
                 Respond x  fx' -> return (Respond x (\x' -> go (fx' x')))
                 Pure       a   -> return (Pure a) )
-    p0 //> fb = go p0 where
+    p0 //> fb = go p0
+      where
         go p = Proxy (do
-            x <- unProxy p
-            case x of
+            y <- unProxy p
+            case y of
                 Request x' fx  -> return (Request x' (\x -> go (fx x)))
                 Respond b  fb' -> unProxy (fb b >>= \b' -> go (fb' b'))
                 Pure       a   -> return (Pure a) )
@@ -163,26 +165,26 @@ instance Proxy ProxyCorrect where
     'runProxy' / 'runProxyK' command.
 -}
 
-go :: (Monad m) => ProxyCorrect a' () () b m r -> m r
-go p = do
+run :: (Monad m) => ProxyCorrect a' () () b m r -> m r
+run p = do
     x <- unProxy p
     case x of
-        Request _ fa  -> go (fa  ())
-        Respond _ fb' -> go (fb' ())
+        Request _ fa  -> run (fa  ())
+        Respond _ fb' -> run (fb' ())
         Pure      r   -> return r
 
 {-| Run a self-sufficient 'ProxyCorrect' Kleisli arrow, converting it back to
     the base monad
 -}
 runProxy :: (Monad m) => (() -> ProxyCorrect a' () () b m r) -> m r
-runProxy k = go (k ()) where
+runProxy k = run (k ()) where
 {-# INLINABLE runProxy #-}
 
 {-| Run a self-sufficient 'ProxyCorrect' Kleisli arrow, converting it back to a
     Kleisli arrow in the base monad
 -}
 runProxyK :: (Monad m) => (q -> ProxyCorrect a' () () b m r) -> (q -> m r)
-runProxyK k q = go (k q)
+runProxyK k q = run (k q)
 {-# INLINABLE runProxyK #-}
 
 -- | Run the 'Pipe' monad transformer, converting it back to the base monad

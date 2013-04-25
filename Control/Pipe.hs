@@ -32,11 +32,12 @@ module Control.Pipe (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
-import Control.Category (Category((.), id), (<<<), (>>>))
-import Control.Monad (forever)
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Synonym (C)
 import Prelude hiding ((.), id)
+
+-- For documentation
+import Control.Category (Category((.), id), (<<<), (>>>))
 
 {- $types
     The 'Pipe' type is strongly inspired by Mario Blazevic's @Coroutine@ type in

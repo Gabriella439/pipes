@@ -114,7 +114,6 @@ import Control.Proxy.ListT (
     RequestT(RequestT),
     ProduceT,
     CoProduceT )
-import Control.Proxy.Prelude.Kleisli (replicateK, foreverK)
 import Control.Proxy.Synonym (Producer, Consumer, Pipe, CoProducer, CoPipe)
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK, identityK)
 import Data.Monoid (
@@ -237,7 +236,7 @@ useD :: (Monad m, Proxy p) => (a -> m r1) -> x -> p x a x a m r
 useD f = runIdentityK go where
     go x = do
         a  <- request x
-        lift $ f a
+        _  <- lift $ f a
         x2 <- respond a
         go x2
 {-# INLINABLE useD #-}
@@ -252,7 +251,7 @@ useD f = runIdentityK go where
 useU :: (Monad m, Proxy p) => (a' -> m r2) -> a' -> p a' x a' x m r
 useU g = runIdentityK go where
     go a' = do
-        lift $ g a'
+        _   <- lift $ g a'
         x   <- request a'
         a'2 <- respond x
         go a'2
@@ -270,9 +269,9 @@ useB
     => (a -> m r1) -> (a' -> m r2) -> a' -> p a' a a' a m r
 useB f g = runIdentityK go where
     go a' = do
-        lift $ g a'
+        _   <- lift $ g a'
         a   <- request a'
-        lift $ f a
+        _   <- lift $ f a
         a'2 <- respond a
         go a'2
 {-# INLINABLE useB #-}
@@ -287,7 +286,7 @@ execD :: (Monad m, Proxy p) => m r1 -> a' -> p a' a a' a m r
 execD md = runIdentityK go where
     go a' = do
         a   <- request a'
-        lift md
+        _   <- lift md
         a'2 <- respond a
         go a'2
 {- execD md = foreverK $ \a' -> do
@@ -305,7 +304,7 @@ execD md = runIdentityK go where
 execU :: (Monad m, Proxy p) => m r2 -> a' -> p a' a a' a m r
 execU mu = runIdentityK go where
     go a' = do
-        lift mu
+        _   <- lift mu
         a   <- request a'
         a'2 <- respond a
         go a'2
@@ -325,9 +324,9 @@ execU mu = runIdentityK go where
 execB :: (Monad m, Proxy p) => m r1 -> m r2 -> a' -> p a' a a' a m r
 execB md mu = runIdentityK go where
     go a' = do
-        lift mu
+        _   <- lift mu
         a   <- request a'
-        lift md
+        _   <- lift md
         a'2 <- respond a
         go a'2
 {- execB md mu = foreverK $ \a' -> do
@@ -417,7 +416,7 @@ dropD n0 = \() -> runIdentityP (go n0) where
     go n
         | n <= 0    = idPull ()
         | otherwise = do
-            request ()
+            _ <- request ()
             go (n - 1)
 {- dropD n () = do
     replicateM_ n $ request ()
@@ -511,7 +510,7 @@ filterU p = runIdentityK go where
     go a' =
         if (p a')
         then do
-            request a'
+            _   <- request a'
             a'2 <- respond ()
             go a'2
         else do
@@ -545,7 +544,7 @@ fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 enumFromS :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
 enumFromS b0 = \_ -> runIdentityP (go b0) where
     go b = do
-        respond b
+        _ <- respond b
         go $! succ b
 {-# INLINABLE enumFromS #-}
 
@@ -553,7 +552,7 @@ enumFromS b0 = \_ -> runIdentityP (go b0) where
 enumFromC :: (Enum a', Monad m, Proxy p) => a' -> () -> CoProducer p a' m r
 enumFromC a'0 = \_ -> runIdentityP (go a'0) where
     go a' = do
-        request a'
+        _ <- request a'
         go $! succ a'
 {-# INLINABLE enumFromC #-}
 
@@ -564,7 +563,7 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
     go b
         | b > b2    = return ()
         | otherwise = do
-            respond b
+            _ <- respond b
             go $! succ b
 {-# INLINABLE enumFromToS #-}
 
@@ -576,7 +575,7 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
     go n
         | n > a2 = return ()
         | otherwise = do
-            request n
+            _ <- request n
             go $! succ n
 {-# INLINABLE enumFromToC #-}
 
@@ -649,7 +648,7 @@ foldU f = runIdentityK go where
     predicate
 -}
 allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) r
-allD pred = foldD (All . pred)
+allD predicate = foldD (All . predicate)
 {-# INLINABLE allD #-}
 
 {-| Fold that returns whether 'All' values flowing \'@U@\'pstream satisfy the
@@ -657,7 +656,7 @@ allD pred = foldD (All . pred)
 -}
 allU
     :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) r
-allU pred = foldU (All . pred)
+allU predicate = foldU (All . predicate)
 {-# INLINABLE allU #-}
 
 {-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
@@ -666,10 +665,10 @@ allU pred = foldU (All . pred)
     'allD_' terminates on the first value that fails the predicate
 -}
 allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT All m) ()
-allD_ pred = runIdentityK go where
+allD_ predicate = runIdentityK go where
     go x = do
         a <- request x
-        if (pred a)
+        if (predicate a)
             then do
                 x2 <- respond a
                 go x2
@@ -684,9 +683,9 @@ allD_ pred = runIdentityK go where
 allU_
     :: (Monad m, Proxy p)
     => (a' -> Bool) -> a' -> p a' x a' x (WriterT All m) ()
-allU_ pred = runIdentityK go where
+allU_ predicate = runIdentityK go where
     go a' =
-        if (pred a')
+        if (predicate a')
             then do
                 x   <- request a'
                 a'2 <- respond x
@@ -698,7 +697,7 @@ allU_ pred = runIdentityK go where
     the predicate
 -}
 anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
-anyD pred = foldD (Any . pred)
+anyD predicate = foldD (Any . predicate)
 {-# INLINABLE anyD #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@U@\'pstream satisfies
@@ -706,7 +705,7 @@ anyD pred = foldD (Any . pred)
 -}
 anyU
     :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) r
-anyU pred = foldU (Any . pred)
+anyU predicate = foldU (Any . predicate)
 {-# INLINABLE anyU #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies the
@@ -715,10 +714,10 @@ anyU pred = foldU (Any . pred)
     'anyD_' terminates on the first value that satisfies the predicate
 -}
 anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) ()
-anyD_ pred = runIdentityK go where
+anyD_ predicate = runIdentityK go where
     go x = do
         a <- request x
-        if (pred a)
+        if (predicate a)
             then lift $ W.tell $ Any True
             else do
                 x2 <- respond a
@@ -733,9 +732,9 @@ anyD_ pred = runIdentityK go where
 anyU_
     :: (Monad m, Proxy p)
     => (a' -> Bool) -> a' -> p a' x a' x (WriterT Any m) ()
-anyU_ pred = runIdentityK go where
+anyU_ predicate = runIdentityK go where
     go a' =
-        if (pred a')
+        if (predicate a')
             then lift $ W.tell $ Any True
             else do
                 x   <- request a'
@@ -993,7 +992,7 @@ mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
 unitD :: (Monad m, Proxy p) => q -> p x' x y' () m r
 unitD _ = runIdentityP go where
     go = do
-        respond ()
+        _ <- respond ()
         go
 {-# INLINABLE unitD #-}
 
@@ -1001,7 +1000,7 @@ unitD _ = runIdentityP go where
 unitU :: (Monad m, Proxy p) => q -> p () x y' y m r
 unitU _ = runIdentityP go where
     go = do
-        request ()
+        _ <- request ()
         go
 {-# INLINABLE unitU #-}
 
