@@ -70,8 +70,6 @@ module Control.Proxy.Prelude.Base (
     toListU,
     foldrD,
     foldrU,
-    foldlD',
-    foldlU',
 
     -- * ArrowChoice
     -- $choice
@@ -91,7 +89,6 @@ module Control.Proxy.Prelude.Base (
 
     -- * Modules
     -- $modules
-    module Control.Monad.Trans.State.Strict,
     module Control.Proxy.Trans.Writer,
     module Data.Monoid
     ) where
@@ -102,13 +99,6 @@ import Control.Monad.Trans.Class (lift)
 import Control.Proxy.Trans.Writer (
     WriterP, runWriterP, runWriterK, execWriterP, execWriterK )
 import qualified Control.Proxy.Trans.Writer as W
-import Control.Monad.Trans.State.Strict (
-    StateT(StateT, runStateT),
-    execStateT,
-    evalStateT,
-    runState,
-    execState,
-    evalState )
 import Control.Proxy.Class
 import Control.Proxy.ListT (
     RespondT(RespondT),
@@ -611,7 +601,7 @@ rangeC
 rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 {-# INLINABLE rangeC #-}
 
-{-| Fold values flowing \'@D@\'ownstream
+{-| Strict fold over values flowing \'@D@\'ownstream.
 
 > foldD f >-> foldD g = foldD (f <> g)
 >
@@ -628,7 +618,7 @@ foldD f = go where
         go x2
 {-# INLINABLE foldD #-}
 
-{-| Fold values flowing \'@U@\'pstream
+{-| Strict fold over values flowing \'@U@\'pstream.
 
 > foldU f >-> foldU g = foldU (g <> f)
 >
@@ -840,28 +830,6 @@ foldrU
     => (a' -> b -> b) -> a' -> WriterP (Endo b) p a' x a' x m r
 foldrU step = foldU (Endo . step)
 {-# INLINABLE foldrU #-}
-
--- | Left strict fold over \'@D@\'ownstream values
-foldlD'
-    :: (Monad m, Proxy p) => (b -> a -> b) -> x -> p x a x a (StateT b m) r
-foldlD' f = runIdentityK go where
-    go x = do
-        a  <- request x
-        lift $ StateT $ \b -> let b' = f b a in b' `seq` return ((), b')
-        x2 <- respond a
-        go x2
-{-# INLINABLE foldlD' #-}
-
--- | Left strict fold over \'@U@\'pstream values
-foldlU'
-    :: (Monad m, Proxy p) => (b -> a' -> b) -> a' -> p a' x a' x (StateT b m) r
-foldlU' f = runIdentityK go where
-    go a' = do
-        lift $ StateT $ \b -> let b' = f b a' in b' `seq` return ((), b')
-        x   <- request a'
-        a'2 <- respond x
-        go a'2
-{-# INLINABLE foldlU' #-}
 
 {- $choice
     'leftD' and 'rightD' satisfy the 'ArrowChoice' laws using @arr = mapD@.
