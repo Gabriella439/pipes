@@ -103,7 +103,7 @@ import Control.Proxy.Trans.Either
 > import Control.Monad
 > import Control.Proxy
 > import System.IO
-> 
+>
 > --                 Produces Strings ---+----------+
 > --                                     |          |
 > --                                     v          v
@@ -270,7 +270,7 @@ You shall not pass!
     'request'.
 
     'Server's similarly generalize 'Producer's because they receive arguments
-    other than @()@.  The following 'Server' receives 'Int' requests and 
+    other than @()@.  The following 'Server' receives 'Int' requests and
     responds with 'Bool's:
 
 > --                    Receives 'Int's ---+   +--- Replies with 'Bool's
@@ -575,7 +575,7 @@ Client Receives: False
     argument come from?  Well, it turns out that every 'Proxy' receives this
     initial argument as an ordinary parameter, as if they all began blocked on
     a 'respond' statement.
-   
+
     We can see this if we take all the previous proxies we defined and fully
     expand every type synonym.  The initial argument of each 'Proxy' matches
     the type parameter corresponding to the return value of 'respond':
@@ -1125,7 +1125,7 @@ Received a value:
 34
 ...
 
-    What if we only want the user to provide three values?  We can 
+    What if we only want the user to provide three values?  We can
     selectively throttle it with 'takeB_':
 
 > source2 :: (Proxy p) => () -> Producer p Int IO ()
@@ -1350,56 +1350,29 @@ Received 8
 -}
 
 {- $folds
-    You can fold a stream of values in two ways, both of which use the base
-    monad:
+    You can fold a stream of values using the 'WriterP' proxy transformer.
 
-    * Use 'WriterT' in the base monad and 'tell' the values to fold
+> import qualified Control.Proxy.Trans.Writer as W
 
-    * Use 'StateT' in the base monad and 'put' strict values
-
-    'WriterT' is more elegant in principle but leaks space for a large number of
-    values to fold.  'StateT' does not leak space if you keep the accumulator
-    strict, but is less elegant and doesn't guarantee write-only behavior.  To
-    remedy this, I am currently working on a stricter 'WriterT' implementation
-    that does not leak space to add to the @transformers@ package.
-
-    "Control.Proxy.Prelude.Base" provides several common folds using 'WriterT'
-    as the base monad, such as:
+   "Control.Proxy.Prelude.Base" provides several common folds implemented this
+    way, such as:
 
     * 'lengthD': Count how many values flow downstream
 
-> lengthD :: (Monad m, Proxy p) => x -> p x a x a (WriterT (Sum Int) m) r
+> lengthD :: (Monad m, Proxy p) => x -> W.WriterP (Sum Int) p x a x a m r
 
     * 'toListD': Fold the values flowing downstream into a list.
 
-> toListD :: (Monad m, Proxy p) => x -> p x a x a (WriterT [a] m) r
+> toListD :: (Monad m, Proxy p) => x -> W.WriterP [a] p x a x a m r
 
     * 'anyD': Determine whether any values satisfy the predicate
 
-> anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> p x a x a (WriterT Any m) r
-
-    These 'WriterT' versions demonstrate how the elegant approach should work in
-    principle and they should be okay for folding a medium number of values
-    until I release the fixed 'WriterT'.  If space leaks cause problems, you can
-    temporarily rewrite the 'WriterT' folds using the following two strict
-    'StateT' folds:
-
-    * 'foldlD'': Strictly fold values flowing downstream
-
-> foldlD'
->     :: (Monad m, Proxy p)
->     => (b -> a -> b) -> x -> p x a x a (StateT b m) r
-
-    * 'foldlU'': Strictly fold values flowing upstream
-
-> foldU'
->     :: (Monad m, Proxy p)
->     => (b -> a' -> b) -> a' -> p a' x a' x (StateT b m) r
+> anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> W.WriterP Any p x a x a m r
 
     Now, let's try these folds out and see if we can build a list from user
     input:
 
->>> runWriterT $ runProxy $ raiseK promptInt >-> takeB_ 3 >-> toListD
+>>> runProxy . W.runWriterK $ promptInt >-> takeB_ 3 >-> toListD
 Enter an Integer:
 1<Enter>
 Enter an Integer:
@@ -1408,39 +1381,42 @@ Enter an Integer:
 5<Enter>
 ((),[1,66,5])
 
-    Notice that @promptInt@ uses 'IO' as its base monad, but 'toListD' uses
-    @(WriterT [Int] m)@ as its base monad, so I use 'raiseK' to get the base
-    monads to match.
-
     You can insert these folds anywhere in the middle of a pipeline and they
     still work:
 
->>> runWriterT $ runProxy $ fromListS [5, 7, 4] >-> lengthD >-> raiseK printD
+>>> runProxy . W.runWriterK $ fromListS [5, 7, 4] >-> lengthD >-> printD
 5
 7
 4
 ((),Sum {getSum = 3})
 
     You can also run multiple folds at the same time just by adding more
-    'WriterT' layers to your base monad:
+    'WriterP' layers to your proxy transformer stack. You can use 'mapP'
+    to introduce a new layer inmmediately beneath the outer one:
 
->>> runWriterT $ runWriterT $ runProxy $ fromListS [9, 10] >-> anyD even >-> raiseK sumD
-(((),Any {getAny = True}),Sum {getSum = 19}
+> fromListS [9, 10] >-> anyD even >-> mapP sumD
+>   :: (Integral c, Monad m, Proxy p) =>
+>      () -> Producer (W.WriterP Any (W.WriterP (Sum c) p)) c m ()
+
+    Then you just run both 'WriterP' layers:
+
+>>> runProxy . W.runWriterK . W.runWriterK $ fromListS [9, 10] >-> anyD even >-> mapP sumD
+(((),Any {getAny = True}),Sum {getSum = 19})
 
     I designed certain special folds to terminate the 'Session' early if they
     can compute their result prematurely, in order to draw as little input as
     possible.  These folds end with an underscore, such as 'headD_', which
     terminates the stream once it receives an input:
 
-> headD_ :: (Monad m, Proxy p) => x -> p x a x a (WriterT (First a) m) ()
+> headD_ :: (Monad m, Proxy p) => x -> W.WriterP (First a) p x a x a m ()
 
->>> runWriterT $ runProxy $ fromListS [3, 4, 9] >-> raiseK printD >-> headD_
+>>> runProxy . runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD_
 3
 ((),First {getFirst = Just 3})
 
     Compare this to 'headD' without underscore, which folds the entire input:
 
->>> runWriterT $ runProxy $ fromListS [3, 4, 9] >-> raiseK printD >-> headD
+>>> runProxy . W.runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD
 3
 4
 9
@@ -2053,7 +2029,7 @@ Left "Could not read an Integer"
 > p1' :: (Monad m, Proxy p)
 >     => a' -> StateP s (MaybeP (ReaderP i (WriterP w p))) a' a a' a m a'
 > p1' = hoistP liftP . p1
-> 
+>
 > p2' :: (Monad m, Proxy p)
 >     => a' -> StateP s (MaybeP (ReaderP i (WriterP w p))) a' a a' a m a'
 > p2' = liftP . hoistP liftP . p2
@@ -2095,7 +2071,7 @@ Left "Could not read an Integer"
 -- $appendix
 -- I've provided the full code for the above examples here so you can easily
 -- play with the examples yourself:
--- 
+--
 -- > import Control.Monad
 -- > import Control.Proxy hiding (zipD)
 -- > import System.IO
@@ -2104,7 +2080,7 @@ Left "Could not read an Integer"
 -- > import Safe (readMay)
 -- > import qualified Control.Proxy.Trans.Either as E
 -- > import qualified Control.Proxy.Trans.State as S
--- > 
+-- >
 -- > lines' :: (Proxy p) => Handle -> () -> Producer p String IO ()
 -- > lines' h () = runIdentityP loop where
 -- >     loop = do
@@ -2115,7 +2091,7 @@ Left "Could not read an Integer"
 -- >             str <- lift $ hGetLine h
 -- >             respond str  -- Produce the string
 -- >             loop
--- > 
+-- >
 -- > promptInt :: (Proxy p) => () -> Producer p Int IO r
 -- > promptInt () = runIdentityP $ forever $ do
 -- >     lift $ putStrLn "Enter an Integer:"
@@ -2124,7 +2100,7 @@ Left "Could not read an Integer"
 -- > {-
 -- > promptInt = readLnS >-> execU (putStrLn "Enter an Integer:")
 -- > -}
--- > 
+-- >
 -- > printer :: (Proxy p, Show a) => () -> Consumer p a IO r
 -- > printer () = runIdentityP $ forever $ do
 -- >     a <- request ()  -- Consume a value
@@ -2134,26 +2110,26 @@ Left "Could not read an Integer"
 -- > printer :: (Proxy p, Show a) => x -> p x a x a IO r
 -- > printer = execD (putStrLn "Received a value:") >-> printD
 -- > -}
--- > 
+-- >
 -- > take' :: (Proxy p) => Int -> () -> Pipe p a a IO ()
 -- > take' n a' = runIdentityP $ do  -- Remember, we need 'runIdentityP' if
 -- >     takeB_ n a'                 -- we use 'do' notation or 'lift'
 -- >     lift $ putStrLn "You shall not pass!"
--- > 
+-- >
 -- > threeReqs :: (Proxy p) => () -> Client p Int Bool IO ()
 -- > threeReqs () = runIdentityP $ forM_ [1, 3, 1] $ \argument -> do
 -- >     lift $ putStrLn $ "Client Sends:    " ++ show (argument :: Int)
 -- >     result <- request argument
 -- >     lift $ putStrLn $ "Client Receives: " ++ show (result :: Bool)
 -- >     lift $ putStrLn "*"
--- > 
+-- >
 -- > comparer :: (Proxy p) => Int -> Server p Int Bool IO r
 -- > comparer = runIdentityK $ foreverK $ \argument -> do
 -- >     lift $ putStrLn $ "Server Receives: " ++ show argument
 -- >     let result = argument > 2
 -- >     lift $ putStrLn $ "Server Sends:    " ++ show result
 -- >     respond result
--- > 
+-- >
 -- > cache :: (Proxy p, Ord key) => key -> p key val key val IO r
 -- > cache = runIdentityK (loop M.empty) where
 -- >     loop _map key = case M.lookup key _map of
@@ -2165,20 +2141,20 @@ Left "Could not read an Integer"
 -- >             lift $ putStrLn "Used cache!"
 -- >             key2 <- respond val
 -- >             loop _map key2
--- > 
+-- >
 -- > downstream :: (Proxy p) => () -> Consumer p () IO ()
 -- > downstream () = runIdentityP $ do
 -- >     lift $ print 1
 -- >     request ()  -- Switch to upstream
 -- >     lift $ print 3
 -- >     request ()  -- Switch to upstream
--- > 
+-- >
 -- > upstream :: (Proxy p) => () -> Producer p () IO ()
 -- > upstream () = runIdentityP $ do
 -- >     lift $ print 2
 -- >     respond () -- Switch to downstream
 -- >     lift $ print 4
--- > 
+-- >
 -- > promptInt2 :: (Proxy p) => () -> Producer p Int (EitherT String IO) r
 -- > promptInt2 () = runIdentityP $ forever $ do
 -- >     str <- lift $ lift $ do
@@ -2187,38 +2163,38 @@ Left "Could not read an Integer"
 -- >     case readMay str of
 -- >         Nothing -> lift $ left "Could not read an Integer"
 -- >         Just n  -> respond n
--- > 
+-- >
 -- > readIntS :: (Proxy p) => () -> Producer p Int IO r
 -- > readIntS = readLnS
--- > 
+-- >
 -- > source1 :: (Proxy p) => () -> Producer p Int IO r
 -- > source1 () = runIdentityP $ do
 -- >     fromListS [4, 4] ()  -- Source 1
 -- >     readLnS ()           -- Source 2
--- > 
+-- >
 -- > source2 :: (Proxy p) => () -> Producer p Int IO ()
 -- > source2 () = runIdentityP $ do
 -- >     fromListS [4, 4] ()
 -- >     (readLnS >-> takeB_ 3) () -- You can compose inside a do block!
--- > 
+-- >
 -- > sink1 :: (Proxy p) => () -> Pipe p Int Int IO ()
 -- > sink1 () = runIdentityP $ do
 -- >     (takeB_ 3         >-> printD) () -- Sink 1
 -- >     (takeWhileD (< 4) >-> printD) () -- Sink 2
--- > 
+-- >
 -- > sink2 :: (Proxy p) => () -> Pipe p Int Int IO ()
 -- > sink2 = intermediate >-> printD where
 -- >     intermediate () = runIdentityP $ do
 -- >         takeB_ 3 ()          -- Intermediate stage 1
 -- >         takeWhileD (< 4) ()  -- Intermediate stage 2
--- > 
+-- >
 -- > pairs :: (ListT p) => () -> ProduceT p IO (Int, Int)
 -- > pairs () = do
 -- >     x <- rangeS 1 3     -- Select a number betwen 1 and 3
 -- >     lift $ putStrLn $ "Currently using: " ++ show x
 -- >     y <- eachS [4,6,8]  -- Select one of 4, 6, or 8
 -- >     return (x, y)
--- > 
+-- >
 -- > pairs2 :: (ListT p) => () -> ProduceT p IO (Int, Int)
 -- > pairs2 () = do
 -- >     x <- RespondT $ runIdentityP $ do
@@ -2250,13 +2226,13 @@ Left "Could not read an Integer"
 -- >     hGetLineS h ()
 -- >     lift $ putStrLn "Closing file"
 -- >     lift $ hClose h
--- > 
+-- >
 -- > cp :: FilePath -> FilePath -> IO ()
 -- > cp inFile outFile =
 -- >     withFile inFile  ReadMode  $ \hIn  ->
 -- >     withFile outFile WriteMode $ \hOut ->
 -- >     runProxy $ hGetLineS hIn >-> hPutStrLnD hOut
--- > 
+-- >
 -- > promptInt3 :: (Proxy p) => () -> Producer (E.EitherP String p) Int IO r
 -- > promptInt3 () = forever $ do
 -- >     str <- lift $ do
@@ -2265,7 +2241,7 @@ Left "Could not read an Integer"
 -- >     case readMay str of
 -- >         Nothing -> E.throw "Could not read an Integer"
 -- >         Just n  -> respond n
--- > 
+-- >
 -- > heartbeat
 -- >     :: (Proxy p)
 -- >     => E.EitherP String p a' a b' b IO r
@@ -2273,40 +2249,40 @@ Left "Could not read an Integer"
 -- > heartbeat p = p `E.catch` \err -> do
 -- >     lift $ putStrLn err  -- Print the error
 -- >     heartbeat p          -- Restart 'p'
--- > 
+-- >
 -- > increment :: (Monad m, Proxy p) => () -> Producer (S.StateP Int p) Int m r
 -- > increment () = forever $ do
 -- >     n <- S.get
 -- >     respond n
 -- >     S.put (n + 1)
--- > 
+-- >
 -- > numbers :: (Monad m, Proxy p) => () -> Producer p Int m ()
 -- > numbers () = runIdentityP $ do
 -- >     (takeB_ 5 <-< S.evalStateK 10 increment) ()
 -- >     S.evalStateK 1  (takeB_ 3 <-< increment) () -- This works, too!
--- > 
+-- >
 -- > increment2 :: (Proxy p) => () -> Consumer (S.StateP Int p) Int IO r
 -- > increment2 () = forever $ do
 -- >     nOurs   <- S.get
 -- >     nTheirs <- request ()
 -- >     lift $ print (nTheirs, nOurs)
 -- >     S.put (nOurs + 2)
--- > 
+-- >
 -- > zipD
 -- >     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
 -- >     => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
 -- > zipD () =
 -- >     runIdentityP . hoist (runIdentityP . hoist runIdentityP) $ forever $ do
 -- >     -- Yes, this 'runIdentityP' mess is necessary.  Sorry!
--- > 
+-- >
 -- >         a <- request ()               -- Request from the outer 'Consumer'
 -- >         b <- lift $ request ()        -- Request from the inner 'Consumer'
 -- >         lift $ lift $ respond (a, b)  -- Respond to the 'Producer'
--- > 
+-- >
 -- > p1 = runProxyK $ zipD <-< fromListS [1..3]
 -- > p2 = runProxyK $ p1 <-< fromListS [4..]
 -- > p3 = runProxy $ printD <-< p2
--- > 
+-- >
 -- > fork
 -- >     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
 -- >     => () -> Consumer p1 a (Producer p2 a (Producer p3 a m)) r
@@ -2315,19 +2291,19 @@ Left "Could not read an Integer"
 -- >         a <- request ()          -- Request output from the 'Consumer'
 -- >         lift $ respond a         -- Send output to the outer 'Producer'
 -- >         lift $ lift $ respond a  -- Send output to the inner 'Producer'
--- > 
+-- >
 -- > {-
 -- > p1 = runProxyK $ fork <-< fromListS [1..3]
 -- > p2 = runProxyK $ raiseK printD <-< mapD (> 2) <-< p1
 -- > p3 = runProxy  $ printD <-< mapD show <-< p2
 -- > -}
--- > 
+-- >
 -- > {-
 -- > p1 = runProxyK $ S.evalStateK 0 $ fork <-< increment
 -- > p2 = runProxyK $ raiseK printD <-< mapD (+ 10) <-< p1
 -- > p3 = runProxy  $ E.runEitherK $ printD <-< (takeB_ 3 >=> E.throw) <-< p2
 -- > -}
--- > 
+-- >
 -- > twoLayers
 -- >     :: (Proxy p)
 -- >     => () -> Consumer (E.EitherP String (S.StateP Int p)) Int IO r
