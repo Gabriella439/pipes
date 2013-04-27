@@ -107,8 +107,10 @@ class (PFunctor t, ProxyTrans t) => PMonad t where
     -}
     embedP
         :: (Monad m2, Proxy p2)
-        => (forall x . p1 a1' a1 b1' b1 m1 x -> t p2 a2' a2 b2' b2 m2 x)
-        -> (         t p1 a1' a1 b1' b1 m1 r -> t p2 a2' a2 b2' b2 m2 r)
+        => (forall _a' _a _b' _b _r . p1 _a' _a _b' _b m1 _r
+                                 -> t p2 _a' _a _b' _b m2 _r)
+        -> (                        t p1  a'  a  b'  b m1  r
+                                 -> t p2  a'  a  b'  b m2  r)
 
 {-| Squash to 'PMonad' layers into a single layer
 
