@@ -6,7 +6,8 @@
     The 'Pipe' type is a monad transformer that enriches the base monad with the
     ability to 'await' or 'yield' data to and from other 'Pipe's.
 -}
-module Control.Pipe (
+module Control.Pipe
+    {-# DEPRECATED "Use 'Control.Proxy.Pipe' instead of 'Control.Pipe'" #-} (
     -- * Types
     -- $types
     Pipe(..),
