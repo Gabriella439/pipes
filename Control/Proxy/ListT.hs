@@ -133,5 +133,7 @@ runRequestK k q = runRequestT (k q)
 -- | 'CoProduceT' is isomorphic to \"ListT done right\"
 type CoProduceT p = RequestT p () () C
 
+{-# DEPRECATED ListT "Use 'Proxy' instead of 'ListT'" #-}
+
 -- | 'ListT' will be deprecated in @pipes-5.0.0@
 class (Proxy p) => ListT p

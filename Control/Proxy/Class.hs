@@ -505,10 +505,10 @@ class (Proxy p) => MonadPlusP p where
 {-# DEPRECATED   idT "Use 'idPull' instead of 'idT'"   #-}
 {-# DEPRECATED coidT "Use 'idPush' instead of 'coidT'" #-}
 
--- | For backwards compatibility, and will be deprecated in @pipes-4.0.0@
+-- | For backwards compatibility, and will be deprecated in @pipes-5.0.0@
 idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
 idT = idPull
 
--- | For backwards compatibility, and will be deprecated in @pipes-4.0.0@
+-- | For backwards compatibility, and will be deprecated in @pipes-5.0.0@
 coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
 coidT = idPush
