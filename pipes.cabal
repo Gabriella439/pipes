@@ -53,7 +53,6 @@ Library
         Control.Proxy.Core.Correct,
         Control.Proxy.ListT,
         Control.Proxy.Morph,
-        Control.Proxy.Synonym,
         Control.Proxy.Trans,
         Control.Proxy.Trans.Codensity,
         Control.Proxy.Trans.Either,

@@ -4,7 +4,6 @@ module Control.Proxy.Core (
     -- * Modules
     -- $modules
     module Control.Proxy.Class,
-    module Control.Proxy.Synonym,
     module Control.Proxy.Prelude,
     module Control.Proxy.Trans,
     module Control.Proxy.Trans.Identity,
@@ -21,7 +20,6 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
 import Control.Proxy.ListT
 import Control.Proxy.Morph
-import Control.Proxy.Synonym
 import Control.Proxy.Trans
 import Control.Proxy.Trans.Identity
 import Control.Proxy.Prelude

@@ -82,7 +82,6 @@ import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
 import Control.Proxy.Morph (PFunctor(hoistP))
-import Control.Proxy.Synonym (Producer, Consumer, Pipe, CoProducer, CoPipe)
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK, identityK)
 import qualified System.IO as IO

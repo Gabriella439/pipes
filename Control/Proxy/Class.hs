@@ -3,7 +3,7 @@
     implementations and extensions can share the same standard library.
 -}
 
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types, KindSignatures #-}
 
 module Control.Proxy.Class (
     -- * Core proxy class
@@ -25,13 +25,27 @@ module Control.Proxy.Class (
     (//<),
     (<\\),
 
+    -- * Closed
+    C,
+
+    -- * Synonyms
+    Pipe,
+    Producer,
+    Consumer,
+    CoPipe,
+    CoProducer,
+    CoConsumer,
+    Client,
+    Server,
+    Session,
+
     -- * Laws
     -- $laws
 
     -- * Polymorphic proxies
     -- $poly
     ProxyInternal(..),
-    MonadPlusP(..),
+    MonadPlusP(..)
     ) where
 
 import Control.Monad.IO.Class (MonadIO)
@@ -273,6 +287,59 @@ p //< f = f >\\ p
     ->       p x' x c' c m a'
 f <\\ p = p //> f
 {-# INLINABLE (<\\) #-}
+
+-- | The empty type, denoting a \'@C@\'losed end
+data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
+
+-- | A unidirectional 'Proxy'.
+type Pipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b = p () a () b
+
+{-| A 'Pipe' that produces values
+
+    'Producer's never 'request'.
+-}
+type Producer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b = p C () () b
+
+{-| A 'Pipe' that consumes values
+
+    'Consumer's never 'respond'.
+-}
+type Consumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a = p () a () C
+
+-- | A 'Pipe' where everything flows upstream
+type CoPipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' b' = p a' () b' ()
+
+{-| A 'CoPipe' that produces values flowing upstream
+
+    'CoProducer's never 'respond'.
+-}
+type CoProducer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' = p a' () () C
+
+{-| A 'CoConsumer' that consumes values flowing upstream
+
+    'CoConsumer's never 'request'.
+-}
+type CoConsumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' = p C () b' ()
+
+{-| @Server b' b@ receives requests of type @b'@ and sends responses of type
+    @b@.
+
+    'Server's never 'request'.
+-}
+type Server (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b = p C () b' b
+
+{-| @Client a' a@ sends requests of type @a'@ and receives responses of
+    type @a@.
+
+    'Client's never 'respond'.
+-}
+type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
+
+{-| A self-contained 'Session', ready to be run by 'runProxy'
+
+    'Session's never 'request' or 'respond'.
+-}
+type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
 {- $laws
     First, all proxies are monads and must satify the monad laws using:
