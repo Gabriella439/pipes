@@ -25,10 +25,8 @@ module Control.Proxy.Class (
     (//<),
     (<\\),
 
-    -- * Closed
-    C,
-
     -- * Synonyms
+    C,
     Pipe,
     Producer,
     Consumer,
