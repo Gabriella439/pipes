@@ -27,11 +27,9 @@ module Control.Proxy.Prelude.Base (
     filterD,
     filterU,
 
-    -- * Lists
+    -- * Lists and Enumerations
     fromListS,
     fromListC,
-
-    -- * Enumerations
     enumFromS,
     enumFromC,
     enumFromToS,
@@ -58,19 +56,10 @@ module Control.Proxy.Prelude.Base (
     -- $open
     unitD,
     unitU,
-
-    -- * Modules
-    -- $modules
-    module Control.Proxy.Trans.Writer,
-    module Data.Monoid
     ) where
 
 import Control.Monad.Morph (hoist)
 import Control.Monad.Trans.Class (lift)
-
-import Control.Proxy.Trans.Writer (
-    WriterP, runWriterP, runWriterK, execWriterP, execWriterK )
-import qualified Control.Proxy.Trans.Writer as W
 import Control.Proxy.Class
 import Control.Proxy.ListT (
     RespondT(RespondT),
@@ -79,15 +68,6 @@ import Control.Proxy.ListT (
     CoProduceT )
 import Control.Proxy.Synonym (Producer, Consumer, Pipe, CoProducer, CoPipe)
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK, identityK)
-import Data.Monoid (
-    Monoid,
-    Endo(Endo, appEndo),
-    All(All, getAll),
-    Any(Any, getAny),
-    Sum(Sum, getSum),
-    Product(Product, getProduct),
-    First(First, getFirst),
-    Last(Last, getLast) )
 
 {-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
 
