@@ -22,7 +22,22 @@ module Control.Proxy.Trans.Writer (
     writer,
     writerT,
     tell,
-    censor
+    censor,
+
+    -- * Folds
+    foldD,
+    allD,
+    allD_,
+    anyD,
+    anyD_,
+    sumD,
+    productD,
+    lengthD,
+    headD,
+    headD_,
+    lastD,
+    toListD,
+    foldrD,
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -36,7 +51,7 @@ import Control.Proxy.Class (
     MonadPlusP(mzero_P, mplus_P) )
 import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
-import Data.Monoid (Monoid(mempty, mappend))
+import qualified Data.Monoid as M
 
 -- | The strict 'Writer' proxy transformer
 newtype WriterP w p a' a b' b (m :: * -> *) r
@@ -124,19 +139,19 @@ instance PFunctor (WriterP w) where
 
 -- | Create a 'WriterP' from a proxy that generates a result and a monoid
 writerP
-    :: (Monad m, Proxy p, Monoid w)
+    :: (Monad m, Proxy p, M.Monoid w)
     => p a' a b' b m (r, w) -> WriterP w p a' a b' b m r
 writerP p = WriterP (\w ->
     thread_P p w ?>= \((r, w2), w1) ->
-    let w' = mappend w1 w2
+    let w' = M.mappend w1 w2
     in  w' `seq` return_P (r, w') )
 {-# INLINABLE writerP #-}
 
 -- | Run a 'WriterP' computation, producing the final result and monoid
 runWriterP
-    :: (Monad m, Proxy p, Monoid w)
+    :: (Monad m, Proxy p, M.Monoid w)
     => WriterP w p a' a b' b m r -> p a' a b' b m (r, w)
-runWriterP p = up >\\ unWriterP p mempty //> dn
+runWriterP p = up >\\ unWriterP p M.mempty //> dn
   where
     up (a', w) =
         request a' ?>= \a  ->
@@ -148,43 +163,162 @@ runWriterP p = up >\\ unWriterP p mempty //> dn
 
 -- | Run a 'WriterP' \'@K@\'leisli arrow, producing the final result and monoid
 runWriterK
-    :: (Monad m, Proxy p, Monoid w)
+    :: (Monad m, Proxy p, M.Monoid w)
     => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m (r, w))
 runWriterK k q = runWriterP (k q)
 {-# INLINABLE runWriterK #-}
 
 -- | Evaluate a 'WriterP' computation, but discard the final result
 execWriterP
-    :: (Monad m, Proxy p, Monoid w)
+    :: (Monad m, Proxy p, M.Monoid w)
     => WriterP w p a' a b' b m r -> p a' a b' b m w
 execWriterP m = runWriterP m ?>= \(_, w) -> return_P w
 {-# INLINABLE execWriterP #-}
 
 -- | Evaluate a 'WriterP' \'@K@\'leisli arrow, but discard the final result
 execWriterK
-    :: (Monad m, Proxy p, Monoid w)
+    :: (Monad m, Proxy p, M.Monoid w)
     => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m w)
 execWriterK k q= execWriterP (k q)
 {-# INLINABLE execWriterK #-}
 
 -- | Convert a Writer to a 'WriterP'
-writer :: (Monad m, Proxy p, Monoid w) => (r, w) -> WriterP w p a' a b' b m r
+writer :: (Monad m, Proxy p, M.Monoid w) => (r, w) -> WriterP w p a' a b' b m r
 writer x = writerP (return_P x)
 
 -- | Convert a WriterT to a 'WriterP'
-writerT :: (Monad m, Proxy p, Monoid w) => m (r, w) -> WriterP w p a' a b' b m r
+writerT
+    :: (Monad m, Proxy p, M.Monoid w)
+    => m (r, w) -> WriterP w p a' a b' b m r
 writerT m = writerP (lift_P m)
 
 -- | Add a value to the monoid
-tell :: (Monad m, Proxy p, Monoid w) => w -> WriterP w p a' a b' b m ()
-tell w' = WriterP (\w -> let w'' = mappend w w' in w'' `seq` return_P ((), w''))
+tell :: (Monad m, Proxy p, M.Monoid w) => w -> WriterP w p a' a b' b m ()
+tell w' = WriterP (\w ->
+    let w'' = M.mappend w w' in w'' `seq` return_P ((), w''))
 {-# INLINABLE tell #-}
 
 -- | Modify the result of a writer computation
 censor
-    :: (Monad m, Proxy p, Monoid w)
+    :: (Monad m, Proxy p, M.Monoid w)
     => (w -> w) -> WriterP w p a' a b' b m r -> WriterP w p a' a b' b m r
 censor f p = WriterP (\w0 ->
     unWriterP p w0 ?>= \(r, w1) ->
     return_P (r, f w1) )
 {-# INLINABLE censor #-}
+
+{-| Strict fold over values flowing \'@D@\'ownstream.
+
+> foldD f >-> foldD g = foldD (f <> g)
+>
+> foldD mempty = idPull
+-}
+foldD
+    :: (Monad m, Proxy p, M.Monoid w)
+    => (a -> w) -> x -> WriterP w p x a x a m r
+foldD f = go where
+    go x = do
+        a <- request x
+        tell (f a)
+        x2 <- respond a
+        go x2
+{-# INLINABLE foldD #-}
+
+{-| Fold that returns whether 'M.All' values flowing \'@D@\'ownstream satisfy
+    the predicate
+-}
+allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP M.All p x a x a m r
+allD predicate = foldD (M.All . predicate)
+{-# INLINABLE allD #-}
+
+{-| Fold that returns whether 'M.All' values flowing \'@D@\'ownstream satisfy
+    the predicate
+
+    'allD_' terminates on the first value that fails the predicate
+-}
+allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP M.All p x a x a m ()
+allD_ predicate = go where
+    go x = do
+        a <- request x
+        if (predicate a)
+            then do
+                x2 <- respond a
+                go x2
+            else tell (M.All False)
+{-# INLINABLE allD_ #-}
+
+{-| Fold that returns whether 'M.Any' value flowing \'@D@\'ownstream satisfies
+    the predicate
+-}
+anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP M.Any p x a x a m r
+anyD predicate = foldD (M.Any . predicate)
+{-# INLINABLE anyD #-}
+
+{-| Fold that returns whether 'M.Any' value flowing \'@D@\'ownstream satisfies
+    the predicate
+
+    'anyD_' terminates on the first value that satisfies the predicate
+-}
+anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP M.Any p x a x a m ()
+anyD_ predicate = go where
+    go x = do
+        a <- request x
+        if (predicate a)
+            then tell (M.Any True)
+            else do
+                x2 <- respond a
+                go x2
+{-# INLINABLE anyD_ #-}
+
+-- | Compute the 'M.Sum' of all values that flow \'@D@\'ownstream
+sumD :: (Monad m, Proxy p, Num a) => x -> WriterP (M.Sum a) p x a x a m r
+sumD = foldD M.Sum
+{-# INLINABLE sumD #-}
+
+-- | Compute the 'M.Product' of all values that flow \'@D@\'ownstream
+productD
+    :: (Monad m, Proxy p, Num a) => x -> WriterP (M.Product a) p x a x a m r
+productD = foldD M.Product
+{-# INLINABLE productD #-}
+
+-- | Count how many values flow \'@D@\'ownstream
+lengthD :: (Monad m, Proxy p) => x -> WriterP (M.Sum Int) p x a x a m r
+lengthD = foldD (\_ -> M.Sum 1)
+{-# INLINABLE lengthD #-}
+
+-- | Retrieve the first value going \'@D@\'ownstream
+headD :: (Monad m, Proxy p) => x -> WriterP (M.First a) p x a x a m r
+headD = foldD (M.First . Just)
+{-# INLINABLE headD #-}
+
+{-| Retrieve the first value going \'@D@\'ownstream
+
+    'headD_' terminates on the first value it receives
+-}
+headD_ :: (Monad m, Proxy p) => x -> WriterP (M.First a) p x a x a m ()
+headD_ x = do
+    a <- request x
+    tell $ M.First (Just a)
+{-# INLINABLE headD_ #-}
+
+-- | Retrieve the last value going \'@D@\'ownstream
+lastD :: (Monad m, Proxy p) => x -> WriterP (M.Last a) p x a x a m r
+lastD = foldD (M.Last . Just)
+{-# INLINABLE lastD #-}
+
+-- | Fold the values flowing \'@D@\'ownstream into a list
+toListD :: (Monad m, Proxy p) => x -> WriterP [a] p x a x a m r
+toListD = foldD (\x -> [x])
+{-# INLINABLE toListD #-}
+
+{-| Fold equivalent to 'foldr'
+
+    To see why, consider this isomorphic type for 'foldr':
+
+> foldr :: (a -> b -> b) -> [a] -> Endo b
+-}
+foldrD
+    :: (Monad m, Proxy p)
+    => (a -> b -> b) -> x -> WriterP (M.Endo b) p x a x a m r
+foldrD step = foldD (M.Endo . step)
+{-# INLINABLE foldrD #-}
