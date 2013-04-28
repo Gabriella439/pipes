@@ -32,10 +32,6 @@ module Control.Proxy.Class (
     -- $poly
     ProxyInternal(..),
     MonadPlusP(..),
-
-    -- * Deprecated
-    idT,
-    coidT
     ) where
 
 import Control.Monad.IO.Class (MonadIO)
@@ -501,14 +497,3 @@ class (Proxy p) => MonadPlusP p where
     mzero_P :: (Monad m) => p a' a b' b m r
     mplus_P
         :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r
-
-{-# DEPRECATED   idT "Use 'idPull' instead of 'idT'"   #-}
-{-# DEPRECATED coidT "Use 'idPush' instead of 'coidT'" #-}
-
--- | For backwards compatibility, and will be deprecated in @pipes-5.0.0@
-idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
-idT = idPull
-
--- | For backwards compatibility, and will be deprecated in @pipes-5.0.0@
-coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
-coidT = idPush
