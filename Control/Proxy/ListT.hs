@@ -42,7 +42,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
     Proxy(request, respond, (//>)), (//<), return_P, (?>=), lift_P )
-import Control.Proxy.Prelude.Base (
+import Control.Proxy.Prelude (
     fromListS, fromListC, enumFromToS, enumFromToC )
 import Control.Proxy.Synonym (C)
 import Data.Monoid (Monoid(mempty, mappend))
