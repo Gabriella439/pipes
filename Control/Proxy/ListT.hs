@@ -28,6 +28,12 @@ module Control.Proxy.ListT (
     RequestT(..),
     runRequestK,
     CoProduceT,
+
+    -- * Utilities
+    eachS,
+    eachC,
+    rangeS,
+    rangeC,
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -36,6 +42,8 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
     Proxy(request, respond, (//>)), (//<), return_P, (?>=), lift_P )
+import Control.Proxy.Prelude.Base (
+    fromListS, fromListC, enumFromToS, enumFromToC )
 import Control.Proxy.Synonym (C)
 import Data.Monoid (Monoid(mempty, mappend))
 
@@ -129,3 +137,34 @@ runRequestK k q = runRequestT (k q)
 
 -- | 'CoProduceT' is isomorphic to \"ListT done right\"
 type CoProduceT p = RequestT p () () C
+
+{-| Non-deterministically choose from all values in the given list
+
+> mappend <$> eachS xs <*> eachS ys = eachS (mappend <$> xs <*> ys)
+>
+> eachS (pure mempty) = pure mempty
+-}
+eachS :: (Monad m, Proxy p) => [b] -> ProduceT p m b
+eachS bs = RespondT (fromListS bs ())
+{-# INLINABLE eachS #-}
+
+{-| Non-deterministically choose from all values in the given list
+
+> mappend <$> eachC xs <*> eachC ys = eachC (mappend <$> xs <*> ys)
+>
+> eachC (pure mempty) = pure mempty
+-}
+eachC :: (Monad m, Proxy p) => [a'] -> CoProduceT p m a'
+eachC a's = RequestT (fromListC a's ())
+{-# INLINABLE eachC #-}
+
+-- | Non-deterministically choose from all values in the given range
+rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ProduceT p m b
+rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
+{-# INLINABLE rangeS #-}
+
+-- | Non-deterministically choose from all values in the given range
+rangeC
+    :: (Enum a', Ord a', Monad m, Proxy p) => a' -> a' -> CoProduceT p m a'
+rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
+{-# INLINABLE rangeC #-}
