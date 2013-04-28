@@ -1,12 +1,9 @@
-{-| The 'Proxy' class defines the library's core API.  Everything else in this
-    library builds on top of the 'Proxy' type class so that all proxy
-    implementations and extensions can share the same standard library.
--}
+-- | This module defines the theoretical framework underpinning this library
 
 {-# LANGUAGE Rank2Types, KindSignatures #-}
 
 module Control.Proxy.Class (
-    -- * Core proxy class
+    -- * The Proxy Class
     Proxy(..),
 
     -- * Composition operators
@@ -65,7 +62,7 @@ import Control.Monad.IO.Class (MonadIO)
    * Keep 'request' and 'respond' composition lower in precedence than 'pull'
      and 'push' composition, so that users can do:
 
-> read \>\ idPull >-> writer
+> read \>\ pull >-> writer
 
    * I arbitrarily choose a lower priority for downstream operators so that lazy
      pull-based computations need not evaluate upstream stages unless absolutely
@@ -81,7 +78,11 @@ infixr 8 /</, >\\
 infixl 8 \>\, //<
 infixl 1 ?>=  -- This should match the fixity of >>=
 
-{-| The core API for the @pipes@ library
+{-| The 'Proxy' class defines a 'Monad' that intersects four streaming
+    categories.
+
+    This class requires the \"point-ful\" version of each category's composition
+    operator for efficiency.
 
     Minimal definition:
 
@@ -122,14 +123,14 @@ class (ProxyInternal p) => Proxy p where
         -> (b -> p x' x c' c m b')
         ->       p x' x c' c m a'
 
-    -- | @idPull = request >=> respond >=> idT@
-    idPull :: (Monad m, Proxy p) => a' -> p a' a a' a m r
-    idPull = go where
+    -- | @pull = request >=> respond >=> pull@
+    pull :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+    pull = go where
       go a' =
         request a' ?>= \a   ->
         respond a  ?>= \a'2 ->
         go a'2
-    {- DO NOT replace 'go' with 'idPull' or ghc-7.4.2 will not terminate while
+    {- DO NOT replace 'go' with 'push' or ghc-7.4.2 will not terminate while
        compiling `pipes` -}
 
     -- | @(f ->> p)@ pairs each 'request' in @p@ with a 'respond' in @f@.
@@ -139,14 +140,14 @@ class (ProxyInternal p) => Proxy p where
         ->         p b' b c' c m r
         ->         p a' a c' c m r
 
-    -- | @coidT = respond >=> request >=> idT@
-    idPush :: (Monad m, Proxy p) => a -> p a' a a' a m r
-    idPush = go where
+    -- | @push = respond >=> request >=> push@
+    push :: (Monad m, Proxy p) => a -> p a' a a' a m r
+    push = go where
       go a =
         respond a  ?>= \a' ->
         request a' ?>= \a2 ->
         go a2
-    {- DO NOT replace 'go' with 'idPush' or ghc-7.4.2 will not terminate while
+    {- DO NOT replace 'go' with 'push' or ghc-7.4.2 will not terminate while
        compiling `pipes` -}
 
     -- | @(p >>~ f)@ pairs each 'respond' in @p@ with a 'request' in @f@.
@@ -156,7 +157,7 @@ class (ProxyInternal p) => Proxy p where
         -> (b  -> p b' b c' c m r)
         ->        p a' a c' c m r
 
-{-| Pull-based composition
+{-| \"pull\" composition
 
 > (f >-> g) x = f ->> g x
 
@@ -171,7 +172,7 @@ class (ProxyInternal p) => Proxy p where
 f >-> g = \c' -> f ->> g c'
 {-# INLINABLE (>->) #-}
 
-{-| Push-based composition
+{-| \"push\" composition
 
 > (f >~> g) x = f x >>~ g
 
@@ -340,11 +341,47 @@ type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
 type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
 {- $laws
-    First, all proxies are monads and must satify the monad laws using:
-    
-    * @(>>=) = (?>=)@
+    First, all proxies sit at the intersection of five categories:
 
-    * @return = return_P@
+    * The Kleisli category (all proxies are monads)
+
+> return >=> f = f
+>
+> f >=> return = f
+>
+> (f >=> g) >=> h = f >=> (g >=> h)
+
+    * The \"request\" category
+
+> request \>\ f = f
+>
+> f \>\ request = f
+>
+> (f \>\ g) \>\ h = f \>\ (g \>\ h)
+
+    * The \"respond\" category
+
+> respond />/ f = f
+>
+> f />/ respond = f
+>
+> (f />/ g) />/ h = f />/ (g />/ h)
+
+    * The \"pull\" category
+
+> pull >-> f = f
+>
+> f >-> pull = f
+>
+> (f >-> g) >-> h = (f >-> g) >-> h
+
+    * The \"push\" category
+
+> push >~> f = f
+>
+> f >~> push = f
+>
+> (f >~> g) >~> h = f >~> (g >~> h)
 
     Second, all proxies are monad transformers and must satisfy the monad
     transformer laws, using:
@@ -356,37 +393,7 @@ type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
     *  @hoist = hoist_P@
 
-    Fourth , all proxies form a \"pull-based\" category and must satisfy the
-    category laws using:
-
-    * @(.) = (>->)@
-
-    * @id = idPull@
-
-
-    Fifth, all proxies form a \"push-based\" category and must satisfy the
-    category laws using:
-
-    * @(.) = (>~>)@
-
-    * @id = idPush@
-
-    Sixth, all proxies form a \"request\" category and must satisfy the category
-    laws using:
-
-    * @(.) = (\\>\\)@
-
-    * @id = request@
-
-    Seventh, all proxies form a \"respond\" category and must satisfy the
-    category laws using:
-
-    * @(.) = (\/>\/)@
-
-    * @id = respond@
-
-    Eighth, ('\>\') and ('/>/') both define functors between Proxy Kleisli
-    categories:
+    Fourth, ('\>\') and ('/>/') both define functors between Kleisli categories:
 
 > a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
 >
@@ -396,31 +403,39 @@ type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 >
 > return />/ a = return
 
-    Finally, all proxies must satisfy the following 'Proxy' laws:
+    Fifth, all proxies must satisfy these additional 'Proxy' laws:
 
-> idPull = request >=> respond >=> idPull
+> p \>\ lift . f = lift . f
 >
-> idPush = respond >=> request >=> idPush
+> p \>\ respond  = respond
 >
-> p1 >-> liftK f = liftK f
+> lift . f />/ p = lift . f
 >
-> p1 >-> (liftK f >=> respond >=> p2) = liftK f >=> respond >=> (p1 >-> p2)
+> request />/  p = request
 >
-> (liftK g >=> respond >=> p1) >-> (liftK f >=> request >=> liftK h >=> p2)
->     = liftK (f >=> g >=> h) >=> (p1 >-> p2)
+> pull = request >=> respond >=> pull
 >
-> (liftK g >=> request >=> p1) >-> (liftK f >=> request >=> p2)
->     = liftK (f >=> g) >=> request >=> (p1 >~> p2)
+> push = respond >=> request >=> push
 >
-> liftK f >~> p2 = liftK f
+> p1 >-> lift . f = lift . f
 >
-> (liftK f >=> request >=> p1) >~> p2 = liftK f >=> request >=> (p1 >~> p2)
+> p1 >-> (lift . f >=> respond >=> p2) = lift . f >=> respond >=> (p1 >-> p2)
 >
-> (liftK f >=> respond >=> liftK h >=> p1) >~> (liftK g >=> request >=> p2)
->     = liftK (f >=> g >=> h) >=> (p1 >~> p2)
+> (lift . g >=> respond >=> p1) >-> (lift . f >=> request >=> lift . h >=> p2)
+>     = lift . (f >=> g >=> h) >=> (p1 >-> p2)
 >
-> (liftK f >=> respond >=> p1) >~> (liftK g >=> respond >=> p2)
->     = liftK (f >=> g) >=> (p1 >-> p2)
+> (lift . g >=> request >=> p1) >-> (lift . f >=> request >=> p2)
+>     = lift . (f >=> g) >=> request >=> (p1 >~> p2)
+>
+> lift . f >~> p2 = lift . f
+>
+> (lift . f >=> request >=> p1) >~> p2 = lift . f >=> request >=> (p1 >~> p2)
+>
+> (lift . f >=> respond >=> lift . h >=> p1) >~> (lift . g >=> request >=> p2)
+>     = lift . (f >=> g >=> h) >=> (p1 >~> p2)
+>
+> (lift . f >=> respond >=> p1) >~> (lift . g >=> respond >=> p2)
+>     = lift . (f >=> g) >=> (p1 >-> p2)
 
 -}
 

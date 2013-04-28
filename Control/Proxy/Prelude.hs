@@ -204,7 +204,7 @@ hPrintB h = runIdentityK $ foreverK $ \a' -> do
 
 > mapD f1 >-> mapD f2 = mapD (f2 . f1)
 >
-> mapD id = idPull
+> mapD id = pull
 -}
 mapD :: (Monad m, Proxy p) => (a -> b) -> x -> p x a x b m r
 mapD f = runIdentityK go where
@@ -219,7 +219,7 @@ mapD f = runIdentityK go where
 
 > mapU g1 >-> mapU g2 = mapU (g1 . g2)
 >
-> mapU id = idPull
+> mapU id = pull
 -}
 mapU :: (Monad m, Proxy p) => (b' -> a') -> b' -> p a' x b' x m r
 mapU g = runIdentityK go where
@@ -234,7 +234,7 @@ mapU g = runIdentityK go where
 
 > mapMD f1 >-> mapMD f2 = mapMD (f1 >=> f2)
 >
-> mapMD return = idPull
+> mapMD return = pull
 -}
 mapMD :: (Monad m, Proxy p) => (a -> m b) -> x -> p x a x b m r
 mapMD f = runIdentityK go where
@@ -250,7 +250,7 @@ mapMD f = runIdentityK go where
 
 > mapMU g1 >-> mapMU g2 = mapMU (g2 >=> g1)
 >
-> mapMU return = idPull
+> mapMU return = pull
 -}
 mapMU :: (Monad m, Proxy p) => (b' -> m a') -> b' -> p a' x b' x m r
 mapMU g = runIdentityK go where
@@ -267,7 +267,7 @@ mapMU g = runIdentityK go where
 
 > useD f1 >-> useD f2 = useD (\a -> f1 a >> f2 a)
 >
-> useD (\_ -> return ()) = idPull
+> useD (\_ -> return ()) = pull
 -}
 useD :: (Monad m, Proxy p) => (a -> m r1) -> x -> p x a x a m r
 useD f = runIdentityK go where
@@ -283,7 +283,7 @@ useD f = runIdentityK go where
 
 > useU g1 >-> useU g2 = useU (\a' -> g2 a' >> g1 a')
 >
-> useU (\_ -> return ()) = idPull
+> useU (\_ -> return ()) = pull
 -}
 useU :: (Monad m, Proxy p) => (a' -> m r2) -> a' -> p a' x a' x m r
 useU g = runIdentityK go where
@@ -298,7 +298,7 @@ useU g = runIdentityK go where
 
 > execD md1 >-> execD md2 = execD (md1 >> md2)
 >
-> execD (return ()) = idPull
+> execD (return ()) = pull
 -}
 execD :: (Monad m, Proxy p) => m r1 -> a' -> p a' a a' a m r
 execD md = runIdentityK go where
@@ -317,7 +317,7 @@ execD md = runIdentityK go where
 
 > execU mu1 >-> execU mu2 = execU (mu2 >> mu1)
 >
-> execU (return ()) = idPull
+> execU (return ()) = pull
 -}
 execU :: (Monad m, Proxy p) => m r2 -> a' -> p a' a a' a m r
 execU mu = runIdentityK go where
@@ -370,7 +370,7 @@ takeB_ n0 = runIdentityK (go n0) where
 >
 > takeWhileD p1 >-> takeWhileD p2 = takeWhileD (p1 <> p2)
 >
-> takeWhileD mempty = idPull
+> takeWhileD mempty = pull
 -}
 takeWhileD :: (Monad m, Proxy p) => (a -> Bool) -> a' -> p a' a a' a m ()
 takeWhileD p = runIdentityK go where
@@ -388,7 +388,7 @@ takeWhileD p = runIdentityK go where
 
 > takeWhileU p1 >-> takeWhileU p2 = takeWhileU (p1 <> p2)
 >
-> takeWhileD mempty = idPull
+> takeWhileD mempty = pull
 -}
 takeWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' a a' a m ()
 takeWhileU p = runIdentityK go where
@@ -405,30 +405,30 @@ takeWhileU p = runIdentityK go where
 
 > dropD n1 >-> dropD n2 = dropD (n1 + n2)  -- n2 >= 0 && n2 >= 0
 >
-> dropD 0 = idPull
+> dropD 0 = pull
 -}
 dropD :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m r
 dropD n0 = \() -> runIdentityP (go n0) where
     go n
-        | n <= 0    = idPull ()
+        | n <= 0    = pull ()
         | otherwise = do
             _ <- request ()
             go (n - 1)
 {- dropD n () = do
     replicateM_ n $ request ()
-    idPull () -}
+    pull () -}
 {-# INLINABLE dropD #-}
 
 {-| @(dropU n)@ discards @n@ values going upstream
 
 > dropU n1 >-> dropU n2 = dropU (n1 + n2)  -- n2 >= 0 && n2 >= 0
 >
-> dropU 0 = idPull
+> dropU 0 = pull
 -}
 dropU :: (Monad m, Proxy p) => Int -> a' -> CoPipe p a' a' m r
 dropU n0 = runIdentityK (go n0) where
     go n
-        | n <= 0    = idPull
+        | n <= 0    = pull
         | otherwise = \_ -> do
             a' <- respond ()
             go (n - 1) a'
@@ -443,7 +443,7 @@ dropU n0 = runIdentityK (go n0) where
 >
 > dropWhileD p1 >-> dropWhileD p2 = dropWhileD (p1 <> p2)
 >
-> dropWhileD mempty = idPull
+> dropWhileD mempty = pull
 -}
 dropWhileD :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m r
 dropWhileD p () = runIdentityP go where
@@ -453,7 +453,7 @@ dropWhileD p () = runIdentityP go where
             then go
             else do
                 x <- respond a
-                idPull x
+                pull x
 {-# INLINABLE dropWhileD #-}
 
 {-| @(dropWhileU p)@ discards values going upstream until one violates the
@@ -461,7 +461,7 @@ dropWhileD p () = runIdentityP go where
 
 > dropWhileU p1 >-> dropWhileU p2 = dropWhileU (p1 <> p2)
 >
-> dropWhileU mempty = idPull
+> dropWhileU mempty = pull
 -}
 dropWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
 dropWhileU p = runIdentityK go where
@@ -470,7 +470,7 @@ dropWhileU p = runIdentityK go where
             then do
                 a2 <- respond ()
                 go a2
-            else idPull a'
+            else pull a'
 {-# INLINABLE dropWhileU #-}
 
 {-| @(filterD p)@ discards values going downstream if they fail the predicate
@@ -482,7 +482,7 @@ dropWhileU p = runIdentityK go where
 >
 > filterD p1 >-> filterD p2 = filterD (p1 <> p2)
 >
-> filterD mempty = idPull
+> filterD mempty = pull
 -}
 filterD :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m r
 filterD p = \() -> runIdentityP go where
@@ -499,7 +499,7 @@ filterD p = \() -> runIdentityP go where
 
 > filterU p1 >-> filterU p2 = filterU (p1 <> p2)
 >
-> filterU mempty = idPull
+> filterU mempty = pull
 -}
 filterU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
 filterU p = runIdentityK go where
