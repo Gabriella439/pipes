@@ -4,16 +4,12 @@ module Control.Proxy.Prelude.Base (
     -- * Maps
     mapD,
     mapU,
-    mapB,
     mapMD,
     mapMU,
-    mapMB,
     useD,
     useU,
-    useB,
     execD,
     execU,
-    execB,
 
     -- * Filters
     takeB,
@@ -88,24 +84,6 @@ mapU g = runIdentityK go where
 -- mapU g = foreverK $ (request . g) >=> respond
 {-# INLINABLE mapU #-}
 
-{-| @(mapB f g)@ applies @f@ to all values going downstream and @g@ to all
-    values going upstream.
-
-    Mnemonic: map \'@B@\'idirectional
-
-> mapB f1 g1 >-> mapB f2 g2 = mapB (f2 . f1) (g1 . g2)
->
-> mapB id id = idPull
--}
-mapB :: (Monad m, Proxy p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
-mapB f g = runIdentityK go where
-    go b' = do
-        a   <- request (g b')
-        b'2 <- respond (f a )
-        go b'2
--- mapB f g = foreverK $ request . g >=> respond . f
-{-# INLINABLE mapB #-}
-
 {-| @(mapMD f)@ applies the monadic function @f@ to all values going downstream
 
 > mapMD f1 >-> mapMD f2 = mapMD (f1 >=> f2)
@@ -138,25 +116,6 @@ mapMU g = runIdentityK go where
 -- mapMU g = foreverK $ lift . g >=> request >=> respond
 {-# INLINABLE mapMU #-}
 
-{-| @(mapMB f g)@ applies the monadic function @f@ to all values going
-    downstream and the monadic function @g@ to all values going upstream.
-
-> mapMB f1 g1 >-> mapMB f2 g2 = mapMB (f1 >=> f2) (g2 >=> g1)
->
-> mapMB return return = idPull
--}
-mapMB
-    :: (Monad m, Proxy p) => (a -> m b) -> (b' -> m a') -> b' -> p a' a b' b m r
-mapMB f g = runIdentityK go where
-    go b' = do
-        a'  <- lift (g b')
-        a   <- request a'
-        b   <- lift (f a )
-        b'2 <- respond b
-        go b'2
--- mapMB f g = foreverK $ lift . g >=> request >=> lift . f >=> respond
-{-# INLINABLE mapMB #-}
-
 {-| @(useD f)@ executes the monadic function @f@ on all values flowing
     \'@D@\'ownstream
 
@@ -188,25 +147,6 @@ useU g = runIdentityK go where
         a'2 <- respond x
         go a'2
 {-# INLINABLE useU #-}
-
-{-| @(useB f g)@ executes the monadic function @f@ on all values flowing
-    downstream and the monadic function @g@ on all values flowing upstream
-
-> useB f1 g1 >-> useB f2 g2 = useB (\a -> f1 a >> f2 a) (\a' -> g2 a' >> g1 a')
->
-> useB (\_ -> return ()) (\_ -> return ()) = idPull
--}
-useB
-    :: (Monad m, Proxy p)
-    => (a -> m r1) -> (a' -> m r2) -> a' -> p a' a a' a m r
-useB f g = runIdentityK go where
-    go a' = do
-        _   <- lift $ g a'
-        a   <- request a'
-        _   <- lift $ f a
-        a'2 <- respond a
-        go a'2
-{-# INLINABLE useB #-}
 
 {-| @(execD md)@ executes @md@ every time values flow downstream through it.
 
@@ -245,28 +185,6 @@ execU mu = runIdentityK go where
     a <- request a'
     respond a -}
 {-# INLINABLE execU #-}
-
-{-| @(execB md mu)@ executes @mu@ every time values flow upstream through it,
-    and executes @md@ every time values flow downstream through it.
-
-> execB md1 mu1 >-> execB md2 mu2 = execB (md1 >> md2) (mu2 >> mu1)
->
-> execB (return ()) = idPull
--}
-execB :: (Monad m, Proxy p) => m r1 -> m r2 -> a' -> p a' a a' a m r
-execB md mu = runIdentityK go where
-    go a' = do
-        _   <- lift mu
-        a   <- request a'
-        _   <- lift md
-        a'2 <- respond a
-        go a'2
-{- execB md mu = foreverK $ \a' -> do
-    lift mu
-    a <- request a'
-    lift md
-    respond a -}
-{-# INLINABLE execB #-}
 
 {-| @(takeB n)@ allows @n@ upstream/downstream roundtrips to pass through
 
