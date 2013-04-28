@@ -27,7 +27,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Proxy.Prelude.Kleisli (foreverK)
 import Control.Proxy.Class (Proxy(request, respond))
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK)
-import Control.Proxy.Synonym (Producer, CoProducer)
+import Control.Proxy.Synonym (Producer)
 import qualified System.IO as IO
 
 {-| A 'Producer' that sends lines from 'stdin' downstream
