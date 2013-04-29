@@ -7,7 +7,6 @@ module Control.Proxy.Core (
     module Control.Proxy.Prelude,
     module Control.Proxy.Trans,
     module Control.Proxy.Trans.Identity,
-    module Control.Proxy.ListT,
     module Control.Proxy.Morph,
     module Control.Monad,
     module Control.Monad.Trans.Class,
@@ -18,7 +17,6 @@ import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
 import Control.Monad (forever, (>=>), (<=<))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
-import Control.Proxy.ListT
 import Control.Proxy.Morph
 import Control.Proxy.Trans
 import Control.Proxy.Trans.Identity

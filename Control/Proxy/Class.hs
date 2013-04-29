@@ -22,6 +22,16 @@ module Control.Proxy.Class (
     (//<),
     (<\\),
 
+    -- * Respond Monad Transformer
+    RespondT(..),
+    runRespondK,
+    ProduceT,
+
+    -- * Request Monad Transformer
+    RequestT(..),
+    runRequestK,
+    CoProduceT,
+
     -- * Synonyms
     C,
     Pipe,
@@ -43,7 +53,11 @@ module Control.Proxy.Class (
     MonadPlusP(..)
     ) where
 
-import Control.Monad.IO.Class (MonadIO)
+import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
+import Control.Monad (MonadPlus(mzero, mplus))
+import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.Trans.Class (MonadTrans(lift))
+import Data.Monoid (Monoid(mempty, mappend))
 
 {- * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
@@ -286,6 +300,94 @@ p //< f = f >\\ p
     ->       p x' x c' c m a'
 f <\\ p = p //> f
 {-# INLINABLE (<\\) #-}
+
+-- | A monad transformer over a proxy's downstream output
+newtype RespondT (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a b' m b =
+    RespondT { runRespondT :: p a' a b' b m b' }
+
+instance (Monad m, Proxy p) => Functor (RespondT p a' a b' m) where
+    fmap f p = RespondT (runRespondT p //> \a -> respond (f a))
+
+instance (Monad m, Proxy p) => Applicative (RespondT p a' a b' m) where
+    pure a = RespondT (respond a)
+    mf <*> mx = RespondT (
+        runRespondT mf //> \f ->
+        runRespondT mx //> \x ->
+        respond (f x) )
+
+instance (Monad m, Proxy p) => Monad (RespondT p a' a b' m) where
+    return a = RespondT (respond a)
+    m >>= f  = RespondT (runRespondT m //> \a -> runRespondT (f a))
+
+instance (Proxy p) => MonadTrans (RespondT p a' a b') where
+    lift m = RespondT (lift_P m ?>= \a -> respond a)
+
+instance (MonadIO m, Proxy p) => MonadIO (RespondT p a' a b' m) where
+    liftIO m = lift (liftIO m)
+
+instance (Monad m, Proxy p, Monoid b')
+       => Alternative (RespondT p a' a b' m) where
+    empty = RespondT (return_P mempty)
+    p1 <|> p2 = RespondT (
+        runRespondT p1 ?>= \r1 ->
+        runRespondT p2 ?>= \r2 ->
+        return_P (mappend r1 r2) )
+
+instance (Monad m, Proxy p, Monoid b') => MonadPlus (RespondT p a' a b' m) where
+    mzero = empty
+    mplus = (<|>)
+
+-- | Convert a 'RespondT' \'@K@\'leisli arrow into a proxy
+runRespondK :: (q -> RespondT p a' a b' m b) -> (q -> p a' a b' b m b')
+runRespondK k q = runRespondT (k q)
+{-# INLINABLE runRespondK #-}
+
+-- | 'ProduceT' is isomorphic to \"ListT done right\"
+type ProduceT p = RespondT p C () ()
+
+-- | A monad transformer over a proxy's upstream output
+newtype RequestT (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b' b m a' =
+    RequestT { runRequestT :: p a' a b' b m a }
+
+instance (Monad m, Proxy p) => Functor (RequestT p a b' b m) where
+    fmap f p = RequestT (runRequestT p //< \a -> request (f a))
+
+instance (Monad m, Proxy p) => Applicative (RequestT p a b' b m) where
+    pure a = RequestT (request a)
+    mf <*> mx = RequestT (
+        runRequestT mf //< \f ->
+        runRequestT mx //< \x ->
+        request (f x) )
+
+instance (Monad m, Proxy p) => Monad (RequestT p a b' b m) where
+    return a = RequestT (request a)
+    m >>= f  = RequestT (runRequestT m //< \a -> runRequestT (f a))
+
+instance (Proxy p) => MonadTrans (RequestT p a' a b') where
+    lift m = RequestT (lift_P m ?>= \a -> request a)
+
+instance (MonadIO m, Proxy p) => MonadIO (RequestT p a b' b m) where
+    liftIO m = lift (liftIO m)
+
+instance (Monad m, Proxy p, Monoid a)
+       => Alternative (RequestT p a b' b m) where
+    empty = RequestT (return_P mempty)
+    p1 <|> p2 = RequestT (
+        runRequestT p1 ?>= \r1 ->
+        runRequestT p2 ?>= \r2 ->
+        return_P (mappend r1 r2) )
+
+instance (Monad m, Proxy p, Monoid a) => MonadPlus (RequestT p a b' b m) where
+    mzero = empty
+    mplus = (<|>)
+
+-- | Convert a 'RequestT' \'@K@\'leisli arrow into a proxy
+runRequestK :: (q -> RequestT p a b' b m a') -> (q -> p a' a b' b m a)
+runRequestK k q = runRequestT (k q)
+{-# INLINABLE runRequestK #-}
+
+-- | 'CoProduceT' is isomorphic to \"ListT done right\"
+type CoProduceT p = RequestT p () () C
 
 -- | The empty type, denoting a \'@C@\'losed end
 data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls

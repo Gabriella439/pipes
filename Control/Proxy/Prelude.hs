@@ -45,6 +45,10 @@ module Control.Proxy.Prelude (
     enumFromC,
     enumFromToS,
     enumFromToC,
+    eachS,
+    eachC,
+    rangeS,
+    rangeC,
 
     -- * ArrowChoice
     -- $choice
@@ -540,6 +544,37 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
             _ <- request n
             go $! succ n
 {-# INLINABLE enumFromToC #-}
+
+{-| Non-deterministically choose from all values in the given list
+
+> mappend <$> eachS xs <*> eachS ys = eachS (mappend <$> xs <*> ys)
+>
+> eachS (pure mempty) = pure mempty
+-}
+eachS :: (Monad m, Proxy p) => [b] -> ProduceT p m b
+eachS bs = RespondT (fromListS bs ())
+{-# INLINABLE eachS #-}
+
+{-| Non-deterministically choose from all values in the given list
+
+> mappend <$> eachC xs <*> eachC ys = eachC (mappend <$> xs <*> ys)
+>
+> eachC (pure mempty) = pure mempty
+-}
+eachC :: (Monad m, Proxy p) => [a'] -> CoProduceT p m a'
+eachC a's = RequestT (fromListC a's ())
+{-# INLINABLE eachC #-}
+
+-- | Non-deterministically choose from all values in the given range
+rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ProduceT p m b
+rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
+{-# INLINABLE rangeS #-}
+
+-- | Non-deterministically choose from all values in the given range
+rangeC
+    :: (Enum a', Ord a', Monad m, Proxy p) => a' -> a' -> CoProduceT p m a'
+rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
+{-# INLINABLE rangeC #-}
 
 {- $choice
     'leftD' and 'rightD' satisfy the 'ArrowChoice' laws using @arr = mapD@.

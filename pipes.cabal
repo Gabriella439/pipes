@@ -51,7 +51,6 @@ Library
         Control.Proxy.Core,
         Control.Proxy.Core.Fast,
         Control.Proxy.Core.Correct,
-        Control.Proxy.ListT,
         Control.Proxy.Morph,
         Control.Proxy.Trans,
         Control.Proxy.Trans.Codensity,
