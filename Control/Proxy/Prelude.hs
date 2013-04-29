@@ -3,18 +3,14 @@
 {-# LANGUAGE Rank2Types #-}
 
 module Control.Proxy.Prelude (
-    -- * Standard I/O
+    -- * I/O
     stdinS,
     readLnS,
     stdoutD,
     printD,
     printU,
-
-    -- * Handle I/O
     hGetLineS,
     hPutStrLnD,
-    hPrintD,
-    hPrintU,
 
     -- * Maps
     mapD,
@@ -167,22 +163,6 @@ hPutStrLnD h = runIdentityK $ foreverK $ \x -> do
     lift $ IO.hPutStrLn h a
     respond a
 {-# INLINABLE hPutStrLnD #-}
-
--- | 'print's all values flowing \'@D@\'ownstream to a 'Handle'
-hPrintD :: (Show a, Proxy p) => IO.Handle -> x -> p x a x a IO r
-hPrintD h = runIdentityK $ foreverK $ \x -> do
-    a <- request x
-    lift $ IO.hPrint h a
-    respond a
-{-# INLINABLE hPrintD #-}
-
--- | 'print's all values flowing \'@U@\'pstream to a 'Handle'
-hPrintU :: (Show a', Proxy p) => IO.Handle -> a' -> p a' x a' x IO r
-hPrintU h = runIdentityK $ foreverK $ \a' -> do
-    lift $ IO.hPrint h a'
-    x <- request a'
-    respond x
-{-# INLINABLE hPrintU #-}
 
 {-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
 
