@@ -8,31 +8,22 @@ module Control.Proxy.Prelude (
     readLnS,
     stdoutD,
     printD,
-    printU,
     hGetLineS,
     hPutStrLnD,
 
     -- * Maps
     mapD,
-    mapU,
     mapMD,
-    mapMU,
     useD,
-    useU,
     execD,
-    execU,
 
     -- * Filters
     takeB,
     takeB_,
     takeWhileD,
-    takeWhileU,
     dropD,
-    dropU,
     dropWhileD,
-    dropWhileU,
     filterD,
-    filterU,
 
     -- * Lists and Enumerations
     fromListS,
@@ -135,14 +126,6 @@ printD = runIdentityK $ foreverK $ \x -> do
     respond a
 {-# INLINABLE printD #-}
 
--- | 'print's all values flowing \'@U@\'pstream to 'stdout'
-printU :: (Show a', Proxy p) => a' -> p a' x a' x IO r
-printU = runIdentityK $ foreverK $ \a' -> do
-    lift $ print a'
-    x <- request a'
-    respond x
-{-# INLINABLE printU #-}
-
 -- | A 'Producer' that sends lines from a handle downstream
 hGetLineS :: (Proxy p) => IO.Handle -> () -> Producer p String IO ()
 hGetLineS h () = runIdentityP go where
@@ -179,21 +162,6 @@ mapD f = runIdentityK go where
 -- mapD f = runIdentityK $ foreverK $ request >=> respond . f
 {-# INLINABLE mapD #-}
 
-{-| @(mapU g)@ applies @g@ to all values going \'@U@\'pstream.
-
-> mapU g1 >-> mapU g2 = mapU (g1 . g2)
->
-> mapU id = pull
--}
-mapU :: (Monad m, Proxy p) => (b' -> a') -> b' -> p a' x b' x m r
-mapU g = runIdentityK go where
-    go b' = do
-        x   <- request (g b')
-        b'2 <- respond x
-        go b'2
--- mapU g = foreverK $ (request . g) >=> respond
-{-# INLINABLE mapU #-}
-
 {-| @(mapMD f)@ applies the monadic function @f@ to all values going downstream
 
 > mapMD f1 >-> mapMD f2 = mapMD (f1 >=> f2)
@@ -210,22 +178,6 @@ mapMD f = runIdentityK go where
 -- mapMD f = foreverK $ request >=> lift . f >=> respond
 {-# INLINABLE mapMD #-}
 
-{-| @(mapMU g)@ applies the monadic function @g@ to all values going upstream
-
-> mapMU g1 >-> mapMU g2 = mapMU (g2 >=> g1)
->
-> mapMU return = pull
--}
-mapMU :: (Monad m, Proxy p) => (b' -> m a') -> b' -> p a' x b' x m r
-mapMU g = runIdentityK go where
-    go b' = do
-        a'  <- lift (g b')
-        x   <- request a'
-        b'2 <- respond x
-        go b'2
--- mapMU g = foreverK $ lift . g >=> request >=> respond
-{-# INLINABLE mapMU #-}
-
 {-| @(useD f)@ executes the monadic function @f@ on all values flowing
     \'@D@\'ownstream
 
@@ -241,22 +193,6 @@ useD f = runIdentityK go where
         x2 <- respond a
         go x2
 {-# INLINABLE useD #-}
-
-{-| @(useU g)@ executes the monadic function @g@ on all values flowing
-    \'@U@\'pstream
-
-> useU g1 >-> useU g2 = useU (\a' -> g2 a' >> g1 a')
->
-> useU (\_ -> return ()) = pull
--}
-useU :: (Monad m, Proxy p) => (a' -> m r2) -> a' -> p a' x a' x m r
-useU g = runIdentityK go where
-    go a' = do
-        _   <- lift $ g a'
-        x   <- request a'
-        a'2 <- respond x
-        go a'2
-{-# INLINABLE useU #-}
 
 {-| @(execD md)@ executes @md@ every time values flow downstream through it.
 
@@ -276,25 +212,6 @@ execD md = runIdentityK go where
     lift md
     respond a -}
 {-# INLINABLE execD #-}
-
-{-| @(execU mu)@ executes @mu@ every time values flow upstream through it.
-
-> execU mu1 >-> execU mu2 = execU (mu2 >> mu1)
->
-> execU (return ()) = pull
--}
-execU :: (Monad m, Proxy p) => m r2 -> a' -> p a' a a' a m r
-execU mu = runIdentityK go where
-    go a' = do
-        _   <- lift mu
-        a   <- request a'
-        a'2 <- respond a
-        go a'2
-{- execU mu = foreverK $ \a' -> do
-    lift mu
-    a <- request a'
-    respond a -}
-{-# INLINABLE execU #-}
 
 {-| @(takeB n)@ allows @n@ upstream/downstream roundtrips to pass through
 
@@ -347,24 +264,6 @@ takeWhileD p = runIdentityK go where
             else return ()
 {-# INLINABLE takeWhileD #-}
 
-{-| @(takeWhileU p)@ allows values to pass upstream so long as they satisfy the
-    predicate @p@.
-
-> takeWhileU p1 >-> takeWhileU p2 = takeWhileU (p1 <> p2)
->
-> takeWhileD mempty = pull
--}
-takeWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' a a' a m ()
-takeWhileU p = runIdentityK go where
-    go a' =
-        if (p a')
-            then do
-                a   <- request a'
-                a'2 <- respond a
-                go a'2
-            else return_P ()
-{-# INLINABLE takeWhileU #-}
-
 {-| @(dropD n)@ discards @n@ values going downstream
 
 > dropD n1 >-> dropD n2 = dropD (n1 + n2)  -- n2 >= 0 && n2 >= 0
@@ -382,21 +281,6 @@ dropD n0 = \() -> runIdentityP (go n0) where
     replicateM_ n $ request ()
     pull () -}
 {-# INLINABLE dropD #-}
-
-{-| @(dropU n)@ discards @n@ values going upstream
-
-> dropU n1 >-> dropU n2 = dropU (n1 + n2)  -- n2 >= 0 && n2 >= 0
->
-> dropU 0 = pull
--}
-dropU :: (Monad m, Proxy p) => Int -> a' -> CoPipe p a' a' m r
-dropU n0 = runIdentityK (go n0) where
-    go n
-        | n <= 0    = pull
-        | otherwise = \_ -> do
-            a' <- respond ()
-            go (n - 1) a'
-{-# INLINABLE dropU #-}
 
 {-| @(dropWhileD p)@ discards values going downstream until one violates the
     predicate @p@.
@@ -420,23 +304,6 @@ dropWhileD p () = runIdentityP go where
                 pull x
 {-# INLINABLE dropWhileD #-}
 
-{-| @(dropWhileU p)@ discards values going upstream until one violates the
-    predicate @p@.
-
-> dropWhileU p1 >-> dropWhileU p2 = dropWhileU (p1 <> p2)
->
-> dropWhileU mempty = pull
--}
-dropWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
-dropWhileU p = runIdentityK go where
-    go a' =
-        if (p a')
-            then do
-                a2 <- respond ()
-                go a2
-            else pull a'
-{-# INLINABLE dropWhileU #-}
-
 {-| @(filterD p)@ discards values going downstream if they fail the predicate
     @p@
 
@@ -458,25 +325,6 @@ filterD p = \() -> runIdentityP go where
                 go
             else go
 {-# INLINABLE filterD #-}
-
-{-| @(filterU p)@ discards values going upstream if they fail the predicate @p@
-
-> filterU p1 >-> filterU p2 = filterU (p1 <> p2)
->
-> filterU mempty = pull
--}
-filterU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
-filterU p = runIdentityK go where
-    go a' =
-        if (p a')
-        then do
-            _   <- request a'
-            a'2 <- respond ()
-            go a'2
-        else do
-            a'2 <- respond ()
-            go a'2
-{-# INLINABLE filterU #-}
 
 {-| Convert a list into a 'Producer'
 
