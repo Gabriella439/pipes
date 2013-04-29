@@ -35,6 +35,7 @@ module Control.Proxy.Core.Fast (
 
     -- * Run Sessions 
     -- $run
+    run,
     runProxy,
     runProxyK,
 
@@ -235,6 +236,7 @@ p0 `_resp` fb = go p0 where
     'runProxy' / 'runProxyK' command.
 -}
 
+-- | Run a self-sufficient 'ProxyFast', converting it back to the base monad
 run :: (Monad m) => ProxyFast a' () () b m r -> m r
 run p = case p of
     Request _ fa  -> run (fa  ())

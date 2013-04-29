@@ -13,6 +13,7 @@ module Control.Proxy.Core.Correct (
 
     -- * Run Sessions 
     -- $run
+    run,
     runProxy,
     runProxyK
     ) where
@@ -173,6 +174,7 @@ instance Proxy ProxyCorrect where
     'runProxy' / 'runProxyK' command.
 -}
 
+-- | Run a self-sufficient 'ProxyCorrect', converting it back to the base monad
 run :: (Monad m) => ProxyCorrect a' () () b m r -> m r
 run p = do
     x <- unProxy p
