@@ -25,9 +25,7 @@ module Control.Proxy.Class (
     -- * ListT Monad Transformers
     -- $listT
     RespondT(..),
-    runRespondK,
     RequestT(..),
-    runRequestK,
 
     -- * Synonyms
     C,
@@ -349,11 +347,6 @@ instance (Monad m, Proxy p, Monoid b') => MonadPlus (RespondT p a' a b' m) where
     mzero = empty
     mplus = (<|>)
 
--- | Convert a 'RespondT' \'@K@\'leisli arrow into a proxy
-runRespondK :: (q -> RespondT p a' a b' m b) -> (q -> p a' a b' b m b')
-runRespondK k q = runRespondT (k q)
-{-# INLINABLE runRespondK #-}
-
 {- $listT
     The 'RespondT' monad transformer is equivalent to 'ListT' over the
     downstream output.  The 'RespondT' Kleisli category corresponds to the
@@ -403,11 +396,6 @@ instance (Monad m, Proxy p, Monoid a)
 instance (Monad m, Proxy p, Monoid a) => MonadPlus (RequestT p a b' b m) where
     mzero = empty
     mplus = (<|>)
-
--- | Convert a 'RequestT' \'@K@\'leisli arrow into a proxy
-runRequestK :: (q -> RequestT p a b' b m a') -> (q -> p a' a b' b m a)
-runRequestK k q = runRequestT (k q)
-{-# INLINABLE runRequestK #-}
 
 -- | The empty type, denoting a \'@C@\'losed end
 data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
