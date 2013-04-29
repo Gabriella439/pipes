@@ -40,15 +40,10 @@ module Control.Proxy.Prelude (
 
     -- * Lists and Enumerations
     fromListS,
-    fromListC,
     enumFromS,
-    enumFromC,
     enumFromToS,
-    enumFromToC,
     eachS,
-    eachC,
     rangeS,
-    rangeC,
 
     -- * Folds
     foldD,
@@ -83,14 +78,6 @@ module Control.Proxy.Prelude (
 
     -- * Kleisli utilities
     foreverK,
-    replicateK,
-    liftK,
-    hoistK,
-    raise,
-    raiseK,
-    hoistPK,
-    raiseP,
-    raisePK,
 
     -- * Re-exports
     module Data.Monoid
@@ -522,17 +509,6 @@ fromListS xs = \_ -> foldr (\e a -> respond e ?>= \_ -> a) (return_P ()) xs
 -- fromListS xs _ = mapM_ respond xs
 {-# INLINABLE fromListS #-}
 
-{-| Convert a list into a 'CoProducer'
-
-> fromListC xs >=> fromListC ys = fromListC (xs ++ ys)
->
-> fromListC [] = return
--}
-fromListC :: (Monad m, Proxy p) => [a'] -> () -> CoProducer p a' m ()
-fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
--- fromListC xs _ = mapM_ request xs
-{-# INLINABLE fromListC #-}
-
 -- | 'Producer' version of 'enumFrom'
 enumFromS :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
 enumFromS b0 = \_ -> runIdentityP (go b0) where
@@ -540,14 +516,6 @@ enumFromS b0 = \_ -> runIdentityP (go b0) where
         _ <- respond b
         go $! succ b
 {-# INLINABLE enumFromS #-}
-
--- | 'CoProducer' version of 'enumFrom'
-enumFromC :: (Enum a', Monad m, Proxy p) => a' -> () -> CoProducer p a' m r
-enumFromC a'0 = \_ -> runIdentityP (go a'0) where
-    go a' = do
-        _ <- request a'
-        go $! succ a'
-{-# INLINABLE enumFromC #-}
 
 -- | 'Producer' version of 'enumFromTo'
 enumFromToS
@@ -560,18 +528,6 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
             go $! succ b
 {-# INLINABLE enumFromToS #-}
 
--- | 'CoProducer' version of 'enumFromTo'
-enumFromToC
-    :: (Enum a', Ord a', Monad m, Proxy p)
-    => a' -> a' -> () -> CoProducer p a' m ()
-enumFromToC a1 a2 _ = runIdentityP (go a1) where
-    go n
-        | n > a2 = return ()
-        | otherwise = do
-            _ <- request n
-            go $! succ n
-{-# INLINABLE enumFromToC #-}
-
 {-| Non-deterministically choose from all values in the given list
 
 > mappend <$> eachS xs <*> eachS ys = eachS (mappend <$> xs <*> ys)
@@ -582,26 +538,10 @@ eachS :: (Monad m, Proxy p) => [b] -> ProduceT p m b
 eachS bs = RespondT (fromListS bs ())
 {-# INLINABLE eachS #-}
 
-{-| Non-deterministically choose from all values in the given list
-
-> mappend <$> eachC xs <*> eachC ys = eachC (mappend <$> xs <*> ys)
->
-> eachC (pure mempty) = pure mempty
--}
-eachC :: (Monad m, Proxy p) => [a'] -> CoProduceT p m a'
-eachC a's = RequestT (fromListC a's ())
-{-# INLINABLE eachC #-}
-
 -- | Non-deterministically choose from all values in the given range
 rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ProduceT p m b
 rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
 {-# INLINABLE rangeS #-}
-
--- | Non-deterministically choose from all values in the given range
-rangeC
-    :: (Enum a', Ord a', Monad m, Proxy p) => a' -> a' -> CoProduceT p m a'
-rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
-{-# INLINABLE rangeC #-}
 
 {-| Strict fold over values flowing \'@D@\'ownstream.
 
@@ -882,84 +822,3 @@ foreverK k = let r = \a -> k a >>= r in r
    See: http://hackage.haskell.org/trac/ghc/ticket/5205
 -}
 {-# INLINABLE foreverK #-}
-
--- | Repeat a \'@K@\'leisli arrow multiple times
-replicateK :: (Monad m) => Int -> (a -> m a) -> (a -> m a)
-replicateK n0 k = go n0 where
-    go n
-        | n < 1     = return
-        | n == 1    = k
-        | otherwise = \a -> k a >>= go (n - 1)
-{-# INLINABLE replicateK #-}
-
-{-| Convenience function equivalent to @(lift .)@
-
-> liftK f >=> liftK g = liftK (f >=> g)
->
-> liftK return = return
--}
-liftK :: (Monad m, MonadTrans t) => (a -> m b) -> (a -> t m b)
-liftK k a = lift (k a)
--- liftK = (lift .)
-{-# INLINABLE liftK #-}
-
--- | Convenience function equivalent to @(hoist f .)@
-hoistK
-    :: (Monad m, MFunctor t)
-    => (forall a . m a -> n a)  -- ^ Monad morphism
-    -> (b' -> t m b)            -- ^ Kleisli arrow
-    -> (b' -> t n b)
-hoistK k p a' = hoist k (p a')
--- hoistK k = (hoist k .)
-{-# INLINABLE hoistK #-}
-
-{-| Lift the base monad
-
-> raise = hoist lift
--}
-raise :: (Monad m, MFunctor t1, MonadTrans t2) => t1 m r -> t1 (t2 m) r
-raise = hoist lift
-{-# INLINABLE raise #-}
-
-{-| Lift the base monad of a \'@K@\'leisli arrow
-
-> raiseK = hoistK lift
--}
-raiseK
-    :: (Monad m, MFunctor t1, MonadTrans t2)
-    => (q -> t1 m r) -> (q -> t1 (t2 m) r)
-raiseK = (hoist lift .)
-{-# INLINABLE raiseK #-}
-
--- | Convenience function equivalent to @(hoistP f .)@
-hoistPK
-    :: (Monad m1, Proxy p1, PFunctor t)
-    => (forall _a' _a _b' _b _r .
-            p1 _a' _a _b' _b m1 _r -> p2 _a' _a _b' _b m2 _r)
-    -- ^ Proxy morphism
-    -> (q -> t p1 a' a b' b m1 r) -- ^ Proxy Kleisli arrow
-    -> (q -> t p2 a' a b' b m2 r)
-hoistPK f = (hoistP f .)
-{-# INLINABLE hoistPK #-}
-
-{-| Lift the base proxy
-
-> raiseP = hoistP liftP
--}
-raiseP
-    :: (Monad m, Proxy p, PFunctor t1, ProxyTrans t2)
-    => t1 p a' a b' b m r -- ^ Proxy
-    -> t1 (t2 p) a' a b' b m r
-raiseP = hoistP liftP
-{-# INLINABLE raiseP #-}
-
-{-| Lift the base proxy of a \'@K@\'leisli arrow
-
-> raisePK = hoistPK liftP
--}
-raisePK
-    :: (Monad m, Proxy p, PFunctor t1, ProxyTrans t2)
-    => (q -> t1 p a' a b' b m r) -- ^ Proxy Kleisli arrow
-    -> (q -> t1 (t2 p) a' a b' b m r)
-raisePK = hoistPK liftP
-{-# INLINABLE raisePK #-}
