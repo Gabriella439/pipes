@@ -50,6 +50,21 @@ module Control.Proxy.Prelude (
     rangeS,
     rangeC,
 
+    -- * Folds
+    foldD,
+    allD,
+    allD_,
+    anyD,
+    anyD_,
+    sumD,
+    productD,
+    lengthD,
+    headD,
+    headD_,
+    lastD,
+    toListD,
+    foldrD,
+
     -- * ArrowChoice
     -- $choice
     leftD,
@@ -75,8 +90,10 @@ module Control.Proxy.Prelude (
     raiseK,
     hoistPK,
     raiseP,
-    raisePK
+    raisePK,
 
+    -- * Re-exports
+    module Data.Monoid
     ) where
 
 import Control.Monad (forever)
@@ -86,6 +103,16 @@ import Control.Proxy.Class
 import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK, identityK)
+import Control.Proxy.Trans.Writer (WriterP, tell)
+import Data.Monoid (
+    Monoid(mempty, mappend),
+    Endo(Endo, appEndo),
+    All(All, getAll),
+    Any(Any, getAny),
+    Sum(Sum, getSum),
+    Product(Product, getProduct),
+    First(First, getFirst),
+    Last(Last, getLast) )
 import qualified System.IO as IO
 
 {-| A 'Producer' that sends lines from 'stdin' downstream
@@ -575,6 +602,120 @@ rangeC
     :: (Enum a', Ord a', Monad m, Proxy p) => a' -> a' -> CoProduceT p m a'
 rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 {-# INLINABLE rangeC #-}
+
+{-| Strict fold over values flowing \'@D@\'ownstream.
+
+> foldD f >-> foldD g = foldD (f <> g)
+>
+> foldD mempty = idPull
+-}
+foldD
+    :: (Monad m, Proxy p, Monoid w) => (a -> w) -> x -> WriterP w p x a x a m r
+foldD f = go where
+    go x = do
+        a <- request x
+        tell (f a)
+        x2 <- respond a
+        go x2
+{-# INLINABLE foldD #-}
+
+{-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
+    predicate
+-}
+allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP All p x a x a m r
+allD predicate = foldD (All . predicate)
+{-# INLINABLE allD #-}
+
+{-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
+    predicate
+
+    'allD_' terminates on the first value that fails the predicate
+-}
+allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP All p x a x a m ()
+allD_ predicate = go where
+    go x = do
+        a <- request x
+        if (predicate a)
+            then do
+                x2 <- respond a
+                go x2
+            else tell (All False)
+{-# INLINABLE allD_ #-}
+
+{-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies the
+    predicate
+-}
+anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP Any p x a x a m r
+anyD predicate = foldD (Any . predicate)
+{-# INLINABLE anyD #-}
+
+{-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies the
+    predicate
+
+    'anyD_' terminates on the first value that satisfies the predicate
+-}
+anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP Any p x a x a m ()
+anyD_ predicate = go where
+    go x = do
+        a <- request x
+        if (predicate a)
+            then tell (Any True)
+            else do
+                x2 <- respond a
+                go x2
+{-# INLINABLE anyD_ #-}
+
+-- | Compute the 'Sum' of all values that flow \'@D@\'ownstream
+sumD :: (Monad m, Proxy p, Num a) => x -> WriterP (Sum a) p x a x a m r
+sumD = foldD Sum
+{-# INLINABLE sumD #-}
+
+-- | Compute the 'Product' of all values that flow \'@D@\'ownstream
+productD :: (Monad m, Proxy p, Num a) => x -> WriterP (Product a) p x a x a m r
+productD = foldD Product
+{-# INLINABLE productD #-}
+
+-- | Count how many values flow \'@D@\'ownstream
+lengthD :: (Monad m, Proxy p) => x -> WriterP (Sum Int) p x a x a m r
+lengthD = foldD (\_ -> Sum 1)
+{-# INLINABLE lengthD #-}
+
+-- | Retrieve the first value going \'@D@\'ownstream
+headD :: (Monad m, Proxy p) => x -> WriterP (First a) p x a x a m r
+headD = foldD (First . Just)
+{-# INLINABLE headD #-}
+
+{-| Retrieve the first value going \'@D@\'ownstream
+
+    'headD_' terminates on the first value it receives
+-}
+headD_ :: (Monad m, Proxy p) => x -> WriterP (First a) p x a x a m ()
+headD_ x = do
+    a <- request x
+    tell $ First (Just a)
+{-# INLINABLE headD_ #-}
+
+-- | Retrieve the last value going \'@D@\'ownstream
+lastD :: (Monad m, Proxy p) => x -> WriterP (Last a) p x a x a m r
+lastD = foldD (Last . Just)
+{-# INLINABLE lastD #-}
+
+-- | Fold the values flowing \'@D@\'ownstream into a list
+toListD :: (Monad m, Proxy p) => x -> WriterP [a] p x a x a m r
+toListD = foldD (\x -> [x])
+{-# INLINABLE toListD #-}
+
+{-| Fold equivalent to 'foldr'
+
+    To see why, consider this isomorphic type for 'foldr':
+
+> foldr :: (a -> b -> b) -> [a] -> Endo b
+-}
+foldrD
+    :: (Monad m, Proxy p)
+    => (a -> b -> b) -> x -> WriterP (Endo b) p x a x a m r
+foldrD step = foldD (Endo . step)
+{-# INLINABLE foldrD #-}
 
 {- $choice
     'leftD' and 'rightD' satisfy the 'ArrowChoice' laws using @arr = mapD@.
