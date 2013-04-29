@@ -37,7 +37,6 @@ module Control.Proxy.Core.Fast (
     -- $run
     runProxy,
     runProxyK,
-    runPipe,
 
     -- * Safety
     observe
@@ -248,11 +247,6 @@ runProxy k = run (k ())
 runProxyK :: (Monad m) => (q -> ProxyFast a' () () b m r) -> (q -> m r)
 runProxyK k q = run (k q)
 {-# INLINABLE runProxyK #-}
-
--- | Run the 'Pipe' monad transformer, converting it back to the base monad
-runPipe :: (Monad m) => ProxyFast a' () () b m r -> m r
-runPipe p = runProxy (\_ -> p)
-{-# INLINABLE runPipe #-}
 
 {-| The monad transformer laws are correct when viewed through the 'observe'
     function:

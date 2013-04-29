@@ -14,8 +14,7 @@ module Control.Proxy.Core.Correct (
     -- * Run Sessions 
     -- $run
     runProxy,
-    runProxyK,
-    runPipe
+    runProxyK
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
@@ -186,8 +185,3 @@ runProxy k = run (k ()) where
 runProxyK :: (Monad m) => (q -> ProxyCorrect a' () () b m r) -> (q -> m r)
 runProxyK k q = run (k q)
 {-# INLINABLE runProxyK #-}
-
--- | Run the 'Pipe' monad transformer, converting it back to the base monad
-runPipe :: (Monad m) => ProxyCorrect a' () () b m r -> m r
-runPipe p = runProxy (\_ -> p)
-{-# INLINABLE runPipe #-}
