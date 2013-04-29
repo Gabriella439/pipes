@@ -109,9 +109,10 @@ class (PFunctor t, ProxyTrans t) => PMonad t where
         :: (Monad m2, Proxy p2)
         => (forall _a' _a _b' _b _r
               . p1 _a' _a _b' _b m1 _r -> t p2 _a' _a _b' _b m2 _r)
+        -- ^ Proxy morphism
         -> (  t p1  a'  a  b'  b m1  r -> t p2  a'  a  b'  b m2  r)
 
-{-| Squash to 'PMonad' layers into a single layer
+{-| Squash two 'PMonad' layers into a single layer
 
     'squashP' is analogous to 'join'
 -}
