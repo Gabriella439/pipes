@@ -51,8 +51,6 @@ module Control.Proxy.Prelude (
     -- $choice
     leftD,
     rightD,
-    leftU,
-    rightU,
 
     -- * Zips and Merges
     zipD,
@@ -487,8 +485,6 @@ foldrD step = foldD (Endo . step)
 
 {- $choice
     'leftD' and 'rightD' satisfy the 'ArrowChoice' laws using @arr = mapD@.
-
-    'leftU' and 'rightU' satisfy the 'ArrowChoice' laws using @arr = mapU@.
 -}
 
 {-| Lift a proxy to operate only on 'Left' values flowing \'@D@\'ownstream and
@@ -526,42 +522,6 @@ rightD k = runIdentityK (up \>\ (identityK k />/ dn))
                 up x2
             Right a -> return a
 {-# INLINABLE rightD #-}
-
-{-| Lift a proxy to operate only on 'Left' values flowing \'@U@\'pstream and
-    forward 'Right' values
--}
-leftU
-    :: (Monad m, Proxy p)
-    => (q -> p a' x b' x m r) -> (q -> p (Either a' e) x (Either b' e) x m r)
-leftU k = runIdentityK ((up \>\ identityK k) />/ dn)
-  where
-    up a' = request (Left a')
-    dn x = do
-        mb' <- respond x
-        case mb' of
-            Left  b' -> return b'
-            Right e  -> do
-                x2 <- request (Right e)
-                dn x2
-{-# INLINABLE leftU #-}
-
-{-| Lift a proxy to operate only on 'Right' values flowing \'@D@\'ownstream and
-    forward 'Left' values
--}
-rightU
-    :: (Monad m, Proxy p)
-    => (q -> p a' x b' x m r) -> (q -> p (Either e a') x (Either e b') x m r)
-rightU k = runIdentityK ((up \>\ identityK k) />/ dn)
-  where
-    up a' = request (Right a')
-    dn x = do
-        mb' <- respond x
-        case mb' of
-            Left  e  -> do
-                x2 <- request (Left e)
-                dn x2
-            Right b' -> return b'
-{-# INLINABLE rightU #-}
 
 -- | Zip values flowing downstream
 zipD
