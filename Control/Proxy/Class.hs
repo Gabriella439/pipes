@@ -22,15 +22,12 @@ module Control.Proxy.Class (
     (//<),
     (<\\),
 
-    -- * Respond Monad Transformer
+    -- * ListT Monad Transformers
+    -- $listT
     RespondT(..),
     runRespondK,
-    ProduceT,
-
-    -- * Request Monad Transformer
     RequestT(..),
     runRequestK,
-    CoProduceT,
 
     -- * Synonyms
     C,
@@ -43,6 +40,8 @@ module Control.Proxy.Class (
     Client,
     Server,
     Session,
+    ProduceT,
+    CoProduceT,
 
     -- * Laws
     -- $laws
@@ -93,7 +92,15 @@ infixl 8 \>\, //<
 infixl 1 ?>=  -- This should match the fixity of >>=
 
 {-| The 'Proxy' class defines a 'Monad' that intersects four streaming
-    categories.
+    categories:
+
+    * The \"request\" category: 'request' and ('\>\')
+
+    * The \"respond\" category: 'respond' and ('/>/')
+
+    * The \"pull\" category: 'pull' and ('>->')
+
+    * The \"push\" category: 'push' and ('>~>')
 
     This class requires the \"point-ful\" version of each category's composition
     operator for efficiency.
@@ -342,8 +349,19 @@ runRespondK :: (q -> RespondT p a' a b' m b) -> (q -> p a' a b' b m b')
 runRespondK k q = runRespondT (k q)
 {-# INLINABLE runRespondK #-}
 
--- | 'ProduceT' is isomorphic to \"ListT done right\"
-type ProduceT p = RespondT p C () ()
+{- $listT
+    The 'RespondT' monad transformer is equivalent to 'ListT' over the
+    downstream output.  The 'RespondT' Kleisli category corresponds to the
+    \"respond\" category.
+
+    The 'RequestT' monad transformer is equivalent to 'ListT' over the upstream
+    output.  The 'RequestT' Kleisli category corresponds to the \"request\"
+    category.
+
+    Unlike 'ListT' from @transformers@, these monad transformers are correct by
+    construction and always satisfy the monad and monad transformer laws.
+-}
+
 
 -- | A monad transformer over a proxy's upstream output
 newtype RequestT (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b' b m a' =
@@ -385,9 +403,6 @@ instance (Monad m, Proxy p, Monoid a) => MonadPlus (RequestT p a b' b m) where
 runRequestK :: (q -> RequestT p a b' b m a') -> (q -> p a' a b' b m a)
 runRequestK k q = runRequestT (k q)
 {-# INLINABLE runRequestK #-}
-
--- | 'CoProduceT' is isomorphic to \"ListT done right\"
-type CoProduceT p = RequestT p () () C
 
 -- | The empty type, denoting a \'@C@\'losed end
 data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
@@ -441,6 +456,12 @@ type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
     'Session's never 'request' or 'respond'.
 -}
 type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
+
+-- | 'ProduceT' is 'ListT' over the downstream output
+type ProduceT p = RespondT p C () ()
+
+-- | 'CoProduceT' is 'ListT' over the upstream output
+type CoProduceT p = RequestT p () () C
 
 {- $laws
     First, all proxies sit at the intersection of five categories:
