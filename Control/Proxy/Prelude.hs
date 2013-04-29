@@ -9,14 +9,12 @@ module Control.Proxy.Prelude (
     stdoutD,
     printD,
     printU,
-    printB,
 
     -- * Handle I/O
     hGetLineS,
     hPutStrLnD,
     hPrintD,
     hPrintU,
-    hPrintB,
 
     -- * Maps
     mapD,
@@ -131,22 +129,6 @@ printU = runIdentityK $ foreverK $ \a' -> do
     respond x
 {-# INLINABLE printU #-}
 
-{-| 'print's all values flowing through it to 'stdout'
-
-    Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
--}
-printB :: (Show a', Show a, Proxy p) => a' -> p a' a a' a IO r
-printB = runIdentityK $ foreverK $ \a' -> do
-    lift $ do
-        putStr "U: "
-        print a'
-    a <- request a'
-    lift $ do
-        putStr "D: "
-        print a
-    respond a
-{-# INLINABLE printB #-}
-
 -- | A 'Producer' that sends lines from a handle downstream
 hGetLineS :: (Proxy p) => IO.Handle -> () -> Producer p String IO ()
 hGetLineS h () = runIdentityP go where
@@ -183,22 +165,6 @@ hPrintU h = runIdentityK $ foreverK $ \a' -> do
     x <- request a'
     respond x
 {-# INLINABLE hPrintU #-}
-
-{-| 'print's all values flowing through it to a 'Handle'
-
-    Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
--}
-hPrintB :: (Show a, Show a', Proxy p) => IO.Handle -> a' -> p a' a a' a IO r
-hPrintB h = runIdentityK $ foreverK $ \a' -> do
-    lift $ do
-        IO.hPutStr h "U: "
-        IO.hPrint h a'
-    a <- request a'
-    lift $ do
-        IO.hPutStr h "D: "
-        IO.hPrint h a
-    respond a
-{-# INLINABLE hPrintB #-}
 
 {-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
 
