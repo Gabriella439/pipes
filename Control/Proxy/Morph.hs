@@ -6,29 +6,29 @@
 
     * Functor between Kleisli categories:
 
-> morph p1 >=> morph p2 = morph (p1 >=> p2)
+> morph . p1 >=> morph . p2 = morph . (p1 >=> p2)
 >
-> morph return = return
+> morph . return = return
 
     * Functor between 'P.Proxy' composition categories:
 
-> morph p1 >-> morph p2 = morph (p1 >-> p2)
+> morph . p1 >-> morph . p2 = morph . (p1 >-> p2)
 >
-> morph idT = idT
+> morph . idT = idT
 
-> morph p1 >~> morph p2 = morph (p1 >~> p2)
+> morph . p1 >~> morph . p2 = morph . (p1 >~> p2)
 >
-> morph coidT = coidT
+> morph . coidT = coidT
 
     * Functor between 'ListT' Kleisli categories:
 
-> morph p1 \>\ morph p2 = morph (p2 \>\ p2)
+> morph . p1 \>\ morph . p2 = morph . (p2 \>\ p2)
 >
-> morph request = request
+> morph . request = request
 
-> morph p1 />/ morph p2 = morph (p2 />/ p2)
+> morph . p1 />/ morph . p2 = morph . (p2 />/ p2)
 >
-> morph respond = respond
+> morph . respond = respond
 
     Examples of proxy morphisms include:
 
@@ -89,7 +89,7 @@ class PFunctor (t
         => (forall _a' _a _b' _b _r .
                 p1 _a' _a _b' _b m1 _r ->   p2 _a' _a _b' _b m2 _r)
         -- ^ Proxy morphism
-        -> (                   t p1 a' a b' b m1 r -> t p2 a' a b' b m2 r)
+        -> (  t p1  a'  a  b'  b m1  r -> t p2  a'  a  b'  b m2  r)
 
 {-| A monad in the category of monads, using 'liftP' from 'ProxyTrans' as the
     analog of 'return' and 'embedP' as the analog of ('=<<'):
@@ -107,10 +107,9 @@ class (PFunctor t, ProxyTrans t) => PMonad t where
     -}
     embedP
         :: (Monad m2, Proxy p2)
-        => (forall _a' _a _b' _b _r . p1 _a' _a _b' _b m1 _r
-                                 -> t p2 _a' _a _b' _b m2 _r)
-        -> (                        t p1  a'  a  b'  b m1  r
-                                 -> t p2  a'  a  b'  b m2  r)
+        => (forall _a' _a _b' _b _r
+              . p1 _a' _a _b' _b m1 _r -> t p2 _a' _a _b' _b m2 _r)
+        -> (  t p1  a'  a  b'  b m1  r -> t p2  a'  a  b'  b m2  r)
 
 {-| Squash to 'PMonad' layers into a single layer
 
