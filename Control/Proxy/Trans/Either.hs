@@ -5,7 +5,6 @@
 module Control.Proxy.Trans.Either (
     -- * EitherP
     EitherP(..),
-    runEitherK,
 
     -- * Either operations
     left,
@@ -156,12 +155,6 @@ instance PMonad (EitherP e) where
             Left         e  -> Left e
             Right (Left  e) -> Left e
             Right (Right a) -> Right a ) )
-
--- | Run an 'EitherP' \'@K@\'leisi arrow, returning either a 'Left' or 'Right'
-runEitherK
-    :: (q -> EitherP e p a' a b' b m r) -> (q -> p a' a b' b m (Either e r))
-runEitherK p q = runEitherP (p q)
-{-# INLINABLE runEitherK #-}
 
 -- | Abort the computation and return a 'Left' result
 left :: (Monad m, Proxy p) => e -> EitherP e p a' a b' b m r

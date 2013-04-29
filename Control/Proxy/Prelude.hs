@@ -74,7 +74,7 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
 import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
-import Control.Proxy.Trans.Identity (runIdentityP, runIdentityK, identityK)
+import Control.Proxy.Trans.Identity (IdentityP(IdentityP, runIdentityP))
 import Control.Proxy.Trans.Writer (WriterP, tell)
 import Data.Monoid (
     Monoid(mempty, mappend),
@@ -110,18 +110,18 @@ readLnS () = runIdentityP $ forever $ do
 > stdoutD = hPutStrLnD stdout
 -}
 stdoutD :: (Proxy p) => x -> p x String x String IO r
-stdoutD = runIdentityK $ foreverK $ \x -> do
+stdoutD = runIdentityP . (foreverK $ \x -> do
     a <- request x
     lift $ putStrLn a
-    respond a
+    respond a)
 {-# INLINABLE stdoutD #-}
 
 -- | 'print's all values flowing \'@D@\'ownstream to 'stdout'
 printD :: (Show a, Proxy p) => x -> p x a x a IO r
-printD = runIdentityK $ foreverK $ \x -> do
+printD = runIdentityP . (foreverK $ \x -> do
     a <- request x
     lift $ print a
-    respond a
+    respond a )
 {-# INLINABLE printD #-}
 
 -- | A 'Producer' that sends lines from a handle downstream
@@ -139,10 +139,10 @@ hGetLineS h () = runIdentityP go where
 
 -- | 'putStrLn's all values flowing \'@D@\'ownstream to a 'Handle'
 hPutStrLnD :: (Proxy p) => IO.Handle -> x -> p x String x String IO r
-hPutStrLnD h = runIdentityK $ foreverK $ \x -> do
+hPutStrLnD h = runIdentityP . (foreverK $ \x -> do
     a <- request x
     lift $ IO.hPutStrLn h a
-    respond a
+    respond a )
 {-# INLINABLE hPutStrLnD #-}
 
 {-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
@@ -152,12 +152,12 @@ hPutStrLnD h = runIdentityK $ foreverK $ \x -> do
 > mapD id = pull
 -}
 mapD :: (Monad m, Proxy p) => (a -> b) -> x -> p x a x b m r
-mapD f = runIdentityK go where
+mapD f = runIdentityP . go where
     go x = do
         a  <- request x
         x2 <- respond (f a)
         go x2
--- mapD f = runIdentityK $ foreverK $ request >=> respond . f
+-- mapD f = runIdentityP . (foreverK $ request >=> respond . f)
 {-# INLINABLE mapD #-}
 
 {-| @(mapMD f)@ applies the monadic function @f@ to all values going downstream
@@ -167,7 +167,7 @@ mapD f = runIdentityK go where
 > mapMD return = pull
 -}
 mapMD :: (Monad m, Proxy p) => (a -> m b) -> x -> p x a x b m r
-mapMD f = runIdentityK go where
+mapMD f = runIdentityP . go where
     go x = do
         a  <- request x
         b  <- lift (f a)
@@ -184,7 +184,7 @@ mapMD f = runIdentityK go where
 > useD (\_ -> return ()) = pull
 -}
 useD :: (Monad m, Proxy p) => (a -> m r1) -> x -> p x a x a m r
-useD f = runIdentityK go where
+useD f = runIdentityP . go where
     go x = do
         a  <- request x
         _  <- lift $ f a
@@ -199,7 +199,7 @@ useD f = runIdentityK go where
 > execD (return ()) = pull
 -}
 execD :: (Monad m, Proxy p) => m r1 -> a' -> p a' a a' a m r
-execD md = runIdentityK go where
+execD md = runIdentityP . go where
     go a' = do
         a   <- request a'
         _   <- lift md
@@ -218,19 +218,19 @@ execD md = runIdentityK go where
 > takeB 0 = return
 -}
 takeB :: (Monad m, Proxy p) => Int -> a' -> p a' a a' a m a'
-takeB n0 = runIdentityK (go n0) where
+takeB n0 = runIdentityP . (go n0) where
     go n
         | n <= 0    = return
         | otherwise = \a' -> do
              a   <- request a'
              a'2 <- respond a
              go (n - 1) a'2
--- takeB n = runIdentityK $ replicateK n $ request >=> respond
+-- takeB n = runIdentityP . (replicateK n $ request >=> respond)
 {-# INLINABLE takeB #-}
 
 -- | 'takeB_' is 'takeB' with a @()@ return value, convenient for composing
 takeB_ :: (Monad m, Proxy p) => Int -> a' -> p a' a a' a m ()
-takeB_ n0 = runIdentityK (go n0) where
+takeB_ n0 = runIdentityP . (go n0) where
     go n
         | n <= 0    = \_ -> return ()
         | otherwise = \a' -> do
@@ -252,7 +252,7 @@ takeB_ n0 = runIdentityK (go n0) where
 > takeWhileD mempty = pull
 -}
 takeWhileD :: (Monad m, Proxy p) => (a -> Bool) -> a' -> p a' a a' a m ()
-takeWhileD p = runIdentityK go where
+takeWhileD p = runIdentityP . go where
     go a' = do
         a <- request a'
         if (p a)
@@ -493,7 +493,7 @@ foldrD step = foldD (Endo . step)
 leftD
     :: (Monad m, Proxy p)
     => (q -> p x a x b m r) -> (q -> p x (Either a e) x (Either b e) m r)
-leftD k = runIdentityK (up \>\ (identityK k />/ dn))
+leftD k = runIdentityP . (up \>\ (IdentityP . k />/ dn))
   where
     dn b = respond (Left b)
     up x = do
@@ -511,7 +511,7 @@ leftD k = runIdentityK (up \>\ (identityK k />/ dn))
 rightD
     :: (Monad m, Proxy p)
     => (q -> p x a x b m r) -> (q -> p x (Either e a) x (Either e b) m r)
-rightD k = runIdentityK (up \>\ (identityK k />/ dn))
+rightD k = runIdentityP . (up \>\ (IdentityP . k />/ dn))
   where
     dn b = respond (Right b)
     up x = do

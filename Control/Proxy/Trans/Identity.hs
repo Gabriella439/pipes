@@ -4,9 +4,7 @@
 
 module Control.Proxy.Trans.Identity (
     -- * Identity Proxy Transformer
-    IdentityP(..),
-    identityK,
-    runIdentityK
+    IdentityP(..)
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -95,13 +93,3 @@ instance PFunctor IdentityP where
 
 instance PMonad IdentityP where
     embedP nat p = nat (runIdentityP p)
-
--- | Wrap a \'@K@\'leisli arrow in 'IdentityP'
-identityK :: (q -> p a' a b' b m r) -> (q -> IdentityP p a' a b' b m r)
-identityK k q = IdentityP (k q)
-{-# INLINABLE identityK #-}
-
--- | Run an 'P' \'@K@\'leisli arrow
-runIdentityK :: (q -> IdentityP p a' a b' b m r) -> (q -> p a' a b' b m r)
-runIdentityK k q = runIdentityP (k q)
-{-# INLINABLE runIdentityK #-}
