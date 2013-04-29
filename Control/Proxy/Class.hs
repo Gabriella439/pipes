@@ -118,6 +118,8 @@ infixl 1 ?>=  -- This should match the fixity of >>=
     * ('>\\')
 
     * ('//>')
+
+    * 'turn'
 -}
 class (ProxyInternal p) => Proxy p where
     {-| 'request' sends a value of type @a'@ upstream and receives a value of
@@ -177,6 +179,9 @@ class (ProxyInternal p) => Proxy p where
         =>        p a' a b' b m r
         -> (b  -> p b' b c' c m r)
         ->        p a' a c' c m r
+
+    -- | 'turn' swaps 'request's and 'respond's
+    turn :: (Monad m) => p a' a b' b m r -> p b b' a a' m r
 
 {-| \"pull\" composition
 
@@ -506,17 +511,43 @@ type CoProduceT p = RequestT p () () C
 >
 > (f >~> g) >~> h = f >~> (g >~> h)
 
-    Second, all proxies are monad transformers and must satisfy the monad
+    Second, @(turn .)@ transforms each streaming category into its dual:
+
+    * The \"request\" category
+
+> turn . request = respond
+>
+> turn . (f \>\ g) = turn . f \<\ turn . g
+
+    * The \"respond\" category
+
+> turn . respond = request
+>
+> turn . (f />/ g) = turn . f /</ turn. g
+
+    * The \"pull\" category
+
+> turn . pull = push
+>
+> turn . (f >-> g) = turn . f <~< turn . g
+
+    * The \"push\" category
+
+> turn . push = pull
+>
+> turn . (f >~> g) = turn . f <-< turn . g
+
+    Third, all proxies are monad transformers and must satisfy the monad
     transformer laws, using:
 
     * @lift = lift_P@
 
-    Third, all proxies are functors in the category of monads and must satisfy
+    Fourth, all proxies are functors in the category of monads and must satisfy
     the functor laws, using:
 
     *  @hoist = hoist_P@
 
-    Fourth, ('\>\') and ('/>/') both define functors between Kleisli categories:
+    Fifth, ('\>\') and ('/>/') both define functors between Kleisli categories
 
 > a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
 >
@@ -526,7 +557,7 @@ type CoProduceT p = RequestT p () () C
 >
 > return />/ a = return
 
-    Fifth, all proxies must satisfy these additional 'Proxy' laws:
+    Sixth, all proxies must satisfy these additional 'Proxy' laws:
 
 > p \>\ lift . f = lift . f
 >

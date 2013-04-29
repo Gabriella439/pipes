@@ -22,7 +22,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>), turn),
     ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P) )
 
 {-| A 'ProxyCorrect' communicates with an upstream interface and a downstream
@@ -151,6 +151,15 @@ instance Proxy ProxyCorrect where
                 Request x' fx  -> return (Request x' (\x -> go (fx x)))
                 Respond b  fb' -> unProxy (fb b >>= \b' -> go (fb' b'))
                 Pure       a   -> return (Pure a) )
+
+    turn = go
+      where
+        go p = Proxy (do
+            x <- unProxy p
+            return (case x of
+                Request a  fa' -> Respond a  (\a' -> go (fa' a'))
+                Respond b' fb  -> Request b' (\b  -> go (fb  b ))
+                Pure       r   -> Pure r ) )
 
 {- $run
     The following commands run self-sufficient proxies, converting them back to

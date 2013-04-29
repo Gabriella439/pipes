@@ -45,7 +45,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>), turn),
     ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
     MonadPlusP(mzero_P, mplus_P) )
 import Control.Proxy.Morph (PFunctor(hoistP))
@@ -136,6 +136,8 @@ instance (Proxy p) => Proxy (CodensityP p) where
     p //> fb  = CodensityP (\k ->
         (unCodensityP p return_P //> (\b -> unCodensityP (fb b) return_P))
             ?>= k )
+
+    turn p = CodensityP (\k -> turn (unCodensityP p return_P) ?>= k)
 
 instance ProxyTrans CodensityP where
     liftP p = CodensityP (\k -> p ?>= k)

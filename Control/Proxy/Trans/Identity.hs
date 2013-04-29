@@ -15,7 +15,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>), turn),
     ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
     MonadPlusP(mzero_P, mplus_P) )
 import Control.Proxy.Morph (PFunctor(hoistP), PMonad(embedP))
@@ -80,6 +80,8 @@ instance (Proxy p) => Proxy (IdentityP p) where
 
     fb' >\\ p = IdentityP ((\b' -> runIdentityP (fb' b')) >\\ runIdentityP p)
     p //> fb  = IdentityP (runIdentityP p //> (\b -> runIdentityP (fb b)))
+
+    turn p = IdentityP (turn (runIdentityP p))
 
 instance (MonadPlusP p) => MonadPlusP (IdentityP p) where
     mzero_P       = IdentityP  mzero_P

@@ -31,7 +31,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
-    Proxy(request, respond, (->>), (>>~), (>\\), (//>)),
+    Proxy(request, respond, (->>), (>>~), (>\\), (//>), turn),
     ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
     MonadPlusP(mzero_P, mplus_P) )
 import Control.Proxy.Morph (PFunctor(hoistP))
@@ -111,6 +111,8 @@ instance (Proxy p) => Proxy (WriterP w p) where
         (\(b', w') -> unWriterP (fb' b') w') >\\ unWriterP p w )
     p //> fb  = WriterP (\w ->
         unWriterP p w //> (\(b, w') -> unWriterP (fb b) w') )
+
+    turn p = WriterP (\w -> turn (unWriterP p w))
 
 instance (MonadPlusP p) => MonadPlusP (WriterP w p) where
     mzero_P       = WriterP (\_ -> mzero_P)
