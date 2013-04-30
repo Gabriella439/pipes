@@ -12,13 +12,13 @@
 module Control.Proxy.Trans.Writer (
     -- * WriterP
     WriterP,
+    writer,
+    writerT,
     writerP,
     runWriterP,
     execWriterP,
 
     -- * Writer operations
-    writer,
-    writerT,
     tell,
     censor
     ) where
@@ -122,6 +122,14 @@ instance ProxyTrans (WriterP w) where
 instance PFunctor (WriterP w) where
     hoistP nat p = WriterP (\s -> nat (unWriterP p s))
 
+-- | Convert a Writer to a 'WriterP'
+writer :: (Monad m, Proxy p, Monoid w) => (r, w) -> WriterP w p a' a b' b m r
+writer x = writerP (return_P x)
+
+-- | Convert a WriterT to a 'WriterP'
+writerT :: (Monad m, Proxy p, Monoid w) => m (r, w) -> WriterP w p a' a b' b m r
+writerT m = writerP (lift_P m)
+
 -- | Create a 'WriterP' from a proxy that generates a result and a monoid
 writerP
     :: (Monad m, Proxy p, Monoid w)
@@ -152,14 +160,6 @@ execWriterP
     => WriterP w p a' a b' b m r -> p a' a b' b m w
 execWriterP m = runWriterP m ?>= \(_, w) -> return_P w
 {-# INLINABLE execWriterP #-}
-
--- | Convert a Writer to a 'WriterP'
-writer :: (Monad m, Proxy p, Monoid w) => (r, w) -> WriterP w p a' a b' b m r
-writer x = writerP (return_P x)
-
--- | Convert a WriterT to a 'WriterP'
-writerT :: (Monad m, Proxy p, Monoid w) => m (r, w) -> WriterP w p a' a b' b m r
-writerT m = writerP (lift_P m)
 
 -- | Add a value to the monoid
 tell :: (Monad m, Proxy p, Monoid w) => w -> WriterP w p a' a b' b m ()
