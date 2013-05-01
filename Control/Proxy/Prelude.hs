@@ -13,17 +13,25 @@ module Control.Proxy.Prelude (
 
     -- * Maps
     mapD,
+    mapU,
     mapMD,
+    mapMU,
     useD,
+    useU,
     execD,
+    execU,
 
     -- * Filters
     takeB,
     takeB_,
     takeWhileD,
+    takeWhileU,
     dropD,
+    dropU,
     dropWhileD,
+    dropWhileU,
     filterD,
+    filterU,
 
     -- * Lists and Enumerations
     fromListS,
@@ -65,7 +73,16 @@ module Control.Proxy.Prelude (
     foreverK,
 
     -- * Re-exports
-    module Data.Monoid
+    module Data.Monoid,
+
+    -- * Deprecated
+    mapB,
+    mapMB,
+    useB,
+    execB,
+    fromListC,
+    enumFromC,
+    enumFromToC
     ) where
 
 import Control.Monad (forever)
@@ -160,6 +177,21 @@ mapD f = runIdentityP . go where
 -- mapD f = runIdentityP . (foreverK $ request >=> respond . f)
 {-# INLINABLE mapD #-}
 
+{-| @(mapU g)@ applies @g@ to all values going \'@U@\'pstream.
+
+> mapU g1 >-> mapU g2 = mapU (g1 . g2)
+>
+> mapU id = pull
+-}
+mapU :: (Monad m, Proxy p) => (b' -> a') -> b' -> p a' x b' x m r
+mapU g = runIdentityP . go where
+    go b' = do
+        x   <- request (g b')
+        b'2 <- respond x
+        go b'2
+-- mapU g = foreverK $ (request . g) >=> respond
+{-# INLINABLE mapU #-}
+
 {-| @(mapMD f)@ applies the monadic function @f@ to all values going downstream
 
 > mapMD f1 >-> mapMD f2 = mapMD (f1 >=> f2)
@@ -176,6 +208,22 @@ mapMD f = runIdentityP . go where
 -- mapMD f = foreverK $ request >=> lift . f >=> respond
 {-# INLINABLE mapMD #-}
 
+{-| @(mapMU g)@ applies the monadic function @g@ to all values going upstream
+
+> mapMU g1 >-> mapMU g2 = mapMU (g2 >=> g1)
+>
+> mapMU return = pull
+-}
+mapMU :: (Monad m, Proxy p) => (b' -> m a') -> b' -> p a' x b' x m r
+mapMU g = runIdentityP . go where
+    go b' = do
+        a'  <- lift (g b')
+        x   <- request a'
+        b'2 <- respond x
+        go b'2
+-- mapMU g = foreverK $ lift . g >=> request >=> respond
+{-# INLINABLE mapMU #-}
+
 {-| @(useD f)@ executes the monadic function @f@ on all values flowing
     \'@D@\'ownstream
 
@@ -191,6 +239,22 @@ useD f = runIdentityP . go where
         x2 <- respond a
         go x2
 {-# INLINABLE useD #-}
+
+{-| @(useU g)@ executes the monadic function @g@ on all values flowing
+    \'@U@\'pstream
+
+> useU g1 >-> useU g2 = useU (\a' -> g2 a' >> g1 a')
+>
+> useU (\_ -> return ()) = pull
+-}
+useU :: (Monad m, Proxy p) => (a' -> m r2) -> a' -> p a' x a' x m r
+useU g = runIdentityP . go where
+    go a' = do
+        lift $ g a'
+        x   <- request a'
+        a'2 <- respond x
+        go a'2
+{-# INLINABLE useU #-}
 
 {-| @(execD md)@ executes @md@ every time values flow downstream through it.
 
@@ -210,6 +274,25 @@ execD md = runIdentityP . go where
     lift md
     respond a -}
 {-# INLINABLE execD #-}
+
+{-| @(execU mu)@ executes @mu@ every time values flow upstream through it.
+
+> execU mu1 >-> execU mu2 = execU (mu2 >> mu1)
+>
+> execU (return ()) = pull
+-}
+execU :: (Monad m, Proxy p) => m r2 -> a' -> p a' a a' a m r
+execU mu = runIdentityP . go where
+    go a' = do
+        lift mu
+        a   <- request a'
+        a'2 <- respond a
+        go a'2
+{- execU mu = foreverK $ \a' -> do
+    lift mu
+    a <- request a'
+    respond a -}
+{-# INLINABLE execU #-}
 
 {-| @(takeB n)@ allows @n@ upstream/downstream roundtrips to pass through
 
@@ -262,6 +345,24 @@ takeWhileD p = runIdentityP . go where
             else return ()
 {-# INLINABLE takeWhileD #-}
 
+{-| @(takeWhileU p)@ allows values to pass upstream so long as they satisfy the
+    predicate @p@.
+
+> takeWhileU p1 >-> takeWhileU p2 = takeWhileU (p1 <> p2)
+>
+> takeWhileD mempty = pull
+-}
+takeWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' a a' a m ()
+takeWhileU p = runIdentityP . go where
+    go a' =
+        if (p a')
+            then do
+                a   <- request a'
+                a'2 <- respond a
+                go a'2
+            else return_P ()
+{-# INLINABLE takeWhileU #-}
+
 {-| @(dropD n)@ discards @n@ values going downstream
 
 > dropD n1 >-> dropD n2 = dropD (n1 + n2)  -- n2 >= 0 && n2 >= 0
@@ -279,6 +380,21 @@ dropD n0 = \() -> runIdentityP (go n0) where
     replicateM_ n $ request ()
     pull () -}
 {-# INLINABLE dropD #-}
+
+{-| @(dropU n)@ discards @n@ values going upstream
+
+> dropU n1 >-> dropU n2 = dropU (n1 + n2)  -- n2 >= 0 && n2 >= 0
+>
+> dropU 0 = pull
+-}
+dropU :: (Monad m, Proxy p) => Int -> a' -> CoPipe p a' a' m r
+dropU n0 = runIdentityP . (go n0) where
+    go n
+        | n <= 0    = pull
+        | otherwise = \_ -> do
+            a' <- respond ()
+            go (n - 1) a'
+{-# INLINABLE dropU #-}
 
 {-| @(dropWhileD p)@ discards values going downstream until one violates the
     predicate @p@.
@@ -302,6 +418,23 @@ dropWhileD p () = runIdentityP go where
                 pull x
 {-# INLINABLE dropWhileD #-}
 
+{-| @(dropWhileU p)@ discards values going upstream until one violates the
+    predicate @p@.
+
+> dropWhileU p1 >-> dropWhileU p2 = dropWhileU (p1 <> p2)
+>
+> dropWhileU mempty = pull
+-}
+dropWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
+dropWhileU p = runIdentityP . go where
+    go a' =
+        if (p a')
+            then do
+                a2 <- respond ()
+                go a2
+            else pull a'
+{-# INLINABLE dropWhileU #-}
+
 {-| @(filterD p)@ discards values going downstream if they fail the predicate
     @p@
 
@@ -323,6 +456,25 @@ filterD p = \() -> runIdentityP go where
                 go
             else go
 {-# INLINABLE filterD #-}
+
+{-| @(filterU p)@ discards values going upstream if they fail the predicate @p@
+
+> filterU p1 >-> filterU p2 = filterU (p1 <> p2)
+>
+> filterU mempty = pull
+-}
+filterU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
+filterU p = runIdentityP . go where
+    go a' =
+        if (p a')
+        then do
+            request a'
+            a'2 <- respond ()
+            go a'2
+        else do
+            a'2 <- respond ()
+            go a'2
+{-# INLINABLE filterU #-}
 
 {-| Convert a list into a 'Producer'
 
@@ -610,3 +762,79 @@ foreverK k = let r = \a -> k a >>= r in r
    See: http://hackage.haskell.org/trac/ghc/ticket/5205
 -}
 {-# INLINABLE foreverK #-}
+
+{- $deprecate
+    These will be removed in version @4.0.0@
+-}
+
+mapB :: (Monad m, Proxy p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
+mapB f g = runIdentityP . go where
+    go b' = do
+        a   <- request (g b')
+        b'2 <- respond (f a )
+        go b'2
+{-# INLINABLE mapB #-}
+{-# DEPRECATED mapB "Combine 'mapD' and 'mapU' instead" #-}
+
+mapMB
+    :: (Monad m, Proxy p) => (a -> m b) -> (b' -> m a') -> b' -> p a' a b' b m r
+mapMB f g = runIdentityP . go where
+    go b' = do
+        a'  <- lift (g b')
+        a   <- request a'
+        b   <- lift (f a )
+        b'2 <- respond b
+        go b'2
+{-# INLINABLE mapMB #-}
+{-# DEPRECATED mapMB "Combine 'mapMD' and 'mapMU' instead" #-}
+
+useB
+    :: (Monad m, Proxy p)
+    => (a -> m r1) -> (a' -> m r2) -> a' -> p a' a a' a m r
+useB f g = runIdentityP . go where
+    go a' = do
+        lift $ g a'
+        a   <- request a'
+        lift $ f a
+        a'2 <- respond a
+        go a'2
+{-# INLINABLE useB #-}
+{-# DEPRECATED useB "Combined 'useD' and 'useU' instead" #-}
+
+execB :: (Monad m, Proxy p) => m r1 -> m r2 -> a' -> p a' a a' a m r
+execB md mu = runIdentityP . go where
+    go a' = do
+        lift mu
+        a   <- request a'
+        lift md
+        a'2 <- respond a
+        go a'2
+{-# INLINABLE execB #-}
+{-# DEPRECATED execB "Combine 'execD' and 'execU' instead" #-}
+
+fromListC :: (Monad m, Proxy p) => [a'] -> () -> CoProducer p a' m ()
+fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
+-- fromListC xs _ = mapM_ request xs
+{-# INLINABLE fromListC #-}
+{-# DEPRECATED fromListC "Use 'turn . fromListS xs' instead" #-}
+
+enumFromC :: (Enum a', Monad m, Proxy p) => a' -> () -> CoProducer p a' m r
+enumFromC a'0 = \_ -> runIdentityP (go a'0) where
+    go a' = do
+        request a'
+        go $! succ a'
+{-# INLINABLE enumFromC #-}
+{-# DEPRECATED enumFromC "Use 'turn . enumFromS n' instead" #-}
+
+-- | 'CoProducer' version of 'enumFromTo'
+enumFromToC
+    :: (Enum a', Ord a', Monad m, Proxy p)
+    => a' -> a' -> () -> CoProducer p a' m ()
+enumFromToC a1 a2 _ = runIdentityP (go a1) where
+    go n
+        | n > a2 = return ()
+        | otherwise = do
+            request n
+            go $! succ n
+{-# INLINABLE enumFromToC #-}
+{-# DEPRECATED enumFromToC "Use 'turn . enumFromToS n1 n2' instead" #-}
