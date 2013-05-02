@@ -7,9 +7,11 @@ module Control.Proxy.Prelude (
     stdinS,
     readLnS,
     stdoutD,
-    printD,
     hGetLineS,
     hPutStrLnD,
+    printD,
+    printU,
+    printB,
 
     -- * Maps
     mapD,
@@ -76,13 +78,27 @@ module Control.Proxy.Prelude (
     module Data.Monoid,
 
     -- * Deprecated
+    -- $deprecate
     mapB,
     mapMB,
     useB,
     execB,
     fromListC,
     enumFromC,
-    enumFromToC
+    enumFromToC,
+    eachC,
+    rangeC,
+    getLineS,
+    getLineC,
+    readLnC,
+    putStrLnU,
+    putStrLnB,
+    hGetLineC,
+    hPutStrLnU,
+    hPutStrLnB,
+    hPrintD,
+    hPrintU,
+    hPrintB
     ) where
 
 import Control.Monad (forever)
@@ -133,14 +149,6 @@ stdoutD = runIdentityP . (foreverK $ \x -> do
     respond a)
 {-# INLINABLE stdoutD #-}
 
--- | 'print's all values flowing \'@D@\'ownstream to 'stdout'
-printD :: (Show a, Proxy p) => x -> p x a x a IO r
-printD = runIdentityP . (foreverK $ \x -> do
-    a <- request x
-    lift $ print a
-    respond a )
-{-# INLINABLE printD #-}
-
 -- | A 'Producer' that sends lines from a handle downstream
 hGetLineS :: (Proxy p) => IO.Handle -> () -> Producer p String IO ()
 hGetLineS h () = runIdentityP go where
@@ -161,6 +169,38 @@ hPutStrLnD h = runIdentityP . (foreverK $ \x -> do
     lift $ IO.hPutStrLn h a
     respond a )
 {-# INLINABLE hPutStrLnD #-}
+
+-- | 'print's all values flowing \'@D@\'ownstream to 'stdout'
+printD :: (Show a, Proxy p) => x -> p x a x a IO r
+printD = runIdentityP . (foreverK $ \x -> do
+    a <- request x
+    lift $ print a
+    respond a )
+{-# INLINABLE printD #-}
+
+-- | 'print's all values flowing \'@U@\'pstream to 'stdout'
+printU :: (Show a', Proxy p) => a' -> p a' x a' x IO r
+printU = runIdentityP . (foreverK $ \a' -> do
+    lift $ print a'
+    x <- request a'
+    respond x )
+{-# INLINABLE printU #-}
+
+{-| 'print's all values flowing through it to 'stdout'
+
+    Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
+-}
+printB :: (Show a', Show a, Proxy p) => a' -> p a' a a' a IO r
+printB = runIdentityP . (foreverK $ \a' -> do
+    lift $ do
+        putStr "U: "
+        print a'
+    a <- request a'
+    lift $ do
+        putStr "D: "
+        print a
+    respond a )
+{-# INLINABLE printB #-}
 
 {-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
 
@@ -826,7 +866,6 @@ enumFromC a'0 = \_ -> runIdentityP (go a'0) where
 {-# INLINABLE enumFromC #-}
 {-# DEPRECATED enumFromC "Use 'turn . enumFromS n' instead" #-}
 
--- | 'CoProducer' version of 'enumFromTo'
 enumFromToC
     :: (Enum a', Ord a', Monad m, Proxy p)
     => a' -> a' -> () -> CoProducer p a' m ()
@@ -838,3 +877,122 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
             go $! succ n
 {-# INLINABLE enumFromToC #-}
 {-# DEPRECATED enumFromToC "Use 'turn . enumFromToS n1 n2' instead" #-}
+
+eachC :: (Monad m, Proxy p) => [a'] -> CoProduceT p m a'
+eachC a's = RequestT (fromListC a's ())
+{-# INLINABLE eachC #-}
+{-# DEPRECATED eachC "Use 'RequestT $ turn $ fromListS xs ()' instead" #-}
+
+rangeC
+    :: (Enum a', Ord a', Monad m, Proxy p) => a' -> a' -> CoProduceT p m a'
+rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
+{-# INLINABLE rangeC #-}
+{-# DEPRECATED rangeC "Use 'RequestT $ turn $ enumFromToS n1 n2 ()' instead" #-}
+
+getLineS :: (Proxy p) => () -> Producer p String IO r
+getLineS () = runIdentityP $ forever $ do
+    str <- lift getLine
+    respond str
+{-# INLINABLE getLineS #-}
+{-# DEPRECATED getLineS "Use 'stdinS' instead" #-}
+
+getLineC :: (Proxy p) => () -> CoProducer p String IO r
+getLineC () = runIdentityP $ forever $ do
+    str <- lift getLine
+    request str
+{-# INLINABLE getLineC #-}
+{-# DEPRECATED getLineC "Use 'turn . stdinS' instead" #-}
+
+readLnC :: (Read a', Proxy p) => () -> CoProducer p a' IO r
+readLnC () = runIdentityP $ forever $ do
+    a <- lift readLn
+    request a
+{-# INLINABLE readLnC #-}
+{-# DEPRECATED readLnC "Use 'turn . readLnC' instead" #-}
+
+putStrLnU :: (Proxy p) => String -> p String x String x IO r
+putStrLnU = runIdentityP . (foreverK $ \a' -> do
+    lift $ putStrLn a'
+    x <- request a'
+    respond x )
+{-# INLINABLE putStrLnU #-}
+{-# DEPRECATED putStrLnU "Use 'execU putStrLn' instead" #-}
+
+putStrLnB :: (Proxy p) => String -> p String String String String IO r
+putStrLnB = runIdentityP . (foreverK $ \a' -> do
+    lift $ do
+        putStr "U: "
+        putStrLn a'
+    a <- request a'
+    lift $ do
+        putStr "D: "
+        putStrLn a
+    respond a )
+{-# INLINABLE putStrLnB #-}
+{-# DEPRECATED putStrLnB "Not that useful" #-}
+
+hGetLineC :: (Proxy p) => IO.Handle -> () -> CoProducer p String IO ()
+hGetLineC h () = runIdentityP go where
+    go = do
+        eof <- lift $ IO.hIsEOF h
+        if eof
+            then return ()
+            else do
+                str <- lift $ IO.hGetLine h
+                request str
+                go
+{-# INLINABLE hGetLineC #-}
+{-# DEPRECATED hGetLineC "Use 'turn . hGetLineS h'" #-}
+
+-- | 'print's all values flowing \'@D@\'ownstream to a 'Handle'
+hPrintD :: (Show a, Proxy p) => IO.Handle -> x -> p x a x a IO r
+hPrintD h = runIdentityP . (foreverK $ \x -> do
+    a <- request x
+    lift $ IO.hPrint h a
+    respond a )
+{-# INLINABLE hPrintD #-}
+{-# DEPRECATED hPrintD "Not that useful" #-}
+
+-- | 'print's all values flowing \'@U@\'pstream to a 'Handle'
+hPrintU :: (Show a', Proxy p) => IO.Handle -> a' -> p a' x a' x IO r
+hPrintU h = runIdentityP . (foreverK $ \a' -> do
+    lift $ IO.hPrint h a'
+    x <- request a'
+    respond x )
+{-# INLINABLE hPrintU #-}
+{-# DEPRECATED hPrintU "Not that useful" #-}
+
+hPrintB :: (Show a, Show a', Proxy p) => IO.Handle -> a' -> p a' a a' a IO r
+hPrintB h = runIdentityP . (foreverK $ \a' -> do
+    lift $ do
+        IO.hPutStr h "U: "
+        IO.hPrint h a'
+    a <- request a'
+    lift $ do
+        IO.hPutStr h "D: "
+        IO.hPrint h a
+    respond a )
+{-# INLINABLE hPrintB #-}
+{-# DEPRECATED hPrintB "Not that useful" #-}
+
+hPutStrLnU :: (Proxy p) => IO.Handle -> String -> p String x String x IO r
+hPutStrLnU h = runIdentityP . (foreverK $ \a' -> do
+    lift $ IO.hPutStrLn h a'
+    x <- request a'
+    respond x )
+{-# INLINABLE hPutStrLnU #-}
+{-# DEPRECATED hPutStrLnU "Not that useful" #-}
+
+hPutStrLnB
+    :: (Proxy p) => IO.Handle -> String -> p String String String String IO r
+hPutStrLnB h = runIdentityP . (foreverK $ \a' -> do
+    lift $ do
+        IO.hPutStr h "U: "
+        IO.hPutStrLn h a'
+    a <- request a'
+    lift $ do
+        IO.hPutStr h "D: "
+        IO.hPutStrLn h a
+    respond a )
+{-# INLINABLE hPutStrLnB #-}
+{-# DEPRECATED hPutStrLnB "Not that useful" #-}
