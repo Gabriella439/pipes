@@ -35,7 +35,8 @@
 module Control.Proxy.Trans.Codensity (
     -- * Codensity Proxy Transformer
     CodensityP,
-    runCodensityP
+    runCodensityP,
+    runCodensityK
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -149,3 +150,11 @@ runCodensityP
     :: (Monad m, Proxy p) => CodensityP p a' a b' b m r -> p a' a b' b m r
 runCodensityP p = unCodensityP p return_P
 {-# INLINABLE runCodensityP #-}
+
+{-| Run a 'CodensityP' \'@K@\'leisli arrow, converting it back to the base proxy
+-}
+runCodensityK
+    :: (Monad m, Proxy p)
+    => (q -> CodensityP p a' a b' b m r) -> (q -> p a' a b' b m r)
+runCodensityK k q = runCodensityP (k q)
+{-# INLINABLE runCodensityK #-}

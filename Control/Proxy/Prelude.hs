@@ -98,7 +98,15 @@ module Control.Proxy.Prelude (
     hPutStrLnB,
     hPrintD,
     hPrintU,
-    hPrintB
+    hPrintB,
+    replicateK,
+    liftK,
+    hoistK,
+    raise,
+    raiseK,
+    hoistPK,
+    raiseP,
+    raisePK
     ) where
 
 import Control.Monad (forever)
@@ -804,7 +812,7 @@ foreverK k = let r = \a -> k a >>= r in r
 {-# INLINABLE foreverK #-}
 
 {- $deprecate
-    These will be removed in version @4.0.0@
+    To be removed in version @4.0.0@
 -}
 
 mapB :: (Monad m, Proxy p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
@@ -996,3 +1004,64 @@ hPutStrLnB h = runIdentityP . (foreverK $ \a' -> do
     respond a )
 {-# INLINABLE hPutStrLnB #-}
 {-# DEPRECATED hPutStrLnB "Not that useful" #-}
+
+replicateK :: (Monad m) => Int -> (a -> m a) -> (a -> m a)
+replicateK n0 k = go n0 where
+    go n
+        | n < 1     = return
+        | n == 1    = k
+        | otherwise = \a -> k a >>= go (n - 1)
+{-# INLINABLE replicateK #-}
+{-# DEPRECATED replicateK "Not very useful" #-}
+
+liftK :: (Monad m, MonadTrans t) => (a -> m b) -> (a -> t m b)
+liftK k a = lift (k a)
+{-# INLINABLE liftK #-}
+{-# DEPRECATED liftK "Use '(lift .)' instead" #-}
+
+hoistK
+    :: (Monad m, MFunctor t)
+    => (forall a . m a -> n a)  -- ^ Monad morphism
+    -> (b' -> t m b)            -- ^ Kleisli arrow
+    -> (b' -> t n b)
+hoistK k p a' = hoist k (p a')
+{-# INLINABLE hoistK #-}
+{-# DEPRECATED hoistK "Use '(hoist f .)' instead" #-}
+
+raise :: (Monad m, MFunctor t1, MonadTrans t2) => t1 m r -> t1 (t2 m) r
+raise = hoist lift
+{-# INLINABLE raise #-}
+{-# DEPRECATED raise "Use 'hoist lift' instead" #-}
+
+raiseK
+    :: (Monad m, MFunctor t1, MonadTrans t2)
+    => (q -> t1 m r) -> (q -> t1 (t2 m) r)
+raiseK = (hoist lift .)
+{-# INLINABLE raiseK #-}
+{-# DEPRECATED raiseK "Use '(hoist lift .)' instead" #-}
+
+hoistPK
+    :: (Monad m, Proxy p1, PFunctor t)
+    => (forall _a' _a _b' _b _r .
+        p1 _a' _a _b' _b m _r -> p2 _a' _a _b' _b n _r) -- ^ Proxy morphism
+    -> (q -> t p1 a' a b' b m r) -- ^ Proxy Kleisli arrow
+    -> (q -> t p2 a' a b' b n r)
+hoistPK f = (hoistP f .)
+{-# INLINABLE hoistPK #-}
+{-# DEPRECATED hoistPK "Use '(hoistP f .)' instead" #-}
+
+raiseP
+    :: (Monad m, Proxy p, PFunctor t1, ProxyTrans t2)
+    => t1 p a' a b' b m r -- ^ Proxy
+    -> t1 (t2 p) a' a b' b m r
+raiseP = hoistP liftP
+{-# INLINABLE raiseP #-}
+{-# DEPRECATED raiseP "Use 'hoistP liftP' instead" #-}
+
+raisePK
+    :: (Monad m, Proxy p, PFunctor t1, ProxyTrans t2)
+    => (q -> t1 p a' a b' b m r) -- ^ Proxy Kleisli arrow
+    -> (q -> t1 (t2 p) a' a b' b m r)
+raisePK = hoistPK liftP
+{-# INLINABLE raisePK #-}
+{-# DEPRECATED raisePK "Use '(hoistP liftP .)' instead" #-}

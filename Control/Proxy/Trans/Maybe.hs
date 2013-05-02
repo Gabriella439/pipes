@@ -5,6 +5,7 @@
 module Control.Proxy.Trans.Maybe (
     -- * MaybeP
     MaybeP(..),
+    runMaybeK,
 
     -- * Maybe operations
     nothing,
@@ -136,6 +137,11 @@ instance PMonad MaybeP where
             Nothing       -> Nothing
             Just Nothing  -> Nothing
             Just (Just a) -> Just a ) )
+
+-- | Run a 'MaybeP' \'@K@\'leisli arrow, returning the result or 'Nothing'
+runMaybeK :: (q -> MaybeP p a' a b' b m r) -> (q -> p a' a b' b m (Maybe r))
+runMaybeK p q = runMaybeP (p q)
+{-# INLINABLE runMaybeK #-}
 
 -- | A synonym for 'mzero'
 nothing :: (Monad m, Proxy p) => MaybeP p a' a b' b m r

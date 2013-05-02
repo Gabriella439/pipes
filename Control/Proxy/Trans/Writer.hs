@@ -16,7 +16,9 @@ module Control.Proxy.Trans.Writer (
     writerT,
     writerP,
     runWriterP,
+    runWriterK,
     execWriterP,
+    execWriterK,
 
     -- * Writer operations
     tell,
@@ -154,12 +156,24 @@ runWriterP p = up >\\ unWriterP p mempty //> dn
         return_P (b', w) 
 {-# INLINABLE runWriterP #-}
 
+-- | Run a 'WriterP' \'@K@\'leisli arrow, producing the final result and monoid
+runWriterK
+    :: (Monad m, Proxy p, Monoid w)
+    => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m (r, w))
+runWriterK k q = runWriterP (k q)
+
 -- | Evaluate a 'WriterP' computation, but discard the final result
 execWriterP
     :: (Monad m, Proxy p, Monoid w)
     => WriterP w p a' a b' b m r -> p a' a b' b m w
 execWriterP m = runWriterP m ?>= \(_, w) -> return_P w
 {-# INLINABLE execWriterP #-}
+
+-- | Evaluate a 'WriterP' \'@K@\'leisli arrow, but discard the final result
+execWriterK
+    :: (Monad m, Proxy p, Monoid w)
+    => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m w)
+execWriterK k q = execWriterP (k q)
 
 -- | Add a value to the monoid
 tell :: (Monad m, Proxy p, Monoid w) => w -> WriterP w p a' a b' b m ()

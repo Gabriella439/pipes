@@ -8,8 +8,11 @@ module Control.Proxy.Trans.State (
     state,
     stateT,
     runStateP,
+    runStateK,
     evalStateP,
+    evalStateK,
     execStateP,
+    execStateK,
 
     -- * State operations
     get,
@@ -137,17 +140,35 @@ runStateP s0 m = up >\\ unStateP m s0 //> dn
         return_P (b', s)
 {-# INLINABLE runStateP #-}
 
+-- | Run a 'StateP' \'@K@\'leisli arrow, procuding the final result and state
+runStateK
+    :: (Monad m, Proxy p)
+    => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m (r, s))
+runStateK s k q = runStateP s (k q)
+
 -- | Evaluate a 'StateP' computation, but discard the final state
 evalStateP
     :: (Monad m, Proxy p) => s -> StateP s p a' a b' b m r -> p a' a b' b m r
 evalStateP s p = runStateP s p ?>= \(r, _) -> return_P r
 {-# INLINABLE evalStateP #-}
 
+-- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final state
+evalStateK
+    :: (Monad m, Proxy p)
+    => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m r)
+evalStateK s k q = evalStateP s (k q)
+
 -- | Evaluate a 'StateP' computation, but discard the final result
 execStateP
     :: (Monad m, Proxy p) => s -> StateP s p a' a b' b m r -> p a' a b' b m s
 execStateP s p = runStateP s p ?>= \(_, s') -> return_P s'
 {-# INLINABLE execStateP #-}
+
+-- | Evaluate a 'StateP' \'@K@\'leisli arrow, but discard the final result
+execStateK
+    :: (Monad m, Proxy p)
+    => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m s)
+execStateK s k q = execStateP s (k q)
 
 -- | Get the current state
 get :: (Monad m, Proxy p) => StateP s p a' a b' b m s

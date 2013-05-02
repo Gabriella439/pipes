@@ -6,6 +6,7 @@ module Control.Proxy.Trans.Reader (
     -- * ReaderP
     ReaderP(..),
     runReaderP,
+    runReaderK,
 
     -- * Reader operations
     ask,
@@ -106,6 +107,11 @@ instance PMonad (ReaderP i) where
 runReaderP :: i -> ReaderP i p a' a b' b m r -> p a' a b' b m r
 runReaderP i m = unReaderP m i
 {-# INLINABLE runReaderP #-}
+
+-- | Run a 'ReaderP' \'@K@\'leisli arrow, supplying the environment
+runReaderK :: i -> (q -> ReaderP i p a' a b' b m r) -> (q -> p a' a b' b m r)
+runReaderK i p q = runReaderP i (p q)
+{-# INLINABLE runReaderK #-}
 
 -- | Get the environment
 ask :: (Monad m, Proxy p) => ReaderP i p a' a b' b m i
