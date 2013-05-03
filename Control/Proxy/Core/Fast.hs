@@ -35,7 +35,6 @@ module Control.Proxy.Core.Fast (
 
     -- * Run Sessions 
     -- $run
-    run,
     runProxy,
     runProxyK,
 

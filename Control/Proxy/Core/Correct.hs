@@ -13,7 +13,6 @@ module Control.Proxy.Core.Correct (
 
     -- * Run Sessions 
     -- $run
-    run,
     runProxy,
     runProxyK
     ) where
