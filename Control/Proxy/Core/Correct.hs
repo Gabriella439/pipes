@@ -9,7 +9,7 @@
 module Control.Proxy.Core.Correct (
     -- * Types
     ProxyCorrect(..),
-    ProxyF(..),
+    ProxyStep(..),
 
     -- * Run Sessions 
     -- $run
@@ -44,12 +44,12 @@ import Control.Proxy.Class (
     * @r     @ - The final return value
 -}
 data ProxyCorrect a' a b' b m  r =
-    Proxy { unProxy :: m (ProxyF a' a b' b r (ProxyCorrect a' a b' b m r)) }
+    Proxy { unProxy :: m (ProxyStep a' a b' b m r) }
 
--- | The base functor for the 'ProxyCorrect' type
-data ProxyF a' a b' b r x
-    = Request a' (a  -> x)
-    | Respond b  (b' -> x)
+-- | The pure component of 'ProxyCorrect'
+data ProxyStep a' a b' b m r
+    = Request a' (a  -> ProxyCorrect a' a b' b m r)
+    | Respond b  (b' -> ProxyCorrect a' a b' b m r)
     | Pure    r
 
 instance (Monad m) => Functor (ProxyCorrect a' a b' b m) where
