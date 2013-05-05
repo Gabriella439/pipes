@@ -39,9 +39,6 @@ module Control.Proxy.Tutorial (
     -- * ListT
     -- $listT
 
-    -- * Folds
-    -- $folds
-
     -- * Resource Management
     -- $resource
 
@@ -51,7 +48,10 @@ module Control.Proxy.Tutorial (
     -- * Error handling
     -- $error
 
-    -- * Local state
+    -- * Folds
+    -- $folds
+
+    -- * State
     -- $state
 
     -- * Branching, zips, and merges
@@ -1334,85 +1334,6 @@ Received 8
     symmetric implementations of \"ListT done right\".
 -}
 
-{- $folds
-    You can fold a stream of values using the 'WriterP' proxy transformer.
-
-> import qualified Control.Proxy.Trans.Writer as W
-
-   "Control.Proxy.Prelude" provides several common folds implemented this
-    way, such as:
-
-    * 'lengthD': Count how many values flow downstream
-
-> lengthD :: (Monad m, Proxy p) => x -> W.WriterP (Sum Int) p x a x a m r
-
-    * 'toListD': Fold the values flowing downstream into a list.
-
-> toListD :: (Monad m, Proxy p) => x -> W.WriterP [a] p x a x a m r
-
-    * 'anyD': Determine whether any values satisfy the predicate
-
-> anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> W.WriterP Any p x a x a m r
-
-    Now, let's try these folds out and see if we can build a list from user
-    input:
-
->>> runProxy $ W.runWriterK $ promptInt >-> takeB_ 3 >-> toListD
-Enter an Integer:
-1<Enter>
-Enter an Integer:
-66<Enter>
-Enter an Integer:
-5<Enter>
-((),[1,66,5])
-
-    You can insert these folds anywhere in the middle of a pipeline and they
-    still work:
-
->>> runProxy $ W.runWriterK $ fromListS [5, 7, 4] >-> lengthD >-> printD
-5
-7
-4
-((),Sum {getSum = 3})
-
-    You can also run multiple folds at the same time just by adding more
-    'WriterP' layers to your proxy transformer stack. You can use 'liftP'
-    to introduce a new layer immediately beneath the outer one:
-
-> fromListS [9, 10] >-> anyD even >-> liftP . sumD
->   :: (Integral c, Monad m, Proxy p) =>
->      () -> Producer (W.WriterP Any (W.WriterP (Sum c) p)) c m ()
-
-    Then you just run both 'WriterP' layers:
-
->>> runProxy $ W.runWriterK $ W.runWriterK $ fromListS [9, 10] >-> anyD even >-> mapP sumD
-(((),Any {getAny = True}),Sum {getSum = 19})
-
-    I designed certain special folds to terminate the 'Session' early if they
-    can compute their result prematurely, in order to draw as little input as
-    possible.  These folds end with an underscore, such as 'headD_', which
-    terminates the stream once it receives an input:
-
-> headD_ :: (Monad m, Proxy p) => x -> W.WriterP (First a) p x a x a m ()
-
->>> runProxy $ runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD_
-3
-((),First {getFirst = Just 3})
-
-    Compare this to 'headD' without underscore, which folds the entire input:
-
->>> runProxy $ W.runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD
-3
-4
-9
-((),First {getFirst = Just 3})
-
-    Use the versions that don't prematurely terminate if you are running
-    multiple folds or if you want to continue to use the rest of the input when
-    the fold is done.  Use the versions that do prematurely terminate if
-    collecting that single fold is the entire purpose of the session.
--}
-
 {- $resource
     This core library provides utilities for lazily streaming from resources,
     but does not provide utilities for lazily managing resource allocation and
@@ -1610,14 +1531,90 @@ Received a value:
     we can run it locally on a subset of the pipeline like so:
 
 >>> runProxy $ (E.runEitherK $ heartbeat . promptInt3 >-> takeB_ 2) >-> printer
+-}
 
-    Proxy transformers do not use the base monad at all, so you can use them to
-    isolate effects from other proxies, as the next section demonstrates.
+{- $folds
+    You can fold a stream of values using the 'WriterP' proxy transformer.
+
+> import qualified Control.Proxy.Trans.Writer as W
+
+   "Control.Proxy.Prelude" provides several common folds implemented this
+    way, such as:
+
+    * 'lengthD': Count how many values flow downstream
+
+> lengthD :: (Monad m, Proxy p) => x -> W.WriterP (Sum Int) p x a x a m r
+
+    * 'toListD': Fold the values flowing downstream into a list.
+
+> toListD :: (Monad m, Proxy p) => x -> W.WriterP [a] p x a x a m r
+
+    * 'anyD': Determine whether any values satisfy the predicate
+
+> anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> W.WriterP Any p x a x a m r
+
+    Now, let's try these folds out and see if we can build a list from user
+    input:
+
+>>> runProxy $ W.runWriterK $ promptInt >-> takeB_ 3 >-> toListD
+Enter an Integer:
+1<Enter>
+Enter an Integer:
+66<Enter>
+Enter an Integer:
+5<Enter>
+((),[1,66,5])
+
+    You can insert these folds anywhere in the middle of a pipeline and they
+    still work:
+
+>>> runProxy $ W.runWriterK $ fromListS [5, 7, 4] >-> lengthD >-> printD
+5
+7
+4
+((),Sum {getSum = 3})
+
+    You can also run multiple folds at the same time just by adding more
+    'WriterP' layers to your proxy transformer stack. You can use 'liftP'
+    (see \"Proxy Transformers\" below) to mix these two folds together:
+
+> fromListS [9, 10] >-> anyD even >-> liftP . sumD
+>     :: (Monad m, Proxy p)
+>     => () -> Producer (W.WriterP Any (W.WriterP (Sum Int) p)) c m ()
+
+    Then you just run both 'WriterP' layers:
+
+>>> runProxy $ W.runWriterK $ W.runWriterK $ fromListS [9, 10] >-> anyD even >-> mapP sumD
+(((),Any {getAny = True}),Sum {getSum = 19})
+
+    I designed certain special folds to terminate the 'Session' early if they
+    can compute their result prematurely, in order to draw as little input as
+    possible.  These folds end with an underscore, such as 'headD_', which
+    terminates the stream once it receives an input:
+
+> headD_ :: (Monad m, Proxy p) => x -> W.WriterP (First a) p x a x a m ()
+
+>>> runProxy $ runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD_
+3
+((),First {getFirst = Just 3})
+
+    Compare this to 'headD' without underscore, which folds the entire input:
+
+>>> runProxy $ W.runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD
+3
+4
+9
+((),First {getFirst = Just 3})
+
+    Use the versions that don't prematurely terminate if you are running
+    multiple folds or if you want to continue to use the rest of the input when
+    the fold is done.  Use the versions that do prematurely terminate if
+    collecting that single fold is the entire purpose of the session.
 -}
 
 {- $state
-    The 'StateP' proxy lets you embed local state into any 'Proxy' computation.
-    For example, we might want to gratuitously use state to generate successive
+    The 'StateP' proxy lets you embed state into any 'Proxy' computation.  For
+    example, we might want to gratuitously use state to generate successive
     numbers:
 
 > import qualified Control.Proxy.Trans.State as S
@@ -1626,9 +1623,9 @@ Received a value:
 > increment () = forever $ do
 >     n <- S.get
 >     respond n
->     S.put (n + 1)
+>     S.modify (+1)
 
-    We could then embed it locally into any 'Proxy', such as the following one:
+    We could then embed it into any 'Proxy', such as the following ones:
 
 > numbers :: (Monad m, Proxy p) => () -> Producer p Int m ()
 > numbers () = runIdentityP $ do
@@ -1645,25 +1642,23 @@ Received a value:
 2
 3
 
-    We can also prove the effect is local even when you directly compose two
-    'StateP' proxies before running them.  Let's define a stateful consumer:
+    The state is shared across connected proxies, and we can prove this by
+    composing two 'StateP' proxies.  Let's define a stateful consumer:
 
 > increment2 :: (Proxy p) => () -> Consumer (S.StateP Int p) Int IO r
 > increment2 () = forever $ do
->     nOurs   <- S.get
 >     nTheirs <- request ()
+>     S.modify (+2)
+>     nOurs   <- S.get
 >     lift $ print (nTheirs, nOurs)
->     S.put (nOurs + 2)
 
     .. and hook it up directly to @increment@:
 
 >>> runProxy $ S.evalStateK 0 $ increment >-> takeB_ 3 >-> increment2
-(0, 0)
-(1, 2)
-(2, 4)
+(0,2)
+(3,5)
+(6,8)
 
-    They each share the same initial state, but they isolate their own side
-    effects completely from each other.
 -}
 
 {- $branch
@@ -1815,30 +1810,24 @@ Left ()
 >     liftP
 >          :: (Monad m, Proxy p)
 >          => p a' a b' b m r -> t p a' a b' b m r
->
-> -- mapP is slightly more elegant
-> mapP
->     :: (Monad m, Proxy p, ProxyTrans t)
->     => (q -> p a' a b' b m r) -> (q -> t p a' a b' b m r)
-> mapP = (liftP .)
 
-    It's very easy to use.  Just use 'mapP' to lift one proxy transformer to
-    match another one.  For example, we can 'mapP' @increment2@ to match
+    It's very easy to use.  Just use 'liftP' to lift one proxy transformer to
+    match another one.  For example, we can 'liftP' @increment2@ to match
     @promptInt3@:
 
 > promptInt3
 >     :: (Proxy stateP)
 >     => () -> Producer (EitherP String  stateP       ) Int IO r
 >
-> mapP increment2
+> liftP . increment2
 >     :: (Proxy p, ProxyTrans eitherP)
 >     => () -> Consumer (eitherP        (StateP Int p)) Int IO r
 >
-> promptInt3 >-> mapP increment2
+> promptInt3 >-> liftP . increment2
 >     :: (Proxy p)
 >     => () -> Session  (EitherP String (StateP Int p))     IO r
 
-    'mapP' creates a new 'ProxyTrans' layer that type-checks as 'EitherP', and
+    'liftP' creates a new 'ProxyTrans' layer that type-checks as 'EitherP', and
     @StateP Int p@ type-checks as the 'Proxy' in @promptInt3@'s signature.
 
 >>> runProxy $ S.evalStateK 0 $ E.runEitherK $ promptInt3 >-> mapP increment2
@@ -1852,10 +1841,10 @@ Enter an Integer:
 Hello<Enter>
 Left "Could not read an Integer"
 
-    ... or we could instead 'mapP' @promptInt3@ to match @increment2@ and switch
+    ... or we could instead 'liftP' @promptInt3@ to match @increment2@ and switch
     the order of the two proxy transformers:
 
-> mapP promptInt3
+> liftP . promptInt3
 >     :: (Proxy p, ProxyTrans stateP)
 >     => () -> Producer (stateP     (EitherP String p)) Int IO r
 >
@@ -1863,11 +1852,11 @@ Left "Could not read an Integer"
 >     :: (Proxy eitherP)
 >     => () -> Consumer (StateP Int  eitherP          ) Int IO r
 >
-> mapP promptInt3 >-> increment2
+> liftP . promptInt3 >-> increment2
 >     :: (Proxy p)
 >     => () -> Session  (StateP Int (EitherP String p))     IO r
 
-    'mapP' creates a new 'ProxyTrans' layer that type-checks as 'StateP', and
+    'liftP' creates a new 'ProxyTrans' layer that type-checks as 'StateP', and
     @EitherP Int p@ type-checks as the 'Proxy' in @increment2@'s signature.
 
 >>> runProxy $ E.runEitherK $ S.evalStateK 0 $ mapP promptInt3 >-> increment2
@@ -1910,9 +1899,9 @@ Left "Could not read an Integer"
     Monad transformers impose certain laws to ensure that 'lift' behaves
     correctly.  These are known as the \"monad morphism laws\":
 
-> (lift .) (f >=> g) = (lift .) f >=> (lift .) g
+> lift . (f >=> g) = lift . f >=> lift . g
 >
-> (lift .) return = return
+> lift . return = return
 
     If you convert these laws to @do@ notation, they just say:
 
@@ -1925,17 +1914,9 @@ Left "Could not read an Integer"
     base monad to the extended monad correctly.  Just replace 'lift' with
     'liftP':
 
-> (liftP .) (f >=> g) = (liftP .) f >=> (liftP .) g
+> liftP . (f >=> g) = liftP . f >=> liftP . g  -- These are functor laws!
 >
-> (liftP .) return = return
-
-    The only difference is 'mapP' sweetens these laws a little bit:
-
-> mapP = (liftP .)
->
-> mapP (f >=> g) = mapP f >=> mapP g  -- These are functor laws!
->
-> mapP return = return
+> liftP . return = return
 
     However, proxy transformers do one extra thing above and beyond ordinary
     monad transformers.  Proxy transformers lift the 'Proxy' type class, meaning
@@ -1945,42 +1926,35 @@ Left "Could not read an Integer"
     transformer lifts the 'Proxy' instance correctly.  I call these laws the
     \"proxy morphism laws\":
 
-> mapP (f >-> g) = mapP f >-> mapP g  -- These are functor laws, too!
+> liftP . (f >-> g) = liftP . f >-> liftP . g  -- These are functor laws, too!
 >
-> mapP pull = pull
+> liftP . pull = pull
 
     In other words, a proxy transformer defines a functor from the base
     composition to the extended composition!  Neat!
 
-    But we're not even done, because proxies actually form three other
-    categories, only one of which I have mentioned so far, and proxy
-    transformers lift these three other categories correctly, too:
+    But we're not even done, because we know that proxies also form three other
+    categories, so we expect 'liftP' to correctly lift those categories, too:
 
-> -- The push-based category
+> liftP . (f >~> g) = liftP . f >~> liftP . g
 >
-> mapP (f >~> g) = mapP f >~> mapP g
->
-> mapP push = push
+> liftP . push = push
 
-> -- The upstream ListT Kleisli category
+> liftP . (f \>\ g) = liftP . f \>\ liftP . g
 >
-> mapP (f \>\ g) = mapP f \>\ mapP g
->
-> mapP request = request
+> liftP . request = request
 
-> -- The downstream ListT Kleisli category
+> liftP . (f />/ g) = liftP . f />/ liftP . g
 >
-> mapP (f />/ g) = mapP f />/ mapP g
->
-> mapP respond = respond
+> liftP . respond = respond
 
     I want to highlight two of the above laws:
 
-> mapP request = request
+> liftP . request = request
 >
-> mapP respond = respond
+> liftP . respond = respond
 
-    We can translate those back to 'liftP' to get:
+    The \"pointful\" statement of those laws is:
 
 > liftP (request a') = request a'
 >
@@ -1989,8 +1963,8 @@ Left "Could not read an Integer"
     In other words, 'request' and 'respond' in the extended proxy must behave
     exactly the same as lifting 'request' and 'respond' from the base proxy.
 
-    All the proxy transformers in this library obey the proxy morphism laws,
-    which ensure that 'liftP' / 'mapP' always do \"the right thing\".
+    All the proxy transformers in this library obey these proxy morphism laws,
+    which ensures that 'liftP' always does \"the right thing\".
 -}
 
 {- $proxyfunctor
@@ -2034,16 +2008,12 @@ Left "Could not read an Integer"
 -}
 
 {- $conclusion
-    The @pipes@ library emphasizes the reuse of a small set of core abstractions
-    grounded in theory to implement all functionality:
+    The @pipes@ library implements all functionality using theoretically
+    inspired abstractions:
 
-    * Monads
+    * Monads, Monad Transformers, and Functors on Monads
 
-    * Proxies: ('>->'), 'request', and 'respond'
-
-    * Monad Transformers and Functors on Monads: 'lift' and 'hoist'
-
-    * Proxy Transformers and Functors on Proxies: 'liftP' and 'hoistP'
+    * Proxies, Proxy Transformers, and Functors on Proxies
 
     However, I don't expect everybody to immediately understand how so few
     primitives can implement such a wide variety of features.  This tutorial
@@ -2240,7 +2210,7 @@ Left "Could not read an Integer"
 -- > increment () = forever $ do
 -- >     n <- S.get
 -- >     respond n
--- >     S.put (n + 1)
+-- >     S.modify (+1)
 -- >
 -- > numbers :: (Monad m, Proxy p) => () -> Producer p Int m ()
 -- > numbers () = runIdentityP $ do
@@ -2249,10 +2219,10 @@ Left "Could not read an Integer"
 -- >
 -- > increment2 :: (Proxy p) => () -> Consumer (S.StateP Int p) Int IO r
 -- > increment2 () = forever $ do
--- >     nOurs   <- S.get
 -- >     nTheirs <- request ()
+-- >     S.modify (+2)
+-- >     nOurs   <- S.get
 -- >     lift $ print (nTheirs, nOurs)
--- >     S.put (nOurs + 2)
 -- >
 -- > zipD
 -- >     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
