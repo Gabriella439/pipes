@@ -12,8 +12,8 @@
 >
 > lift . return /= return
 
-    These laws only hold when viewed through certain safe observation functions,
-    like 'runProxy' and 'observe'.
+    The monad transformer laws do hold when viewed through the safe API exported
+    from "Control.Proxy".
 
     Also, you really should not use the constructors anyway, let alone the
     concrete type and instead you should stick to the 'Proxy' type class API.
@@ -53,19 +53,19 @@ import Control.Proxy.Class (
 {-| A 'ProxyFast' communicates with an upstream interface and a downstream
     interface.
 
-    The type variables of @ProxyFast req_a' resp_a req_b' resp_b m r@ signify:
+    The type variables signify:
 
-    * @req_a'@ - The request supplied to the upstream interface
+    * @a'@ - The request supplied to the upstream interface
 
-    * @resp_a@ - The response provided by the upstream interface
+    * @a @ - The response provided by the upstream interface
 
-    * @req_b'@ - The request supplied by the downstream interface
+    * @b'@ - The request supplied by the downstream interface
 
-    * @resp_b@ - The response provided to the downstream interface
+    * @b @ - The response provided to the downstream interface
 
-    * @m     @ - The base monad
+    * @m @ - The base monad
 
-    * @r     @ - The final return value
+    * @r @ - The final return value
 -}
 data ProxyFast a' a b' b m r
     = Request a' (a  -> ProxyFast a' a b' b m r )

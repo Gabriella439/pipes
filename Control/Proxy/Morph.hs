@@ -14,11 +14,11 @@
 
 > morph . p1 >-> morph . p2 = morph . (p1 >-> p2)
 >
-> morph . idT = idT
+> morph . pull = pull
 
 > morph . p1 >~> morph . p2 = morph . (p1 >~> p2)
 >
-> morph . coidT = coidT
+> morph . push = push
 
     * Functor between 'ListT' Kleisli categories:
 

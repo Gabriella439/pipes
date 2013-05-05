@@ -1,6 +1,6 @@
 {-| Recommended entry import for this library
 
-    Read "Control.Proxy.Tutorial" for an extended proxy tutorial.
+    Read "Control.Proxy.Tutorial" for an extended tutorial.
 -}
 
 module Control.Proxy (
@@ -20,8 +20,8 @@ import Control.Proxy.Core.Fast hiding (Request, Respond, M, Pure)
     their own 'runProxy' function:
 
     * "Control.Proxy.Core.Fast": This runs faster for code that is not
-      'IO'-bound, but it only obeys the monad transformer laws modulo safe
-      observation functions.
+      'IO'-bound, but requires implementation hiding to enforce the monad
+      transformer laws.
 
     * "Control.Proxy.Core.Correct": This trades speed on pure code segments, but
        strictly preserves the monad transformer laws.

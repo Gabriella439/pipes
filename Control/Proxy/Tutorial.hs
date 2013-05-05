@@ -108,7 +108,8 @@ import Control.Proxy.Trans.Either
 > --                                     |          |
 > --                                     v          v
 > lines' :: (Proxy p) => Handle -> () -> Producer p String IO ()
-> lines' h () = runIdentityP loop where
+> lines' h () = runIdentityP loop
+>   where
 >     loop = do
 >         eof <- lift $ hIsEOF h
 >         if eof
@@ -223,7 +224,7 @@ Received a value:
 2
 You shall not pass!
 
-    When @take' 2@ terminates, it brings down every 'Proxy' composed with it.
+    When @(take' 2)@ terminates, it brings down every 'Proxy' composed with it.
 
     Notice how @promptInt@ behaves lazily and only 'respond's with as many
     values as we 'request'.  We 'request'ed exactly two values, so it only
@@ -542,7 +543,7 @@ Client Receives: False
     as type synonyms on top of a single type class: 'Proxy'.  This makes your
     life easier because:
 
-    * You only use one composition operator: ('>->')
+    * You can reuse the same composition operator: ('>->')
 
     * You can mix multiple abstractions together as long as the types match
 -}
@@ -686,41 +687,41 @@ Client Receives: False
 
 > p1 >-> p2 >-> p3
 
-    Also, we can define a \'@T@\'ransparent 'Proxy' that auto-forwards values
-    both ways:
+    Also, we can define a 'Proxy' that auto-forwards values both ways, beginning
+    from its upstream interface:
 
-> idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
-> idT = runIdentityK loop where
+> pull :: (Monad m, Proxy p) => a' -> p a' a a' a m r
+> pull = runIdentityK loop where
 >     loop a' = do
 >         a   <- request a'
 >         a'2 <- respond a
 >         loop a'2
 >
-> -- or: idT = runIdentityK $ foreverK $ request >=> respond
-> --         = runIdentityK $ request >=> respond >=> request >=> respond ...
+> -- or: pull = runIdentityK $ foreverK $ request >=> respond
+> --          = runIdentityK $ request >=> respond >=> request >=> respond ...
 
     Diagramatically, this looks like:
 
->     +-----+
->     |     |
-> a' <======== a'   <- All values pass
->     | idT |          straight through
-> a  ========> a    <- immediately
->     |     |
->     +-----+
+>     +------+
+>     |      |
+> a' <========= a'   <- All values pass
+>     | pull |          straight through
+> a  =========> a    <- immediately
+>     |      |
+>     +------+
 
-    Transparency means that:
+    'pull' is completely invisible to composition, meaning that:
 
-> idT >-> p = p
+> pull >-> p = p
 >
-> p >-> idT = p
+> p >-> pull = p
 
-    In other words, 'idT' is an identity of composition.
+    In other words, 'pull' is an identity of composition.
 
     This means that proxies form a true 'Category' where ('>->') is composition
-    and 'idT' is the identity.   The associativity law and the two
+    and 'pull' is the identity.   The associativity law and the two
     identity laws are just the 'Category' laws.  The objects of the category are
-    the 'Proxy' interfaces.
+    the 'Proxy' interfaces and the morphisms are the proxies.
 
     These 'Category' laws guarantee the following important properties:
 
@@ -728,31 +729,57 @@ Client Receives: False
       (otherwise composition wouldn't be associative)
 
     * You don't encounter weird behavior at the interface between two components
-      or at the 'Server' or 'Client' ends of a 'Session' (otherwise 'idT'
+      or at the 'Server' or 'Client' ends of a 'Session' (otherwise 'pull'
       wouldn't be an identity)
 -}
 
 {- $class
     All the proxy code we wrote was generic over the 'Proxy' type class, which
-    defines the four central operations of this library's API:
+    defines the library's central API.  This type class actually defines four
+    separate categories that all proxies obey!  Each category has an identity
+    operation:
 
-    * ('->>'): \"Pointful\" pull-based composition, from which the point-free
-      ('>->') operator derives
+    * 'request': The identity of the \"request\" composition
 
-    * ('>>~'): \"Pointful\" push-based composition, from which the point-free
-      ('>~>') operator derives
+    * 'respond': The identity of the \"respond\" composition
 
-    * 'request': Request input from upstream
+    * 'pull': The identity of pull-based composition
 
-    * 'respond': Respond with output to downstream
+    * 'push': The identity of push-based composition
 
-    @pipes@ defines everything in terms of these four operations, which is
-    why all the library's utilities are polymorphic over the 'Proxy' type class.
+    ... and each category has a composition operation:
+
+    * ('\>\'): \"request\" composition
+
+    * ('/>/'): \"respond\" composition
+
+    * ('>->'): pull-based composition
+
+    * ('>~>'): push-based composition
+
+    However, the 'Proxy' type class actually defines the \"pointful\" versions
+    of these composition operator for efficiency reasons:
+
+    * ('->>'): \"Pointful\" version of ('>->')
+
+    * ('>>~'): \"Pointful\" version of ('>~>')
+
+    * ('>\\'): \"Pointful\" version of ('\>\')
+
+    * ('//>'): \"Pointful\" version of ('/>/')
+
+    For now I will only cover pull-based composition for simplicity, but just
+    keep these other categories in the back of your mind.  If you ever struggle
+    with the pull-based category, chances are that an elegant solution resides
+    within one of the other three categories.
+
+    @pipes@ defines everything in terms of these four categories, which is
+    why all the library's utilities are generic over the 'Proxy' type class.
 
     Let's look at some example instances of the 'Proxy' type class:
 
 > instance Proxy ProxyFast     -- Fastest implementation
-> instance Proxy ProxyCorrect  -- Strict monad transformer laws
+> instance Proxy ProxyCorrect  -- Correct by construction
 
     These two types provide the two alternative base implementations:
 
@@ -761,8 +788,8 @@ Client Receives: False
       hand-tuned code.
 
     * 'ProxyCorrect': This uses a monad transformer implementation that is
-      correct by construction, but runs about 8x slower on pure code segments.
-      However, for 'IO'-bound code, the performance gap is small.
+      correct by construction, meaning that it requires no implementation
+      hiding.
 
     These two implementations differ only in the 'runProxy' function that they
     export, which is how the compiler selects which 'Proxy' implementation to
@@ -882,10 +909,10 @@ promptInt
 
     * If a 'Proxy' terminates, it terminates every 'Proxy' composed with it
 
-    Several of the utilities in "Control.Proxy.Prelude.Base" use these
-    equational laws to rigorously prove things about their behavior.  For
-    example, consider the 'mapD' proxy, which applies a function @f@ to all
-    values flowing downstream:
+    Several of the utilities in "Control.Proxy.Prelude" use these equational
+    laws to rigorously prove things about their behavior.  For example, consider
+    the 'mapD' proxy, which applies a function @f@ to all values flowing
+    downstream:
 
 > mapD :: (Monad m, Proxy p) => (a -> b) -> x -> p x a x b m r
 > mapD f = runIdentityK loop where
@@ -900,15 +927,15 @@ promptInt
 
 > mapD f >-> mapD g = mapD (g . f)
 >
-> mapD id = idT
+> mapD pull = pull
 
     ... which is what we expect.  We can fuse two consecutive 'mapD's into one
     by composing their functions, and mapping 'id' does nothing at all, just
-    like the identity proxy: 'idT'.
+    like the identity proxy: 'pull'.
 
     In fact, these are just the functor laws in disguise, where 'mapD' defines a
     functor between the category of Haskell function composition and the
-    category of 'Proxy' composition.  "Control.Proxy.Prelude.Base" is full of
+    category of 'Proxy' composition.  "Control.Proxy.Prelude" is full of
     utilities like this that are simultaneously practical and theoretically
     elegant.
 -}
@@ -953,31 +980,10 @@ Enter an Integer:
 Hello<Enter>
 Left "Could not read an Integer"
 
-    This library provides three syntactic conveniences for making this easier to
-    write.
-
-    First, ('.') has higher precedence than ('>->'), so you can drop the
-    parentheses:
+    Also, note that ('.') has higher precedence than ('>->'), so you can drop
+    the parentheses:
 
 >>> runEitherT $ runProxy $ promptInt2 >-> hoist lift . printer
-...
-
-    Second, 'lift' is such a common argument to 'hoist' that I provide the
-    'raise' function:
-
-> raise = hoist lift
-
->>> runEitherT $ runProxy $ promptInt2 >-> raise . printer
-...
-
-    Third, I provide the 'hoistK' and 'raiseK' functions in case you think
-    composition looks ugly:
-
-> hoistK f = (hoist f .)
->
-> raiseK = (raise .)
-
->>> runEitherT $ runProxy $ promptInt2 >-> raiseK printer
 ...
 
     For more information on using 'MFunctor', consult the tutorial in the
@@ -985,9 +991,9 @@ Left "Could not read an Integer"
 -}
 
 {- $utilities
-    The "Control.Proxy.Prelude" heirarchy provides several utility functions
-    for common tasks.  We can redefine the previous example functions just by
-    composing these utilities.
+    "Control.Proxy.Prelude" provides several utility functions for common tasks.
+    We can redefine the previous example functions just by composing these
+    utilities.
 
     For example, 'readLnS' reads values from user input:
 
@@ -1152,8 +1158,8 @@ Received a value:
 
 > sink1 :: (Proxy p) => () -> Pipe p Int Int IO ()
 > sink1 () = runIdentityP $ do
->     (takeB_ 3         >-> printD) () -- Sink 1
->     (takeWhileD (< 4) >-> printD) () -- Sink 2
+>     (takeB_ 3         >-> printD) ()  -- Sink 1
+>     (takeWhileD (< 4) >-> printD) ()  -- Sink 2
 >
 > -- or: sink1 = (takeB_ 3 >-> printD) >=> (takeWhileD (< 4) >-> printD)
 
@@ -1180,22 +1186,21 @@ Received a value:
 >>> runProxy $ source2 >-> sink2
 <Exact same behavior>
 
-    These examples demonstrate the two principal ways to combine proxies:
+    These examples demonstrate two possible ways to combine proxies:
 
     * \"Vertical\" composition, using ('>=>') from the Kleisli category
 
     * \"Horizontal\" composition: using ('>->') from the Proxy category
 
-    You assemble most proxies simply by composing them in one or both of these
-    two categories.
+    You can assemble many proxies simply by composing them in one or both of
+    these two categories.
 -}
 
 {- $listT
     Proxies generalize lists by allowing you to interleave effects between list
     elements, but you might be surprised to learn that they also generalize the
-    list monad, too!  "Control.Proxy.ListT" provides the machinery necessary to
-    convert back and forth between proxies and a @ListT@-like monad transformer
-    that binds proxy outputs.
+    list monad, too!  You can convert back and forth between proxies and
+    @ListT@-like monad transformers that bind proxy outputs at either end.
 
     For example, let's say that we want to select elements from two separate
     lists, except interleaving side effects, too:
@@ -1203,7 +1208,7 @@ Received a value:
 > --                          +-- ListT that will compile to a 'Producer'
 > --                          |
 > --                          v
-> pairs :: (ListT p) => () -> ProduceT p IO (Int, Int)
+> pairs :: (Proxy p) => () -> ProduceT p IO (Int, Int)
 > pairs () = do
 >     x <- rangeS 1 3     -- Select a number betwen 1 and 3
 >     lift $ putStrLn $ "Currently using: " ++ show x
@@ -1216,7 +1221,7 @@ Received a value:
 > -- runRespondK's type is actually more general
 > runRespondK :: (() -> ProduceT p m b) -> () -> Producer p b m ()
 >
-> runRespondK pairs :: (ListT p) => () -> Producer p (Int, Int) IO ()
+> runRespondK pairs :: (Proxy p) => () -> Producer p (Int, Int) IO ()
 
     The return value of the 'ProduceT' becomes the output of the corresponding
     'Producer', which produces one output for each permutation of elements that
@@ -1239,7 +1244,7 @@ Currently using: 3
     This works the other way around, too!  You can wrap any 'Producer' in the
     'RespondT' newtype to bind its output in the 'ProduceT' monad:
 
-> pairs2 :: (ListT p) => () -> ProduceT p IO (Int, Int)
+> pairs2 :: (Proxy p) => () -> ProduceT p IO (Int, Int)
 > pairs2 () = do
 >     x <- RespondT $ runIdentityP $ do
 >         respond 1
@@ -1262,10 +1267,10 @@ There
 
     In fact, this is how 'eachS' and 'rangeS' are implemented:
 
-> eachS :: (Monad m, ListT p) => [b] -> ProduceT p m b
+> eachS :: (Monad m, Proxy p) => [b] -> ProduceT p m b
 > eachS xs = RespondT (fromList xs ())
 >
-> rangeS :: (Enum b, Monad m, Ord b, ListT p) => b -> b -> ProduceT p m b
+> rangeS :: (Enum b, Monad m, Ord b, Proxy p) => b -> b -> ProduceT p m b
 > rangeS n1 n2 = RespondT (enumFromS n1 n2 ())
 
     'ProduceT' is actually a special case of 'RespondT', related by the
@@ -1273,10 +1278,10 @@ There
 
 > type ProduceT p = RespondT p C () ()
 
-    Moreover, you can bind anything within 'RespondT', not just 'Producer's.
-    For example, you can bind 'Pipe's within the more general 'RespondT' monad:
+    This more general 'RespondT' monad lets you bind more general things than
+    'Producer's.  For example, you can bind 'Pipe' outputs this way:
 
-> pairs3 :: (ListT p) => () -> RespondT p () Int () IO (Int, Int)
+> pairs3 :: (Proxy p) => () -> RespondT p () Int () IO (Int, Int)
 > pairs3 () = do
 >     x <- RespondT $ runIdentityP $ replicateM_ 2 $ do
 >         a <- request ()
@@ -1290,7 +1295,7 @@ There
 
     ... and you will get a 'Pipe' back when you 'runRespondK' the final result:
 
-> runRespondK pairs3 :: ListT p => () -> Pipe p Int (Int, Int) IO ()
+> runRespondK pairs3 :: Proxy p => () -> Pipe p Int (Int, Int) IO ()
 
 >>> runProxy $ enumFromS 1 >-> runRespondK pairs3 >-> printD
 Received 1
@@ -1313,39 +1318,19 @@ Received 8
     elements output from the proxy's upstream interface.  To distinguish them,
     I call the downstream one 'RespondT' and the upstream one 'RequestT'.
 
-    "Control.Proxy.ListT" contains the 'ListT' class, which provides the the
-    underlying operators for both 'RespondT' and 'RequestT':
+    Remember how I said there were three extra categories?  Well, two of them
+    directly correspond to the 'RespondT' and 'RequestT' monds:
 
-    * ('>\\'): Equivalent to ('=<<') for 'RequestT'
+    * ('\>\') and 'request': Equivalent to ('<=<') and 'return' for 'RequestT'
 
-    * ('//>'): Equivalent to ('>>=') for 'RespondT'
+    * ('/>/') and 'respond': Equivalent to ('>=>') for 'return' for 'RespondT'
 
-    You don't need to use these operators directly, since you can instead just
-    wrap your proxies in the 'RespondT' or 'RequestT' monad transformers and
-    they will translate the binds in those monads to the above operators under
-    the hood.
-
-    If those are the bind operators, though, then where are the corresponding
-    'return' equivalents?  Why, they are just 'respond' and 'request'!
-
-> -- return for 'RespondT'
-> return b  = RespondT (respond b)
-
-> -- return for 'RequestT'
-> return a' = RequestT (request a')
-
-    Therefore, we can use the monad laws to reason about how 'respond' interacts
-    with 'RespondT' (and, dually, how 'request' interacts with 'RequestT'):
-
-> do x' <- RespondT (respond x)  =  do f x
->    f x'
->
-> do x <- m                      =  do m
->    RespondT (respond x)
+    In other words, two of the 'Proxy' categories are 'ListT' Kleisli
+    categories in disguise!
 
     'RequestT' and 'RespondT' are correct by construction, meaning that they
-    always satisfy the monad and monad transformer without exception, unlike
-    @ListT@ from @transformers@.  In other words, they behave like two
+    always satisfy the monad and monad transformer laws without exception,
+    unlike 'ListT' from @transformers@.  In other words, they behave like two
     symmetric implementations of \"ListT done right\".
 -}
 
@@ -1354,7 +1339,7 @@ Received 8
 
 > import qualified Control.Proxy.Trans.Writer as W
 
-   "Control.Proxy.Prelude.Base" provides several common folds implemented this
+   "Control.Proxy.Prelude" provides several common folds implemented this
     way, such as:
 
     * 'lengthD': Count how many values flow downstream
@@ -1372,7 +1357,7 @@ Received 8
     Now, let's try these folds out and see if we can build a list from user
     input:
 
->>> runProxy . W.runWriterK $ promptInt >-> takeB_ 3 >-> toListD
+>>> runProxy $ W.runWriterK $ promptInt >-> takeB_ 3 >-> toListD
 Enter an Integer:
 1<Enter>
 Enter an Integer:
@@ -1384,23 +1369,23 @@ Enter an Integer:
     You can insert these folds anywhere in the middle of a pipeline and they
     still work:
 
->>> runProxy . W.runWriterK $ fromListS [5, 7, 4] >-> lengthD >-> printD
+>>> runProxy $ W.runWriterK $ fromListS [5, 7, 4] >-> lengthD >-> printD
 5
 7
 4
 ((),Sum {getSum = 3})
 
     You can also run multiple folds at the same time just by adding more
-    'WriterP' layers to your proxy transformer stack. You can use 'mapP'
-    to introduce a new layer inmmediately beneath the outer one:
+    'WriterP' layers to your proxy transformer stack. You can use 'liftP'
+    to introduce a new layer immediately beneath the outer one:
 
-> fromListS [9, 10] >-> anyD even >-> mapP sumD
+> fromListS [9, 10] >-> anyD even >-> liftP . sumD
 >   :: (Integral c, Monad m, Proxy p) =>
 >      () -> Producer (W.WriterP Any (W.WriterP (Sum c) p)) c m ()
 
     Then you just run both 'WriterP' layers:
 
->>> runProxy . W.runWriterK . W.runWriterK $ fromListS [9, 10] >-> anyD even >-> mapP sumD
+>>> runProxy $ W.runWriterK $ W.runWriterK $ fromListS [9, 10] >-> anyD even >-> mapP sumD
 (((),Any {getAny = True}),Sum {getSum = 19})
 
     I designed certain special folds to terminate the 'Session' early if they
@@ -1410,13 +1395,13 @@ Enter an Integer:
 
 > headD_ :: (Monad m, Proxy p) => x -> W.WriterP (First a) p x a x a m ()
 
->>> runProxy . runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD_
+>>> runProxy $ runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD_
 3
 ((),First {getFirst = Just 3})
 
     Compare this to 'headD' without underscore, which folds the entire input:
 
->>> runProxy . W.runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD
+>>> runProxy $ W.runWriterK $ fromListS [3, 4, 9] >-> printD >-> headD
 3
 4
 9
@@ -1962,7 +1947,7 @@ Left "Could not read an Integer"
 
 > mapP (f >-> g) = mapP f >-> mapP g  -- These are functor laws, too!
 >
-> mapP idT = idT
+> mapP pull = pull
 
     In other words, a proxy transformer defines a functor from the base
     composition to the extended composition!  Neat!
@@ -1975,7 +1960,7 @@ Left "Could not read an Integer"
 >
 > mapP (f >~> g) = mapP f >~> mapP g
 >
-> mapP coidT = coidT
+> mapP push = push
 
 > -- The upstream ListT Kleisli category
 >
@@ -2082,7 +2067,8 @@ Left "Could not read an Integer"
 -- > import qualified Control.Proxy.Trans.State as S
 -- >
 -- > lines' :: (Proxy p) => Handle -> () -> Producer p String IO ()
--- > lines' h () = runIdentityP loop where
+-- > lines' h () = runIdentityP loop
+-- >   where
 -- >     loop = do
 -- >         eof <- lift $ hIsEOF h
 -- >         if eof
@@ -2188,14 +2174,14 @@ Left "Could not read an Integer"
 -- >         takeB_ 3 ()          -- Intermediate stage 1
 -- >         takeWhileD (< 4) ()  -- Intermediate stage 2
 -- >
--- > pairs :: (ListT p) => () -> ProduceT p IO (Int, Int)
+-- > pairs :: (Proxy p) => () -> ProduceT p IO (Int, Int)
 -- > pairs () = do
 -- >     x <- rangeS 1 3     -- Select a number betwen 1 and 3
 -- >     lift $ putStrLn $ "Currently using: " ++ show x
 -- >     y <- eachS [4,6,8]  -- Select one of 4, 6, or 8
 -- >     return (x, y)
 -- >
--- > pairs2 :: (ListT p) => () -> ProduceT p IO (Int, Int)
+-- > pairs2 :: (Proxy p) => () -> ProduceT p IO (Int, Int)
 -- > pairs2 () = do
 -- >     x <- RespondT $ runIdentityP $ do
 -- >         respond 1
@@ -2207,7 +2193,7 @@ Left "Could not read an Integer"
 -- >         respond 4
 -- >     return (x, y)
 -- >
--- > pairs3 :: (ListT p) => () -> RespondT p () Int () IO (Int, Int)
+-- > pairs3 :: (Proxy p) => () -> RespondT p () Int () IO (Int, Int)
 -- > pairs3 () = do
 -- >     x <- RespondT $ runIdentityP $ replicateM_ 2 $ do
 -- >         a <- request ()

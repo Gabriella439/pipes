@@ -28,20 +28,19 @@ import Control.Proxy.Class (
 {-| A 'ProxyCorrect' communicates with an upstream interface and a downstream
     interface.
 
-    The type variables of @ProxyCorrect req_a' resp_a req_b' resp_b m r@
-    signify:
+    The type variables signify:
 
-    * @req_a'@ - The request supplied to the upstream interface
+    * @a'@ - The request supplied to the upstream interface
 
-    * @resp_a@ - The response provided by the upstream interface
+    * @a @ - The response provided by the upstream interface
 
-    * @req_b'@ - The request supplied by the downstream interface
+    * @b'@ - The request supplied by the downstream interface
 
-    * @resp_b@ - The response provided to the downstream interface
+    * @b @ - The response provided to the downstream interface
 
-    * @m     @ - The base monad
+    * @m @ - The base monad
 
-    * @r     @ - The final return value
+    * @r @ - The final return value
 -}
 data ProxyCorrect a' a b' b m  r =
     Proxy { unProxy :: m (ProxyStep a' a b' b m r) }
