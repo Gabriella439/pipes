@@ -34,7 +34,7 @@ Description:
   .
   Import "Control.Proxy" to use the library.
   .
-  Read "Control.Proxy.Tutorial" for a really extensive tutorial.
+  Read "Control.Proxy.Tutorial" for an extensive tutorial.
 Category: Control, Pipes, Proxies
 Source-Repository head
     Type: git
