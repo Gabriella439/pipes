@@ -52,7 +52,7 @@ data ProxyStep a' a b' b m r
     | Pure    r
 
 instance (Monad m) => Functor (ProxyCorrect a' a b' b m) where
-    fmap f p0 = go p0 where
+    fmap f = go where
         go p = Proxy (do
             x <- unProxy p
             return (case x of

@@ -121,10 +121,12 @@ instance PFunctor (StateP s) where
 -- | Convert a State to a 'StateP'
 state :: (Monad m, Proxy p) => (s -> (r, s)) -> StateP s p a' a b' b m r
 state f = StateP (\s -> return_P (f s))
+{-# INLINABLE state #-}
 
 -- | Convert a StateT to a 'StateP'
 stateT :: (Monad m, Proxy p) => (s -> m (r, s)) -> StateP s p a' a b' b m r
 stateT f = StateP (\s -> lift_P (f s))
+{-# INLINABLE stateT #-}
 
 -- | Run a 'StateP' computation, producing the final result and state
 runStateP
@@ -145,6 +147,7 @@ runStateK
     :: (Monad m, Proxy p)
     => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m (r, s))
 runStateK s k q = runStateP s (k q)
+{-# INLINABLE runStateK #-}
 
 -- | Evaluate a 'StateP' computation, but discard the final state
 evalStateP
@@ -157,6 +160,7 @@ evalStateK
     :: (Monad m, Proxy p)
     => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m r)
 evalStateK s k q = evalStateP s (k q)
+{-# INLINABLE evalStateK #-}
 
 -- | Evaluate a 'StateP' computation, but discard the final result
 execStateP
@@ -169,6 +173,7 @@ execStateK
     :: (Monad m, Proxy p)
     => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m s)
 execStateK s k q = execStateP s (k q)
+{-# INLINABLE execStateK #-}
 
 -- | Get the current state
 get :: (Monad m, Proxy p) => StateP s p a' a b' b m s

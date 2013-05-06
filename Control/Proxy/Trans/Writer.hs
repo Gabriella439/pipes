@@ -127,10 +127,12 @@ instance PFunctor (WriterP w) where
 -- | Convert a Writer to a 'WriterP'
 writer :: (Monad m, Proxy p, Monoid w) => (r, w) -> WriterP w p a' a b' b m r
 writer x = writerP (return_P x)
+{-# INLINABLE writer #-}
 
 -- | Convert a WriterT to a 'WriterP'
 writerT :: (Monad m, Proxy p, Monoid w) => m (r, w) -> WriterP w p a' a b' b m r
 writerT m = writerP (lift_P m)
+{-# INLINABLE writerT #-}
 
 -- | Create a 'WriterP' from a proxy that generates a result and a monoid
 writerP
@@ -161,6 +163,7 @@ runWriterK
     :: (Monad m, Proxy p, Monoid w)
     => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m (r, w))
 runWriterK k q = runWriterP (k q)
+{-# INLINABLE runWriterK #-}
 
 -- | Evaluate a 'WriterP' computation, but discard the final result
 execWriterP
@@ -174,6 +177,7 @@ execWriterK
     :: (Monad m, Proxy p, Monoid w)
     => (q -> WriterP w p a' a b' b m r) -> (q -> p a' a b' b m w)
 execWriterK k q = execWriterP (k q)
+{-# INLINABLE execWriterK #-}
 
 -- | Add a value to the monoid
 tell :: (Monad m, Proxy p, Monoid w) => w -> WriterP w p a' a b' b m ()

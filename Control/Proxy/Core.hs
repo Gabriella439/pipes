@@ -13,14 +13,14 @@ module Control.Proxy.Core (
     module Control.Monad.Morph,
     ) where
 
-import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
 import Control.Monad (forever, (>=>), (<=<))
+import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
 import Control.Proxy.Morph
+import Control.Proxy.Prelude
 import Control.Proxy.Trans
 import Control.Proxy.Trans.Identity
-import Control.Proxy.Prelude
 
 {- $modules
     "Control.Proxy.Class" defines the 'Proxy' type class that lets you program

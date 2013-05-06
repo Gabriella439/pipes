@@ -138,7 +138,6 @@ stdinS :: (Proxy p) => () -> Producer p String IO r
 stdinS () = runIdentityP $ forever $ do
     str <- lift getLine
     respond str
-
 {-# INLINABLE stdinS #-}
 
 {-| 'putStrLn's all values flowing \'@D@\'ownstream to 'stdout'
