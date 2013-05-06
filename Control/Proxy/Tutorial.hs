@@ -33,7 +33,7 @@ module Control.Proxy.Tutorial (
     -- * Utilities
     -- $utilities
 
-    -- * Mix Monads
+    -- * Sequencing Proxies
     -- $mixmonadcomp
 
     -- * ListT
