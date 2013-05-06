@@ -33,7 +33,7 @@ module Control.Proxy.Tutorial (
     -- * Utilities
     -- $utilities
 
-    -- * Mix Monads and Composition
+    -- * Mix Monads
     -- $mixmonadcomp
 
     -- * ListT
@@ -45,19 +45,19 @@ module Control.Proxy.Tutorial (
     -- * Extensions
     -- $extend
 
-    -- * Error handling
+    -- ** Error handling
     -- $error
 
-    -- * Folds
+    -- ** Folds
     -- $folds
 
-    -- * State
+    -- ** State
     -- $state
 
     -- * Branching, zips, and merges
     -- $branch
 
-    -- * Proxy Transformers
+    -- * Mixing Proxies
     -- $proxytrans
 
     -- * Proxy Morphism Laws
