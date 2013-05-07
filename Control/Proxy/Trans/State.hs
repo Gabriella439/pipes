@@ -83,14 +83,14 @@ instance (Proxy p) => ProxyInternal (StateP s p) where
     liftIO_P m = StateP (\s -> liftIO_P (m >>= \r -> return (r, s)))
 
     thread_P p s = StateP (\s' ->
-        ((up ->> thread_P (unStateP p s') s) >>~ dn) ?>= next )
+        ((up >\\ thread_P (unStateP p s') s) //> dn) ?>= next )
       where
         up ((a', s1), s2) =
-            request ((a', s2 ), s1 ) ?>= \((a , s1'), s2') ->
-            respond ((a , s2'), s1') ?>= up
+            request  ((a', s2 ), s1 ) ?>= \((a , s1'), s2') ->
+            return_P ((a , s2'), s1')
         dn ((b , s1), s2) =
-            respond ((b , s2 ), s1 ) ?>= \((b', s1'), s2') ->
-            request ((b', s2'), s1') ?>= dn
+            respond  ((b , s2 ), s1 ) ?>= \((b', s1'), s2') ->
+            return_P ((b', s2'), s1')
         next ((r, s1), s2) = return_P ((r, s2), s1)
 
 instance (Proxy p) => Proxy (StateP s p) where
