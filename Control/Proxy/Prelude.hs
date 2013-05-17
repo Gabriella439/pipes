@@ -56,6 +56,7 @@ module Control.Proxy.Prelude (
     lastD,
     toListD,
     foldrD,
+    foldlD',
 
     -- * ArrowChoice
     -- $choice
@@ -118,6 +119,7 @@ import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Control.Proxy.Trans.Identity (
     IdentityP(IdentityP, runIdentityP), runIdentityK)
+import Control.Proxy.Trans.State (StateP(StateP))
 import Control.Proxy.Trans.Writer (WriterP, tell)
 import Data.Monoid (
     Monoid(mempty, mappend),
@@ -570,7 +572,7 @@ rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ProduceT p m b
 rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
 {-# INLINABLE rangeS #-}
 
-{-| Strict fold over values flowing \'@D@\'ownstream.
+{-| Strict fold into a 'Monoid' over values flowing \'@D@\'ownstream.
 
 > foldD f >-> foldD g = foldD (f <> g)
 >
@@ -683,6 +685,21 @@ foldrD
     => (a -> b -> b) -> x -> WriterP (Endo b) p x a x a m r
 foldrD step = foldD (Endo . step)
 {-# INLINABLE foldrD #-}
+
+-- | Fold equivalent to 'foldl''.
+--
+-- Contrary to 'foldD', this doesn't require that you fold into a 'Monoid'.
+foldlD' :: (Monad m, Proxy p)
+        => (s -> a -> s) -> x -> (StateP s p x a x a m r)
+foldlD' f = go where
+    go x = do
+        a <- request x
+        StateP (\s -> let s' = f s a
+                      in  s' `seq` return_P ((), s'))
+        x2 <- respond a
+        go x2
+{-# INLINABLE foldlD' #-}
+
 
 {- $choice
     'leftD' and 'rightD' satisfy the 'ArrowChoice' laws using @arr = mapD@.
