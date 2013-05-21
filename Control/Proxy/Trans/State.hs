@@ -142,7 +142,7 @@ runStateP s0 m = up >\\ unStateP m s0 //> dn
         return_P (b', s)
 {-# INLINABLE runStateP #-}
 
--- | Run a 'StateP' \'@K@\'leisli arrow, procuding the final result and state
+-- | Run a 'StateP' \'@K@\'leisli arrow, producing the final result and state
 runStateK
     :: (Monad m, Proxy p)
     => s -> (q -> StateP s p a' a b' b m r) -> (q -> p a' a b' b m (r, s))
