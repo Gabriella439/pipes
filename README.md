@@ -20,9 +20,10 @@
 
 Then fire up ` ghci`:
 
+    $ ghci
     Prelude> import Control.Proxy as P
 
-... and stream standard input to standard output until you enter `quit`.
+... and echo standard input to standard output until you enter `quit`.
 
     Prelude P> runProxy $ stdinS >-> takeWhileD (/= "quit") >-> stdoutD
     Test[Enter]
