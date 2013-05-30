@@ -1,10 +1,10 @@
-# Pipes v3.2.0
+# Pipes v3.3.0
 
 `pipes` provides an easy, elegant, and powerful framework for describing streaming behaviors.
 
 ## Features
 
-* *Simple API*: Use three simple commands: `(>->)`, `request`, and `respond`
+* *Concise API*: Use three simple commands: `(>->)`, `request`, and `respond`
 * *Bidirectionality*: Implement duplex channels 
 * *Blazing fast*: Implementation tuned for speed 
 * *Elegant semantics*: Use practical category theory
@@ -32,4 +32,4 @@ Then fire up ` ghci`:
     quit[Enter]
     Prelude P> -- Done!
 
-Now read [the official tutorial](http://hackage.haskell.org/packages/archive/pipes/3.2.0/doc/html/Control-Proxy-Tutorial.html).
+Now read [the official tutorial](http://hackage.haskell.org/packages/archive/pipes/3.3.0/doc/html/Control-Proxy-Tutorial.html).
