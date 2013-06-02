@@ -3,17 +3,6 @@
 `pipes` is an easy, elegant, and powerful framework for describing streaming
 behaviors.
 
-## Features
-
-* *Concise API*: Use three simple commands: `(>->)`, `request`, and `respond`
-* *Bidirectionality*: Implement duplex channels 
-* *Blazing fast*: Implementation tuned for speed 
-* *Elegant semantics*: Use practical category theory
-* *Extension Framework*: Mix and match extensions and create your own
-* *ListT*: Correct implementation of `ListT` that interconverts with pipes 
-* *Lightweight Dependency*: `pipes` depends only on `transformers` and compiles rapidly
-* *Extensive Documentation*: Second to none!
-
 ## Quick start
 
 * Install the [Haskell Platform](http://www.haskell.org/platform/)
@@ -36,13 +25,32 @@ Then fire up ` ghci`:
 
 Now read [the official tutorial](http://hackage.haskell.org/packages/archive/pipes/3.3.0/doc/html/Control-Proxy-Tutorial.html).
 
-# Community Resources
+## Features
+
+* *Concise API*: Use three simple commands: `(>->)`, `request`, and `respond`
+
+* *Bidirectionality*: Implement duplex channels 
+
+* *Blazing fast*: Implementation tuned for speed 
+
+* *Elegant semantics*: Use practical category theory
+
+* *Extension Framework*: Mix and match extensions and create your own
+
+* *ListT*: Correct implementation of `ListT` that interconverts with pipes 
+
+* *Lightweight Dependency*: `pipes` depends only on `transformers` and `mmorph`
+  and compiles rapidly
+
+* *Extensive Documentation*: Second to none!
+
+## Community Resources
 
 * [Haskell wiki page](http://www.haskell.org/haskellwiki/Pipes)
 
 * [Mailing list](haskell-pipes@googlegroups.com) ([Google Group](https://groups.google.com/forum/?fromgroups#!forum/haskell-pipes))
 
-# How to contribute
+## How to contribute
 
 * Contribute code
 
@@ -50,7 +58,7 @@ Now read [the official tutorial](http://hackage.haskell.org/packages/archive/pip
 
 * Write `pipes` tutorials
 
-# Copyright
+## Copyright
 
 Copyright (c) 2012, 2013 Gabriel Gonzalez
 All rights reserved.
