@@ -27,25 +27,23 @@ module Control.Proxy.Class (
     RespondT(..),
     RequestT(..),
 
-    -- * Synonyms
-    C,
+    -- * Polymorphic Type Synonyms
     Pipe,
     Producer,
-    Producer',
     Consumer,
-    Consumer',
-    CoPipe,
-    CoProducer,
-    CoConsumer,
     Client,
-    Client',
     Server,
-    Server',
     Session,
-    Session',
     ProduceT,
+
+    -- * Concrete Type Synonyms
+    C,
+    Producer',
+    Consumer',
+    Client',
+    Server',
+    Session',
     ProduceT',
-    CoProduceT,
 
     -- * Laws
     -- $laws
@@ -61,7 +59,11 @@ module Control.Proxy.Class (
     coidT,
     ListT,
     runRespondK,
-    runRequestK
+    runRequestK,
+    CoPipe,
+    CoProducer,
+    CoConsumer,
+    CoProduceT
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -411,9 +413,6 @@ instance (Monad m, Proxy p, Monoid a) => MonadPlus (RequestT p a b' b m) where
     mzero = empty
     mplus = (<|>)
 
--- | The empty type, denoting a \'@C@\'losed end
-data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
-
 -- | A unidirectional 'Proxy'.
 type Pipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b = p () a () b
 
@@ -424,44 +423,12 @@ type Pipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b = p () a () b
 type Producer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b m r
     = forall a' a . p a' a () b m r
 
--- | Like 'Producer', but with concrete types to improve type inference
-type Producer' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b = p C () () b
-
 {-| A 'Pipe' that consumes values
 
     'Consumer's never 'respond'.
 -}
 type Consumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a m r
     = forall b' b . p () a b' b m r
-
--- | Like a 'Consumer', but with concrete types to improve type inference
-type Consumer' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a = p () a () C
-
--- | A 'Pipe' where everything flows upstream
-type CoPipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' b' = p a' () b' ()
-
-{-| A 'CoPipe' that produces values flowing upstream
-
-    'CoProducer's never 'respond'.
--}
-type CoProducer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' = p a' () () C
-
-{-| A 'CoConsumer' that consumes values flowing upstream
-
-    'CoConsumer's never 'request'.
--}
-type CoConsumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' = p C () b' ()
-
-{-| @Server b' b@ receives requests of type @b'@ and sends responses of type
-    @b@.
-
-    'Server's never 'request'.
--}
-type Server (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b m r
-    = forall a' a . p a' a b' b m r
-
--- | Like 'Server', but with concrete types to improve type inference
-type Server' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b = p C () b' b
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
@@ -471,8 +438,13 @@ type Server' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b = p C () b' b
 type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a m r
     = forall b' b . p a' a b' b m r
 
--- | Like 'Client', but with concrete types to improve type inference
-type Client' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
+{-| @Server b' b@ receives requests of type @b'@ and sends responses of type
+    @b@.
+
+    'Server's never 'request'.
+-}
+type Server (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b m r
+    = forall a' a . p a' a b' b m r
 
 {-| A self-contained 'Session', ready to be run by 'runProxy'
 
@@ -481,17 +453,29 @@ type Client' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
 type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) m r
     = forall a' a b' b . p a' a b' b m r
 
--- | Like 'Session', but with concrete types to improve type inference
-type Session' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
-
 -- | 'ProduceT' is 'ListT' over the downstream output
 type ProduceT p m b = forall a' a . RespondT p a' a () m b
 
+-- | The empty type, denoting a \'@C@\'losed end
+data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
+
+-- | Like 'Producer', but with concrete types to improve type inference
+type Producer' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b = p C () () b
+
+-- | Like 'Consumer', but with concrete types to improve type inference
+type Consumer' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a = p () a () C
+
+-- | Like 'Server', but with concrete types to improve type inference
+type Server' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b = p C () b' b
+
+-- | Like 'Client', but with concrete types to improve type inference
+type Client' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
+
+-- | Like 'Session', but with concrete types to improve type inference
+type Session' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
+
 -- | Like 'ProduceT', but with concrete types to improve type inference
 type ProduceT' p = RespondT p C () ()
-
--- | 'CoProduceT' is 'ListT' over the upstream output
-type CoProduceT p = RequestT p () () C
 
 {- $laws
     First, all proxies sit at the intersection of five categories:
@@ -783,3 +767,15 @@ runRequestK :: (q -> RequestT p a b' b m a') -> (q -> p a' a b' b m a)
 runRequestK k q = runRequestT (k q)
 {-# INLINABLE runRequestK #-}
 {-# DEPRECATED runRequestK "Use '(runRequestK .)' instead" #-}
+
+type CoPipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' b' = p a' () b' ()
+{-# DEPRECATED CoPipe "Not that useful" #-}
+
+type CoProducer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' = p a' () () C
+{-# DEPRECATED CoProducer "Not that useful" #-}
+
+type CoConsumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' = p C () b' ()
+{-# DEPRECATED CoConsumer "Not that useful" #-}
+
+type CoProduceT p = RequestT p () () C
+{-# DEPRECATED CoProduceT "Not that useful" #-}
