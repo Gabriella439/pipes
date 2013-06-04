@@ -978,7 +978,6 @@ hGetLineC h () = runIdentityP go where
 {-# INLINABLE hGetLineC #-}
 {-# DEPRECATED hGetLineC "Use 'turn . hGetLineS h'" #-}
 
--- | 'print's all values flowing \'@D@\'ownstream to a 'Handle'
 hPrintD :: (Show a, Proxy p) => IO.Handle -> x -> p x a x a IO r
 hPrintD h = runIdentityK $ foreverK $ \x -> do
     a <- request x
@@ -987,7 +986,6 @@ hPrintD h = runIdentityK $ foreverK $ \x -> do
 {-# INLINABLE hPrintD #-}
 {-# DEPRECATED hPrintD "Not that useful" #-}
 
--- | 'print's all values flowing \'@U@\'pstream to a 'Handle'
 hPrintU :: (Show a', Proxy p) => IO.Handle -> a' -> p a' x a' x IO r
 hPrintU h = runIdentityK $ foreverK $ \a' -> do
     lift $ IO.hPrint h a'
