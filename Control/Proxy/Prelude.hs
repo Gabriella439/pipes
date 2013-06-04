@@ -27,13 +27,9 @@ module Control.Proxy.Prelude (
     takeB,
     takeB_,
     takeWhileD,
-    takeWhileU,
     dropD,
-    dropU,
     dropWhileD,
-    dropWhileU,
     filterD,
-    filterU,
 
     -- * Lists and Enumerations
     fromListS,
@@ -84,6 +80,10 @@ module Control.Proxy.Prelude (
     mapMB,
     useB,
     execB,
+    takeWhileU,
+    dropU,
+    dropWhileU,
+    filterU,
     fromListC,
     enumFromC,
     enumFromToC,
@@ -396,24 +396,6 @@ takeWhileD p = runIdentityK go where
             else return ()
 {-# INLINABLE takeWhileD #-}
 
-{-| @(takeWhileU p)@ allows values to pass upstream so long as they satisfy the
-    predicate @p@.
-
-> takeWhileU p1 >-> takeWhileU p2 = takeWhileU (p1 <> p2)
->
-> takeWhileD mempty = pull
--}
-takeWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' a a' a m ()
-takeWhileU p = runIdentityK go where
-    go a' =
-        if (p a')
-            then do
-                a   <- request a'
-                a'2 <- respond a
-                go a'2
-            else return_P ()
-{-# INLINABLE takeWhileU #-}
-
 {-| @(dropD n)@ discards @n@ values going downstream
 
 > dropD n1 >-> dropD n2 = dropD (n1 + n2)  -- n2 >= 0 && n2 >= 0
@@ -431,21 +413,6 @@ dropD n0 = \() -> runIdentityP (go n0) where
     replicateM_ n $ request ()
     pull () -}
 {-# INLINABLE dropD #-}
-
-{-| @(dropU n)@ discards @n@ values going upstream
-
-> dropU n1 >-> dropU n2 = dropU (n1 + n2)  -- n2 >= 0 && n2 >= 0
->
-> dropU 0 = pull
--}
-dropU :: (Monad m, Proxy p) => Int -> a' -> CoPipe p a' a' m r
-dropU n0 = runIdentityK (go n0) where
-    go n
-        | n <= 0    = pull
-        | otherwise = \_ -> do
-            a' <- respond ()
-            go (n - 1) a'
-{-# INLINABLE dropU #-}
 
 {-| @(dropWhileD p)@ discards values going downstream until one violates the
     predicate @p@.
@@ -469,23 +436,6 @@ dropWhileD p () = runIdentityP go where
                 pull x
 {-# INLINABLE dropWhileD #-}
 
-{-| @(dropWhileU p)@ discards values going upstream until one violates the
-    predicate @p@.
-
-> dropWhileU p1 >-> dropWhileU p2 = dropWhileU (p1 <> p2)
->
-> dropWhileU mempty = pull
--}
-dropWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
-dropWhileU p = runIdentityK go where
-    go a' =
-        if (p a')
-            then do
-                a2 <- respond ()
-                go a2
-            else pull a'
-{-# INLINABLE dropWhileU #-}
-
 {-| @(filterD p)@ discards values going downstream if they fail the predicate
     @p@
 
@@ -507,25 +457,6 @@ filterD p = \() -> runIdentityP go where
                 go
             else go
 {-# INLINABLE filterD #-}
-
-{-| @(filterU p)@ discards values going upstream if they fail the predicate @p@
-
-> filterU p1 >-> filterU p2 = filterU (p1 <> p2)
->
-> filterU mempty = pull
--}
-filterU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
-filterU p = runIdentityK go where
-    go a' =
-        if (p a')
-        then do
-            request a'
-            a'2 <- respond ()
-            go a'2
-        else do
-            a'2 <- respond ()
-            go a'2
-{-# INLINABLE filterU #-}
 
 {-| Convert a list into a 'Producer'
 
@@ -877,6 +808,53 @@ execB md mu = runIdentityK go where
         go a'2
 {-# INLINABLE execB #-}
 {-# DEPRECATED execB "Combine 'execD' and 'execU' instead" #-}
+
+takeWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' a a' a m ()
+takeWhileU p = runIdentityK go where
+    go a' =
+        if (p a')
+            then do
+                a   <- request a'
+                a'2 <- respond a
+                go a'2
+            else return_P ()
+{-# INLINABLE takeWhileU #-}
+{-# DEPRECATED takeWhileU "Not that useful" #-}
+
+dropU :: (Monad m, Proxy p) => Int -> a' -> CoPipe p a' a' m r
+dropU n0 = runIdentityK (go n0) where
+    go n
+        | n <= 0    = pull
+        | otherwise = \_ -> do
+            a' <- respond ()
+            go (n - 1) a'
+{-# INLINABLE dropU #-}
+{-# DEPRECATED dropU "Not that useful" #-}
+
+dropWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
+dropWhileU p = runIdentityK go where
+    go a' =
+        if (p a')
+            then do
+                a2 <- respond ()
+                go a2
+            else pull a'
+{-# INLINABLE dropWhileU #-}
+{-# DEPRECATED dropWhileU "Not that useful" #-}
+
+filterU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
+filterU p = runIdentityK go where
+    go a' =
+        if (p a')
+        then do
+            request a'
+            a'2 <- respond ()
+            go a'2
+        else do
+            a'2 <- respond ()
+            go a'2
+{-# INLINABLE filterU #-}
+{-# DEPRECATED filterU "Not that useful" #-}
 
 fromListC :: (Monad m, Proxy p) => [a'] -> () -> CoProducer p a' m ()
 fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
