@@ -744,7 +744,7 @@ rightD k = runIdentityK (up \>\ (IdentityP . k />/ dn))
 -- | Zip values flowing downstream
 zipD
     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
-    => () -> Consumer p1 a (Consumer p2 b (Producer p3 (a, b) m)) r
+    => () -> Consumer' p1 a (Consumer' p2 b (Producer' p3 (a, b) m)) r
 zipD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
     go = do
         a <- request ()
@@ -757,7 +757,7 @@ zipD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
 -- | Interleave values flowing downstream using simple alternation
 mergeD
     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
-    => () -> Consumer p1 a (Consumer p2 a (Producer p3 a m)) r
+    => () -> Consumer' p1 a (Consumer' p2 a (Producer' p3 a m)) r
 mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
     go = do
         a1 <- request ()

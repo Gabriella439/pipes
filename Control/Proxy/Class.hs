@@ -31,14 +31,20 @@ module Control.Proxy.Class (
     C,
     Pipe,
     Producer,
+    Producer',
     Consumer,
+    Consumer',
     CoPipe,
     CoProducer,
     CoConsumer,
     Client,
+    Client',
     Server,
+    Server',
     Session,
+    Session',
     ProduceT,
+    ProduceT',
     CoProduceT,
 
     -- * Laws
@@ -415,13 +421,21 @@ type Pipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a b = p () a () b
 
     'Producer's never 'request'.
 -}
-type Producer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b = p C () () b
+type Producer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b m r
+    = forall a' a . p a' a () b m r
+
+-- | Like 'Producer', but with concrete types to improve type inference
+type Producer' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b = p C () () b
 
 {-| A 'Pipe' that consumes values
 
     'Consumer's never 'respond'.
 -}
-type Consumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a = p () a () C
+type Consumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a m r
+    = forall b' b . p () a b' b m r
+
+-- | Like a 'Consumer', but with concrete types to improve type inference
+type Consumer' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a = p () a () C
 
 -- | A 'Pipe' where everything flows upstream
 type CoPipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' b' = p a' () b' ()
@@ -443,23 +457,38 @@ type CoConsumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' = p C () b' ()
 
     'Server's never 'request'.
 -}
-type Server (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b = p C () b' b
+type Server (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b m r
+    = forall a' a . p a' a b' b m r
+
+-- | Like 'Server', but with concrete types to improve type inference
+type Server' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b = p C () b' b
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
     'Client's never 'respond'.
 -}
-type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
+type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a m r
+    = forall b' b . p a' a b' b m r
+
+-- | Like 'Client', but with concrete types to improve type inference
+type Client' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
 
 {-| A self-contained 'Session', ready to be run by 'runProxy'
 
     'Session's never 'request' or 'respond'.
 -}
-type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
+type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) m r
+    = forall a' a b' b . p a' a b' b m r
+
+-- | Like 'Session', but with concrete types to improve type inference
+type Session' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
 -- | 'ProduceT' is 'ListT' over the downstream output
-type ProduceT p = RespondT p C () ()
+type ProduceT p m b = forall a' a . RespondT p a' a () m b
+
+-- | Like 'ProduceT', but with concrete types to improve type inference
+type ProduceT' p = RespondT p C () ()
 
 -- | 'CoProduceT' is 'ListT' over the upstream output
 type CoProduceT p = RequestT p () () C
