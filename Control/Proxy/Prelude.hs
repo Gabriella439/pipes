@@ -821,7 +821,7 @@ takeWhileU p = runIdentityK go where
 {-# INLINABLE takeWhileU #-}
 {-# DEPRECATED takeWhileU "Not that useful" #-}
 
-dropU :: (Monad m, Proxy p) => Int -> a' -> CoPipe p a' a' m r
+dropU :: (Monad m, Proxy p) => Int -> a' -> p a' () a' () m r
 dropU n0 = runIdentityK (go n0) where
     go n
         | n <= 0    = pull
@@ -831,7 +831,7 @@ dropU n0 = runIdentityK (go n0) where
 {-# INLINABLE dropU #-}
 {-# DEPRECATED dropU "Not that useful" #-}
 
-dropWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
+dropWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' () a' () m r
 dropWhileU p = runIdentityK go where
     go a' =
         if (p a')
@@ -842,7 +842,7 @@ dropWhileU p = runIdentityK go where
 {-# INLINABLE dropWhileU #-}
 {-# DEPRECATED dropWhileU "Not that useful" #-}
 
-filterU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> CoPipe p a' a' m r
+filterU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' () a' () m r
 filterU p = runIdentityK go where
     go a' =
         if (p a')
@@ -856,13 +856,13 @@ filterU p = runIdentityK go where
 {-# INLINABLE filterU #-}
 {-# DEPRECATED filterU "Not that useful" #-}
 
-fromListC :: (Monad m, Proxy p) => [a'] -> () -> CoProducer p a' m ()
+fromListC :: (Monad m, Proxy p) => [a'] -> () -> p a' () () C m ()
 fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
 -- fromListC xs _ = mapM_ request xs
 {-# INLINABLE fromListC #-}
 {-# DEPRECATED fromListC "Use 'turn . fromListS xs' instead" #-}
 
-enumFromC :: (Enum a', Monad m, Proxy p) => a' -> () -> CoProducer p a' m r
+enumFromC :: (Enum a', Monad m, Proxy p) => a' -> () -> p a' () () C m r
 enumFromC a'0 = \_ -> runIdentityP (go a'0) where
     go a' = do
         request a'
@@ -872,7 +872,7 @@ enumFromC a'0 = \_ -> runIdentityP (go a'0) where
 
 enumFromToC
     :: (Enum a', Ord a', Monad m, Proxy p)
-    => a' -> a' -> () -> CoProducer p a' m ()
+    => a' -> a' -> () -> p a' () () C m ()
 enumFromToC a1 a2 _ = runIdentityP (go a1) where
     go n
         | n > a2 = return ()
@@ -882,13 +882,14 @@ enumFromToC a1 a2 _ = runIdentityP (go a1) where
 {-# INLINABLE enumFromToC #-}
 {-# DEPRECATED enumFromToC "Use 'turn . enumFromToS n1 n2' instead" #-}
 
-eachC :: (Monad m, Proxy p) => [a'] -> CoProduceT p m a'
+eachC :: (Monad m, Proxy p) => [a'] -> RequestT p () () C m a'
 eachC a's = RequestT (fromListC a's ())
 {-# INLINABLE eachC #-}
 {-# DEPRECATED eachC "Use 'RequestT $ turn $ fromListS xs ()' instead" #-}
 
 rangeC
-    :: (Enum a', Ord a', Monad m, Proxy p) => a' -> a' -> CoProduceT p m a'
+    :: (Enum a', Ord a', Monad m, Proxy p)
+    => a' -> a' -> RequestT p () () C m a'
 rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 {-# INLINABLE rangeC #-}
 {-# DEPRECATED rangeC "Use 'RequestT $ turn $ enumFromToS n1 n2 ()' instead" #-}
@@ -900,14 +901,14 @@ getLineS () = runIdentityP $ forever $ do
 {-# INLINABLE getLineS #-}
 {-# DEPRECATED getLineS "Use 'stdinS' instead" #-}
 
-getLineC :: (Proxy p) => () -> CoProducer p String IO r
+getLineC :: (Proxy p) => () -> p String () () C IO r
 getLineC () = runIdentityP $ forever $ do
     str <- lift getLine
     request str
 {-# INLINABLE getLineC #-}
 {-# DEPRECATED getLineC "Use 'turn . stdinS' instead" #-}
 
-readLnC :: (Read a', Proxy p) => () -> CoProducer p a' IO r
+readLnC :: (Read a', Proxy p) => () -> p a' () () C IO r
 readLnC () = runIdentityP $ forever $ do
     a <- lift readLn
     request a
@@ -943,7 +944,7 @@ putStrLnB = runIdentityK $ foreverK $ \a' -> do
 {-# INLINABLE putStrLnB #-}
 {-# DEPRECATED putStrLnB "Not that useful" #-}
 
-hGetLineC :: (Proxy p) => IO.Handle -> () -> CoProducer p String IO ()
+hGetLineC :: (Proxy p) => IO.Handle -> () -> p String () () C IO ()
 hGetLineC h () = runIdentityP go where
     go = do
         eof <- lift $ IO.hIsEOF h
