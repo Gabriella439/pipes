@@ -14,9 +14,7 @@ module Control.Proxy.Prelude (
     -- * Maps
     mapD,
     mapMD,
-    mapMU,
     useD,
-    useU,
     execD,
     execU,
 
@@ -36,9 +34,9 @@ module Control.Proxy.Prelude (
     rangeS,
 
     -- * Folds
-    foldD,
-    allD,
-    allD_,
+    foldC,
+    allC,
+    allC_,
     anyD,
     anyD_,
     sumD,
@@ -79,7 +77,9 @@ module Control.Proxy.Prelude (
     -- $deprecate
     mapU,
     mapB,
+    mapMU,
     mapMB,
+    useU,
     useB,
     execB,
     takeWhileU,
@@ -91,6 +91,9 @@ module Control.Proxy.Prelude (
     enumFromToC,
     eachC,
     rangeC,
+    foldD,
+    allD,
+    allD_,
     getLineS,
     getLineC,
     readLnC,
@@ -208,94 +211,48 @@ mapD f () = runIdentityP $ forever $ do
 mapMD :: (Monad m, Proxy p) => (a -> m b) -> () -> Pipe p a b m r
 mapMD f () = runIdentityP $ forever $ do
     a <- request ()
-    b <- lift (f a)
+    b <- lift $ f a
     respond b
 {-# INLINABLE mapMD #-}
 
-{-| @(mapMU g)@ applies the monadic function @g@ to all values going upstream
-
-> mapMU g1 >-> mapMU g2 = mapMU (g2 >=> g1)
->
-> mapMU return = pull
--}
-mapMU :: (Monad m, Proxy p) => (b' -> m a') -> b' -> p a' x b' x m r
-mapMU g = runIdentityK go where
-    go b' = do
-        a'  <- lift (g b')
-        x   <- request a'
-        b'2 <- respond x
-        go b'2
--- mapMU g = foreverK $ lift . g >=> request >=> respond
-{-# INLINABLE mapMU #-}
-
 {-| @(useD f)@ executes the monadic function @f@ on all values flowing
-    \'@D@\'ownstream
+    \'@D@\'ownstream, discarding the result
 
 > useD f1 >-> useD f2 = useD (\a -> f1 a >> f2 a)
 >
 > useD (\_ -> return ()) = pull
 -}
-useD :: (Monad m, Proxy p) => (a -> m r1) -> x -> p x a x a m r
-useD f = runIdentityK go where
-    go x = do
-        a  <- request x
-        _  <- lift $ f a
-        x2 <- respond a
-        go x2
+useD :: (Monad m, Proxy p) => (a -> m b) -> () -> Pipe p a a m r
+useD f () = runIdentityP $ forever $ do
+    a <- request ()
+    _ <- lift (f a)
+    return ()
 {-# INLINABLE useD #-}
 
-{-| @(useU g)@ executes the monadic function @g@ on all values flowing
-    \'@U@\'pstream
-
-> useU g1 >-> useU g2 = useU (\a' -> g2 a' >> g1 a')
->
-> useU (\_ -> return ()) = pull
--}
-useU :: (Monad m, Proxy p) => (a' -> m r2) -> a' -> p a' x a' x m r
-useU g = runIdentityK go where
-    go a' = do
-        lift $ g a'
-        x   <- request a'
-        a'2 <- respond x
-        go a'2
-{-# INLINABLE useU #-}
-
-{-| @(execD md)@ executes @md@ every time values flow downstream through it.
+{-| @(execD md)@ executes @md@ every time control flows downstream through it
 
 > execD md1 >-> execD md2 = execD (md1 >> md2)
 >
 > execD (return ()) = pull
 -}
-execD :: (Monad m, Proxy p) => m r1 -> a' -> p a' a a' a m r
-execD md = runIdentityK go where
-    go a' = do
-        a   <- request a'
-        _   <- lift md
-        a'2 <- respond a
-        go a'2
-{- execD md = foreverK $ \a' -> do
-    a <- request a'
-    lift md
-    respond a -}
+execD :: (Monad m, Proxy p) => m b -> () -> Pipe p a a m r
+execD md () = runIdentityP $ forever $ do
+    a <- request ()
+    _ <- lift md
+    respond a
 {-# INLINABLE execD #-}
 
-{-| @(execU mu)@ executes @mu@ every time values flow upstream through it.
+{-| @(execU mu)@ executes @mu@ every time control flows upstream through it
 
 > execU mu1 >-> execU mu2 = execU (mu2 >> mu1)
 >
 > execU (return ()) = pull
 -}
-execU :: (Monad m, Proxy p) => m r2 -> a' -> p a' a a' a m r
-execU mu = runIdentityK go where
-    go a' = do
-        lift mu
-        a   <- request a'
-        a'2 <- respond a
-        go a'2
-{- execU mu = foreverK $ \a' -> do
+execU :: (Monad m, Proxy p) => m b -> () -> Pipe p a a m r
+execU mu () = runIdentityP $ forever $ do
     lift mu
-    a <- request a'
-    respond a -}
+    a <- request ()
+    respond a
 {-# INLINABLE execU #-}
 
 {-| @(takeB n)@ allows @n@ upstream/downstream roundtrips to pass through
@@ -456,44 +413,36 @@ rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ProduceT p m b
 rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
 {-# INLINABLE rangeS #-}
 
-{-| Strict fold into a 'Monoid' over values flowing \'@D@\'ownstream.
+-- | Strict fold using the provided 'Monoid'
+foldC
+    :: (Monoid w, Monad m, Proxy p)
+    => (a -> w) -> () -> Consumer (WriterP w p) a m r
+foldC f () =  forever $ do
+    a <- request ()
+    tell (f a)
+{-# INLINABLE foldC #-}
 
-> foldD f >-> foldD g = foldD (f <> g)
->
-> foldD mempty = idPull
+-- | Fold that returns whether 'All' values satisfy the predicate
+allC
+    :: (Monad m, Proxy p) => (a -> Bool) -> () -> Consumer (WriterP All p) a m r
+allC predicate = foldC (All . predicate)
+{-# INLINABLE allC #-}
+
+{-| Fold that returns whether 'All' values satisfy the predicate
+
+    'allC_' terminates on the first value that fails the predicate
 -}
-foldD
-    :: (Monad m, Proxy p, Monoid w) => (a -> w) -> x -> WriterP w p x a x a m r
-foldD f = go where
-    go x = do
-        a <- request x
-        tell (f a)
-        x2 <- respond a
-        go x2
-{-# INLINABLE foldD #-}
-
-{-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
-    predicate
--}
-allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP All p x a x a m r
-allD predicate = foldD (All . predicate)
-{-# INLINABLE allD #-}
-
-{-| Fold that returns whether 'All' values flowing \'@D@\'ownstream satisfy the
-    predicate
-
-    'allD_' terminates on the first value that fails the predicate
--}
-allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP All p x a x a m ()
-allD_ predicate = go where
-    go x = do
-        a <- request x
+allC_
+    :: (Monad m, Proxy p)
+    => (a -> Bool) -> () -> Consumer (WriterP All p) a m ()
+allC_ predicate () = go
+  where
+    go = do
+        a <- request ()
         if (predicate a)
-            then do
-                x2 <- respond a
-                go x2
+            then go
             else tell (All False)
-{-# INLINABLE allD_ #-}
+{-# INLINABLE allC_ #-}
 
 {-| Fold that returns whether 'Any' value flowing \'@D@\'ownstream satisfies the
     predicate
@@ -781,6 +730,16 @@ mapB f g = runIdentityK go where
 {-# INLINABLE mapB #-}
 {-# DEPRECATED mapB "Combine 'mapD' and 'mapU' instead" #-}
 
+mapMU :: (Monad m, Proxy p) => (b' -> m a') -> b' -> p a' x b' x m r
+mapMU g = runIdentityK go where
+    go b' = do
+        a'  <- lift (g b')
+        x   <- request a'
+        b'2 <- respond x
+        go b'2
+{-# INLINABLE mapMU #-}
+{-# DEPRECATED mapMU "Not very useful" #-}
+
 mapMB
     :: (Monad m, Proxy p) => (a -> m b) -> (b' -> m a') -> b' -> p a' a b' b m r
 mapMB f g = runIdentityK go where
@@ -792,6 +751,16 @@ mapMB f g = runIdentityK go where
         go b'2
 {-# INLINABLE mapMB #-}
 {-# DEPRECATED mapMB "Combine 'mapMD' and 'mapMU' instead" #-}
+
+useU :: (Monad m, Proxy p) => (a' -> m r2) -> a' -> p a' x a' x m r
+useU g = runIdentityK go where
+    go a' = do
+        lift $ g a'
+        x   <- request a'
+        a'2 <- respond x
+        go a'2
+{-# INLINABLE useU #-}
+{-# DEPRECATED useU "Not very useful" #-}
 
 useB
     :: (Monad m, Proxy p)
@@ -901,6 +870,34 @@ rangeC
 rangeC a'1 a'2 = RequestT (enumFromToC a'1 a'2 ())
 {-# INLINABLE rangeC #-}
 {-# DEPRECATED rangeC "Use 'RequestT $ turn $ enumFromToS n1 n2 ()' instead" #-}
+
+foldD
+    :: (Monad m, Proxy p, Monoid w) => (a -> w) -> x -> WriterP w p x a x a m r
+foldD f = go where
+    go x = do
+        a <- request x
+        tell (f a)
+        x2 <- respond a
+        go x2
+{-# INLINABLE foldD #-}
+{-# DEPRECATED foldD "Use 'forward foldC' instead" #-}
+
+allD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP All p x a x a m r
+allD predicate = foldD (All . predicate)
+{-# INLINABLE allD #-}
+{-# DEPRECATED allD "Use 'forward allC' instead" #-}
+
+allD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP All p x a x a m ()
+allD_ predicate = go where
+    go x = do
+        a <- request x
+        if (predicate a)
+            then do
+                x2 <- respond a
+                go x2
+            else tell (All False)
+{-# INLINABLE allD_ #-}
+{-# DEPRECATED allD_ "Use 'forward allC_' instead" #-}
 
 getLineS :: (Proxy p) => () -> Producer p String IO r
 getLineS () = runIdentityP $ forever $ do
