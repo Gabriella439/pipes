@@ -55,19 +55,17 @@ module Control.Proxy.Prelude (
     zipD,
     mergeD,
 
-    -- * Closed Adapters
-    -- $open
-    unitD,
-    unitU,
-
     -- * Kleisli utilities
     foreverK,
 
     -- * Adapters
+    unitD,
+    unitU,
     forward,
     generalize,
 
     -- * Re-exports
+    -- $modules
     module Data.Monoid,
 
     -- * Deprecated
@@ -556,45 +554,6 @@ mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
         go
 {-# INLINABLE mergeD #-}
 
-{- $open
-    Use the @unit@ functions when you need to embed a proxy with a closed end
-    within an open proxy.  For example, the following code will not type-check
-    because @fromListS [1..]@  is a 'Producer' and has a closed upstream end,
-    which conflicts with the 'request' statement preceding it:
-
-> p () = do
->     request ()
->     fromList [1..] ()
-
-    You fix this by composing 'unitD' upstream of it, which replaces its closed
-    upstream end with an open polymorphic end:
-
-> p () = do
->     request ()
->     (fromList [1..] <-< unitD) ()
-
--}
-
--- | Compose 'unitD' with a closed upstream end to create a polymorphic end
-unitD :: (Monad m, Proxy p) => q -> p x' x y' () m r
-unitD _ = runIdentityP go where
-    go = do
-        _ <- respond ()
-        go
-{-# INLINABLE unitD #-}
-
--- | Compose 'unitU' with a closed downstream end to create a polymorphic end
-unitU :: (Monad m, Proxy p) => q -> p () x y' y m r
-unitU _ = runIdentityP go where
-    go = do
-        _ <- request ()
-        go
-{-# INLINABLE unitU #-}
-
-{- $modules
-    These modules help you build, run, and extract folds
--}
-
 {-| Compose a \'@K@\'leisli arrow with itself forever
 
     Use 'foreverK' to abstract away the following common recursion pattern:
@@ -616,6 +575,22 @@ foreverK k = let r = \a -> k a >>= r in r
    See: http://hackage.haskell.org/trac/ghc/ticket/5205
 -}
 {-# INLINABLE foreverK #-}
+
+-- | Discards all values going upstream
+unitD :: (Monad m, Proxy p) => q -> p x' x y' () m r
+unitD _ = runIdentityP go where
+    go = do
+        _ <- respond ()
+        go
+{-# INLINABLE unitD #-}
+
+-- | Discards all values going downstream
+unitU :: (Monad m, Proxy p) => q -> p () x y' y m r
+unitU _ = runIdentityP go where
+    go = do
+        _ <- request ()
+        go
+{-# INLINABLE unitU #-}
 
 {-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
     downstream
@@ -661,6 +636,11 @@ generalize p x = evalStateP x $ up >\\ liftP (p ()) //> dn
         x <- respond a
         put x
 {-# INLINABLE generalize #-}
+
+{- $modules
+    @Data.Monoid@ re-exports unwrapping functions for monoids in order to
+    extract the results of folds.
+-}
 
 {- $deprecate
     To be removed in version @4.0.0@
