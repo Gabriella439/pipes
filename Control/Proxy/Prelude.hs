@@ -273,14 +273,14 @@ takeB_ n () = runIdentityP $ replicateM_ n $ do
 >
 > takeWhileD mempty = pull
 -}
-takeWhileD :: (Monad m, Proxy p) => (a -> Bool) -> a' -> p a' a a' a m ()
-takeWhileD p = runIdentityK go where
-    go a' = do
-        a <- request a'
-        if (p a)
+takeWhileD :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m ()
+takeWhileD predicate () = runIdentityP go where
+    go = do
+        a <- request ()
+        if (predicate a)
             then do
-                a'2 <- respond a
-                go a'2
+                respond a
+                go
             else return ()
 {-# INLINABLE takeWhileD #-}
 
@@ -291,15 +291,9 @@ takeWhileD p = runIdentityK go where
 > dropD 0 = pull
 -}
 dropD :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m r
-dropD n0 = \() -> runIdentityP (go n0) where
-    go n
-        | n <= 0    = pull ()
-        | otherwise = do
-            _ <- request ()
-            go (n - 1)
-{- dropD n () = do
+dropD n () = runIdentityP $ do
     replicateM_ n $ request ()
-    pull () -}
+    pull ()
 {-# INLINABLE dropD #-}
 
 {-| @(dropWhileD p)@ discards values going downstream until one violates the
@@ -320,8 +314,8 @@ dropWhileD p () = runIdentityP go where
         if (p a)
             then go
             else do
-                x <- respond a
-                pull x
+                respond a
+                pull ()
 {-# INLINABLE dropWhileD #-}
 
 {-| @(filterD p)@ discards values going downstream if they fail the predicate
@@ -336,7 +330,7 @@ dropWhileD p () = runIdentityP go where
 > filterD mempty = pull
 -}
 filterD :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m r
-filterD p = \() -> runIdentityP go where
+filterD p () = runIdentityP go where
     go = do
         a <- request ()
         if (p a)
@@ -353,8 +347,7 @@ filterD p = \() -> runIdentityP go where
 > fromListS [] = return
 -}
 fromListS :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
-fromListS xs = \_ -> foldr (\e a -> respond e ?>= \_ -> a) (return_P ()) xs
--- fromListS xs _ = mapM_ respond xs
+fromListS xs () = runIdentityP $ mapM_ respond xs
 {-# INLINABLE fromListS #-}
 
 -- | 'Producer' version of 'enumFrom'
