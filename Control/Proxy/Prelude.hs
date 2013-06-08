@@ -140,9 +140,7 @@ import Data.Monoid (
     Product(Product, getProduct),
     First(First, getFirst),
     Last(Last, getLast) )
-import Data.Foldable (Foldable, mapM_)
 import qualified System.IO as IO
-import Prelude hiding (mapM_)
 
 -- | Produces lines, using 'getLine'
 stdinS :: (Proxy p) => () -> Producer p String IO r
@@ -348,7 +346,7 @@ filterD p () = runIdentityP go where
 >
 > fromListS [] = return
 -}
-fromListS :: (Monad m, Proxy p, Foldable t) => t b -> () -> Producer p b m ()
+fromListS :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
 fromListS xs () = runIdentityP $ mapM_ respond xs
 {-# INLINABLE fromListS #-}
 
