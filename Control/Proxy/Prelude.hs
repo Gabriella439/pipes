@@ -5,17 +5,14 @@
 module Control.Proxy.Prelude (
     -- * I/O
     stdinS,
-    stdoutD,
     readLnS,
     hGetLineS,
-    hPutStrLnD,
-    printD,
-    printU,
-    printB,
+    stdoutC,
+    hPutStrLnC,
+    printC,
 
     -- * Maps
     mapD,
-    mapU,
     mapMD,
     mapMU,
     useD,
@@ -71,14 +68,16 @@ module Control.Proxy.Prelude (
     -- * Kleisli utilities
     foreverK,
 
-    -- * Generalization
+    -- * Adapters
     forward,
+    generalize,
 
     -- * Re-exports
     module Data.Monoid,
 
     -- * Deprecated
     -- $deprecate
+    mapU,
     mapB,
     mapMB,
     useB,
@@ -95,12 +94,17 @@ module Control.Proxy.Prelude (
     getLineS,
     getLineC,
     readLnC,
+    stdoutD,
     putStrLnD,
     putStrLnU,
     putStrLnB,
     hGetLineC,
+    hPutStrLnD,
     hPutStrLnU,
     hPutStrLnB,
+    printD,
+    printU,
+    printB,
     hPrintD,
     hPrintU,
     hPrintB,
@@ -135,26 +139,12 @@ import Data.Monoid (
     Last(Last, getLast) )
 import qualified System.IO as IO
 
-{-| A 'Producer' that sends lines from 'stdin' downstream
-
-> stdinS = hGetLineS stdin
--}
+-- | Produces lines, using 'getLine'
 stdinS :: (Proxy p) => () -> Producer p String IO r
 stdinS () = runIdentityP $ forever $ do
     str <- lift getLine
     respond str
 {-# INLINABLE stdinS #-}
-
-{-| 'putStrLn's all values flowing \'@D@\'ownstream to 'stdout'
-
-> stdoutD = hPutStrLnD stdout
--}
-stdoutD :: (Proxy p) => x -> p x String x String IO r
-stdoutD = runIdentityK $ foreverK $ \x -> do
-    a <- request x
-    lift $ putStrLn a
-    respond a
-{-# INLINABLE stdoutD #-}
 
 -- | 'read' input from 'stdin' one line at a time and send \'@D@\'ownstream
 readLnS :: (Read b, Proxy p) => () -> Producer p b IO r
@@ -176,45 +166,26 @@ hGetLineS h () = runIdentityP go where
                 go
 {-# INLINABLE hGetLineS #-}
 
--- | 'putStrLn's all values flowing \'@D@\'ownstream to a 'Handle'
-hPutStrLnD :: (Proxy p) => IO.Handle -> x -> p x String x String IO r
-hPutStrLnD h = runIdentityK $ foreverK $ \x -> do
-    a <- request x
-    lift $ IO.hPutStrLn h a
-    respond a
-{-# INLINABLE hPutStrLnD #-}
+-- | Consumes 'String's, using 'putStrLn'
+stdoutC :: (Proxy p) => () -> Consumer p String IO r
+stdoutC () = runIdentityP $ forever $ do
+    str <- request ()
+    lift $ putStrLn str
+{-# INLINABLE stdoutC #-}
 
--- | 'print's all values flowing \'@D@\'ownstream to 'stdout'
-printD :: (Show a, Proxy p) => x -> p x a x a IO r
-printD = runIdentityK $ foreverK $ \x -> do
-    a <- request x
+-- | Consumes 'String's using 'hPutStrLn'
+hPutStrLnC :: (Proxy p) => IO.Handle -> () -> Consumer p String IO r
+hPutStrLnC handle () = runIdentityP $ forever $ do
+    str <- request ()
+    lift $ IO.hPutStrLn handle str
+{-# INLINABLE hPutStrLnC #-}
+
+-- | Consumes 'Show'able values using 'print'
+printC :: (Show a, Proxy p) => () -> Consumer p a IO r
+printC () = runIdentityP $ forever $ do
+    a <- request ()
     lift $ print a
-    respond a
-{-# INLINABLE printD #-}
-
--- | 'print's all values flowing \'@U@\'pstream to 'stdout'
-printU :: (Show a', Proxy p) => a' -> p a' x a' x IO r
-printU = runIdentityK $ foreverK $ \a' -> do
-    lift $ print a'
-    x <- request a'
-    respond x
-{-# INLINABLE printU #-}
-
-{-| 'print's all values flowing through it to 'stdout'
-
-    Prefixes upstream values with \"@U: @\" and downstream values with \"@D: @\"
--}
-printB :: (Show a', Show a, Proxy p) => a' -> p a' a a' a IO r
-printB = runIdentityK $ foreverK $ \a' -> do
-    lift $ do
-        putStr "U: "
-        print a'
-    a <- request a'
-    lift $ do
-        putStr "D: "
-        print a
-    respond a
-{-# INLINABLE printB #-}
+{-# INLINABLE printC #-}
 
 {-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
 
@@ -222,29 +193,11 @@ printB = runIdentityK $ foreverK $ \a' -> do
 >
 > mapD id = pull
 -}
-mapD :: (Monad m, Proxy p) => (a -> b) -> x -> p x a x b m r
-mapD f = runIdentityK go where
-    go x = do
-        a  <- request x
-        x2 <- respond (f a)
-        go x2
--- mapD f = runIdentityK (foreverK $ request >=> respond . f)
+mapD :: (Monad m, Proxy p) => (a -> b) -> () -> Pipe p a b m r
+mapD f () = runIdentityP $ forever $ do
+    a <- request ()
+    respond (f a)
 {-# INLINABLE mapD #-}
-
-{-| @(mapU g)@ applies @g@ to all values going \'@U@\'pstream.
-
-> mapU g1 >-> mapU g2 = mapU (g1 . g2)
->
-> mapU id = pull
--}
-mapU :: (Monad m, Proxy p) => (b' -> a') -> b' -> p a' x b' x m r
-mapU g = runIdentityK go where
-    go b' = do
-        x   <- request (g b')
-        b'2 <- respond x
-        go b'2
--- mapU g = foreverK $ (request . g) >=> respond
-{-# INLINABLE mapU #-}
 
 {-| @(mapMD f)@ applies the monadic function @f@ to all values going downstream
 
@@ -252,14 +205,11 @@ mapU g = runIdentityK go where
 >
 > mapMD return = pull
 -}
-mapMD :: (Monad m, Proxy p) => (a -> m b) -> x -> p x a x b m r
-mapMD f = runIdentityK go where
-    go x = do
-        a  <- request x
-        b  <- lift (f a)
-        x2 <- respond b
-        go x2
--- mapMD f = foreverK $ request >=> lift . f >=> respond
+mapMD :: (Monad m, Proxy p) => (a -> m b) -> () -> Pipe p a b m r
+mapMD f () = runIdentityP $ forever $ do
+    a <- request ()
+    b <- lift (f a)
+    respond b
 {-# INLINABLE mapMD #-}
 
 {-| @(mapMU g)@ applies the monadic function @g@ to all values going upstream
@@ -792,12 +742,35 @@ forward p x = evalStateP (x, Nothing) $ do
         a <- request x2
         put (x2, Just a)
         return a
+{-# INLINABLE forward #-}
 
-
+-- | Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
+generalize
+    :: (Monad m, Proxy p)
+    => (() -> Pipe p a b m r) -> x -> p x a x b m r
+generalize p x = evalStateP x $ up >\\ liftP (p ()) //> dn
+  where
+    up () = do
+        x <- get
+        request x
+    dn a = do
+        x <- respond a
+        put x
+{-# INLINABLE generalize #-}
 
 {- $deprecate
     To be removed in version @4.0.0@
 -}
+
+mapU :: (Monad m, Proxy p) => (b' -> a') -> b' -> p a' x b' x m r
+mapU g = runIdentityK go where
+    go b' = do
+        x   <- request (g b')
+        b'2 <- respond x
+        go b'2
+-- mapU g = foreverK $ (request . g) >=> respond
+{-# INLINABLE mapU #-}
+{-# DEPRECATED mapU "Not very useful" #-}
 
 mapB :: (Monad m, Proxy p) => (a -> b) -> (b' -> a') -> b' -> p a' a b' b m r
 mapB f g = runIdentityK go where
@@ -950,6 +923,14 @@ readLnC () = runIdentityP $ forever $ do
 {-# INLINABLE readLnC #-}
 {-# DEPRECATED readLnC "Use 'turn . readLnC' instead" #-}
 
+stdoutD :: (Proxy p) => x -> p x String x String IO r
+stdoutD = runIdentityK $ foreverK $ \x -> do
+    a <- request x
+    lift $ putStrLn a
+    respond a
+{-# INLINABLE stdoutD #-}
+{-# DEPRECATED stdoutD "Use 'forward stdoutC' instead" #-}
+
 putStrLnD :: (Proxy p) => x -> p x String x String IO r
 putStrLnD = runIdentityK $ foreverK $ \x -> do
     a <- request x
@@ -992,6 +973,35 @@ hGetLineC h () = runIdentityP go where
 {-# INLINABLE hGetLineC #-}
 {-# DEPRECATED hGetLineC "Use 'turn . hGetLineS h'" #-}
 
+printD :: (Show a, Proxy p) => x -> p x a x a IO r
+printD = runIdentityK $ foreverK $ \x -> do
+    a <- request x
+    lift $ print a
+    respond a
+{-# INLINABLE printD #-}
+{-# DEPRECATED printD "Use 'forward printC' instead" #-}
+
+printU :: (Show a', Proxy p) => a' -> p a' x a' x IO r
+printU = runIdentityK $ foreverK $ \a' -> do
+    lift $ print a'
+    x <- request a'
+    respond x
+{-# INLINABLE printU #-}
+{-# DEPRECATED printU "Not very useful" #-}
+
+printB :: (Show a', Show a, Proxy p) => a' -> p a' a a' a IO r
+printB = runIdentityK $ foreverK $ \a' -> do
+    lift $ do
+        putStr "U: "
+        print a'
+    a <- request a'
+    lift $ do
+        putStr "D: "
+        print a
+    respond a
+{-# INLINABLE printB #-}
+{-# DEPRECATED printB "Not very useful" #-}
+
 hPrintD :: (Show a, Proxy p) => IO.Handle -> x -> p x a x a IO r
 hPrintD h = runIdentityK $ foreverK $ \x -> do
     a <- request x
@@ -1020,6 +1030,14 @@ hPrintB h = runIdentityK $ foreverK $ \a' -> do
     respond a
 {-# INLINABLE hPrintB #-}
 {-# DEPRECATED hPrintB "Not that useful" #-}
+
+hPutStrLnD :: (Proxy p) => IO.Handle -> x -> p x String x String IO r
+hPutStrLnD h = runIdentityK $ foreverK $ \x -> do
+    a <- request x
+    lift $ IO.hPutStrLn h a
+    respond a
+{-# INLINABLE hPutStrLnD #-}
+{-# DEPRECATED hPutStrLnD "Use 'forward hPutStrLnC' instead" #-}
 
 hPutStrLnU :: (Proxy p) => IO.Handle -> String -> p String x String x IO r
 hPutStrLnU h = runIdentityK $ foreverK $ \a' -> do
