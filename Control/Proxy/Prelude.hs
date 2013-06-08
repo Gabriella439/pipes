@@ -34,17 +34,17 @@ module Control.Proxy.Prelude (
     foldC,
     allC,
     allC_,
-    anyD,
-    anyD_,
-    sumD,
-    productD,
-    lengthD,
-    headD,
-    headD_,
-    lastD,
-    toListD,
-    foldrD,
-    foldlD',
+    anyC,
+    anyC_,
+    sumC,
+    productC,
+    lengthC,
+    headC,
+    headC_,
+    lastC,
+    toListC,
+    foldrC,
+    foldlC',
 
     -- * ArrowChoice
     -- $choice
@@ -92,6 +92,17 @@ module Control.Proxy.Prelude (
     foldD,
     allD,
     allD_,
+    anyD,
+    anyD_,
+    sumD,
+    lengthD,
+    productD,
+    headD,
+    headD_,
+    lastD,
+    toListD,
+    foldrD,
+    foldlD',
     getLineS,
     getLineC,
     readLnC,
@@ -392,69 +403,69 @@ allC_ predicate () = go
             else tell (M.All False)
 {-# INLINABLE allC_ #-}
 
-{-| Fold that returns whether 'M.Any' value flowing \'@D@\'ownstream satisfies
-    the predicate
--}
-anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP M.Any p x a x a m r
-anyD predicate = foldD (M.Any . predicate)
-{-# INLINABLE anyD #-}
+-- | Fold that returns whether 'M.Any' value satisfies the predicate
+anyC
+    :: (Monad m, Proxy p)
+    => (a -> Bool) -> () -> Consumer (WriterP M.Any p) a m r
+anyC predicate = foldC (M.Any . predicate)
+{-# INLINABLE anyC #-}
 
-{-| Fold that returns whether 'M.Any' value flowing \'@D@\'ownstream satisfies
-    the predicate
+{-| Fold that returns whether 'M.Any' value satisfies the predicate
 
-    'anyD_' terminates on the first value that satisfies the predicate
+    'anyC_' terminates on the first value that satisfies the predicate
 -}
-anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP M.Any p x a x a m ()
-anyD_ predicate = go where
-    go x = do
-        a <- request x
+anyC_
+    :: (Monad m, Proxy p)
+    => (a -> Bool) -> () -> Consumer (WriterP M.Any p) a m ()
+anyC_ predicate () = go where
+    go = do
+        a <- request ()
         if (predicate a)
             then tell (M.Any True)
-            else do
-                x2 <- respond a
-                go x2
-{-# INLINABLE anyD_ #-}
+            else go
+{-# INLINABLE anyC_ #-}
 
--- | Compute the 'M.Sum' of all values that flow \'@D@\'ownstream
-sumD :: (Monad m, Proxy p, Num a) => x -> WriterP (M.Sum a) p x a x a m r
-sumD = foldD M.Sum
-{-# INLINABLE sumD #-}
+-- | Compute the 'M.Sum' of all values
+sumC :: (Monad m, Proxy p, Num a) => () -> Consumer (WriterP (M.Sum a) p) a m r
+sumC = foldC M.Sum
+{-# INLINABLE sumC #-}
 
--- | Compute the 'M.Product' of all values that flow \'@D@\'ownstream
-productD
-    :: (Monad m, Proxy p, Num a) => x -> WriterP (M.Product a) p x a x a m r
-productD = foldD M.Product
-{-# INLINABLE productD #-}
+-- | Compute the 'M.Product' of all values
+productC
+    :: (Monad m, Proxy p, Num a)
+    => () -> Consumer (WriterP (M.Product a) p) a m r
+productC = foldC M.Product
+{-# INLINABLE productC #-}
 
--- | Count how many values flow \'@D@\'ownstream
-lengthD :: (Monad m, Proxy p) => x -> WriterP (M.Sum Int) p x a x a m r
-lengthD = foldD (\_ -> M.Sum 1)
-{-# INLINABLE lengthD #-}
+-- | Count the number of values
+lengthC :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.Sum Int) p) a m r
+lengthC = foldC (\_ -> M.Sum 1)
+{-# INLINABLE lengthC #-}
 
--- | Retrieve the 'M.First' value going \'@D@\'ownstream
-headD :: (Monad m, Proxy p) => x -> WriterP (M.First a) p x a x a m r
-headD = foldD (M.First . Just)
-{-# INLINABLE headD #-}
+-- | Retrieve the 'M.First' value
+headC :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.First a) p) a m r
+headC = foldC (M.First . Just)
+{-# INLINABLE headC #-}
 
-{-| Retrieve the 'M.First' value going \'@D@\'ownstream
+{-| Retrieve the 'M.First' value
 
-    'headD_' terminates on the first value it receives
+    'headC_' terminates on the first value it receives
 -}
-headD_ :: (Monad m, Proxy p) => x -> WriterP (M.First a) p x a x a m ()
-headD_ x = do
-    a <- request x
+headC_ :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.First a) p) a m ()
+headC_ () = do
+    a <- request ()
     tell $ M.First (Just a)
-{-# INLINABLE headD_ #-}
+{-# INLINABLE headC_ #-}
 
--- | Retrieve the last value going \'@D@\'ownstream
-lastD :: (Monad m, Proxy p) => x -> WriterP (M.Last a) p x a x a m r
-lastD = foldD (M.Last . Just)
-{-# INLINABLE lastD #-}
+-- | Retrieve the last value
+lastC :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.Last a) p) a m r
+lastC = foldC (M.Last . Just)
+{-# INLINABLE lastC #-}
 
 -- | Fold the values flowing \'@D@\'ownstream into a list
-toListD :: (Monad m, Proxy p) => x -> WriterP [a] p x a x a m r
-toListD = foldD (\x -> [x])
-{-# INLINABLE toListD #-}
+toListC :: (Monad m, Proxy p) => () -> Consumer (WriterP [a] p) a m r
+toListC = foldC (\x -> [x])
+{-# INLINABLE toListC #-}
 
 {-| Fold equivalent to 'foldr'
 
@@ -462,26 +473,24 @@ toListD = foldD (\x -> [x])
 
 > foldr :: (a -> b -> b) -> [a] -> M.Endo b
 -}
-foldrD
+foldrC
     :: (Monad m, Proxy p)
-    => (a -> b -> b) -> x -> WriterP (M.Endo b) p x a x a m r
-foldrD step = foldD (M.Endo . step)
-{-# INLINABLE foldrD #-}
+    => (a -> b -> b) -> () -> Consumer (WriterP (M.Endo b) p) a m r
+foldrC step = foldC (M.Endo . step)
+{-# INLINABLE foldrC #-}
 
 -- | Fold equivalent to 'foldl''.
 --
--- Contrary to 'foldD', this doesn't require that you fold into a 'M.Monoid'.
-foldlD' :: (Monad m, Proxy p)
-        => (s -> a -> s) -> x -> (StateP s p x a x a m r)
-foldlD' f = go where
-    go x = do
-        a <- request x
-        StateP (\s -> let s' = f s a
-                      in  s' `seq` return_P ((), s'))
-        x2 <- respond a
-        go x2
-{-# INLINABLE foldlD' #-}
-
+-- Uses 'StateP' instead of 'WriterP' to ensure a strict accumulation
+foldlC'
+    :: (Monad m, Proxy p) => (s -> a -> s) -> () -> Consumer (StateP s p) a m r
+foldlC' step () = go where
+    go = do
+        a <- request ()
+        s <- get
+        put $! step s a 
+        go
+{-# INLINABLE foldlC' #-}
 
 {- $choice
     'leftD' and 'rightD' satisfy the 'ArrowChoice' laws using @arr = mapD@.
@@ -856,6 +865,79 @@ allD_ predicate = go where
             else tell (M.All False)
 {-# INLINABLE allD_ #-}
 {-# DEPRECATED allD_ "Use 'forward allC_' instead" #-}
+
+anyD :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP M.Any p x a x a m r
+anyD predicate = foldD (M.Any . predicate)
+{-# INLINABLE anyD #-}
+{-# DEPRECATED anyD "Use 'forward anyC' instead" #-}
+
+anyD_ :: (Monad m, Proxy p) => (a -> Bool) -> x -> WriterP M.Any p x a x a m ()
+anyD_ predicate = go where
+    go x = do
+        a <- request x
+        if (predicate a)
+            then tell (M.Any True)
+            else do
+                x2 <- respond a
+                go x2
+{-# INLINABLE anyD_ #-}
+{-# DEPRECATED anyD_ "Use 'forward anyC_' instead" #-}
+
+sumD :: (Monad m, Proxy p, Num a) => x -> WriterP (M.Sum a) p x a x a m r
+sumD = foldD M.Sum
+{-# INLINABLE sumD #-}
+{-# DEPRECATED sumD "Use 'forward sumC' instead" #-}
+
+productD
+    :: (Monad m, Proxy p, Num a) => x -> WriterP (M.Product a) p x a x a m r
+productD = foldD M.Product
+{-# INLINABLE productD #-}
+{-# DEPRECATED productD "Use 'forward productC' instead" #-}
+
+lengthD :: (Monad m, Proxy p) => x -> WriterP (M.Sum Int) p x a x a m r
+lengthD = foldD (\_ -> M.Sum 1)
+{-# INLINABLE lengthD #-}
+{-# DEPRECATED lengthD "Use 'forward lengthC' instead" #-}
+
+headD :: (Monad m, Proxy p) => x -> WriterP (M.First a) p x a x a m r
+headD = foldD (M.First . Just)
+{-# INLINABLE headD #-}
+{-# DEPRECATED headD "Use 'forward headC' instead" #-}
+
+headD_ :: (Monad m, Proxy p) => x -> WriterP (M.First a) p x a x a m ()
+headD_ x = do
+    a <- request x
+    tell $ M.First (Just a)
+{-# INLINABLE headD_ #-}
+{-# DEPRECATED headD_ "Use 'forward headC_' instead" #-}
+
+lastD :: (Monad m, Proxy p) => x -> WriterP (M.Last a) p x a x a m r
+lastD = foldD (M.Last . Just)
+{-# INLINABLE lastD #-}
+{-# DEPRECATED lastD "Use 'forward lastC' instead" #-}
+
+toListD :: (Monad m, Proxy p) => x -> WriterP [a] p x a x a m r
+toListD = foldD (\x -> [x])
+{-# INLINABLE toListD #-}
+{-# DEPRECATED toListD "Use 'forward toListC' instead" #-}
+
+foldrD
+    :: (Monad m, Proxy p)
+    => (a -> b -> b) -> x -> WriterP (M.Endo b) p x a x a m r
+foldrD step = foldD (M.Endo . step)
+{-# INLINABLE foldrD #-}
+{-# DEPRECATED foldrD "Use 'forward foldrC' instead" #-}
+
+foldlD' :: (Monad m, Proxy p) => (s -> a -> s) -> x -> (StateP s p x a x a m r)
+foldlD' f = go where
+    go x = do
+        a <- request x
+        StateP (\s -> let s' = f s a
+                      in  s' `seq` return_P ((), s') )
+        x2 <- respond a
+        go x2
+{-# INLINABLE foldlD' #-}
+{-# DEPRECATED foldlD' "Use 'forward foldlC'' instead" #-}
 
 getLineS :: (Proxy p) => () -> Producer p String IO r
 getLineS () = runIdentityP $ forever $ do
