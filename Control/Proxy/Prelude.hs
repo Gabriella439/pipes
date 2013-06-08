@@ -71,6 +71,9 @@ module Control.Proxy.Prelude (
     -- * Kleisli utilities
     foreverK,
 
+    -- * Generalization
+    forward,
+
     -- * Re-exports
     module Data.Monoid,
 
@@ -119,7 +122,7 @@ import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 import Control.Proxy.Trans.Identity (
     IdentityP(IdentityP, runIdentityP), runIdentityK)
-import Control.Proxy.Trans.State (StateP(StateP))
+import Control.Proxy.Trans.State (StateP(StateP), evalStateP, get, put)
 import Control.Proxy.Trans.Writer (WriterP, tell)
 import Data.Monoid (
     Monoid(mempty, mappend),
@@ -759,6 +762,38 @@ foreverK k = let r = \a -> k a >>= r in r
    See: http://hackage.haskell.org/trac/ghc/ticket/5205
 -}
 {-# INLINABLE foreverK #-}
+
+{-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
+    downstream
+
+> forward
+>     :: (Monad m, Proxy p)
+>     => (() -> Consumer p a m r) -> (() -> Pipe p a a m r)
+-}
+forward
+    :: (Monad m, Proxy p)
+    => (() -> Consumer p a m r)
+    -> x -> p x a x a m r
+forward p x = evalStateP (x, Nothing) $ do
+    r <- (up >\\ liftP (p ()))
+    (_, ma) <- get
+    case ma of
+        Nothing -> return ()
+        Just a  -> do
+            respond a
+            return ()
+    return r
+  where
+    up () = do
+        (x, ma) <- get
+        x2 <- case ma of
+            Nothing -> return x
+            Just a  -> respond a
+        a <- request x2
+        put (x2, Just a)
+        return a
+
+
 
 {- $deprecate
     To be removed in version @4.0.0@
