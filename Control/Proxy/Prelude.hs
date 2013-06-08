@@ -28,9 +28,7 @@ module Control.Proxy.Prelude (
     -- * Lists and Enumerations
     fromListS,
     enumFromS,
-    enumFromToS,
     eachS,
-    rangeS,
 
     -- * Folds
     foldC,
@@ -88,8 +86,10 @@ module Control.Proxy.Prelude (
     filterU,
     fromListC,
     enumFromC,
+    enumFromToS,
     enumFromToC,
     eachC,
+    rangeS,
     rangeC,
     foldD,
     allD,
@@ -358,17 +358,6 @@ enumFromS b0 = \_ -> runIdentityP (go b0) where
         go $! succ b
 {-# INLINABLE enumFromS #-}
 
--- | 'Producer' version of 'enumFromTo'
-enumFromToS
-    :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> () -> Producer p b m ()
-enumFromToS b1 b2 _ = runIdentityP (go b1) where
-    go b
-        | b > b2    = return ()
-        | otherwise = do
-            _ <- respond b
-            go $! succ b
-{-# INLINABLE enumFromToS #-}
-
 {-| Non-deterministically choose from all values in the given list
 
 > mappend <$> eachS xs <*> eachS ys = eachS (mappend <$> xs <*> ys)
@@ -378,11 +367,6 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
 eachS :: (Monad m, Proxy p) => [b] -> ListT p m b
 eachS bs = RespondT (fromListS bs ())
 {-# INLINABLE eachS #-}
-
--- | Non-deterministically choose from all values in the given range
-rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ListT p m b
-rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
-{-# INLINABLE rangeS #-}
 
 -- | Strict fold using the provided 'Monoid'
 foldC
@@ -817,7 +801,6 @@ filterU p = runIdentityK go where
 
 fromListC :: (Monad m, Proxy p) => [a'] -> () -> p a' () () C m ()
 fromListC xs = \_ -> foldr (\e a -> request e ?>= \_ -> a) (return_P ()) xs
--- fromListC xs _ = mapM_ request xs
 {-# INLINABLE fromListC #-}
 {-# DEPRECATED fromListC "Use 'turn . fromListS xs' instead" #-}
 
@@ -828,6 +811,17 @@ enumFromC a'0 = \_ -> runIdentityP (go a'0) where
         go $! succ a'
 {-# INLINABLE enumFromC #-}
 {-# DEPRECATED enumFromC "Use 'turn . enumFromS n' instead" #-}
+
+enumFromToS
+    :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> () -> Producer p b m ()
+enumFromToS b1 b2 _ = runIdentityP (go b1) where
+    go b
+        | b > b2    = return ()
+        | otherwise = do
+            _ <- respond b
+            go $! succ b
+{-# INLINABLE enumFromToS #-}
+{-# DEPRECATED enumFromToS "Use 'fromListS [from..to]' instead" #-}
 
 enumFromToC
     :: (Enum a', Ord a', Monad m, Proxy p)
@@ -845,6 +839,11 @@ eachC :: (Monad m, Proxy p) => [a'] -> RequestT p () () C m a'
 eachC a's = RequestT (fromListC a's ())
 {-# INLINABLE eachC #-}
 {-# DEPRECATED eachC "Use 'RequestT $ turn $ fromListS xs ()' instead" #-}
+
+rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ListT p m b
+rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
+{-# INLINABLE rangeS #-}
+{-# DEPRECATED rangeS "Use 'eachS [from..to]' instead" #-}
 
 rangeC
     :: (Enum a', Ord a', Monad m, Proxy p)
