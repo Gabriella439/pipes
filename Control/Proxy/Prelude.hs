@@ -377,12 +377,12 @@ enumFromToS b1 b2 _ = runIdentityP (go b1) where
 >
 > eachS (pure mempty) = pure mempty
 -}
-eachS :: (Monad m, Proxy p) => [b] -> ProduceT p m b
+eachS :: (Monad m, Proxy p) => [b] -> ListT p m b
 eachS bs = RespondT (fromListS bs ())
 {-# INLINABLE eachS #-}
 
 -- | Non-deterministically choose from all values in the given range
-rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ProduceT p m b
+rangeS :: (Enum b, Ord b, Monad m, Proxy p) => b -> b -> ListT p m b
 rangeS b1 b2 = RespondT (enumFromToS b1 b2 ())
 {-# INLINABLE rangeS #-}
 

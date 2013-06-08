@@ -34,11 +34,11 @@ module Control.Proxy.Class (
     Client,
     Server,
     Session,
-    ProduceT,
+    ListT,
     CoPipe,
     CoProducer,
     CoConsumer,
-    CoProduceT,
+    CoListT,
 
     -- * Concrete Type Synonyms
     C,
@@ -47,10 +47,10 @@ module Control.Proxy.Class (
     Client',
     Server',
     Session',
-    ProduceT',
+    ListT',
     CoProducer',
     CoConsumer',
-    CoProduceT',
+    CoListT',
 
     -- * Laws
     -- $laws
@@ -64,7 +64,6 @@ module Control.Proxy.Class (
     -- $deprecate
     idT,
     coidT,
-    ListT,
     runRespondK,
     runRequestK
     ) where
@@ -456,8 +455,8 @@ type Server (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b m r
 type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) m r
     = forall a' a b' b . p a' a b' b m r
 
--- | 'ProduceT' is 'ListT' over the downstream output
-type ProduceT p m b = forall a' a . RespondT p a' a () m b
+-- | The list monad transformer
+type ListT p m b = forall a' a . RespondT p a' a () m b
 
 -- | A 'Pipe' where everything flows upstream
 type CoPipe (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' b' = p a' () b' ()
@@ -474,8 +473,8 @@ type CoProducer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' = p a' () () C
 -}
 type CoConsumer (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' = p C () b' ()
 
--- | 'CoProduceT' is 'ListT' over the upstream output
-type CoProduceT p = RequestT p () () C
+-- | The list monad transformer for values flowing upstream
+type CoListT p = RequestT p () () C
 
 -- | The empty type, denoting a \'@C@\'losed end
 data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
@@ -495,8 +494,8 @@ type Client' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
 -- | Like 'Session', but with concrete types to improve type inference
 type Session' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
--- | Like 'ProduceT', but with concrete types
-type ProduceT' p = RespondT p C () ()
+-- | Like 'ListT', but with concrete types
+type ListT' p = RespondT p C () ()
 
 -- | Like 'CoProducer', but with concrete types
 type CoProducer' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' = p a' () () C
@@ -504,8 +503,8 @@ type CoProducer' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' = p a' () () C
 -- | Like 'CoConsumer', but with concrete types
 type CoConsumer' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' = p C () b' ()
 
--- | Like 'CoProduceT', but with concrete types
-type CoProduceT' p = RequestT p () () C
+-- | Like 'CoListT', but with concrete types
+type CoListT' p = RequestT p () () C
 
 {- $laws
     First, all proxies sit at the intersection of five categories:
@@ -784,9 +783,6 @@ coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
 coidT = push
 {-# INLINABLE coidT #-}
 {-# DEPRECATED coidT "Use 'push' instead" #-}
-
-class (Proxy p) => ListT p where
-{-# DEPRECATED ListT "Use 'Proxy' instead" #-}
 
 runRespondK :: (q -> RespondT p a' a b' m b) -> (q -> p a' a b' b m b')
 runRespondK k q = runRespondT (k q)
