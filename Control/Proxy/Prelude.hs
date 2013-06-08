@@ -19,7 +19,6 @@ module Control.Proxy.Prelude (
     execU,
 
     -- * Filters
-    takeB,
     takeB_,
     takeWhileD,
     dropD,
@@ -82,6 +81,7 @@ module Control.Proxy.Prelude (
     useU,
     useB,
     execB,
+    takeB,
     takeWhileU,
     dropU,
     dropWhileU,
@@ -121,7 +121,7 @@ module Control.Proxy.Prelude (
     raisePK
     ) where
 
-import Control.Monad (forever)
+import Control.Monad (forever, replicateM_)
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class
@@ -255,33 +255,11 @@ execU mu () = runIdentityP $ forever $ do
     respond a
 {-# INLINABLE execU #-}
 
-{-| @(takeB n)@ allows @n@ upstream/downstream roundtrips to pass through
-
-> takeB n1 >=> takeB n2 = takeB (n1 + n2)  -- n1 >= 0 && n2 >= 0
->
-> takeB 0 = return
--}
-takeB :: (Monad m, Proxy p) => Int -> a' -> p a' a a' a m a'
-takeB n0 = runIdentityK (go n0) where
-    go n
-        | n <= 0    = return
-        | otherwise = \a' -> do
-             a   <- request a'
-             a'2 <- respond a
-             go (n - 1) a'2
--- takeB n = runIdentityK (replicateK n $ request >=> respond)
-{-# INLINABLE takeB #-}
-
--- | 'takeB_' is 'takeB' with a @()@ return value, convenient for composing
-takeB_ :: (Monad m, Proxy p) => Int -> a' -> p a' a a' a m ()
-takeB_ n0 = runIdentityK (go n0) where
-    go n
-        | n <= 0    = \_ -> return ()
-        | otherwise = \a' -> do
-            a   <- request a'
-            a'2 <- respond a
-            go (n - 1) a'2
--- takeB_ n = fmap void (takeB n)
+-- | @(takeB_ n)@ only allows @n@ values to pass through
+takeB_ :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m ()
+takeB_ n () = runIdentityP $ replicateM_ n $ do
+    a <- request ()
+    respond a
 {-# INLINABLE takeB_ #-}
 
 {-| @(takeWhileD p)@ allows values to pass downstream so long as they satisfy
@@ -785,6 +763,17 @@ execB md mu = runIdentityK go where
         go a'2
 {-# INLINABLE execB #-}
 {-# DEPRECATED execB "Combine 'execD' and 'execU' instead" #-}
+
+takeB :: (Monad m, Proxy p) => Int -> a' -> p a' a a' a m a'
+takeB n0 = runIdentityK (go n0) where
+    go n
+        | n <= 0    = return
+        | otherwise = \a' -> do
+             a   <- request a'
+             a'2 <- respond a
+             go (n - 1) a'2
+{-# INLINABLE takeB #-}
+{-# DEPRECATED takeB "Not very useful" #-}
 
 takeWhileU :: (Monad m, Proxy p) => (a' -> Bool) -> a' -> p a' a a' a m ()
 takeWhileU p = runIdentityK go where
