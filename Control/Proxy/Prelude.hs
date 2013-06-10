@@ -4,56 +4,56 @@
 
 module Control.Proxy.Prelude (
     -- * I/O
-    stdinS,
-    readLnS,
-    hGetLineS,
-    stdoutC,
-    hPutStrLnC,
-    printC,
+    stdin,
+    fromHandle,
+    stdout,
+    toHandle,
+    readLn,
+    print,
 
     -- * Maps
-    mapD,
-    mapMD,
-    useD,
+    map,
+    mapM,
+    use,
     execD,
     execU,
 
     -- * Filters
-    takeB_,
-    takeWhileD,
-    dropD,
-    dropWhileD,
-    filterD,
+    take,
+    takeWhile,
+    drop,
+    dropWhile,
+    filter,
 
     -- * Lists and Enumerations
-    fromListS,
-    enumFromS,
-    eachS,
+    fromList,
+    enumFrom,
+    each,
 
     -- * Folds
-    foldC,
-    allC,
-    allC_,
-    anyC,
-    anyC_,
-    sumC,
-    productC,
-    lengthC,
-    headC,
-    headC_,
-    lastC,
-    toListC,
-    foldrC,
-    foldlC',
+    fold,
+    all,
+    all_,
+    any,
+    any_,
+    sum,
+    product,
+    length,
+    head,
+    head_,
+    last,
+    toList,
+    foldr,
+    foldl',
 
     -- * ArrowChoice
     -- $choice
-    leftD,
-    rightD,
+    left,
+    right,
 
     -- * Zips and Merges
-    zipD,
-    mergeD,
+    zip,
+    merge,
 
     -- * Kleisli utilities
     foreverK,
@@ -82,24 +82,38 @@ import qualified Data.Monoid as M
 import Data.Monoid (
     appEndo, getAll, getAny, getSum, getProduct, getFirst, getLast )
 import qualified System.IO as IO
+import Prelude hiding (
+    print,
+    readLn,
+    map,
+    mapM,
+    take,
+    takeWhile,
+    drop,
+    dropWhile,
+    filter,
+    enumFrom,
+    all,
+    any,
+    sum,
+    product,
+    length,
+    head,
+    last,
+    foldr,
+    zip )
+import qualified Prelude
 
--- | Produces lines, using 'getLine'
-stdinS :: (Proxy p) => () -> Producer p String IO r
-stdinS () = runIdentityP $ forever $ do
+-- | Read 'String' lines from 'IO.stdin'
+stdin :: (Proxy p) => () -> Producer p String IO r
+stdin () = runIdentityP $ forever $ do
     str <- lift getLine
     respond str
-{-# INLINABLE stdinS #-}
+{-# INLINABLE stdin #-}
 
--- | 'read' input from 'stdin' one line at a time and send \'@D@\'ownstream
-readLnS :: (Read b, Proxy p) => () -> Producer p b IO r
-readLnS () = runIdentityP $ forever $ do
-    a <- lift readLn
-    respond a
-{-# INLINABLE readLnS #-}
-
--- | A 'Producer' that sends lines from a handle downstream
-hGetLineS :: (Proxy p) => IO.Handle -> () -> Producer p String IO ()
-hGetLineS h () = runIdentityP go where
+-- | Read 'String' lines from a 'IO.Handle'
+fromHandle :: (Proxy p) => IO.Handle -> () -> Producer p String IO ()
+fromHandle h () = runIdentityP go where
     go = do
         eof <- lift $ IO.hIsEOF h
         if eof
@@ -108,68 +122,73 @@ hGetLineS h () = runIdentityP go where
                 str <- lift $ IO.hGetLine h
                 respond str
                 go
-{-# INLINABLE hGetLineS #-}
+{-# INLINABLE fromHandle #-}
 
--- | Consumes 'String's, using 'putStrLn'
-stdoutC :: (Proxy p) => () -> Consumer p String IO r
-stdoutC () = runIdentityP $ forever $ do
-    str <- request ()
-    lift $ putStrLn str
-{-# INLINABLE stdoutC #-}
+-- | Write newline-terminated 'String's to 'IO.stdout'
+stdout :: (Proxy p) => () -> Consumer p String IO r
+stdout = toHandle IO.stdout
+{-# INLINABLE stdout #-}
 
--- | Consumes 'String's using 'hPutStrLn'
-hPutStrLnC :: (Proxy p) => IO.Handle -> () -> Consumer p String IO r
-hPutStrLnC handle () = runIdentityP $ forever $ do
+-- | Write newline-terminated 'String's to a 'IO.Handle'
+toHandle :: (Proxy p) => IO.Handle -> () -> Consumer p String IO r
+toHandle handle () = runIdentityP $ forever $ do
     str <- request ()
     lift $ IO.hPutStrLn handle str
-{-# INLINABLE hPutStrLnC #-}
+{-# INLINABLE toHandle #-}
 
--- | Consumes 'Show'able values using 'print'
-printC :: (Show a, Proxy p) => () -> Consumer p a IO r
-printC () = runIdentityP $ forever $ do
+-- | 'read' from 'IO.stdin' using 'Prelude.readLn'
+readLn :: (Read b, Proxy p) => () -> Producer p b IO r
+readLn () = runIdentityP $ forever $ do
+    a <- lift Prelude.readLn
+    respond a
+{-# INLINABLE readLn #-}
+
+-- | 'show' to 'IO.stdout' using 'Prelude.print'
+print :: (Show a, Proxy p) => () -> Consumer p a IO r
+print () = runIdentityP $ forever $ do
     a <- request ()
-    lift $ print a
-{-# INLINABLE printC #-}
+    lift $ Prelude.print a
+{-# INLINABLE print #-}
 
-{-| @(mapD f)@ applies @f@ to all values going \'@D@\'ownstream.
+{-| @(map f)@ applies @f@ to all values going \'@D@\'ownstream.
 
-> mapD f1 >-> mapD f2 = mapD (f2 . f1)
+> map f1 >-> map f2 = map (f2 . f1)
 >
-> mapD id = pull
+> map id = pull
 -}
-mapD :: (Monad m, Proxy p) => (a -> b) -> () -> Pipe p a b m r
-mapD f () = runIdentityP $ forever $ do
+map :: (Monad m, Proxy p) => (a -> b) -> () -> Pipe p a b m r
+map f () = runIdentityP $ forever $ do
     a <- request ()
     respond (f a)
-{-# INLINABLE mapD #-}
+{-# INLINABLE map #-}
 
-{-| @(mapMD f)@ applies the monadic function @f@ to all values going downstream
+{-| @(mapM f)@ applies the monadic function @f@ to all values going downstream
 
-> mapMD f1 >-> mapMD f2 = mapMD (f1 >=> f2)
+> mapM f1 >-> mapM f2 = mapM (f1 >=> f2)
 >
-> mapMD return = pull
+> mapM return = pull
 -}
-mapMD :: (Monad m, Proxy p) => (a -> m b) -> () -> Pipe p a b m r
-mapMD f () = runIdentityP $ forever $ do
+mapM :: (Monad m, Proxy p) => (a -> m b) -> () -> Pipe p a b m r
+mapM f () = runIdentityP $ forever $ do
     a <- request ()
     b <- lift $ f a
     respond b
-{-# INLINABLE mapMD #-}
+{-# INLINABLE mapM #-}
 
-{-| @(useD f)@ executes the monadic function @f@ on all values flowing
+{-| @(use f)@ executes the monadic function @f@ on all values flowing
     \'@D@\'ownstream, discarding the result
 
-> useD f1 >-> useD f2 = useD (\a -> f1 a >> f2 a)
+> use f1 >-> use f2 = use (\a -> f1 a >> f2 a)
 >
-> useD (\_ -> return ()) = pull
+> use (\_ -> return ()) = pull
 -}
-useD :: (Monad m, Proxy p) => (a -> m b) -> () -> Pipe p a a m r
-useD f () = runIdentityP $ forever $ do
+use :: (Monad m, Proxy p) => (a -> m b) -> () -> Pipe p a a m r
+use f () = runIdentityP $ forever $ do
     a <- request ()
     _ <- lift (f a)
     respond a
     return ()
-{-# INLINABLE useD #-}
+{-# INLINABLE use #-}
 
 {-| @(execD md)@ executes @md@ every time control flows downstream through it
 
@@ -197,26 +216,26 @@ execU mu () = runIdentityP $ forever $ do
     respond a
 {-# INLINABLE execU #-}
 
--- | @(takeB_ n)@ only allows @n@ values to pass through
-takeB_ :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m ()
-takeB_ n () = runIdentityP $ replicateM_ n $ do
+-- | @(take n)@ only allows @n@ values to pass through
+take :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m ()
+take n () = runIdentityP $ replicateM_ n $ do
     a <- request ()
     respond a
-{-# INLINABLE takeB_ #-}
+{-# INLINABLE take #-}
 
-{-| @(takeWhileD p)@ allows values to pass downstream so long as they satisfy
+{-| @(takeWhile p)@ allows values to pass downstream so long as they satisfy
     the predicate @p@.
 
 > -- Using the "All" monoid over functions:
 > mempty = \_ -> True
 > (p1 <> p2) a = p1 a && p2 a
 >
-> takeWhileD p1 >-> takeWhileD p2 = takeWhileD (p1 <> p2)
+> takeWhile p1 >-> takeWhile p2 = takeWhile (p1 <> p2)
 >
-> takeWhileD mempty = pull
+> takeWhile mempty = pull
 -}
-takeWhileD :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m ()
-takeWhileD predicate () = runIdentityP go where
+takeWhile :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m ()
+takeWhile predicate () = runIdentityP go where
     go = do
         a <- request ()
         if (predicate a)
@@ -224,33 +243,33 @@ takeWhileD predicate () = runIdentityP go where
                 respond a
                 go
             else return ()
-{-# INLINABLE takeWhileD #-}
+{-# INLINABLE takeWhile #-}
 
-{-| @(dropD n)@ discards @n@ values going downstream
+{-| @(drop n)@ discards @n@ values going downstream
 
-> dropD n1 >-> dropD n2 = dropD (n1 + n2)  -- n2 >= 0 && n2 >= 0
+> drop n1 >-> drop n2 = drop (n1 + n2)  -- n2 >= 0 && n2 >= 0
 >
-> dropD 0 = pull
+> drop 0 = pull
 -}
-dropD :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m r
-dropD n () = runIdentityP $ do
+drop :: (Monad m, Proxy p) => Int -> () -> Pipe p a a m r
+drop n () = runIdentityP $ do
     replicateM_ n $ request ()
     pull ()
-{-# INLINABLE dropD #-}
+{-# INLINABLE drop #-}
 
-{-| @(dropWhileD p)@ discards values going downstream until one violates the
+{-| @(dropWhile p)@ discards values going downstream until one violates the
     predicate @p@.
 
 > -- Using the "Any" monoid over functions:
 > mempty = \_ -> False
 > (p1 <> p2) a = p1 a || p2 a
 >
-> dropWhileD p1 >-> dropWhileD p2 = dropWhileD (p1 <> p2)
+> dropWhile p1 >-> dropWhile p2 = dropWhile (p1 <> p2)
 >
-> dropWhileD mempty = pull
+> dropWhile mempty = pull
 -}
-dropWhileD :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m r
-dropWhileD p () = runIdentityP go where
+dropWhile :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m r
+dropWhile p () = runIdentityP go where
     go = do
         a <- request ()
         if (p a)
@@ -258,21 +277,21 @@ dropWhileD p () = runIdentityP go where
             else do
                 respond a
                 pull ()
-{-# INLINABLE dropWhileD #-}
+{-# INLINABLE dropWhile #-}
 
-{-| @(filterD p)@ discards values going downstream if they fail the predicate
+{-| @(filter p)@ discards values going downstream if they fail the predicate
     @p@
 
 > -- Using the "All" monoid over functions:
 > mempty = \_ -> True
 > (p1 <> p2) a = p1 a && p2 a
 >
-> filterD p1 >-> filterD p2 = filterD (p1 <> p2)
+> filter p1 >-> filter p2 = filter (p1 <> p2)
 >
-> filterD mempty = pull
+> filter mempty = pull
 -}
-filterD :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m r
-filterD p () = runIdentityP go where
+filter :: (Monad m, Proxy p) => (a -> Bool) -> () -> Pipe p a a m r
+filter p () = runIdentityP go where
     go = do
         a <- request ()
         if (p a)
@@ -280,131 +299,131 @@ filterD p () = runIdentityP go where
                 respond a
                 go
             else go
-{-# INLINABLE filterD #-}
+{-# INLINABLE filter #-}
 
 {-| Convert a list into a 'Producer'
 
-> fromListS xs >=> fromListS ys = fromListS (xs ++ ys)
+> fromList xs >=> fromList ys = fromList (xs ++ ys)
 >
-> fromListS [] = return
+> fromList [] = return
 -}
-fromListS :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
-fromListS xs () = runIdentityP $ mapM_ respond xs
-{-# INLINABLE fromListS #-}
+fromList :: (Monad m, Proxy p) => [b] -> () -> Producer p b m ()
+fromList xs () = runIdentityP $ mapM_ respond xs
+{-# INLINABLE fromList #-}
 
 -- | 'Producer' version of 'enumFrom'
-enumFromS :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
-enumFromS b0 = \_ -> runIdentityP (go b0) where
+enumFrom :: (Enum b, Monad m, Proxy p) => b -> () -> Producer p b m r
+enumFrom b0 = \_ -> runIdentityP (go b0) where
     go b = do
         _ <- respond b
         go $! succ b
-{-# INLINABLE enumFromS #-}
+{-# INLINABLE enumFrom #-}
 
 {-| Non-deterministically choose from all values in the given list
 
-> mappend <$> eachS xs <*> eachS ys = eachS (mappend <$> xs <*> ys)
+> mappend <$> each xs <*> each ys = each (mappend <$> xs <*> ys)
 >
-> eachS (pure mempty) = pure mempty
+> each (pure mempty) = pure mempty
 -}
-eachS :: (Monad m, Proxy p) => [b] -> ListT p m b
-eachS bs = RespondT (fromListS bs ())
-{-# INLINABLE eachS #-}
+each :: (Monad m, Proxy p) => [b] -> ListT p m b
+each bs = RespondT (fromList bs ())
+{-# INLINABLE each #-}
 
 -- | Strict fold using the provided 'M.Monoid'
-foldC
+fold
     :: (M.Monoid w, Monad m, Proxy p)
     => (a -> w) -> () -> Consumer (WriterP w p) a m r
-foldC f () =  forever $ do
+fold f () =  forever $ do
     a <- request ()
     tell (f a)
-{-# INLINABLE foldC #-}
+{-# INLINABLE fold #-}
 
 -- | Fold that returns whether 'M.All' values satisfy the predicate
-allC
+all
     :: (Monad m, Proxy p)
     => (a -> Bool) -> () -> Consumer (WriterP M.All p) a m r
-allC predicate = foldC (M.All . predicate)
-{-# INLINABLE allC #-}
+all predicate = fold (M.All . predicate)
+{-# INLINABLE all #-}
 
 {-| Fold that returns whether 'M.All' values satisfy the predicate
 
-    'allC_' terminates on the first value that fails the predicate
+    'all_' terminates on the first value that fails the predicate
 -}
-allC_
+all_
     :: (Monad m, Proxy p)
     => (a -> Bool) -> () -> Consumer (WriterP M.All p) a m ()
-allC_ predicate () = go
+all_ predicate () = go
   where
     go = do
         a <- request ()
         if (predicate a)
             then go
             else tell (M.All False)
-{-# INLINABLE allC_ #-}
+{-# INLINABLE all_ #-}
 
 -- | Fold that returns whether 'M.Any' value satisfies the predicate
-anyC
+any
     :: (Monad m, Proxy p)
     => (a -> Bool) -> () -> Consumer (WriterP M.Any p) a m r
-anyC predicate = foldC (M.Any . predicate)
-{-# INLINABLE anyC #-}
+any predicate = fold (M.Any . predicate)
+{-# INLINABLE any #-}
 
 {-| Fold that returns whether 'M.Any' value satisfies the predicate
 
-    'anyC_' terminates on the first value that satisfies the predicate
+    'any_' terminates on the first value that satisfies the predicate
 -}
-anyC_
+any_
     :: (Monad m, Proxy p)
     => (a -> Bool) -> () -> Consumer (WriterP M.Any p) a m ()
-anyC_ predicate () = go where
+any_ predicate () = go where
     go = do
         a <- request ()
         if (predicate a)
             then tell (M.Any True)
             else go
-{-# INLINABLE anyC_ #-}
+{-# INLINABLE any_ #-}
 
 -- | Compute the 'M.Sum' of all values
-sumC :: (Monad m, Proxy p, Num a) => () -> Consumer (WriterP (M.Sum a) p) a m r
-sumC = foldC M.Sum
-{-# INLINABLE sumC #-}
+sum :: (Monad m, Proxy p, Num a) => () -> Consumer (WriterP (M.Sum a) p) a m r
+sum = fold M.Sum
+{-# INLINABLE sum #-}
 
 -- | Compute the 'M.Product' of all values
-productC
+product
     :: (Monad m, Proxy p, Num a)
     => () -> Consumer (WriterP (M.Product a) p) a m r
-productC = foldC M.Product
-{-# INLINABLE productC #-}
+product = fold M.Product
+{-# INLINABLE product #-}
 
 -- | Count the number of values
-lengthC :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.Sum Int) p) a m r
-lengthC = foldC (\_ -> M.Sum 1)
-{-# INLINABLE lengthC #-}
+length :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.Sum Int) p) a m r
+length = fold (\_ -> M.Sum 1)
+{-# INLINABLE length #-}
 
 -- | Retrieve the 'M.First' value
-headC :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.First a) p) a m r
-headC = foldC (M.First . Just)
-{-# INLINABLE headC #-}
+head :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.First a) p) a m r
+head = fold (M.First . Just)
+{-# INLINABLE head #-}
 
 {-| Retrieve the 'M.First' value
 
-    'headC_' terminates on the first value it receives
+    'head_' terminates on the first value it receives
 -}
-headC_ :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.First a) p) a m ()
-headC_ () = do
+head_ :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.First a) p) a m ()
+head_ () = do
     a <- request ()
     tell $ M.First (Just a)
-{-# INLINABLE headC_ #-}
+{-# INLINABLE head_ #-}
 
 -- | Retrieve the last value
-lastC :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.Last a) p) a m r
-lastC = foldC (M.Last . Just)
-{-# INLINABLE lastC #-}
+last :: (Monad m, Proxy p) => () -> Consumer (WriterP (M.Last a) p) a m r
+last = fold (M.Last . Just)
+{-# INLINABLE last #-}
 
 -- | Fold the values flowing \'@D@\'ownstream into a list
-toListC :: (Monad m, Proxy p) => () -> Consumer (WriterP [a] p) a m r
-toListC = foldC (\x -> [x])
-{-# INLINABLE toListC #-}
+toList :: (Monad m, Proxy p) => () -> Consumer (WriterP [a] p) a m r
+toList = fold (\x -> [x])
+{-# INLINABLE toList #-}
 
 {-| Fold equivalent to 'foldr'
 
@@ -412,36 +431,36 @@ toListC = foldC (\x -> [x])
 
 > foldr :: (a -> b -> b) -> [a] -> M.Endo b
 -}
-foldrC
+foldr
     :: (Monad m, Proxy p)
     => (a -> b -> b) -> () -> Consumer (WriterP (M.Endo b) p) a m r
-foldrC step = foldC (M.Endo . step)
-{-# INLINABLE foldrC #-}
+foldr step = fold (M.Endo . step)
+{-# INLINABLE foldr #-}
 
 -- | Fold equivalent to 'foldl''.
 --
 -- Uses 'StateP' instead of 'WriterP' to ensure a strict accumulation
-foldlC'
+foldl'
     :: (Monad m, Proxy p) => (s -> a -> s) -> () -> Consumer (StateP s p) a m r
-foldlC' step () = go where
+foldl' step () = go where
     go = do
         a <- request ()
         s <- get
         put $! step s a 
         go
-{-# INLINABLE foldlC' #-}
+{-# INLINABLE foldl' #-}
 
 {- $choice
-    'leftD' and 'rightD' satisfy the 'ArrowChoice' laws using @arr = mapD@.
+    'left' and 'right' satisfy the 'ArrowChoice' laws using @arr = map@.
 -}
 
 {-| Lift a proxy to operate only on 'Left' values flowing \'@D@\'ownstream and
     forward 'Right' values
 -}
-leftD
+left
     :: (Monad m, Proxy p)
     => (q -> p x a x b m r) -> (q -> p x (Either a e) x (Either b e) m r)
-leftD k = runIdentityP . (up \>\ (IdentityP . k />/ dn))
+left k = runIdentityP . (up \>\ (IdentityP . k />/ dn))
   where
     dn b = respond (Left b)
     up x = do
@@ -451,15 +470,15 @@ leftD k = runIdentityP . (up \>\ (IdentityP . k />/ dn))
             Right e -> do
                 x2 <- respond (Right e)
                 up x2
-{-# INLINABLE leftD #-}
+{-# INLINABLE left #-}
 
 {-| Lift a proxy to operate only on 'Right' values flowing \'@D@\'ownstream and
     forward 'Left' values
 -}
-rightD
+right
     :: (Monad m, Proxy p)
     => (q -> p x a x b m r) -> (q -> p x (Either e a) x (Either e b) m r)
-rightD k = runIdentityP . (up \>\ (IdentityP . k />/ dn))
+right k = runIdentityP . (up \>\ (IdentityP . k />/ dn))
   where
     dn b = respond (Right b)
     up x = do
@@ -469,26 +488,26 @@ rightD k = runIdentityP . (up \>\ (IdentityP . k />/ dn))
                 x2 <- respond (Left e)
                 up x2
             Right a -> return a
-{-# INLINABLE rightD #-}
+{-# INLINABLE right #-}
 
 -- | Zip values flowing downstream
-zipD
+zip
     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
     => () -> Consumer' p1 a (Consumer' p2 b (Producer' p3 (a, b) m)) r
-zipD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
+zip () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
     go = do
         a <- request ()
         lift $ do
             b <- request ()
             lift $ respond (a, b)
         go
-{-# INLINABLE zipD #-}
+{-# INLINABLE zip #-}
 
 -- | Interleave values flowing downstream using simple alternation
-mergeD
+merge
     :: (Monad m, Proxy p1, Proxy p2, Proxy p3)
     => () -> Consumer' p1 a (Consumer' p2 a (Producer' p3 a m)) r
-mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
+merge () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
     go = do
         a1 <- request ()
         lift $ do
@@ -496,7 +515,7 @@ mergeD () = runIdentityP $ hoist (runIdentityP . hoist runIdentityP) go where
             a2 <- request ()
             lift $ respond a2
         go
-{-# INLINABLE mergeD #-}
+{-# INLINABLE merge #-}
 
 {-| Compose a \'@K@\'leisli arrow with itself forever
 
