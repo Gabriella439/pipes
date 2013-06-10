@@ -229,6 +229,7 @@ useD :: (Monad m, Proxy p) => (a -> m b) -> () -> Pipe p a a m r
 useD f () = runIdentityP $ forever $ do
     a <- request ()
     _ <- lift (f a)
+    respond a
     return ()
 {-# INLINABLE useD #-}
 
