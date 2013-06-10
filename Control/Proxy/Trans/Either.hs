@@ -190,7 +190,7 @@ right r = EitherP (return_P (Right r))
 -}
 
 -- | Synonym for 'left'
-throw :: (Monad m, Proxy p) => e -> EitherP e p a' a b' b m r
+throw :: (Monad m, Proxy p) => e -> Session (EitherP e p) m r
 throw = left
 {-# INLINABLE throw #-}
 

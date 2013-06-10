@@ -29,7 +29,8 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Proxy.Class (
     Proxy(request, respond, (->>), (>>~), (>\\), (//>), turn),
     ProxyInternal(return_P, (?>=), lift_P, liftIO_P, hoist_P, thread_P),
-    MonadPlusP(mzero_P, mplus_P) )
+    MonadPlusP(mzero_P, mplus_P),
+    Effect )
 import Control.Proxy.Morph (PFunctor(hoistP))
 import Control.Proxy.Trans (ProxyTrans(liftP))
 
@@ -176,21 +177,21 @@ execStateK s k q = execStateP s (k q)
 {-# INLINABLE execStateK #-}
 
 -- | Get the current state
-get :: (Monad m, Proxy p) => StateP s p a' a b' b m s
+get :: (Monad m, Proxy p) => Effect (StateP s p) m s
 get = StateP (\s -> return_P (s, s))
 {-# INLINABLE get #-}
 
 -- | Set the current state
-put :: (Monad m, Proxy p) => s -> StateP s p a' a b' b m ()
+put :: (Monad m, Proxy p) => s -> Effect (StateP s p) m ()
 put s = StateP (\_ -> return_P ((), s))
 {-# INLINABLE put #-}
 
 -- | Modify the current state using a function
-modify :: (Monad m, Proxy p) => (s -> s) -> StateP s p a' a b' b m ()
+modify :: (Monad m, Proxy p) => (s -> s) -> Effect (StateP s p) m ()
 modify f = StateP (\s -> return_P ((), f s))
 {-# INLINABLE modify #-}
 
 -- | Get the state filtered through a function
-gets :: (Monad m, Proxy p) => (s -> r) -> StateP s p a' a b' b m r
+gets :: (Monad m, Proxy p) => (s -> r) -> Effect (StateP s p) m r
 gets f = StateP (\s -> return_P (f s, s))
 {-# INLINABLE gets #-}

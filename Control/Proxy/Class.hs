@@ -33,7 +33,7 @@ module Control.Proxy.Class (
     Consumer,
     Client,
     Server,
-    Session,
+    Effect,
     ListT,
     CoPipe,
     CoProducer,
@@ -46,7 +46,7 @@ module Control.Proxy.Class (
     Consumer',
     Client',
     Server',
-    Session',
+    Effect',
     ListT',
     CoProducer',
     CoConsumer',
@@ -441,11 +441,11 @@ type Client (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a m r
 type Server (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b m r
     = forall a' a . p a' a b' b m r
 
-{-| A self-contained 'Session', ready to be run by 'runProxy'
+{-| An effect in the base monad
 
-    'Session's never 'request' or 'respond'.
+    'Effect's never 'request' or 'respond'.
 -}
-type Session (p :: * -> * -> * -> * -> (* -> *) -> * -> *) m r
+type Effect (p :: * -> * -> * -> * -> (* -> *) -> * -> *) m r
     = forall a' a b' b . p a' a b' b m r
 
 -- | The list monad transformer
@@ -484,8 +484,8 @@ type Server' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) b' b = p C () b' b
 -- | Like 'Client', but with concrete types
 type Client' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) a' a = p a' a () C
 
--- | Like 'Session', but with concrete types to improve type inference
-type Session' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
+-- | Like 'Effect', but with concrete types to improve type inference
+type Effect' (p :: * -> * -> * -> * -> (* -> *) -> * -> *) = p C () () C
 
 -- | Like 'ListT', but with concrete types
 type ListT' p = RespondT p C () ()
