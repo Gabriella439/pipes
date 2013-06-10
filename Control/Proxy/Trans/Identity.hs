@@ -5,11 +5,7 @@
 module Control.Proxy.Trans.Identity (
     -- * Identity Proxy Transformer
     IdentityP(..),
-    runIdentityK,
-
-    -- * Deprecated
-    -- $deprecate
-    identityK
+    runIdentityK
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -103,12 +99,3 @@ instance PMonad IdentityP where
 runIdentityK :: (q -> IdentityP p a' a b' b m r) -> (q -> p a' a b' b m r)
 runIdentityK k q = runIdentityP (k q)
 {-# INLINABLE runIdentityK #-}
-
-{- $deprecate
-    To be removed in version @4.0.0@
--}
-
-identityK :: (q -> p a' a b' b m r) -> (q -> IdentityP p a' a b' b m r)
-identityK k q = IdentityP (k q)
-{-# INLINABLE identityK #-}
-{-# DEPRECATED identityK "Use '(IdentityP .)' instead" #-}

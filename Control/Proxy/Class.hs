@@ -58,14 +58,7 @@ module Control.Proxy.Class (
     -- * Polymorphic proxies
     -- $poly
     ProxyInternal(..),
-    MonadPlusP(..),
-
-    -- * Deprecated
-    -- $deprecate
-    idT,
-    coidT,
-    runRespondK,
-    runRequestK
+    MonadPlusP(..)
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -769,27 +762,3 @@ class (Proxy p) => MonadPlusP p where
     mzero_P :: (Monad m) => p a' a b' b m r
     mplus_P
         :: (Monad m) => p a' a b' b m r -> p a' a b' b m r -> p a' a b' b m r
-
-{- $deprecate
-    These will be removed in version @4.0.0@
--}
-
-idT :: (Monad m, Proxy p) => a' -> p a' a a' a m r
-idT = pull
-{-# INLINABLE idT #-}
-{-# DEPRECATED idT "Use 'pull' instead" #-}
-
-coidT :: (Monad m, Proxy p) => a -> p a' a a' a m r
-coidT = push
-{-# INLINABLE coidT #-}
-{-# DEPRECATED coidT "Use 'push' instead" #-}
-
-runRespondK :: (q -> RespondT p a' a b' m b) -> (q -> p a' a b' b m b')
-runRespondK k q = runRespondT (k q)
-{-# INLINABLE runRespondK #-}
-{-# DEPRECATED runRespondK "Use '(runRespondT .)' instead" #-}
-
-runRequestK :: (q -> RequestT p a b' b m a') -> (q -> p a' a b' b m a)
-runRequestK k q = runRequestT (k q)
-{-# INLINABLE runRequestK #-}
-{-# DEPRECATED runRequestK "Use '(runRequestK .)' instead" #-}
