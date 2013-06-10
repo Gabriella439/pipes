@@ -600,39 +600,31 @@ unitU _ = runIdentityP go where
 
 {-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
     downstream
-
-> forward
->     :: (Monad m, Proxy p)
->     => (() -> Consumer p a m r) -> (() -> Pipe p a a m r)
 -}
 forward
     :: (Monad m, Proxy p)
-    => (() -> Consumer p a m r)
-    -> x -> p x a x a m r
-forward p x = evalStateP (x, Nothing) $ do
-    r <- (up >\\ liftP (p ()))
-    (_, ma) <- get
+    => (() -> Consumer p a   m r)
+    -> (() -> Pipe     p a a m r)
+forward p () = evalStateP Nothing $ do
+    r <- up >\\ liftP (p ())
+    ma <- get
     case ma of
         Nothing -> return ()
-        Just a  -> do
-            respond a
-            return ()
+        Just a  -> respond a
     return r
   where
     up () = do
-        (x, ma) <- get
-        x2 <- case ma of
-            Nothing -> return x
+        ma <- get
+        case ma of
+            Nothing -> return ()
             Just a  -> respond a
-        a <- request x2
-        put (x2, Just a)
+        a <- request ()
+        put (Just a)
         return a
 {-# INLINABLE forward #-}
 
 -- | Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
-generalize
-    :: (Monad m, Proxy p)
-    => (() -> Pipe p a b m r) -> x -> p x a x b m r
+generalize :: (Monad m, Proxy p) => (() -> Pipe p a b m r) -> x -> p x a x b m r
 generalize p x = evalStateP x $ up >\\ liftP (p ()) //> dn
   where
     up () = do
