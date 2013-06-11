@@ -46,22 +46,5 @@ Library
         mmorph       >= 1.0.0   && < 1.1,
         transformers >= 0.2.0.0 && < 0.4
     Exposed-Modules:
-        Control.Pipe,
-        Control.Proxy,
-        Control.Proxy.Class,
-        Control.Proxy.Core,
-        Control.Proxy.Core.Fast,
-        Control.Proxy.Core.Correct,
-        Control.Proxy.Morph,
-        Control.Proxy.Pipe,
-        Control.Proxy.Trans,
-        Control.Proxy.Trans.Codensity,
-        Control.Proxy.Trans.Either,
-        Control.Proxy.Trans.Identity,
-        Control.Proxy.Trans.Maybe,
-        Control.Proxy.Trans.Reader,
-        Control.Proxy.Trans.State,
-        Control.Proxy.Trans.Writer,
-        Control.Proxy.Tutorial,
-        Control.Proxy.Prelude
+        Pipes.Core
     GHC-Options: -O2
