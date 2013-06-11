@@ -27,21 +27,34 @@ module Pipes.Core (
     -- * Types
     Proxy(..),
 
-    -- * Operators
+    -- * Categories
+    -- $categories
+
+    -- ** Request
+    -- $request
     request,
     (\>\),
     (>\\),
+
+    -- ** Respond
+    -- $respond
     respond,
     (/>/),
     (//>),
+
+    -- ** Pull
+    -- $pull
     pull,
     (>->),
     (->>),
+
+    -- ** Push
+    -- $push
     push,
     (>~>),
     (>>~),
 
-    -- * Run Sessions 
+    -- * Run Functions
     -- $run
     runProxy,
     runProxyK,
@@ -60,13 +73,9 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 
     The type variables signify:
 
-    * @a'@ - The request supplied to the upstream interface
+    * @a'@ and @a@ - The upstream output and input
 
-    * @a @ - The response provided by the upstream interface
-
-    * @b'@ - The request supplied by the downstream interface
-
-    * @b @ - The response provided to the downstream interface
+    * @b'@ and @b@ - The downstream input and output
 
     * @m @ - The base monad
 
@@ -136,7 +145,6 @@ p0 `_bind` f = go p0 where
         _bind (Pure       r) f = f r;
   #-}
 
--- | Only satisfies monad transformer laws modulo 'observe'
 instance MonadTrans (Proxy a' a b' b) where
     lift m = M (m >>= \r -> return (Pure r))
 
@@ -151,23 +159,67 @@ instance MFunctor (Proxy a' a b' b) where
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
 
+{- $categories
+    The 'Proxy' type sits at the intersection of five categories:
+
+    * The \"request category\"
+
+    * The \"respond category\"
+
+    * The \"pull category\"
+
+    * The \"push category\"
+
+    * The Kleisli category
+-}
+
+{- $request
+    The \"request category\", which lets you substitute 'request's with proxies
+
+> request \>\ f = f
+>
+> f \>\ request = f
+>
+> (f \>\ g) \>\ h = f \>\ (g \>\ h)
+-}
+
+{-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
+
+    'request' is the identity of the \"request category\".
+-}
 request :: (Monad m) => a' -> Proxy a' a b' b m a
 request a' = Request a' Pure
 {-# INLINABLE request #-}
 
+{-| Compose two folds, creating a new fold
+
+> (f \>\ g) x = f >\\ g x
+
+    ('\>\') is the composition operator of the \"request category\".
+-}
 (\>\)
     :: (Monad m)
     => (b' -> Proxy a' a y' y m b)
+    -- ^
     -> (c' -> Proxy b' b y' y m c)
+    -- ^
     -> (c' -> Proxy a' a y' y m c)
+    -- ^
 (fb' \>\ fc') c' = fb' >\\ fc' c'
 {-# INLINABLE (\>\) #-}
 
+{-| @(f >\\\\ p)@ replaces each 'request' in @p@ with @f@.
+
+    Point-ful version of ('\>\')
+-}
 (>\\)
     :: (Monad m)
     => (b' -> Proxy a' a y' y m b)
+    -- ^
     ->        Proxy b' b y' y m c
+    -- ^
     ->        Proxy a' a y' y m c
+    -- ^
 fb' >\\ p0 = go p0
   where
     go p = case p of
@@ -188,23 +240,54 @@ fb' >\\ p0 = go p0
         fb' >\\ (Pure    a     ) = Pure a;
   #-}
 
+{- $respond
+    The \"respond category\", which lets you substitute 'respond's with proxies
+
+> respond />/ f = f
+>
+> f />/ respond = f
+>
+> (f />/ g) />/ h = f />/ (g />/ h)
+-}
+
+{-| Send a value of type @b@ downstream and block waiting for a reply of type
+    @b'@
+
+    'respond' is the identity of the \"respond category\"
+-}
 respond :: (Monad m) => b  -> Proxy a' a b' b m b'
 respond b  = Respond b  Pure
 {-# INLINABLE respond #-}
 
+{-| Compose two unfolds, creating a new unfold
+
+> (f />/ g) x = f x //> g
+
+    ('/>/') is the composition operator of the \"respond category\"
+-}
 (/>/)
     :: (Monad m)
     => (a -> Proxy x' x b' b m a')
+    -- ^
     -> (b -> Proxy x' x c' c m b')
+    -- ^
     -> (a -> Proxy x' x c' c m a')
+    -- ^
 (fa />/ fb) a = fa a //> fb
 {-# INLINABLE (/>/) #-}
 
+{-| @(p \/\/> f)@ replaces each 'respond' in @p@ with @f@.
+
+    Point-ful version of ('/>/')
+-}
 (//>)
     :: (Monad m)
     =>       Proxy x' x b' b m a'
+    -- ^
     -> (b -> Proxy x' x c' c m b')
+    -- ^
     ->       Proxy x' x c' c m a'
+    -- ^
 p0 //> fb = go p0
   where
     go p = case p of
@@ -225,25 +308,59 @@ p0 //> fb = go p0
         (Pure    a     ) //> fb = Pure a;
   #-}
 
+{- $pull
+
+    The \"pull category\", which lets you interleave pull-based streams
+
+> pull >-> f = f
+>
+> f >-> pull = f
+>
+> (f >-> g) >-> h = f >-> (g >-> h)
+-}
+
+{-| Forward requests followed by responses:
+
+> pull = request >=> respond >=> pull
+
+    'pull' is the identity of the \"pull category\".
+-}
 pull :: (Monad m) => a' -> Proxy a' a a' a m r
 pull = go
   where
     go a' = Request a' (\a -> Respond a go)
 {-# INLINABLE pull #-}
 
+{-| Compose two proxies blocked on a 'respond', creating a new proxy blocked on
+    a 'respond'
+
+> (f >-> g) x = f ->> g x
+
+    ('>->') is the composition operator of the \"pull category\".
+-}
 (>->)
     :: (Monad m)
     => ( b' -> Proxy a' a b' b m r)
+    -- ^
     -> (_c' -> Proxy b' b c' c m r)
+    -- ^
     -> (_c' -> Proxy a' a c' c m r)
+    -- ^
 (fb' >-> fc') c' = fb' ->> fc' c'
 {-# INLINABLE (>->) #-}
 
+{-| @(f ->> p)@ pairs each 'request' in @p@ with a 'respond' in @f@.
+
+    Point-ful version of ('>->')
+-}
 (->>)
     :: (Monad m)
     => (b' -> Proxy a' a b' b m r)
+    -- ^
     ->        Proxy b' b c' c m r
+    -- ^
     ->        Proxy a' a c' c m r
+    -- ^
 fb' ->> p = case p of
     Request b' fb  -> fb' b' >>~ fb
     Respond c  fc' -> Respond c (\c' -> fb' ->> fc' c')
@@ -251,25 +368,59 @@ fb' ->> p = case p of
     Pure       r   -> Pure r
 {-# INLINABLE (->>) #-}
 
+{- $push
+
+    The \"push category\", which lets you interleave push-based streams
+
+> push >~> f = f
+>
+> f >~> push = f
+>
+> (f >~> g) >~> h = f >~> (g >~> h)
+-}
+
+{-| Forward responses followed by requests
+
+> push = respond >=> request >=> push
+
+    'push' is the identity of the \"push category\".
+-}
 push :: (Monad m) => a -> Proxy a' a a' a m r
 push = go
   where
     go a = Respond a (\a' -> Request a' go)
 {-# INLINABLE push #-}
 
+{-| Compose two proxies blocked on a 'request', creating a new proxy blocked on
+    a 'request'
+
+> (f >~> g) x = f x >>~ g
+
+    ('>~>') is the composition operator of the \"push category\".
+-}
 (>~>)
     :: (Monad m)
     => (_a -> Proxy a' a b' b m r)
+    -- ^
     -> ( b -> Proxy b' b c' c m r)
+    -- ^
     -> (_a -> Proxy a' a c' c m r)
+    -- ^
 (fa >~> fb) a = fa a >>~ fb
 {-# INLINABLE (>~>) #-}
 
+{-| @(p >>~ f)@ pairs each 'respond' in @p@ with a 'request' in @f@.
+
+    Point-ful version of ('>~>')
+-}
 (>>~)
     :: (Monad m)
     =>       Proxy a' a b' b m r
+    -- ^
     -> (b -> Proxy b' b c' c m r)
+    -- ^
     ->       Proxy a' a c' c m r
+    -- ^
 p >>~ fb = case p of
     Request a' fa  -> Request a' (\a -> fa a >>~ fb)
     Respond b  fb' -> fb' ->> fb b
@@ -290,9 +441,6 @@ reflect = go
 {- $run
     The following commands run self-sufficient proxies, converting them back to
     the base monad.
-
-    These are the only functions specific to the 'Proxy' type.  Everything
-    else programs generically over the 'Proxy' type class.
 
     Use 'runProxyK' if you are running proxies nested within proxies.  It
     provides a Kleisli arrow as its result that you can pass to another
