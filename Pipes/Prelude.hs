@@ -74,7 +74,7 @@ import qualified Data.Monoid as M
 import Data.Monoid (
     appEndo, getAll, getAny, getSum, getProduct, getFirst, getLast )
 import qualified System.IO as IO
-import Pipes.Core
+import Pipes
 import Pipes.Lift
 import Prelude hiding (
     print,

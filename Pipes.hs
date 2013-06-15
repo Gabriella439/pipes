@@ -16,7 +16,7 @@
    functions because they are recursive.
 -}
 
-module Pipes.Core (
+module Pipes (
     -- * Types
     Proxy,
 

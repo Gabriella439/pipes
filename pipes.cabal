@@ -46,7 +46,7 @@ Library
         mmorph       >= 1.0.0   && < 1.1,
         transformers >= 0.2.0.0 && < 0.4
     Exposed-Modules:
-        Pipes.Core,
+        Pipes,
         Pipes.Internal,
         Pipes.Lift,
         Pipes.Prelude
