@@ -95,10 +95,8 @@ import Prelude hiding (
 import qualified Prelude
 
 -- | Read 'String' lines from 'IO.stdin'
-stdin :: () -> Producer String IO r
-stdin () = forever $ do
-    str <- lift getLine
-    respond str
+stdin :: () -> Producer String IO ()
+stdin = fromHandle IO.stdin
 {-# INLINABLE stdin #-}
 
 -- | Read 'String' lines from an 'IO.Handle'
@@ -433,7 +431,8 @@ foldl' step () = go
 {-# INLINABLE foldl' #-}
 
 {- $choice
-    'left' and 'right' satisfy the 'ArrowChoice' laws using @arr = map@.
+    'left' and 'right' satisfy the 'ArrowChoice' laws using
+    @arr f = generalize (map f)@.
 -}
 
 {-| Lift a proxy to operate only on 'Left' values flowing \'@D@\'ownstream and
