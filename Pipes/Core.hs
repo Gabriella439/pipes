@@ -331,7 +331,7 @@ fb' >\\ p0 = go p0
 {-| Send a value of type @b@ downstream and block waiting for a reply of type
     @b'@
 
-    'respond' is the identity of the \"respond category\"
+    'respond' is the identity of the \"respond category\".
 -}
 respond :: (Monad m) => b  -> Proxy a' a b' b m b'
 respond b  = Respond b  Pure
@@ -341,7 +341,7 @@ respond b  = Respond b  Pure
 
 > (f />/ g) x = f x //> g
 
-    ('/>/') is the composition operator of the \"respond category\"
+    ('/>/') is the composition operator of the \"respond category\".
 -}
 (/>/)
     :: (Monad m)
