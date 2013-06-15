@@ -33,7 +33,7 @@ import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import Data.Monoid (Monoid(mempty, mappend))
-import Pipes.Core
+import Pipes.Internal
 #if MIN_VERSION_base(4,6,0)
 #else
 import Prelude hiding (catch)
