@@ -62,7 +62,7 @@ catch
     => Proxy a' a b' b (E.ErrorT e m) r
     -> (e -> Proxy a' a b' b (E.ErrorT f m) r)
     -> Proxy a' a b' b (E.ErrorT f m) r
-catch p f = go p
+catch p0 f = go p0
   where
     go p = case p of
         Request a' fa  -> Request a' (\a  -> go (fa  a ))
@@ -89,7 +89,7 @@ liftCatch
         -> (e -> Proxy a' a b' b m r)
         -> Proxy a' a b' b m r)
     -- ^ Catch function for 'Proxy'
-liftCatch c p f = go p
+liftCatch c p0 f = go p0
   where
     go p = case p of
         Request a' fa  -> Request a' (\a  -> go (fa  a ))

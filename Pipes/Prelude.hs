@@ -55,13 +55,11 @@ module Pipes.Prelude (
     zip,
     merge,
 
-    -- * Adapters
+    -- * Utilities
     unitD,
     unitU,
     forward,
     generalize,
-
-    -- * Kleisli utilities
     foreverK
     ) where
 
@@ -204,7 +202,7 @@ execD md () = forever $ do
 -}
 execU :: (Monad m) => m b -> () -> Pipe a a m r
 execU mu () = forever $ do
-    lift mu
+    _ <- lift mu
     a <- request ()
     respond a
 {-# INLINABLE execU #-}
@@ -327,7 +325,7 @@ each bs = RespondT (fromList bs ())
 {-# INLINABLE each #-}
 
 -- | Strict fold using the provided 'M.Monoid'
-fold :: (M.Monoid w, Monad m) => (a -> w) -> () -> Consumer a (WriterT w m) r
+fold :: (Monad m, M.Monoid w) => (a -> w) -> () -> Consumer a (WriterT w m) r
 fold f () =  forever $ do
     a <- request ()
     lift $ tell (f a)
@@ -543,7 +541,7 @@ forward p () = evalStateP Nothing $ do
 
 -- | Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
 generalize :: (Monad m) => (() -> Pipe a b m r) -> x -> Proxy x a x b m r
-generalize p x = evalStateP x $ up >\\ hoist lift (p ()) //> dn
+generalize p x0 = evalStateP x0 $ up >\\ hoist lift (p ()) //> dn
   where
     up () = do
         x <- lift get

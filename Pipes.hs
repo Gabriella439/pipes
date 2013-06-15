@@ -48,6 +48,10 @@ module Pipes (
     (/>/),
     (//>),
 
+    -- ** Reflect
+    -- $reflect
+    reflect,
+
     -- * ListT Monad Transformers
     -- $listT
     RespondT(..),
@@ -57,10 +61,10 @@ module Pipes (
     Pipe,
     Producer,
     Consumer,
-    Client,
-    Server,
     Effect,
     ListT,
+    Client,
+    Server,
     CoPipe,
     CoProducer,
     CoConsumer,
@@ -70,10 +74,10 @@ module Pipes (
     C,
     Producer',
     Consumer',
-    Client',
-    Server',
     Effect',
     ListT',
+    Client',
+    Server',
     CoProducer',
     CoConsumer',
     CoListT',
@@ -95,7 +99,6 @@ module Pipes (
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
@@ -388,6 +391,31 @@ p0 //> fb = go p0
         (Pure    a     ) //> fb = Pure a;
   #-}
 
+{- $reflect
+    @(reflect .)@ transforms each streaming category into its dual:
+
+    * The \"request\" category is the dual of the \"respond\" category
+
+> reflect . request = respond
+>
+> reflect . (f \>\ g) = reflect . f \<\ reflect . g
+
+> reflect . respond = request
+>
+> reflect . (f />/ g) = reflect . f /</ reflect . g
+
+    * The \"pull\" category is the dual of the \"push\" category
+
+> reflect . pull = push
+>
+> reflect . (f >-> g) = reflect . f <~< reflect . g
+
+> reflect . push = pull
+>
+> reflect . (f >~> g) = reflect . f <-< reflect . g
+-}
+
+-- | Switch the upstream and downstream ends
 reflect :: (Monad m) => Proxy a' a b' b m r -> Proxy b b' a a' m r
 reflect = go
   where
@@ -498,6 +526,15 @@ type Producer b m r = forall a' a . Proxy a' a () b m r
 -}
 type Consumer a m r = forall b' b . Proxy () a b' b m r
 
+{-| An effect in the base monad
+
+    'Effect's never 'request' or 'respond'.
+-}
+type Effect m r = forall a' a b' b . Proxy a' a b' b m r
+
+-- | The list monad transformer
+type ListT m b = forall a' a . RespondT a' a () m b
+
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
@@ -511,15 +548,6 @@ type Client a' a m r = forall b' b . Proxy a' a b' b m r
     'Server's never 'request'.
 -}
 type Server b' b m r = forall a' a . Proxy a' a b' b m r
-
-{-| An effect in the base monad
-
-    'Effect's never 'request' or 'respond'.
--}
-type Effect m r = forall a' a b' b . Proxy a' a b' b m r
-
--- | The list monad transformer
-type ListT m b = forall a' a . RespondT a' a () m b
 
 -- | A 'Pipe' where everything flows upstream
 type CoPipe a' b' = Proxy a' () b' ()
@@ -548,17 +576,17 @@ type Producer' b = Proxy C () () b
 -- | Like 'Consumer', but with concrete types
 type Consumer' a = Proxy () a () C
 
--- | Like 'Server', but with concrete types
-type Server' b' b = Proxy C () b' b
-
--- | Like 'Client', but with concrete types
-type Client' a' a = Proxy a' a () C
-
 -- | Like 'Effect', but with concrete types to improve type inference
 type Effect' = Proxy C () () C
 
 -- | Like 'ListT', but with concrete types
 type ListT' = RespondT C () ()
+
+-- | Like 'Server', but with concrete types
+type Server' b' b = Proxy C () b' b
+
+-- | Like 'Client', but with concrete types
+type Client' a' a = Proxy a' a () C
 
 -- | Like 'CoProducer', but with concrete types
 type CoProducer' a' = Proxy a' () () C
@@ -643,32 +671,6 @@ f <\\ p = p //> f
 
 {- $laws
     In addition to the category laws, proxies also satisfy the following laws.
-
-    @(reflect .)@ transforms each streaming category into its dual:
-
-    * The \"request\" category
-
-> reflect . request = respond
->
-> reflect . (f \>\ g) = reflect . f \<\ reflect . g
-
-    * The \"respond\" category
-
-> reflect . respond = request
->
-> reflect . (f />/ g) = reflect . f /</ reflect . g
-
-    * The \"pull\" category
-
-> reflect . pull = push
->
-> reflect . (f >-> g) = reflect . f <~< reflect . g
-
-    * The \"push\" category
-
-> reflect . push = pull
->
-> reflect . (f >~> g) = reflect . f <-< reflect . g
 
     ('\>\') and ('/>/') both define functors between Kleisli categories
 
