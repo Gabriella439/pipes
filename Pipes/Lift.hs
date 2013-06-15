@@ -1,3 +1,8 @@
+{-| Many actions in base monad transformers cannot be automatically 'lift'ed,
+    These following functions lift these remaining actions so that they work in
+    the 'Proxy' monad transformer.
+-}
+
 module Pipes.Lift (
     -- * StateT
     runStateP,
@@ -111,21 +116,29 @@ catch p f = go p
                 Right p' -> go p' )) ))
 {-# INLINABLE catch #-}
 
+{-| Catch an error using a catch function for the base monad
+
+> catch = liftCatch catchError  -- except 'catch' is more general
+-}
 liftCatch
     :: (Monad m)
     => (   m (Proxy a' a b' b m r)
         -> (e -> m (Proxy a' a b' b m r))
         -> m (Proxy a' a b' b m r) )
-    -> Proxy a' a b' b m r
-    -> (e -> Proxy a' a b' b m r)
-    -> Proxy a' a b' b m r
+    -- ^ Catch function for the base monad
+    ->    (Proxy a' a b' b m r
+        -> (e -> Proxy a' a b' b m r)
+        -> Proxy a' a b' b m r)
+    -- ^ Catch function for 'Proxy'
 liftCatch c p f = go p
   where
     go p = case p of
         Request a' fa  -> Request a' (\a  -> go (fa  a ))
         Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
         Pure   r       -> Pure r
-        M          m   -> M (c (m >>= return . go) (\e -> return (f e)))
+        M          m   -> M ((do
+            p' <- m
+            return (go p') ) `c` (\e -> return (f e)) )
 {-# INLINABLE liftCatch #-}
 
 -- | Run 'M.MaybeT' in the base monad
