@@ -111,6 +111,24 @@ catch p f = go p
                 Right p' -> go p' )) ))
 {-# INLINABLE catch #-}
 
+liftCatch
+    :: (Monad m)
+    => (   m (Proxy a' a b' b m r)
+        -> (e -> m (Proxy a' a b' b m r))
+        -> m (Proxy a' a b' b m r) )
+    -> Proxy a' a b' b m r
+    -> (e -> Proxy a' a b' b m r)
+    -> Proxy a' a b' b m r
+liftCatch c p f = go p
+  where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        Pure   r       -> Pure r
+        M          m   -> M (c (m >>= return . go) (\e -> return (f e)))
+{-# INLINABLE #-}
+
+-- | Run 'MaybeT' in the base monad
 runMaybeP
     :: (Monad m) => Proxy a' a b' b (MaybeT m) r -> Proxy a' a b' b m (Maybe r)
 runMaybeP = go
