@@ -1,11 +1,19 @@
 module Pipes.Lift (
+    -- * StateT
     runStateP,
     evalStateP,
     execStateP,
+
+    -- * WriterT
     runWriterP,
     execWriterP,
+
+    -- * ErrorT
     runErrorP,
     catch,
+    liftCatch,
+
+    -- * MaybeT
     runMaybeP
     ) where
 
@@ -17,6 +25,7 @@ import Data.Monoid
 import Pipes.Core
 import Prelude hiding (catch)
 
+-- | Run 'StateT' in the base monad
 runStateP
     :: (Monad m)
     => s -> Proxy a' a b' b (StateT s m) r -> Proxy a' a b' b m (r, s)
@@ -31,16 +40,19 @@ runStateP = go
             return (go s' p') )
 {-# INLINABLE runStateP #-}
 
+-- | Evaluate 'StateT' in the base monad
 evalStateP
     :: (Monad m) => s -> Proxy a' a b' b (StateT s m) r -> Proxy a' a b' b m r
 evalStateP s = fmap fst . runStateP s
 {-# INLINABLE evalStateP #-}
 
+-- | Execute 'StateT' in the base monad
 execStateP
     :: (Monad m) => s -> Proxy a' a b' b (StateT s m) r -> Proxy a' a b' b m s
 execStateP s = fmap snd . runStateP s
 {-# INLINABLE execStateP #-}
 
+-- | Run 'WriterT' in the base monad
 runWriterP
     :: (Monad m, Monoid w)
     => Proxy a' a b' b (WriterT w m) r -> Proxy a' a b' b m (r, w)
@@ -56,12 +68,14 @@ runWriterP = go mempty
             wt `seq` return (go wt p') )
 {-# INLINABLE runWriterP #-}
 
+-- | Execute 'WriterT' in the base monad
 execWriterP
     :: (Monad m, Monoid w)
     => Proxy a' a b' b (WriterT w m) r -> Proxy a' a b' b m w
 execWriterP = fmap snd . runWriterP
 {-# INLINABLE execWriterP #-}
 
+-- | Run 'ErrorT' in the base monad
 runErrorP
     :: (Monad m)
     => Proxy a' a b' b (ErrorT e m) r -> Proxy a' a b' b m (Either e r)
@@ -78,6 +92,7 @@ runErrorP = go
                 Right p' -> go p' ) )
 {-# INLINABLE runErrorP #-}
 
+-- | Catch an error in the base monad
 catch
     :: (Monad m) 
     => Proxy a' a b' b (ErrorT e m) r
