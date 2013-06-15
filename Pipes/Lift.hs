@@ -3,7 +3,20 @@
     the 'Proxy' monad transformer.
 -}
 
+{-# LANGUAGE CPP #-}
+
 module Pipes.Lift (
+    -- * ErrorT
+    runErrorP,
+    catch,
+    liftCatch,
+
+    -- * MaybeT
+    runMaybeP,
+
+    -- * ReaderT
+    runReaderP,
+
     -- * StateT
     runStateP,
     evalStateP,
@@ -11,74 +24,20 @@ module Pipes.Lift (
 
     -- * WriterT
     runWriterP,
-    execWriterP,
-
-    -- * ErrorT
-    runErrorP,
-    catch,
-    liftCatch,
-
-    -- * MaybeT
-    runMaybeP
+    execWriterP
     ) where
 
 import qualified Control.Monad.Trans.Error as E
 import qualified Control.Monad.Trans.Maybe as M
+import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Core
+#if MIN_VERSION_base(4,6,0)
+#else
 import Prelude hiding (catch)
-
--- | Run 'StateT' in the base monad
-runStateP
-    :: (Monad m)
-    => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m (r, s)
-runStateP = go
-  where
-    go s p = case p of
-        Request a' fa  -> Request a' (\a  -> go s (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go s (fb' b'))
-        Pure    r      -> Pure (r, s)
-        M          m   -> M (do
-            (p', s') <- S.runStateT m s
-            return (go s' p') )
-{-# INLINABLE runStateP #-}
-
--- | Evaluate 'S.StateT' in the base monad
-evalStateP
-    :: (Monad m) => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m r
-evalStateP s = fmap fst . runStateP s
-{-# INLINABLE evalStateP #-}
-
--- | Execute 'S.StateT' in the base monad
-execStateP
-    :: (Monad m) => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m s
-execStateP s = fmap snd . runStateP s
-{-# INLINABLE execStateP #-}
-
--- | Run 'W.WriterT' in the base monad
-runWriterP
-    :: (Monad m, Monoid w)
-    => Proxy a' a b' b (W.WriterT w m) r -> Proxy a' a b' b m (r, w)
-runWriterP = go mempty
-  where
-    go w p = case p of
-        Request a' fa  -> Request a' (\a  -> go w (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go w (fb' b'))
-        Pure    r      -> Pure (r, w)
-        M          m   -> M (do
-            (p', w') <- W.runWriterT m
-            let wt = mappend w w'
-            wt `seq` return (go wt p') )
-{-# INLINABLE runWriterP #-}
-
--- | Execute 'W.WriterT' in the base monad
-execWriterP
-    :: (Monad m, Monoid w)
-    => Proxy a' a b' b (W.WriterT w m) r -> Proxy a' a b' b m w
-execWriterP = fmap snd . runWriterP
-{-# INLINABLE execWriterP #-}
+#endif
 
 -- | Run 'E.ErrorT' in the base monad
 runErrorP
@@ -157,3 +116,68 @@ runMaybeP = go
                 Nothing -> Pure Nothing
                 Just p' -> go p' ) )
 {-# INLINABLE runMaybeP #-}
+
+-- | Run 'R.ReaderT' in the base monad
+runReaderP
+    :: (Monad m)
+    => i -> Proxy a' a b' b (R.ReaderT i m) r -> Proxy a' a b' b m r
+runReaderP i = go
+  where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        Pure    r      -> Pure r
+        M          m   -> M (do
+            p' <- R.runReaderT m i
+            return (go p') )
+{-# INLINABLE runReaderP #-}
+
+-- | Run 'S.StateT' in the base monad
+runStateP
+    :: (Monad m)
+    => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m (r, s)
+runStateP = go
+  where
+    go s p = case p of
+        Request a' fa  -> Request a' (\a  -> go s (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go s (fb' b'))
+        Pure    r      -> Pure (r, s)
+        M          m   -> M (do
+            (p', s') <- S.runStateT m s
+            return (go s' p') )
+{-# INLINABLE runStateP #-}
+
+-- | Evaluate 'S.StateT' in the base monad
+evalStateP
+    :: (Monad m) => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m r
+evalStateP s = fmap fst . runStateP s
+{-# INLINABLE evalStateP #-}
+
+-- | Execute 'S.StateT' in the base monad
+execStateP
+    :: (Monad m) => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m s
+execStateP s = fmap snd . runStateP s
+{-# INLINABLE execStateP #-}
+
+-- | Run 'W.WriterT' in the base monad
+runWriterP
+    :: (Monad m, Monoid w)
+    => Proxy a' a b' b (W.WriterT w m) r -> Proxy a' a b' b m (r, w)
+runWriterP = go mempty
+  where
+    go w p = case p of
+        Request a' fa  -> Request a' (\a  -> go w (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go w (fb' b'))
+        Pure    r      -> Pure (r, w)
+        M          m   -> M (do
+            (p', w') <- W.runWriterT m
+            let wt = mappend w w'
+            wt `seq` return (go wt p') )
+{-# INLINABLE runWriterP #-}
+
+-- | Execute 'W.WriterT' in the base monad
+execWriterP
+    :: (Monad m, Monoid w)
+    => Proxy a' a b' b (W.WriterT w m) r -> Proxy a' a b' b m w
+execWriterP = fmap snd . runWriterP
+{-# INLINABLE execWriterP #-}

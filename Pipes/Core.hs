@@ -16,7 +16,11 @@
     from "Pipes".
 -}
 
+{-# LANGUAGE CPP #-}
+
+#if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
+#endif
 {- The rewrite RULES require the 'TrustWorthy' annotation.  Their proofs are
    pretty trivial since they are just inlining the definition of their
    respective operators.  GHC doesn't do this inlining automatically for these
