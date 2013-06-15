@@ -63,9 +63,6 @@ module Pipes.Core (
     runProxy,
     runProxyK,
 
-    -- * Safety
-    observe,
-
     -- * ListT Monad Transformers
     -- $listT
     RespondT(..),
@@ -104,7 +101,13 @@ module Pipes.Core (
     (<<-),
     (~<<),
     (//<),
-    (<\\)
+    (<\\),
+
+    -- * Laws
+    -- $laws
+
+    -- * Safety
+    observe
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -547,30 +550,6 @@ runProxyK :: (Monad m) => (q -> Proxy a' () () b m r) -> (q -> m r)
 runProxyK k q = run (k q)
 {-# INLINABLE runProxyK #-}
 
-{-| The monad transformer laws are correct when viewed through the 'observe'
-    function:
-
-> observe (lift (return r)) = observe (return r)
->
-> observe (lift (m >>= f)) = observe (lift m >>= lift . f)
-
-    This correctness comes at a moderate cost to performance, so use this
-    function sparingly or else you would be better off using
-    "Control.Proxy.Core.Correct".
-
-    You do not need to use this function if you use the safe API exported from
-    "Control.Proxy", which does not export any functions or constructors that
-    can violate the monad transformer laws.
--}
-observe :: (Monad m) => Proxy a' a b' b m r -> Proxy a' a b' b m r
-observe p0 = M (go p0) where
-    go p = case p of
-        M          m'  -> m' >>= go
-        Pure       r   -> return (Pure r)
-        Request a' fa  -> return (Request a' (\a  -> observe (fa  a )))
-        Respond b  fb' -> return (Respond b  (\b' -> observe (fb' b')))
-{-# INLINABLE observe #-}
-
 {- $listT
     The 'RespondT' monad transformer is equivalent to 'ListT' over the
     downstream output.  The 'RespondT' Kleisli category corresponds to the
@@ -813,3 +792,101 @@ p //< f = f >\\ p
     ->       Proxy x' x c' c m a'
 f <\\ p = p //> f
 {-# INLINABLE (<\\) #-}
+
+{- $laws
+    In addition to the category laws, proxies also satisfy the following laws.
+
+    @(turn .)@ transforms each streaming category into its dual:
+
+    * The \"request\" category
+
+> turn . request = respond
+>
+> turn . (f \>\ g) = turn . f \<\ turn . g
+
+    * The \"respond\" category
+
+> turn . respond = request
+>
+> turn . (f />/ g) = turn . f /</ turn. g
+
+    * The \"pull\" category
+
+> turn . pull = push
+>
+> turn . (f >-> g) = turn . f <~< turn . g
+
+    * The \"push\" category
+
+> turn . push = pull
+>
+> turn . (f >~> g) = turn . f <-< turn . g
+
+    ('\>\') and ('/>/') both define functors between Kleisli categories
+
+> a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
+>
+> a \>\ return = return
+
+> (b >=> c) />/ a = (b />/ a) >=> (c />/ a)
+>
+> return />/ a = return
+
+    Also, proxies obey these uncategorized laws:
+
+> p \>\ lift . f = lift . f
+>
+> p \>\ respond  = respond
+>
+> lift . f />/ p = lift . f
+>
+> request />/  p = request
+>
+> pull = request >=> respond >=> pull
+>
+> push = respond >=> request >=> push
+>
+> p1 >-> lift . f = lift . f
+>
+> p1 >-> (lift . f >=> respond >=> p2) = lift . f >=> respond >=> (p1 >-> p2)
+>
+> (lift . g >=> respond >=> p1) >-> (lift . f >=> request >=> lift . h >=> p2)
+>     = lift . (f >=> g >=> h) >=> (p1 >-> p2)
+>
+> (lift . g >=> request >=> p1) >-> (lift . f >=> request >=> p2)
+>     = lift . (f >=> g) >=> request >=> (p1 >~> p2)
+>
+> lift . f >~> p2 = lift . f
+>
+> (lift . f >=> request >=> p1) >~> p2 = lift . f >=> request >=> (p1 >~> p2)
+>
+> (lift . f >=> respond >=> lift . h >=> p1) >~> (lift . g >=> request >=> p2)
+>     = lift . (f >=> g >=> h) >=> (p1 >~> p2)
+>
+> (lift . f >=> respond >=> p1) >~> (lift . g >=> respond >=> p2)
+>     = lift . (f >=> g) >=> (p1 >-> p2)
+
+-}
+
+{-| The monad transformer laws are correct when viewed through the 'observe'
+    function:
+
+> observe (lift (return r)) = observe (return r)
+>
+> observe (lift (m >>= f)) = observe (lift m >>= lift . f)
+
+    This correctness comes at a small cost to performance, so use this function
+    sparingly.
+
+    You do not need to use this function if you use the safe API exported from
+    "Pipes", which does not export any functions or constructors that can
+    violate the monad transformer laws.
+-}
+observe :: (Monad m) => Proxy a' a b' b m r -> Proxy a' a b' b m r
+observe p0 = M (go p0) where
+    go p = case p of
+        M          m'  -> m' >>= go
+        Pure       r   -> return (Pure r)
+        Request a' fa  -> return (Request a' (\a  -> observe (fa  a )))
+        Respond b  fb' -> return (Respond b  (\b' -> observe (fb' b')))
+{-# INLINABLE observe #-}
