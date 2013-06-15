@@ -16,7 +16,7 @@
     from "Pipes".
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, RankNTypes #-}
 
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
@@ -64,13 +64,55 @@ module Pipes.Core (
     runProxyK,
 
     -- * Safety
-    observe
+    observe,
+
+    -- * ListT Monad Transformers
+    -- $listT
+    RespondT(..),
+    RequestT(..),
+
+    -- * Polymorphic Type Synonyms
+    Pipe,
+    Producer,
+    Consumer,
+    Client,
+    Server,
+    Effect,
+    ListT,
+    CoPipe,
+    CoProducer,
+    CoConsumer,
+    CoListT,
+
+    -- * Concrete Type Synonyms
+    C,
+    Producer',
+    Consumer',
+    Client',
+    Server',
+    Effect',
+    ListT',
+    CoProducer',
+    CoConsumer',
+    CoListT',
+
+    -- ** Flipped operators
+    (<-<),
+    (<~<),
+    (/</),
+    (\<\),
+    (<<-),
+    (~<<),
+    (//<),
+    (<\\)
     ) where
 
-import Control.Applicative (Applicative(pure, (<*>)))
+import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
+import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
+import Data.Monoid (Monoid(mempty, mappend))
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on two
     separate interfaces:
@@ -162,6 +204,38 @@ instance MFunctor (Proxy a' a b' b) where
 
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
+
+{- * Keep proxy composition lower in precedence than function composition, which
+     is 9 at the time of of this comment, so that users can write things like:
+
+> lift . k >-> p
+>
+> hoist f . k >-> p
+
+   * Keep the priorities different so that users can mix composition operators
+     like:
+
+> up \>\ p />/ dn
+>
+> up >~> p >-> dn
+
+   * Keep 'request' and 'respond' composition lower in precedence than 'pull'
+     and 'push' composition, so that users can do:
+
+> read \>\ pull >-> writer
+
+   * I arbitrarily choose a lower priority for downstream operators so that lazy
+     pull-based computations need not evaluate upstream stages unless absolutely
+     necessary.
+-}
+infixr 5 <-<, ->>
+infixl 5 >->, <<-
+infixr 6 >~>, ~<<
+infixl 6 <~<, >>~
+infixl 7 \<\, //>
+infixr 7 />/, <\\ -- GHC will raise a parse error if 
+infixr 8 /</, >\\ -- either of these lines end with '\'
+infixl 8 \>\, //<
 
 {- $categories
     The 'Proxy' type sits at the intersection of five categories:
@@ -496,3 +570,246 @@ observe p0 = M (go p0) where
         Request a' fa  -> return (Request a' (\a  -> observe (fa  a )))
         Respond b  fb' -> return (Respond b  (\b' -> observe (fb' b')))
 {-# INLINABLE observe #-}
+
+{- $listT
+    The 'RespondT' monad transformer is equivalent to 'ListT' over the
+    downstream output.  The 'RespondT' Kleisli category corresponds to the
+    \"respond\" category.
+
+    The 'RequestT' monad transformer is equivalent to 'ListT' over the upstream
+    output.  The 'RequestT' Kleisli category corresponds to the \"request\"
+    category.
+
+    Unlike 'ListT' from @transformers@, these monad transformers are correct by
+    construction and always satisfy the monad and monad transformer laws.
+-}
+
+-- | A monad transformer over a proxy's downstream output
+newtype RespondT a' a b' m b = RespondT { runRespondT :: Proxy a' a b' b m b' }
+
+instance (Monad m) => Functor (RespondT a' a b' m) where
+    fmap f p = RespondT (runRespondT p //> \a -> respond (f a))
+
+instance (Monad m) => Applicative (RespondT a' a b' m) where
+    pure a = RespondT (respond a)
+    mf <*> mx = RespondT (
+        runRespondT mf //> \f ->
+        runRespondT mx //> \x ->
+        respond (f x) )
+
+instance (Monad m) => Monad (RespondT a' a b' m) where
+    return a = RespondT (respond a)
+    m >>= f  = RespondT (runRespondT m //> \a -> runRespondT (f a))
+
+instance MonadTrans (RespondT a' a b') where
+    lift m = RespondT (do
+        a <- lift m
+        respond a )
+
+instance (MonadIO m) => MonadIO (RespondT a' a b' m) where
+    liftIO m = lift (liftIO m)
+
+instance (Monad m, Monoid b') => Alternative (RespondT a' a b' m) where
+    empty = RespondT (return mempty)
+    p1 <|> p2 = RespondT (do
+        r1 <- runRespondT p1
+        r2 <- runRespondT p2
+        return (mappend r1 r2) )
+
+instance (Monad m, Monoid b') => MonadPlus (RespondT a' a b' m) where
+    mzero = empty
+    mplus = (<|>)
+
+-- | A monad transformer over a proxy's upstream output
+newtype RequestT a b' b m a' = RequestT { runRequestT :: Proxy a' a b' b m a }
+
+instance (Monad m) => Functor (RequestT a b' b m) where
+    fmap f p = RequestT (runRequestT p //< \a -> request (f a))
+
+instance (Monad m) => Applicative (RequestT a b' b m) where
+    pure a = RequestT (request a)
+    mf <*> mx = RequestT (
+        runRequestT mf //< \f ->
+        runRequestT mx //< \x ->
+        request (f x) )
+
+instance (Monad m) => Monad (RequestT a b' b m) where
+    return a = RequestT (request a)
+    m >>= f  = RequestT (runRequestT m //< \a -> runRequestT (f a))
+
+instance MonadTrans (RequestT a' a b') where
+    lift m = RequestT (do
+        a <- lift m
+        request a )
+
+instance (MonadIO m) => MonadIO (RequestT a b' b m) where
+    liftIO m = lift (liftIO m)
+
+instance (Monad m, Monoid a) => Alternative (RequestT a b' b m) where
+    empty = RequestT (return mempty)
+    p1 <|> p2 = RequestT (do
+        r1 <- runRequestT p1
+        r2 <- runRequestT p2
+        return (mappend r1 r2) )
+
+instance (Monad m, Monoid a) => MonadPlus (RequestT a b' b m) where
+    mzero = empty
+    mplus = (<|>)
+
+-- | A unidirectional 'Proxy'.
+type Pipe a b = Proxy () a () b
+
+{-| A 'Pipe' that produces values
+
+    'Producer's never 'request'.
+-}
+type Producer b m r = forall a' a . Proxy a' a () b m r
+
+{-| A 'Pipe' that consumes values
+
+    'Consumer's never 'respond'.
+-}
+type Consumer a m r = forall b' b . Proxy () a b' b m r
+
+{-| @Client a' a@ sends requests of type @a'@ and receives responses of
+    type @a@.
+
+    'Client's never 'respond'.
+-}
+type Client a' a m r = forall b' b . Proxy a' a b' b m r
+
+{-| @Server b' b@ receives requests of type @b'@ and sends responses of type
+    @b@.
+
+    'Server's never 'request'.
+-}
+type Server b' b m r = forall a' a . Proxy a' a b' b m r
+
+{-| An effect in the base monad
+
+    'Effect's never 'request' or 'respond'.
+-}
+type Effect m r = forall a' a b' b . Proxy a' a b' b m r
+
+-- | The list monad transformer
+type ListT m b = forall a' a . RespondT a' a () m b
+
+-- | A 'Pipe' where everything flows upstream
+type CoPipe a' b' = Proxy a' () b' ()
+
+{-| A 'CoPipe' that produces values flowing upstream
+
+    'CoProducer's never 'respond'.
+-}
+type CoProducer a' = Proxy a' () () C
+
+{-| A 'CoPipe' that consumes values flowing upstream
+
+    'CoConsumer's never 'request'
+-}
+type CoConsumer b' = Proxy C () b' ()
+
+-- | The list monad transformer for values flowing upstream
+type CoListT = RequestT () () C
+
+-- | The empty type, denoting a \'@C@\'losed end
+data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
+
+-- | Like 'Producer', but with concrete types
+type Producer' b = Proxy C () () b
+
+-- | Like 'Consumer', but with concrete types
+type Consumer' a = Proxy () a () C
+
+-- | Like 'Server', but with concrete types
+type Server' b' b = Proxy C () b' b
+
+-- | Like 'Client', but with concrete types
+type Client' a' a = Proxy a' a () C
+
+-- | Like 'Effect', but with concrete types to improve type inference
+type Effect' = Proxy C () () C
+
+-- | Like 'ListT', but with concrete types
+type ListT' = RespondT C () ()
+
+-- | Like 'CoProducer', but with concrete types
+type CoProducer' a' = Proxy a' () () C
+
+-- | Like 'CoConsumer', but with concrete types
+type CoConsumer' b' = Proxy C () b' ()
+
+-- | Like 'CoListT', but with concrete types
+type CoListT' = RequestT () () C
+
+-- | Equivalent to ('>->') with the arguments flipped
+(<-<)
+    :: (Monad m)
+    => (c' -> Proxy b' b c' c m r)
+    -> (b' -> Proxy a' a b' b m r)
+    -> (c' -> Proxy a' a c' c m r)
+p1 <-< p2 = p2 >-> p1
+{-# INLINABLE (<-<) #-}
+
+-- | Equivalent to ('>~>') with the arguments flipped
+(<~<)
+    :: (Monad m)
+    => (b -> Proxy b' b c' c m r)
+    -> (a -> Proxy a' a b' b m r)
+    -> (a -> Proxy a' a c' c m r)
+p1 <~< p2 = p2 >~> p1
+{-# INLINABLE (<~<) #-}
+
+-- | Equivalent to ('\>\') with the arguments flipped
+(/</)
+    :: (Monad m)
+    => (c' -> Proxy b' b x' x m c)
+    -> (b' -> Proxy a' a x' x m b)
+    -> (c' -> Proxy a' a x' x m c)
+p1 /</ p2 = p2 \>\ p1
+{-# INLINABLE (/</) #-}
+
+-- | Equivalent to ('/>/') with the arguments flipped
+(\<\)
+    :: (Monad m)
+    => (b -> Proxy x' x c' c m b')
+    -> (a -> Proxy x' x b' b m a')
+    -> (a -> Proxy x' x c' c m a')
+p1 \<\ p2 = p2 />/ p1
+{-# INLINABLE (\<\) #-}
+
+-- | Equivalent to ('->>') with the arguments flipped
+(<<-)
+    :: (Monad m)
+    =>         Proxy b' b c' c m r
+    -> (b'  -> Proxy a' a b' b m r)
+    ->         Proxy a' a c' c m r
+k <<- p = p ->> k
+{-# INLINABLE (<<-) #-}
+
+-- | Equivalent to ('>>~') with the arguments flipped
+(~<<)
+    :: (Monad m)
+    => (b  -> Proxy b' b c' c m r)
+    ->        Proxy a' a b' b m r
+    ->        Proxy a' a c' c m r
+k ~<< p = p >>~ k
+{-# INLINABLE (~<<) #-}
+
+-- | Equivalent to ('>\\') with the arguments flipped
+(//<)
+    :: (Monad m)
+    =>        Proxy b' b x' x m c
+    -> (b' -> Proxy a' a x' x m b)
+    ->        Proxy a' a x' x m c
+p //< f = f >\\ p
+{-# INLINABLE (//<) #-}
+
+-- | Equivalent to ('//>') with the arguments flipped
+(<\\)
+    :: (Monad m)
+    => (b -> Proxy x' x c' c m b')
+    ->       Proxy x' x b' b m a'
+    ->       Proxy x' x c' c m a'
+f <\\ p = p //> f
+{-# INLINABLE (<\\) #-}

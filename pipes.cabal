@@ -47,5 +47,6 @@ Library
         transformers >= 0.2.0.0 && < 0.4
     Exposed-Modules:
         Pipes.Core,
-        Pipes.Lift
+        Pipes.Lift,
+        Pipes.Prelude
     GHC-Options: -O2
