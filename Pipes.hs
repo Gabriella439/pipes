@@ -1,8 +1,8 @@
 {-| The core functionality for the 'Proxy' monad transformer
 
-    The documentation in this module focuses more on the theory behind the type.
     Read "Pipes.Tutorial" if you want a practical tutorial explaining how to use
-    this library.
+    this library.  The documentation in this module focuses more on the theory
+    behind the type.
 -}
 
 {-# LANGUAGE CPP, RankNTypes #-}
@@ -17,8 +17,9 @@
 -}
 
 module Pipes (
-    -- * Types
+    -- * Proxy Monad Transformer
     Proxy,
+    runProxy,
 
     -- * Categories
     -- $categories
@@ -46,10 +47,6 @@ module Pipes (
     respond,
     (/>/),
     (//>),
-
-    -- * Run Functions
-    -- $run
-    runProxy,
 
     -- * ListT Monad Transformers
     -- $listT
@@ -102,6 +99,17 @@ import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
+
+-- | Run a self-sufficient 'Proxy', converting it back to the base monad
+runProxy :: (Monad m) => Proxy a' () () b m r -> m r
+runProxy = go
+  where
+    go p = case p of
+        Request _ fa  -> go (fa  ())
+        Respond _ fb' -> go (fb' ())
+        M         m   -> m >>= go
+        Pure      r   -> return r
+{-# INLINABLE runProxy #-}
 
 {- * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
@@ -389,26 +397,6 @@ reflect = go
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       r   -> Pure r
 {-# INLINABLE reflect #-}
-
-{- $run
-    The following commands run self-sufficient proxies, converting them back to
-    the base monad.
-
-    Use 'runProxyK' if you are running proxies nested within proxies.  It
-    provides a Kleisli arrow as its result that you can pass to another
-    'runProxy' / 'runProxyK' command.
--}
-
--- | Run a self-sufficient 'Proxy', converting it back to the base monad
-runProxy :: (Monad m) => Proxy a' () () b m r -> m r
-runProxy = go
-  where
-    go p = case p of
-        Request _ fa  -> go (fa  ())
-        Respond _ fb' -> go (fb' ())
-        M         m   -> m >>= go
-        Pure      r   -> return r
-{-# INLINABLE runProxy #-}
 
 {- $listT
     The 'RespondT' monad transformer is equivalent to 'ListT' over the
