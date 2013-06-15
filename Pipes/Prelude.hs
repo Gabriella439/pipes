@@ -3,7 +3,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Pipes.Prelude (
-    -- * I/O
+    -- * Input and Output
     stdin,
     fromHandle,
     stdout,
@@ -139,24 +139,14 @@ print () = forever $ do
     lift $ Prelude.print a
 {-# INLINABLE print #-}
 
-{-| @(map f)@ applies @f@ to all values going \'@D@\'ownstream.
-
-> map f1 >-> map f2 = map (f2 . f1)
->
-> map id = pull
--}
+-- | @(map f)@ applies @f@ to all values going \'@D@\'ownstream.
 map :: (Monad m) => (a -> b) -> () -> Pipe a b m r
 map f () = forever $ do
     a <- request ()
     respond (f a)
 {-# INLINABLE map #-}
 
-{-| @(mapM f)@ applies the monadic function @f@ to all values going downstream
-
-> mapM f1 >-> mapM f2 = mapM (f1 >=> f2)
->
-> mapM return = pull
--}
+-- | @(mapM f)@ applies the monadic function @f@ to all values going downstream
 mapM :: (Monad m) => (a -> m b) -> () -> Pipe a b m r
 mapM f () = forever $ do
     a <- request ()
@@ -166,10 +156,6 @@ mapM f () = forever $ do
 
 {-| @(use f)@ executes the monadic function @f@ on all values flowing
     \'@D@\'ownstream, discarding the result
-
-> use f1 >-> use f2 = use (\a -> f1 a >> f2 a)
->
-> use (\_ -> return ()) = pull
 -}
 use :: (Monad m) => (a -> m b) -> () -> Pipe a a m r
 use f () = forever $ do
@@ -179,12 +165,7 @@ use f () = forever $ do
     return ()
 {-# INLINABLE use #-}
 
-{-| @(execD md)@ executes @md@ every time control flows downstream through it
-
-> execD md1 >-> execD md2 = execD (md1 >> md2)
->
-> execD (return ()) = pull
--}
+-- | @(execD md)@ executes @md@ every time control flows downstream through it.
 execD :: (Monad m) => m b -> () -> Pipe a a m r
 execD md () = forever $ do
     a <- request ()
@@ -192,12 +173,7 @@ execD md () = forever $ do
     respond a
 {-# INLINABLE execD #-}
 
-{-| @(execU mu)@ executes @mu@ every time control flows upstream through it
-
-> execU mu1 >-> execU mu2 = execU (mu2 >> mu1)
->
-> execU (return ()) = pull
--}
+-- | @(execU mu)@ executes @mu@ every time control flows upstream through it.
 execU :: (Monad m) => m b -> () -> Pipe a a m r
 execU mu () = forever $ do
     _ <- lift mu
@@ -214,14 +190,6 @@ take n () = replicateM_ n $ do
 
 {-| @(takeWhile p)@ allows values to pass downstream so long as they satisfy
     the predicate @p@.
-
-> -- Using the "All" monoid over functions:
-> mempty = \_ -> True
-> (p1 <> p2) a = p1 a && p2 a
->
-> takeWhile p1 >-> takeWhile p2 = takeWhile (p1 <> p2)
->
-> takeWhile mempty = pull
 -}
 takeWhile :: (Monad m) => (a -> Bool) -> () -> Pipe a a m ()
 takeWhile predicate () = go
@@ -235,12 +203,7 @@ takeWhile predicate () = go
             else return ()
 {-# INLINABLE takeWhile #-}
 
-{-| @(drop n)@ discards @n@ values going downstream
-
-> drop n1 >-> drop n2 = drop (n1 + n2)  -- n2 >= 0 && n2 >= 0
->
-> drop 0 = pull
--}
+-- | @(drop n)@ discards @n@ values going downstream
 drop :: (Monad m) => Int -> () -> Pipe a a m r
 drop n () = do
     replicateM_ n $ request ()
@@ -249,14 +212,6 @@ drop n () = do
 
 {-| @(dropWhile p)@ discards values going downstream until one violates the
     predicate @p@.
-
-> -- Using the "Any" monoid over functions:
-> mempty = \_ -> False
-> (p1 <> p2) a = p1 a || p2 a
->
-> dropWhile p1 >-> dropWhile p2 = dropWhile (p1 <> p2)
->
-> dropWhile mempty = pull
 -}
 dropWhile :: (Monad m) => (a -> Bool) -> () -> Pipe a a m r
 dropWhile p () = go
@@ -272,14 +227,6 @@ dropWhile p () = go
 
 {-| @(filter p)@ discards values going downstream if they fail the predicate
     @p@
-
-> -- Using the "All" monoid over functions:
-> mempty = \_ -> True
-> (p1 <> p2) a = p1 a && p2 a
->
-> filter p1 >-> filter p2 = filter (p1 <> p2)
->
-> filter mempty = pull
 -}
 filter :: (Monad m) => (a -> Bool) -> () -> Pipe a a m r
 filter p () = go
@@ -293,12 +240,7 @@ filter p () = go
             else go
 {-# INLINABLE filter #-}
 
-{-| Convert a list into a 'Producer'
-
-> fromList xs >=> fromList ys = fromList (xs ++ ys)
->
-> fromList [] = return
--}
+-- | Convert a list into a 'Producer'
 fromList :: (Monad m) => [b] -> () -> Producer b m ()
 fromList xs () = mapM_ respond xs
 {-# INLINABLE fromList #-}
@@ -312,12 +254,7 @@ enumFrom b0 = \_ -> go b0
         go $! succ b
 {-# INLINABLE enumFrom #-}
 
-{-| Non-deterministically choose from all values in the given list
-
-> mappend <$> each xs <*> each ys = each (mappend <$> xs <*> ys)
->
-> each (pure mempty) = pure mempty
--}
+-- | Non-deterministically choose from all values in the given list
 each :: (Monad m) => [b] -> ListT m b
 each bs = RespondT (fromList bs ())
 {-# INLINABLE each #-}
@@ -411,7 +348,7 @@ toList = fold (\x -> [x])
 
     To see why, consider this isomorphic type for 'foldr':
 
-> foldr :: (a -> b -> b) -> [a] -> M.Endo b
+> foldr :: (a -> b -> b) -> [a] -> Endo b
 -}
 foldr :: (Monad m) => (a -> b -> b) -> () -> Consumer a (WriterT (M.Endo b) m) r
 foldr step = fold (M.Endo . step)
