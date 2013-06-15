@@ -71,11 +71,9 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict (StateT, get, put)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
 import qualified Data.Monoid as M
-import Data.Monoid (
-    appEndo, getAll, getAny, getSum, getProduct, getFirst, getLast )
 import qualified System.IO as IO
 import Pipes
-import Pipes.Lift
+import Pipes.Lift (evalStateP)
 import Prelude hiding (
     print,
     readLn,
