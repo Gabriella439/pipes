@@ -55,18 +55,14 @@ module Pipes.Prelude (
     zip,
     merge,
 
-    -- * Kleisli utilities
-    foreverK,
-
     -- * Adapters
     unitD,
     unitU,
     forward,
     generalize,
 
-    -- * Re-exports
-    -- $modules
-    module Data.Monoid,
+    -- * Kleisli utilities
+    foreverK
     ) where
 
 import Control.Monad (forever, replicateM_)
@@ -507,28 +503,6 @@ merge () = go
         go
 {-# INLINABLE merge #-}
 
-{-| Compose a \'@K@\'leisli arrow with itself forever
-
-    Use 'foreverK' to abstract away the following common recursion pattern:
-
-> p a = do
->     ...
->     a' <- respond b
->     p a'
-
-    Using 'foreverK', you can instead write:
-
-> p = foreverK $ \a -> do
->     ...
->     respond b
--}
-foreverK :: (Monad m) => (a -> m a) -> (a -> m b)
-foreverK k = let r = \a -> k a >>= r in r
-{- foreverK uses 'let' to avoid a space leak.
-   See: http://hackage.haskell.org/trac/ghc/ticket/5205
--}
-{-# INLINABLE foreverK #-}
-
 -- | Discards all values going upstream
 unitD :: (Monad m) => q -> Proxy x' x y' () m r
 unitD _ = go
@@ -581,7 +555,24 @@ generalize p x = evalStateP x $ up >\\ hoist lift (p ()) //> dn
         lift $ put x
 {-# INLINABLE generalize #-}
 
-{- $modules
-    @Data.Monoid@ re-exports unwrapping functions for monoids in order to
-    extract the results of folds.
+{-| Compose a \'@K@\'leisli arrow with itself forever
+
+    Use 'foreverK' to abstract away the following common recursion pattern:
+
+> p a = do
+>     ...
+>     a' <- respond b
+>     p a'
+
+    Using 'foreverK', you can instead write:
+
+> p = foreverK $ \a -> do
+>     ...
+>     respond b
 -}
+foreverK :: (Monad m) => (a -> m a) -> (a -> m b)
+foreverK k = let r = \a -> k a >>= r in r
+{- foreverK uses 'let' to avoid a space leak.
+   See: http://hackage.haskell.org/trac/ghc/ticket/5205
+-}
+{-# INLINABLE foreverK #-}

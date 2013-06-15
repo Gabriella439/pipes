@@ -32,9 +32,9 @@ Description:
   .
   * /Extensive Documentation/: Second to none!
   .
-  Import "Control.Proxy" to use the library.
+  Import "Pipes" to use the library.
   .
-  Read "Control.Proxy.Tutorial" for an extensive tutorial.
+  Read "Pipes.Tutorial" for an extensive tutorial.
 Category: Control, Pipes, Proxies
 Source-Repository head
     Type: git
