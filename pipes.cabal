@@ -23,12 +23,10 @@ Description:
   .
   * /Elegant semantics/: Use practical category theory
   .
-  * /Extension Framework/: Mix and match extensions and create your own
-  .
-  * /ListT/: Correct implementation of ListT that interconverts with pipes
+  * /ListT/: Correct implementation of 'ListT' that interconverts with pipes
   .
   * /Lightweight Dependency/: @pipes@ depends only on @transformers@ and
-    @mmorph@ and compiles rapidly
+    @mmorph@ and compiles very rapidly
   .
   * /Extensive Documentation/: Second to none!
   .
