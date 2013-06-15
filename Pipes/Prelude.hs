@@ -1,36 +1,28 @@
--- | General purpose proxies
+-- | General purpose pipes
 
 {-# LANGUAGE RankNTypes #-}
 
 module Pipes.Prelude (
-    -- * Input and Output
+    -- * Producers
     stdin,
     fromHandle,
-    stdout,
-    toHandle,
     readLn,
-    print,
+    fromList,
+    enumFrom,
 
-    -- * Maps
+    -- * Pipes
     map,
     mapM,
-    use,
-    execD,
-    execU,
-
-    -- * Filters
     take,
     takeWhile,
     drop,
     dropWhile,
     filter,
 
-    -- * Lists and Enumerations
-    fromList,
-    enumFrom,
-    each,
-
-    -- * Folds
+    -- * Consumers
+    stdout,
+    toHandle,
+    print,
     fold,
     all,
     all_,
@@ -46,6 +38,9 @@ module Pipes.Prelude (
     foldr,
     foldl',
 
+    -- * ListT
+    each,
+
     -- * ArrowChoice
     -- $choice
     left,
@@ -53,7 +48,6 @@ module Pipes.Prelude (
 
     -- * Zips and Merges
     zip,
-    merge,
 
     -- * Utilities
     unitD,
@@ -71,6 +65,7 @@ import Control.Monad.Trans.Writer.Strict (WriterT, tell)
 import qualified Data.Monoid as M
 import qualified System.IO as IO
 import Pipes
+import Pipes.Internal
 import Pipes.Lift (evalStateP)
 import Prelude hiding (
     print,
@@ -99,7 +94,7 @@ stdin :: () -> Producer String IO ()
 stdin = fromHandle IO.stdin
 {-# INLINABLE stdin #-}
 
--- | Read 'String' lines from an 'IO.Handle'
+-- | Read 'String' lines from a 'IO.Handle'
 fromHandle :: IO.Handle -> () -> Producer String IO ()
 fromHandle h () = go
   where
@@ -113,18 +108,6 @@ fromHandle h () = go
                 go
 {-# INLINABLE fromHandle #-}
 
--- | Write newline-terminated 'String's to 'IO.stdout'
-stdout :: () -> Consumer String IO r
-stdout = toHandle IO.stdout
-{-# INLINABLE stdout #-}
-
--- | Write newline-terminated 'String's to a 'IO.Handle'
-toHandle :: IO.Handle -> () -> Consumer String IO r
-toHandle handle () = forever $ do
-    str <- request ()
-    lift $ IO.hPutStrLn handle str
-{-# INLINABLE toHandle #-}
-
 -- | 'read' from 'IO.stdin' using 'Prelude.readLn'
 readLn :: (Read b) => () -> Producer b IO r
 readLn () = forever $ do
@@ -132,54 +115,34 @@ readLn () = forever $ do
     respond a
 {-# INLINABLE readLn #-}
 
--- | 'show' to 'IO.stdout' using 'Prelude.print'
-print :: (Show a) => () -> Consumer a IO r
-print () = forever $ do
-    a <- request ()
-    lift $ Prelude.print a
-{-# INLINABLE print #-}
+-- | Convert a list into a 'Producer'
+fromList :: (Monad m) => [b] -> () -> Producer b m ()
+fromList xs () = mapM_ respond xs
+{-# INLINABLE fromList #-}
 
--- | @(map f)@ applies @f@ to all values going \'@D@\'ownstream.
+-- | 'Producer' version of 'enumFrom'
+enumFrom :: (Enum b, Monad m) => b -> () -> Producer b m r
+enumFrom b0 = \_ -> go b0
+  where
+    go b = do
+        _ <- respond b
+        go $! succ b
+{-# INLINABLE enumFrom #-}
+
+-- | Transform all values using a pure function
 map :: (Monad m) => (a -> b) -> () -> Pipe a b m r
 map f () = forever $ do
     a <- request ()
     respond (f a)
 {-# INLINABLE map #-}
 
--- | @(mapM f)@ applies the monadic function @f@ to all values going downstream
+-- | Transform all values using a monadic function
 mapM :: (Monad m) => (a -> m b) -> () -> Pipe a b m r
 mapM f () = forever $ do
     a <- request ()
     b <- lift $ f a
     respond b
 {-# INLINABLE mapM #-}
-
-{-| @(use f)@ executes the monadic function @f@ on all values flowing
-    \'@D@\'ownstream, discarding the result
--}
-use :: (Monad m) => (a -> m b) -> () -> Pipe a a m r
-use f () = forever $ do
-    a <- request ()
-    _ <- lift (f a)
-    respond a
-    return ()
-{-# INLINABLE use #-}
-
--- | @(execD md)@ executes @md@ every time control flows downstream through it.
-execD :: (Monad m) => m b -> () -> Pipe a a m r
-execD md () = forever $ do
-    a <- request ()
-    _ <- lift md
-    respond a
-{-# INLINABLE execD #-}
-
--- | @(execU mu)@ executes @mu@ every time control flows upstream through it.
-execU :: (Monad m) => m b -> () -> Pipe a a m r
-execU mu () = forever $ do
-    _ <- lift mu
-    a <- request ()
-    respond a
-{-# INLINABLE execU #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> () -> Pipe a a m ()
@@ -240,24 +203,24 @@ filter p () = go
             else go
 {-# INLINABLE filter #-}
 
--- | Convert a list into a 'Producer'
-fromList :: (Monad m) => [b] -> () -> Producer b m ()
-fromList xs () = mapM_ respond xs
-{-# INLINABLE fromList #-}
+-- | Write newline-terminated 'String's to 'IO.stdout'
+stdout :: () -> Consumer String IO r
+stdout = toHandle IO.stdout
+{-# INLINABLE stdout #-}
 
--- | 'Producer' version of 'enumFrom'
-enumFrom :: (Enum b, Monad m) => b -> () -> Producer b m r
-enumFrom b0 = \_ -> go b0
-  where
-    go b = do
-        _ <- respond b
-        go $! succ b
-{-# INLINABLE enumFrom #-}
+-- | Write newline-terminated 'String's to a 'IO.Handle'
+toHandle :: IO.Handle -> () -> Consumer String IO r
+toHandle handle () = forever $ do
+    str <- request ()
+    lift $ IO.hPutStrLn handle str
+{-# INLINABLE toHandle #-}
 
--- | Non-deterministically choose from all values in the given list
-each :: (Monad m) => [b] -> ListT m b
-each bs = RespondT (fromList bs ())
-{-# INLINABLE each #-}
+-- | 'show' to 'IO.stdout' using 'Prelude.print'
+print :: (Show a) => () -> Consumer a IO r
+print () = forever $ do
+    a <- request ()
+    lift $ Prelude.print a
+{-# INLINABLE print #-}
 
 -- | Strict fold using the provided 'M.Monoid'
 fold :: (Monad m, M.Monoid w) => (a -> w) -> () -> Consumer a (WriterT w m) r
@@ -339,7 +302,7 @@ last :: (Monad m) => () -> Consumer a (WriterT (M.Last a) m) r
 last = fold (M.Last . Just)
 {-# INLINABLE last #-}
 
--- | Fold the values flowing \'@D@\'ownstream into a list
+-- | Fold input values into a list
 toList :: (Monad m) => () -> Consumer a (WriterT [a] m) r
 toList = fold (\x -> [x])
 {-# INLINABLE toList #-}
@@ -367,14 +330,17 @@ foldl' step () = go
         go
 {-# INLINABLE foldl' #-}
 
+-- | Non-deterministically choose from all values in the given list
+each :: (Monad m) => [b] -> ListT m b
+each bs = RespondT (fromList bs ())
+{-# INLINABLE each #-}
+
 {- $choice
     'left' and 'right' satisfy the 'ArrowChoice' laws using
     @arr f = generalize (map f)@.
 -}
 
-{-| Lift a proxy to operate only on 'Left' values flowing \'@D@\'ownstream and
-    forward 'Right' values
--}
+-- | Lift a proxy to operate only on 'Left' values and forward 'Right' values
 left
     :: (Monad m)
     => (q -> Proxy x a x b m r)
@@ -391,9 +357,7 @@ left k = up \>\ (k />/ dn)
                 up x2
 {-# INLINABLE left #-}
 
-{-| Lift a proxy to operate only on 'Right' values flowing \'@D@\'ownstream and
-    forward 'Left' values
--}
+-- | Lift a proxy to operate only on 'Right' values and forward 'Left' values
 right
     :: (Monad m)
     => (q -> Proxy x a x b m r)
@@ -411,29 +375,28 @@ right k = up \>\ (k />/ dn)
 {-# INLINABLE right #-}
 
 -- | Zip values flowing downstream
-zip :: (Monad m) => () -> Consumer' a (Consumer' b (Producer' (a, b) m)) r
-zip () = go
+zip :: (Monad m)
+    => (() -> Producer  a     m r)
+    -> (() -> Producer     b  m r)
+    -> (() -> Producer (a, b) m r)
+zip p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
   where
-    go = do
-        a <- request ()
-        lift $ do
-            b <- request ()
-            lift $ respond (a, b)
-        go
+    go1 p1 p2 = M (do
+        x <- step p1
+        case x of
+            Left r         -> return (Pure r)
+            Right (a, p1') -> return (go2 p1' p2 a) )
+    go2 p1 p2 a = M (do
+        x <- step p2
+        case x of
+            Left r         -> return (Pure r)
+            Right (b, p2') -> return (Respond (a, b) (\_ -> go1 p1 p2')) )
+    step p = case p of
+        Request _ fa  -> step (fa ())
+        Respond b fb' -> return (Right (b, fb' ()))
+        Pure    r     -> return (Left r)
+        M         m   -> m >>= step
 {-# INLINABLE zip #-}
-
--- | Interleave values flowing downstream using simple alternation
-merge :: (Monad m) => () -> Consumer' a (Consumer' a (Producer' a m)) r
-merge () = go
-  where
-    go = do
-        a1 <- request ()
-        lift $ do
-            lift $ respond a1
-            a2 <- request ()
-            lift $ respond a2
-        go
-{-# INLINABLE merge #-}
 
 -- | Discards all values going upstream
 unitD :: (Monad m) => q -> Proxy x' x y' () m r
