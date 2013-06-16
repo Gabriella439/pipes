@@ -51,8 +51,7 @@ module Pipes.Prelude (
     right,
 
     -- * Utilities
-    unitD,
-    unitU,
+    discard,
     forward,
     generalize,
     foreverK
@@ -391,23 +390,14 @@ right k = up \>\ (k />/ dn)
             Right a -> return a
 {-# INLINABLE right #-}
 
--- | Discards all values going upstream
-unitD :: (Monad m) => () -> CoConsumer b' m r
-unitD () = go
-  where
-    go = do
-        _ <- respond ()
-        go
-{-# INLINABLE unitD #-}
-
 -- | Discards all values going downstream
-unitU :: (Monad m) => () -> Consumer a m r
-unitU () = go
+discard :: (Monad m) => () -> Consumer a m r
+discard () = go
   where
     go = do
         _ <- request ()
         go
-{-# INLINABLE unitU #-}
+{-# INLINABLE discard #-}
 
 {-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
     downstream
