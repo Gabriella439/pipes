@@ -119,7 +119,7 @@ readLn () = forever $ do
 
 -- | Convert a list into a 'Producer'
 fromList :: (Monad m) => [b] -> () -> Producer b m ()
-fromList xs () = mapM_ respond xs
+fromList bs () = mapM_ respond bs
 {-# INLINABLE fromList #-}
 
 -- | 'Producer' version of 'enumFrom'
@@ -401,7 +401,7 @@ right k = up \>\ (k />/ dn)
 {-# INLINABLE right #-}
 
 -- | Discards all values going upstream
-unitD :: (Monad m) => q -> Proxy x' x y' () m r
+unitD :: (Monad m) => q -> Producer () m r
 unitD _ = go
   where
     go = do
@@ -410,7 +410,7 @@ unitD _ = go
 {-# INLINABLE unitD #-}
 
 -- | Discards all values going downstream
-unitU :: (Monad m) => q -> Proxy () x y' y m r
+unitU :: (Monad m) => q -> CoProducer () m r
 unitU _ = go
   where
     go = do
