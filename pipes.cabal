@@ -33,7 +33,7 @@ Description:
   Import "Pipes" to use the library.
   .
   Read "Pipes.Tutorial" for an extensive tutorial.
-Category: Control, Pipes, Proxies
+Category: Control, Pipes
 Source-Repository head
     Type: git
     Location: https://github.com/Gabriel439/Haskell-Pipes-Library
