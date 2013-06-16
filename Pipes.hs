@@ -103,8 +103,8 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
 
--- | Run a self-sufficient 'Proxy', converting it back to the base monad
-runProxy :: (Monad m) => Proxy a' () () b m r -> m r
+-- | Run a self-contained 'Proxy', converting it back to the base monad
+runProxy :: (Monad m) => Proxy C () () C m r -> m r
 runProxy = go
   where
     go p = case p of
