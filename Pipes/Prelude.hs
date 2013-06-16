@@ -8,7 +8,6 @@ module Pipes.Prelude (
     fromHandle,
     readLn,
     fromList,
-    enumFrom,
 
     -- * Pipes
     map,
@@ -59,7 +58,7 @@ module Pipes.Prelude (
     foreverK
     ) where
 
-import Control.Monad (forever, replicateM_)
+import Control.Monad (when, unless, forever, replicateM_)
 import Control.Monad.Morph (hoist)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict (StateT, get, put)
@@ -102,34 +101,28 @@ fromHandle h () = go
   where
     go = do
         eof <- lift $ IO.hIsEOF h
-        if eof
-            then return ()
-            else do
-                str <- lift $ IO.hGetLine h
-                respond str
-                go
+        unless eof $ do
+            str <- lift $ IO.hGetLine h
+            respond str
+            go
 {-# INLINABLE fromHandle #-}
 
 -- | 'read' from 'IO.stdin' using 'Prelude.readLn'
-readLn :: (Read b) => () -> Producer b IO r
-readLn () = forever $ do
-    a <- lift Prelude.readLn
-    respond a
+readLn :: (Read b) => () -> Producer b IO ()
+readLn () = go
+  where
+    go = do
+        eof <- lift $ IO.hIsEOF IO.stdin
+        unless eof $ do
+            str <- lift Prelude.readLn
+            respond str
+            go
 {-# INLINABLE readLn #-}
 
 -- | Convert a list into a 'Producer'
 fromList :: (Monad m) => [b] -> () -> Producer b m ()
 fromList bs () = mapM_ respond bs
 {-# INLINABLE fromList #-}
-
--- | 'Producer' version of 'enumFrom'
-enumFrom :: (Enum b, Monad m) => b -> () -> Producer b m r
-enumFrom b0 = \_ -> go b0
-  where
-    go b = do
-        _ <- respond b
-        go $! succ b
-{-# INLINABLE enumFrom #-}
 
 -- | Transform all values using a pure function
 map :: (Monad m) => (a -> b) -> () -> Pipe a b m r
@@ -161,11 +154,9 @@ takeWhile predicate () = go
   where
     go = do
         a <- request ()
-        if (predicate a)
-            then do
-                respond a
-                go
-            else return ()
+        when (predicate a) $ do
+            respond a
+            go
 {-# INLINABLE takeWhile #-}
 
 -- | @(drop n)@ discards @n@ values going downstream
@@ -401,8 +392,8 @@ right k = up \>\ (k />/ dn)
 {-# INLINABLE right #-}
 
 -- | Discards all values going upstream
-unitD :: (Monad m) => q -> Producer () m r
-unitD _ = go
+unitD :: (Monad m) => () -> CoConsumer b' m r
+unitD () = go
   where
     go = do
         _ <- respond ()
@@ -410,8 +401,8 @@ unitD _ = go
 {-# INLINABLE unitD #-}
 
 -- | Discards all values going downstream
-unitU :: (Monad m) => q -> CoProducer () m r
-unitU _ = go
+unitU :: (Monad m) => () -> Consumer a m r
+unitU () = go
   where
     go = do
         _ <- request ()
