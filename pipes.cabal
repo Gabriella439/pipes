@@ -10,23 +10,23 @@ Maintainer: Gabriel439@gmail.com
 Bug-Reports: https://github.com/Gabriel439/Haskell-Pipes-Library/issues
 Synopsis: Compositional pipelines
 Description:
-  \"Coroutines done right\".  This library generalizes iteratees and coroutines
-  simply and elegantly.
+  \"Streaming done right\".  This library generalizes iteratees, generators,
+  and coroutines simply and elegantly.
   .
   Advantages over traditional iteratee\/coroutine implementations:
   .
   * /Concise API/: Use three simple commands: ('>->'), 'request', and 'respond'
   .
-  * /Bidirectionality/: Implement duplex channels
-  .
   * /Blazing fast/: Implementation tuned for speed
+  .
+  * /Lightweight Dependency/: @pipes@ depends only on @transformers@ and
+    @mmorph@ and compiles very rapidly
   .
   * /Elegant semantics/: Use practical category theory
   .
   * /ListT/: Correct implementation of 'ListT' that interconverts with pipes
   .
-  * /Lightweight Dependency/: @pipes@ depends only on @transformers@ and
-    @mmorph@ and compiles very rapidly
+  * /Bidirectionality/: Implement duplex channels
   .
   * /Extensive Documentation/: Second to none!
   .
