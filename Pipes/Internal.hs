@@ -1,7 +1,7 @@
 {-| This is an internal module, meaning that it is unsafe to import unless you
     understand the risks.
 
-    This module provides a fast 'Proxy' implementation by weakening the monad
+    This module provides a fast implementation by weakening the monad
     transformer laws.  These laws do not hold if you can pattern match on the
     constructors, as the following counter-example illustrates:
 
@@ -11,8 +11,9 @@
 >
 > lift . return /= return
 
-    The monad transformer laws do hold when viewed through the safe API exported
-    from "Pipes.Core".
+    You do not need to worry about this if you do not import this module, since
+    the other modules in this library do not export the constructors or export
+    any functions which can violate the monad transformer laws.
 -}
 
 module Pipes.Internal (
@@ -126,9 +127,8 @@ instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
     This correctness comes at a small cost to performance, so use this function
     sparingly.
 
-    You do not need to use this function if you use the safe API exported from
-    "Pipes", which does not export any functions or constructors that can
-    violate the monad transformer laws.
+    This function is a convenience for low-level @pipes@ implementers.  You do
+    not need to use 'observe' if you stick to the safe API.
 -}
 observe :: (Monad m) => Proxy a' a b' b m r -> Proxy a' a b' b m r
 observe p0 = M (go p0) where
