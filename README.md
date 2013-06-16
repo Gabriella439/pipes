@@ -1,4 +1,4 @@
-# Pipes v3.3.0
+# Pipes v4.0.0
 
 `pipes` is an easy, elegant, and powerful framework for describing streaming
 behaviors.
@@ -11,11 +11,11 @@ behaviors.
 Then fire up ` ghci`:
 
     $ ghci
-    Prelude> import Control.Proxy as P
-
+    Prelude> import Pipes
+    Prelude P> import qualified Pipes.Prelude as P
 ... and echo standard input to standard output until you enter `quit`.
 
-    Prelude P> runProxy $ stdinS >-> takeWhileD (/= "quit") >-> stdoutD
+    Prelude P> runProxy $ (P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout) ()
     Test[Enter]
     Test
     Apple[Enter]
@@ -23,24 +23,23 @@ Then fire up ` ghci`:
     quit[Enter]
     Prelude P> -- Done!
 
-Now read [the official tutorial](http://hackage.haskell.org/packages/archive/pipes/3.3.0/doc/html/Control-Proxy-Tutorial.html).
+A new tutorial for version 4.0.0 is in progres.  For now, you can read [the
+tutorial for version 3.3.0](http://hackage.haskell.org/packages/archive/pipes/3.3.0/doc/html/Control-Proxy-Tutorial.html).
 
 ## Features
 
 * *Concise API*: Use three simple commands: `(>->)`, `request`, and `respond`
 
-* *Bidirectionality*: Implement duplex channels 
-
 * *Blazing fast*: Implementation tuned for speed 
+
+* *Lightweight Dependency*: `pipes` depends only on `transformers` and `mmorph`
+  and compiles very rapidly
 
 * *Elegant semantics*: Use practical category theory
 
-* *Extension Framework*: Mix and match extensions and create your own
-
 * *ListT*: Correct implementation of `ListT` that interconverts with pipes 
 
-* *Lightweight Dependency*: `pipes` depends only on `transformers` and `mmorph`
-  and compiles rapidly
+* *Bidirectionality*: Implement duplex channels 
 
 * *Extensive Documentation*: Second to none!
 
@@ -48,7 +47,7 @@ Now read [the official tutorial](http://hackage.haskell.org/packages/archive/pip
 
 * [Haskell wiki page](http://www.haskell.org/haskellwiki/Pipes)
 
-* [Mailing list](haskell-pipes@googlegroups.com) ([Google Group](https://groups.google.com/forum/?fromgroups#!forum/haskell-pipes))
+* [Mailing list](mailto:haskell-pipes@googlegroups.com) ([Google Group](https://groups.google.com/forum/?fromgroups#!forum/haskell-pipes))
 
 ## How to contribute
 
