@@ -39,6 +39,9 @@ import Pipes.Internal
 import Prelude hiding (catch)
 #endif
 
+-- For documentation
+import Control.Monad.Trans.Class (lift)
+
 -- | Run 'E.ErrorT' in the base monad
 runErrorP
     :: (Monad m)
@@ -77,7 +80,7 @@ catch p0 f = go p0
 
 {-| Catch an error using a catch function for the base monad
 
-> catch = liftCatch catchError  -- except 'catch' is more general
+> catch = liftCatch catchError  -- except 'catch' has a more general type
 -}
 liftCatch
     :: (Monad m)

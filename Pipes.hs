@@ -149,20 +149,20 @@ infixl 8 \>\, //<
 {- $categories
     The 'Proxy' type sits at the intersection of five categories:
 
-    * The \"pull category\"
+    * The pull category
 
-    * The \"push category\"
+    * The push category
 
-    * The \"request category\"
+    * The request category
 
-    * The \"respond category\"
+    * The respond category
 
     * The Kleisli category
 -}
 
 {- $pull
 
-    The \"pull category\", which lets you interleave pull-based streams
+    The pull category lets you interleave pull-based streams.
 
 > pull >-> f = f
 >
@@ -175,7 +175,7 @@ infixl 8 \>\, //<
 
 > pull = request >=> respond >=> pull
 
-    'pull' is the identity of the \"pull category\".
+    'pull' is the identity of the pull category.
 -}
 pull :: (Monad m) => a' -> Proxy a' a a' a m r
 pull = go
@@ -188,7 +188,7 @@ pull = go
 
 > (f >-> g) x = f ->> g x
 
-    ('>->') is the composition operator of the \"pull category\".
+    ('>->') is the composition operator of the pull category.
 -}
 (>->)
     :: (Monad m)
@@ -216,7 +216,7 @@ fb' ->> p = case p of
 
 {- $push
 
-    The \"push category\", which lets you interleave push-based streams
+    The push category lets you interleave push-based streams.
 
 > push >~> f = f
 >
@@ -229,7 +229,7 @@ fb' ->> p = case p of
 
 > push = respond >=> request >=> push
 
-    'push' is the identity of the \"push category\".
+    'push' is the identity of the push category.
 -}
 push :: (Monad m) => a -> Proxy a' a a' a m r
 push = go
@@ -242,7 +242,7 @@ push = go
 
 > (f >~> g) x = f x >>~ g
 
-    ('>~>') is the composition operator of the \"push category\".
+    ('>~>') is the composition operator of the push category.
 -}
 (>~>)
     :: (Monad m)
@@ -269,7 +269,7 @@ p >>~ fb = case p of
 {-# INLINABLE (>>~) #-}
 
 {- $request
-    The \"request category\", which lets you substitute 'request's with proxies
+    The request category lets you substitute 'request's with proxies.
 
 > request \>\ f = f
 >
@@ -280,7 +280,7 @@ p >>~ fb = case p of
 
 {-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
 
-    'request' is the identity of the \"request category\".
+    'request' is the identity of the request category.
 -}
 request :: (Monad m) => a' -> Proxy a' a b' b m a
 request a' = Request a' Pure
@@ -290,7 +290,7 @@ request a' = Request a' Pure
 
 > (f \>\ g) x = f >\\ g x
 
-    ('\>\') is the composition operator of the \"request category\".
+    ('\>\') is the composition operator of the request category.
 -}
 (\>\)
     :: (Monad m)
@@ -330,7 +330,7 @@ fb' >\\ p0 = go p0
   #-}
 
 {- $respond
-    The \"respond category\", which lets you substitute 'respond's with proxies
+    The respond category lets you substitute 'respond's with proxies.
 
 > respond />/ f = f
 >
@@ -342,7 +342,7 @@ fb' >\\ p0 = go p0
 {-| Send a value of type @b@ downstream and block waiting for a reply of type
     @b'@
 
-    'respond' is the identity of the \"respond category\".
+    'respond' is the identity of the respond category.
 -}
 respond :: (Monad m) => b  -> Proxy a' a b' b m b'
 respond b  = Respond b  Pure
@@ -352,7 +352,7 @@ respond b  = Respond b  Pure
 
 > (f />/ g) x = f x //> g
 
-    ('/>/') is the composition operator of the \"respond category\".
+    ('/>/') is the composition operator of the respond category.
 -}
 (/>/)
     :: (Monad m)
@@ -394,7 +394,7 @@ p0 //> fb = go p0
 {- $reflect
     @(reflect .)@ transforms each streaming category into its dual:
 
-    * The \"request\" category is the dual of the \"respond\" category
+    * The request category is the dual of the respond category
 
 > reflect . request = respond
 >
@@ -404,7 +404,7 @@ p0 //> fb = go p0
 >
 > reflect . (f />/ g) = reflect . f /</ reflect . g
 
-    * The \"pull\" category is the dual of the \"push\" category
+    * The pull category is the dual of the push category
 
 > reflect . pull = push
 >
@@ -429,10 +429,10 @@ reflect = go
 {- $listT
     The 'RespondT' monad transformer is equivalent to 'ListT' over the
     downstream output.  The 'RespondT' Kleisli category corresponds to the
-    \"respond\" category.
+    respond category.
 
     The 'RequestT' monad transformer is equivalent to 'ListT' over the upstream
-    output.  The 'RequestT' Kleisli category corresponds to the \"request\"
+    output.  The 'RequestT' Kleisli category corresponds to the request
     category.
 
     Unlike 'ListT' from @transformers@, these monad transformers are correct by
@@ -576,7 +576,7 @@ type Producer' b = Proxy C () () b
 -- | Like 'Consumer', but with concrete types
 type Consumer' a = Proxy () a () C
 
--- | Like 'Effect', but with concrete types to improve type inference
+-- | Like 'Effect', but with concrete types
 type Effect' = Proxy C () () C
 
 -- | Like 'ListT', but with concrete types

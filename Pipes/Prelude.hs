@@ -23,6 +23,8 @@ module Pipes.Prelude (
     stdout,
     toHandle,
     print,
+
+    -- ** Folds
     fold,
     all,
     all_,
@@ -38,6 +40,9 @@ module Pipes.Prelude (
     foldr,
     foldl',
 
+    -- * Zip
+    zip,
+
     -- * ListT
     each,
 
@@ -45,9 +50,6 @@ module Pipes.Prelude (
     -- $choice
     left,
     right,
-
-    -- * Zips and Merges
-    zip,
 
     -- * Utilities
     unitD,
@@ -89,12 +91,12 @@ import Prelude hiding (
     zip )
 import qualified Prelude
 
--- | Read 'String' lines from 'IO.stdin'
+-- | Read 'String's from 'IO.stdin' using 'getLine'
 stdin :: () -> Producer String IO ()
 stdin = fromHandle IO.stdin
 {-# INLINABLE stdin #-}
 
--- | Read 'String' lines from a 'IO.Handle'
+-- | Read 'String's from a 'IO.Handle' using 'IO.hGetLine'
 fromHandle :: IO.Handle -> () -> Producer String IO ()
 fromHandle h () = go
   where
@@ -203,12 +205,12 @@ filter p () = go
             else go
 {-# INLINABLE filter #-}
 
--- | Write newline-terminated 'String's to 'IO.stdout'
+-- | Write 'String's to 'IO.stdout' using 'putStrLn'
 stdout :: () -> Consumer String IO r
 stdout = toHandle IO.stdout
 {-# INLINABLE stdout #-}
 
--- | Write newline-terminated 'String's to a 'IO.Handle'
+-- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: IO.Handle -> () -> Consumer String IO r
 toHandle handle () = forever $ do
     str <- request ()
@@ -297,7 +299,7 @@ head_ () = do
     lift $ tell $ M.First (Just a)
 {-# INLINABLE head_ #-}
 
--- | Retrieve the last value
+-- | Retrieve the 'M.Last' value
 last :: (Monad m) => () -> Consumer a (WriterT (M.Last a) m) r
 last = fold (M.Last . Just)
 {-# INLINABLE last #-}
@@ -329,6 +331,30 @@ foldl' step () = go
         lift $ put $! step s a 
         go
 {-# INLINABLE foldl' #-}
+
+-- | Zip two 'Producer's
+zip :: (Monad m)
+    => (() -> Producer  a     m r)
+    -> (() -> Producer     b  m r)
+    -> (() -> Producer (a, b) m r)
+zip p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
+  where
+    go1 p1 p2 = M (do
+        x <- step p1
+        case x of
+            Left r         -> return (Pure r)
+            Right (a, p1') -> return (go2 p1' p2 a) )
+    go2 p1 p2 a = M (do
+        x <- step p2
+        case x of
+            Left r         -> return (Pure r)
+            Right (b, p2') -> return (Respond (a, b) (\_ -> go1 p1 p2')) )
+    step p = case p of
+        Request _ fa  -> step (fa ())
+        Respond b fb' -> return (Right (b, fb' ()))
+        Pure    r     -> return (Left r)
+        M         m   -> m >>= step
+{-# INLINABLE zip #-}
 
 -- | Non-deterministically choose from all values in the given list
 each :: (Monad m) => [b] -> ListT m b
@@ -373,30 +399,6 @@ right k = up \>\ (k />/ dn)
                 up x2
             Right a -> return a
 {-# INLINABLE right #-}
-
--- | Zip values flowing downstream
-zip :: (Monad m)
-    => (() -> Producer  a     m r)
-    -> (() -> Producer     b  m r)
-    -> (() -> Producer (a, b) m r)
-zip p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
-  where
-    go1 p1 p2 = M (do
-        x <- step p1
-        case x of
-            Left r         -> return (Pure r)
-            Right (a, p1') -> return (go2 p1' p2 a) )
-    go2 p1 p2 a = M (do
-        x <- step p2
-        case x of
-            Left r         -> return (Pure r)
-            Right (b, p2') -> return (Respond (a, b) (\_ -> go1 p1 p2')) )
-    step p = case p of
-        Request _ fa  -> step (fa ())
-        Respond b fb' -> return (Right (b, fb' ()))
-        Pure    r     -> return (Left r)
-        M         m   -> m >>= step
-{-# INLINABLE zip #-}
 
 -- | Discards all values going upstream
 unitD :: (Monad m) => q -> Proxy x' x y' () m r
