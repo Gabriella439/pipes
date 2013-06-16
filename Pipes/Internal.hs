@@ -45,7 +45,7 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 >      +-------+
 >      |       |
 >  a' <==     <== b'
->      |   m   |
+>      |       |
 >  a  ==>     ==> b
 >      |   |   |
 >      +---|---+

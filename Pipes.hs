@@ -161,8 +161,22 @@ infixl 8 \>\, //<
 -}
 
 {- $pull
+    The pull category lets you interleave pull-based streams, beginning from the
+    most downstream component:
 
-    The pull category lets you interleave pull-based streams.
+>         b'           c'                   c'
+>         |            |                    |
+>      +--|--+      +--|--+            +----|----+
+>      |  v  |      |  v  |            |    v    |
+>  a' <==   <== b' <==   <== c'    a' <==       <== c'
+>      |  f  |      |  g  |     =      | f >-> g |
+>  a  ==>   ==> b  ==>   ==> c     a  ==>       ==> c
+>      |  |  |      |  |  |            |    |    |
+>      +--|--+      +--|--+            +----|----+
+>         v            v                    v
+>         r            r                    r
+
+    The pull category obeys the category laws:
 
 > pull >-> f = f
 >
@@ -215,8 +229,22 @@ fb' ->> p = case p of
 {-# INLINABLE (->>) #-}
 
 {- $push
+    The push category lets you interleave push-based streams, beginning from the
+    most upstream component:
 
-    The push category lets you interleave push-based streams.
+>         a            b                    a
+>         |            |                    |
+>      +--|--+      +--|--+            +----|----+
+>      |  v  |      |  v  |            |    v    |
+>  a' <==   <== b' <==   <== c'    a' <==       <== c'
+>      |  f  |      |  g  |     =      | f >~> g |
+>  a  ==>   ==> b  ==>   ==> c     a  ==>       ==> c
+>      |  |  |      |  |  |            |    |    |
+>      +--|--+      +--|--+            +----|----+
+>         v            v                    v
+>         r            r                    r
+
+    The pull category obeys the category laws:
 
 > push >~> f = f
 >
@@ -271,6 +299,20 @@ p >>~ fb = case p of
 {- $request
     The request category lets you substitute 'request's with proxies.
 
+>         b' <===\             c'                   c'
+>         |      \\            |                    |
+>      +--|--+    \\        +--|--+            +----|----+
+>      |  v  |     \\       |  v  |            |    v    |
+>  a' <==   <== y'  \== b' <==   <== y'    a' <==       <== y'
+>      |  f  |              |  g  |     =      | f \>\ g |
+>  a  ==>   ==> y   /=> b  ==>   ==> y     a  ==>       ==> y
+>      |  |  |     //       |  |  |            |    |    |
+>      +--|--+    //        +--|--+            +----|----+
+>         v      //            v                    v
+>         b =====/             c                    c
+
+    The request category obeys the category laws:
+
 > request \>\ f = f
 >
 > f \>\ request = f
@@ -282,7 +324,7 @@ p >>~ fb = case p of
 
     'request' is the identity of the request category.
 -}
-request :: (Monad m) => a' -> Proxy a' a b' b m a
+request :: (Monad m) => a' -> Proxy a' a y' y m a
 request a' = Request a' Pure
 {-# INLINABLE request #-}
 
@@ -332,6 +374,20 @@ fb' >\\ p0 = go p0
 {- $respond
     The respond category lets you substitute 'respond's with proxies.
 
+>         a               /===> b                    a
+>         |              //     |                    |
+>      +--|--+          //   +--|--+            +----|----+
+>      |  v  |         //    |  v  |            |    v    |
+>  x' <==   <== b' <=\// x' <==   <== c'    x' <==       <== c'
+>      |  f  |       \\      |  g  |     =      | f />/ g |
+>  x  ==>   ==> b  ==/\\ x  ==>   ==> c     x  ==>       ==> c'
+>      |  |  |         \\    |  |  |            |    |    |
+>      +--|--+          \\   +--|--+            +----|----+
+>         v              \\     v                    v
+>         a'              \==== b'                   a'
+
+    The respond category obeys the category laws:
+
 > respond />/ f = f
 >
 > f />/ respond = f
@@ -344,8 +400,8 @@ fb' >\\ p0 = go p0
 
     'respond' is the identity of the respond category.
 -}
-respond :: (Monad m) => b  -> Proxy a' a b' b m b'
-respond b  = Respond b  Pure
+respond :: (Monad m) => a -> Proxy x' x a' a m a'
+respond a = Respond a Pure
 {-# INLINABLE respond #-}
 
 {-| Compose two unfolds, creating a new unfold
