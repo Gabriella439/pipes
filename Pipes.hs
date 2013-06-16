@@ -574,36 +574,36 @@ type Pipe a b = Proxy () a () b
 
     'Producer's never 'request'.
 -}
-type Producer b m r = forall a' a . Proxy a' a () b m r
+type Producer b m r = forall x' x . Proxy x' x () b m r
 
 {-| A 'Pipe' that consumes values
 
     'Consumer's never 'respond'.
 -}
-type Consumer a m r = forall b' b . Proxy () a b' b m r
+type Consumer a m r = forall y' y . Proxy () a y' y m r
 
 {-| An effect in the base monad
 
     'Effect's never 'request' or 'respond'.
 -}
-type Effect m r = forall a' a b' b . Proxy a' a b' b m r
+type Effect m r = forall x' x y' y . Proxy x' x y' y m r
 
 -- | The list monad transformer
-type ListT m b = forall a' a . RespondT a' a () m b
+type ListT m b = forall x' x . RespondT x' x () m b
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
     'Client's never 'respond'.
 -}
-type Client a' a m r = forall b' b . Proxy a' a b' b m r
+type Client a' a m r = forall y' y . Proxy a' a y' y m r
 
 {-| @Server b' b@ receives requests of type @b'@ and sends responses of type
     @b@.
 
     'Server's never 'request'.
 -}
-type Server b' b m r = forall a' a . Proxy a' a b' b m r
+type Server b' b m r = forall x' x . Proxy x' x b' b m r
 
 -- | A 'Pipe' where everything flows upstream
 type CoPipe a' b' = Proxy a' () b' ()
