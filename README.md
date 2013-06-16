@@ -13,6 +13,7 @@ Then fire up ` ghci`:
     $ ghci
     Prelude> import Pipes
     Prelude P> import qualified Pipes.Prelude as P
+
 ... and echo standard input to standard output until you enter `quit`.
 
     Prelude P> runProxy $ (P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout) ()
@@ -23,7 +24,7 @@ Then fire up ` ghci`:
     quit[Enter]
     Prelude P> -- Done!
 
-A new tutorial for version 4.0.0 is in progres.  For now, you can read [the
+A new tutorial for version 4.0.0 is in progress.  For now, you can read [the
 tutorial for version 3.3.0](http://hackage.haskell.org/packages/archive/pipes/3.3.0/doc/html/Control-Proxy-Tutorial.html).
 
 ## Features
@@ -57,7 +58,7 @@ tutorial for version 3.3.0](http://hackage.haskell.org/packages/archive/pipes/3.
 
 * Write `pipes` tutorials
 
-## Copyright
+## License
 
 Copyright (c) 2012, 2013 Gabriel Gonzalez
 All rights reserved.
