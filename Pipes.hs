@@ -90,18 +90,27 @@ module Pipes (
     (<<-),
     (~<<),
     (//<),
-    (<\\)
+    (<\\),
 
     -- * Laws
     -- $laws
+
+    -- * Re-exports
+    -- $reexports
+    module Control.Monad,
+    module Control.Monad.Trans.Class,
+    module Control.Monad.Morph
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
-import Control.Monad (MonadPlus(mzero, mplus))
+import Control.Monad (forever, (>=>), (<=<))
+import qualified Control.Monad as M
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
+
+import Control.Monad.Morph (MFunctor(hoist))
 
 -- | Run a self-contained 'Proxy', converting it back to the base monad
 runProxy :: (Monad m) => Proxy C () () C m r -> m r
@@ -527,7 +536,7 @@ instance (Monad m, Monoid b') => Alternative (RespondT a' a b' m) where
         r2 <- runRespondT p2
         return (mappend r1 r2) )
 
-instance (Monad m, Monoid b') => MonadPlus (RespondT a' a b' m) where
+instance (Monad m, Monoid b') => M.MonadPlus (RespondT a' a b' m) where
     mzero = empty
     mplus = (<|>)
 
@@ -563,7 +572,7 @@ instance (Monad m, Monoid a) => Alternative (RequestT a b' b m) where
         r2 <- runRequestT p2
         return (mappend r1 r2) )
 
-instance (Monad m, Monoid a) => MonadPlus (RequestT a b' b m) where
+instance (Monad m, Monoid a) => M.MonadPlus (RequestT a b' b m) where
     mzero = empty
     mplus = (<|>)
 
@@ -772,4 +781,12 @@ f <\\ p = p //> f
 > (lift . f >=> respond >=> p1) >~> (lift . g >=> respond >=> p2)
 >     = lift . (f >=> g) >=> (p1 >-> p2)
 
+-}
+
+{- $reexports
+    "Control.Monad" re-exports 'forever', ('>=>'), and ('<=<').
+
+    "Control.Monad.Trans.Class" re-exports 'MonadTrans'.
+
+    "Control.Monad.Morph" re-exports 'MFunctor'.
 -}
