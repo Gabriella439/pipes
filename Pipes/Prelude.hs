@@ -49,7 +49,7 @@ module Pipes.Prelude (
 
     -- * Utilities
     discard,
-    forward,
+    tee,
     generalize,
     foreverK
     ) where
@@ -211,16 +211,16 @@ print () = forever $ do
     lift $ Prelude.print a
 {-# INLINABLE print #-}
 
--- | Strict fold using the provided 'M.Monoid'
+-- | Strict fold over the input using the provided 'M.Monoid'
 fold :: (Monad m, M.Monoid w) => (a -> w) -> () -> Consumer a (WriterT w m) r
 fold f () =  forever $ do
     a <- request ()
     lift $ tell (f a)
 {-# INLINABLE fold #-}
 
-{-| Fold that returns whether 'M.All' values satisfy the predicate
+{-| Fold that returns whether 'M.All' input values satisfy the predicate
 
-    'all' terminates on the first value that fails the predicate
+    'all' terminates on the first value that fails the predicate.
 -}
 all :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.All m) ()
 all predicate () = go
@@ -232,9 +232,9 @@ all predicate () = go
             else lift $ tell (M.All False)
 {-# INLINABLE all #-}
 
-{-| Fold that returns whether 'M.Any' value satisfies the predicate
+{-| Fold that returns whether 'M.Any' input value satisfies the predicate
 
-    'any' terminates on the first value that satisfies the predicate
+    'any' terminates on the first value that satisfies the predicate.
 -}
 any :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.Any m) ()
 any predicate () = go
@@ -246,24 +246,24 @@ any predicate () = go
             else go
 {-# INLINABLE any #-}
 
--- | Compute the 'M.Sum' of all values
+-- | Compute the 'M.Sum' of all input values
 sum :: (Monad m, Num a) => () -> Consumer a (WriterT (M.Sum a) m) r
 sum = fold M.Sum
 {-# INLINABLE sum #-}
 
--- | Compute the 'M.Product' of all values
+-- | Compute the 'M.Product' of all input values
 product :: (Monad m, Num a) => () -> Consumer a (WriterT (M.Product a) m) r
 product = fold M.Product
 {-# INLINABLE product #-}
 
--- | Count the number of values
+-- | Count the number of input values
 length :: (Monad m) => () -> Consumer a (WriterT (M.Sum Int) m) r
 length = fold (\_ -> M.Sum 1)
 {-# INLINABLE length #-}
 
-{-| Retrieve the 'M.First' value
+{-| Retrieve the 'M.First' input value
 
-    'head' terminates on the first value it receives
+    'head' terminates on the first value it receives.
 -}
 head :: (Monad m) => () -> Consumer a (WriterT (M.First a) m) ()
 head () = do
@@ -271,7 +271,7 @@ head () = do
     lift $ tell $ M.First (Just a)
 {-# INLINABLE head #-}
 
--- | Retrieve the 'M.Last' value
+-- | Retrieve the 'M.Last' input value
 last :: (Monad m) => () -> Consumer a (WriterT (M.Last a) m) r
 last = fold (M.Last . Just)
 {-# INLINABLE last #-}
@@ -384,8 +384,8 @@ discard () = go
 {-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
     downstream
 -}
-forward :: (Monad m) => (() -> Consumer a m r) -> (() -> Pipe a a m r)
-forward p () = evalStateP Nothing $ do
+tee :: (Monad m) => (() -> Consumer a m r) -> (() -> Pipe a a m r)
+tee p () = evalStateP Nothing $ do
     r <- up >\\ hoist lift (p ())
     ma <- lift get
     case ma of
@@ -401,7 +401,7 @@ forward p () = evalStateP Nothing $ do
         a <- request ()
         lift $ put (Just a)
         return a
-{-# INLINABLE forward #-}
+{-# INLINABLE tee #-}
 
 -- | Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
 generalize :: (Monad m) => (() -> Pipe a b m r) -> x -> Proxy x a x b m r
