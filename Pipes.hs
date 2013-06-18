@@ -113,7 +113,7 @@ import Pipes.Internal
 import Control.Monad.Morph (MFunctor(hoist))
 
 -- | Run a self-contained 'Proxy', converting it back to the base monad
-runProxy :: (Monad m) => Proxy C () () C m r -> m r
+runProxy :: (Monad m) => Effect' m r -> m r
 runProxy = go
   where
     go p = case p of
