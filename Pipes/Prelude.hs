@@ -26,14 +26,11 @@ module Pipes.Prelude (
     -- ** Folds
     fold,
     all,
-    all_,
     any,
-    any_,
     sum,
     product,
     length,
     head,
-    head_,
     last,
     toList,
     foldr,
@@ -221,43 +218,33 @@ fold f () =  forever $ do
     lift $ tell (f a)
 {-# INLINABLE fold #-}
 
--- | Fold that returns whether 'M.All' values satisfy the predicate
-all :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.All m) r
-all predicate = fold (M.All . predicate)
-{-# INLINABLE all #-}
-
 {-| Fold that returns whether 'M.All' values satisfy the predicate
 
-    'all_' terminates on the first value that fails the predicate
+    'all' terminates on the first value that fails the predicate
 -}
-all_ :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.All m) ()
-all_ predicate () = go
+all :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.All m) ()
+all predicate () = go
   where
     go = do
         a <- request ()
         if (predicate a)
             then go
             else lift $ tell (M.All False)
-{-# INLINABLE all_ #-}
-
--- | Fold that returns whether 'M.Any' value satisfies the predicate
-any :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.Any m) r
-any predicate = fold (M.Any . predicate)
-{-# INLINABLE any #-}
+{-# INLINABLE all #-}
 
 {-| Fold that returns whether 'M.Any' value satisfies the predicate
 
-    'any_' terminates on the first value that satisfies the predicate
+    'any' terminates on the first value that satisfies the predicate
 -}
-any_ :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.Any m) ()
-any_ predicate () = go
+any :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.Any m) ()
+any predicate () = go
   where
     go = do
         a <- request ()
         if (predicate a)
             then lift $ tell (M.Any True)
             else go
-{-# INLINABLE any_ #-}
+{-# INLINABLE any #-}
 
 -- | Compute the 'M.Sum' of all values
 sum :: (Monad m, Num a) => () -> Consumer a (WriterT (M.Sum a) m) r
@@ -274,20 +261,15 @@ length :: (Monad m) => () -> Consumer a (WriterT (M.Sum Int) m) r
 length = fold (\_ -> M.Sum 1)
 {-# INLINABLE length #-}
 
--- | Retrieve the 'M.First' value
-head :: (Monad m) => () -> Consumer a (WriterT (M.First a) m) r
-head = fold (M.First . Just)
-{-# INLINABLE head #-}
-
 {-| Retrieve the 'M.First' value
 
-    'head_' terminates on the first value it receives
+    'head' terminates on the first value it receives
 -}
-head_ :: (Monad m) => () -> Consumer a (WriterT (M.First a) m) ()
-head_ () = do
+head :: (Monad m) => () -> Consumer a (WriterT (M.First a) m) ()
+head () = do
     a <- request ()
     lift $ tell $ M.First (Just a)
-{-# INLINABLE head_ #-}
+{-# INLINABLE head #-}
 
 -- | Retrieve the 'M.Last' value
 last :: (Monad m) => () -> Consumer a (WriterT (M.Last a) m) r
