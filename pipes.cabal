@@ -47,5 +47,6 @@ Library
         Pipes,
         Pipes.Internal,
         Pipes.Lift,
-        Pipes.Prelude
+        Pipes.Prelude,
+        Pipes.Tutorial
     GHC-Options: -O2

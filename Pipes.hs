@@ -19,7 +19,7 @@
 module Pipes (
     -- * Proxy Monad Transformer
     Proxy,
-    runProxy,
+    runEffect,
 
     -- * Categories
     -- $categories
@@ -113,15 +113,15 @@ import Pipes.Internal
 import Control.Monad.Morph (MFunctor(hoist))
 
 -- | Run a self-contained 'Proxy', converting it back to the base monad
-runProxy :: (Monad m) => Effect' m r -> m r
-runProxy = go
+runEffect :: (Monad m) => Effect' m r -> m r
+runEffect = go
   where
     go p = case p of
         Request _ fa  -> go (fa  ())
         Respond _ fb' -> go (fb' ())
         M         m   -> m >>= go
         Pure      r   -> return r
-{-# INLINABLE runProxy #-}
+{-# INLINABLE runEffect #-}
 
 {- * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
