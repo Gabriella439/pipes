@@ -112,7 +112,7 @@ import Pipes.Internal
 
 import Control.Monad.Morph (MFunctor(hoist))
 
--- | Run a self-contained 'Proxy', converting it back to the base monad
+-- | Run a self-contained 'Effect', converting it back to the base monad
 runEffect :: (Monad m) => Effect m r -> m r
 runEffect p = go p
   where
