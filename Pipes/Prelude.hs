@@ -383,7 +383,7 @@ right k = up \>\ (k />/ dn)
             Right a -> return a
 {-# INLINABLE right #-}
 
--- | Discards all values going downstream
+-- | Discards all input values
 discard :: (Monad m) => () -> Consumer a m r
 discard () = go
   where
