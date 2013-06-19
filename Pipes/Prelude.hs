@@ -36,7 +36,7 @@ module Pipes.Prelude (
     foldr,
     foldl',
 
-    -- * Zip
+    -- * Zips
     zip,
     zipWith,
 
@@ -314,6 +314,7 @@ zip :: (Monad m)
 zip = zipWith (,)
 {-# INLINABLE zip #-}
 
+-- | Zip two 'Producer's using the provided combining function
 zipWith :: (Monad m)
     => (a -> b -> c)
     -> (() -> Producer a m r)
