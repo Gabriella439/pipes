@@ -38,6 +38,7 @@ module Pipes.Prelude (
 
     -- * Zip
     zip,
+    zipWith,
 
     -- * ListT
     each,
@@ -83,7 +84,8 @@ import Prelude hiding (
     head,
     last,
     foldr,
-    zip )
+    zip,
+    zipWith )
 import qualified Prelude
 
 -- | Read 'String's from 'IO.stdin' using 'getLine'
@@ -309,7 +311,15 @@ zip :: (Monad m)
     => (() -> Producer  a     m r)
     -> (() -> Producer     b  m r)
     -> (() -> Producer (a, b) m r)
-zip p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
+zip = zipWith (,)
+{-# INLINABLE zip #-}
+
+zipWith :: (Monad m)
+    => (a -> b -> c)
+    -> (() -> Producer a m r)
+    -> (() -> Producer b m r)
+    -> (() -> Producer c m r)
+zipWith f p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
   where
     go1 p1 p2 = M (do
         x <- step p1
@@ -320,13 +330,13 @@ zip p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
         x <- step p2
         case x of
             Left r         -> return (Pure r)
-            Right (b, p2') -> return (Respond (a, b) (\_ -> go1 p1 p2')) )
+            Right (b, p2') -> return (Respond (f a b) (\_ -> go1 p1 p2')) )
     step p = case p of
         Request _ fa  -> step (fa ())
         Respond b fb' -> return (Right (b, fb' ()))
         Pure    r     -> return (Left r)
         M         m   -> m >>= step
-{-# INLINABLE zip #-}
+{-# INLINABLE zipWith #-}
 
 -- | Non-deterministically choose from all values in the given list
 each :: (Monad m) => [b] -> ListT m b
