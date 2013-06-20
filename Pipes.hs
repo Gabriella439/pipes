@@ -113,7 +113,7 @@ import Pipes.Internal
 import Control.Monad.Morph (MFunctor(hoist))
 
 -- | Run a self-contained 'Effect', converting it back to the base monad
-runEffect :: (Monad m) => Effect m r -> m r
+runEffect :: (Monad m) => Effect' m r -> m r
 runEffect p = go p
   where
     go p = case p of
