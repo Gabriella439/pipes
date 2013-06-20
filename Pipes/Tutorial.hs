@@ -16,8 +16,18 @@ module Pipes.Tutorial (
 
     -- * Types
     -- $types
+
+    -- * Prelude
+    -- $prelude
+
+    -- * Folds
+    -- $folds
+
+    -- * Mixing base monads
+    -- $mixingbasemonads
     ) where
 
+import Control.Monad.Trans.Writer.Strict
 import Pipes
 import qualified Pipes.Prelude as P
 
@@ -134,7 +144,8 @@ import qualified Pipes.Prelude as P
 {- $easytounderstand
     You connect pipes using the ('>->') composition operator.
 
-    If you connect a 'Producer' and a 'Consumer', you get an 'Effect':
+    If you connect a 'Producer' and a 'Consumer', you get a self-contained
+    'Effect':
 
 > (>->) :: (() -> Producer a m r)
 >       -> (() -> Consumer a m r)
@@ -179,11 +190,47 @@ import qualified Pipes.Prelude as P
     'Consumer's, 'Producer's, and 'Pipe's are all type synonyms around the
     'Proxy' type, which is why you can reuse ('>->') to connect all of them:
 
-> type Consumer a m r = forall y' y . Proxy () a y' y m r
-> type Producer b m r = forall x' x . Proxy x' x () b m r
+> type Producer b m r = forall x' x . Proxy x' x () a m r
 > type Pipe   a b m r =               Proxy () a () b m r
+> type Consumer a m r = forall y' y . Proxy () b y' y m r
 
     See the advanced section on bidirectionality if you want to learn more.
     Otherwise, just remember that your pipes require an argument of type @()@ if
     you stick to composing unidirectional pipes using ('>->').
+-}
+
+{- $prelude
+    @pipes@ provides a Prelude of utilities in "Pipes.Prelude" that generalize
+    their list-based counterparts.
+
+    For example, you can 'P.map' a function to convert it to a 'Pipe':
+
+> map :: (Monad m) => (a -> b) -> Pipe a b m r
+
+    You can also 'P.zipWith' two 'Producer's the same way you would 'zipWith'
+    lists:
+
+> zipWith
+>     :: (Monad m)
+>     => (a -> b -> c)
+>     -> (() -> Producer a m r)
+>     -> (() -> Producer b m r)
+>     -> (() -> Producer c m r)
+
+    Using these two functions we can implement the @nl@ utility to number all
+    lines:
+
+> import Text.Printf
+>
+> numbers :: (Monad m) => () -> Producer String m ()
+> numbers = P.fromList [(1::Int)..] >-> P.map (printf "%6d\t")
+> 
+> main = runEffect $ (P.zipWith (++) numbers P.stdin >-> P.stdout) ()
+-}
+
+{- $folds
+    The @pipes@ Prelude also provides several folds which store their results in
+    a 'WriterT' layer in the base monad.  For example, you can count how many
+    input elements you receive using 'P.length':
+
 -}
