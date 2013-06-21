@@ -354,7 +354,7 @@ Left "Could not parse an integer"
 > import Control.Monad.Trans.Writer.Strict
 >
 > main = do
->     numLines <- execWriterT $ runEffect $ (hoist lift . P.stdin >-> P.length)
+>     numLines <- execWriterT $ runEffect $ (hoist lift . P.stdin >-> P.length) ()
 >     print numLines
 
     Let's try it:
