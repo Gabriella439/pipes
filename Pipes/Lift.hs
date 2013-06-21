@@ -8,8 +8,8 @@
 module Pipes.Lift (
     -- * ErrorT
     runErrorP,
-    catch,
-    liftCatch,
+    catchError,
+    liftCatchError,
 
     -- * MaybeT
     runMaybeP,
@@ -34,10 +34,6 @@ import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
-#if MIN_VERSION_base(4,6,0)
-#else
-import Prelude hiding (catch)
-#endif
 
 -- For documentation
 import Control.Monad.Trans.Class (lift)
@@ -60,12 +56,12 @@ runErrorP = go
 {-# INLINABLE runErrorP #-}
 
 -- | Catch an error in the base monad
-catch
+catchError
     :: (Monad m) 
     => Proxy a' a b' b (E.ErrorT e m) r
     -> (e -> Proxy a' a b' b (E.ErrorT f m) r)
     -> Proxy a' a b' b (E.ErrorT f m) r
-catch p0 f = go p0
+catchError p0 f = go p0
   where
     go p = case p of
         Request a' fa  -> Request a' (\a  -> go (fa  a ))
@@ -76,13 +72,10 @@ catch p0 f = go p0
             return (Right (case x of
                 Left  e  -> f  e
                 Right p' -> go p' )) ))
-{-# INLINABLE catch #-}
+{-# INLINABLE catchError #-}
 
-{-| Catch an error using a catch function for the base monad
-
-> catch = liftCatch catchError  -- except 'catch' has a more general type
--}
-liftCatch
+-- | Catch an error using a catch function for the base monad
+liftCatchError
     :: (Monad m)
     => (   m (Proxy a' a b' b m r)
         -> (e -> m (Proxy a' a b' b m r))
@@ -92,7 +85,7 @@ liftCatch
         -> (e -> Proxy a' a b' b m r)
         -> Proxy a' a b' b m r)
     -- ^ Catch function for 'Proxy'
-liftCatch c p0 f = go p0
+liftCatchError c p0 f = go p0
   where
     go p = case p of
         Request a' fa  -> Request a' (\a  -> go (fa  a ))
@@ -101,7 +94,7 @@ liftCatch c p0 f = go p0
         M          m   -> M ((do
             p' <- m
             return (go p') ) `c` (\e -> return (f e)) )
-{-# INLINABLE liftCatch #-}
+{-# INLINABLE liftCatchError #-}
 
 -- | Run 'M.MaybeT' in the base monad
 runMaybeP
