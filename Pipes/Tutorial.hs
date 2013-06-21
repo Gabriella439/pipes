@@ -1,6 +1,8 @@
 {-| @pipes@ is an easy-to-use, powerful, and elegant stream processing library 
 
-    Use @pipes@ to build and connect reusable components like Unix pipes.
+    Use @pipes@ to build and connect reusable components like Unix pipes.  In
+    fact, this tutorial explains @pipes@ using recurring analogies to Unix
+    pipes.
 -}
 
 module Pipes.Tutorial (
@@ -12,6 +14,9 @@ module Pipes.Tutorial (
 
     -- * Easy to understand
     -- $easytounderstand
+
+    -- * Theory - Part 1
+    -- $theory1
 
     -- * Types - Part 1
     -- $types1
@@ -33,7 +38,8 @@ import qualified Pipes.Prelude as P
 
 {- $easytouse
     Haskell pipes are simple to connect.  For example, here's how you echo
-    'P.stdin' to 'P.stdout', just like @cat@ when given no arguments:
+    'P.stdin' to 'P.stdout', just like the Unix @cat@ program when given no
+    arguments:
 
 > -- cat.hs
 > 
@@ -66,7 +72,7 @@ import qualified Pipes.Prelude as P
 > main = runEffect $ (P.stdin >-> P.take 10 >-> P.stdout) ()
 
     ... or you can simulate the @yes@ command by replacing 'P.stdin' with an
-    endless list of @"y"@s:
+    endless list of \"y\"s:
 
 > -- yes.hs
 > 
@@ -166,8 +172,8 @@ import qualified Pipes.Prelude as P
     new input and 'respond' with new output.
 
     Notice that 'take' can transmit values of any type, not just 'String's.
-    These components differ from Unix pipes because they are not limited to
-    text-based inputs or outputs.
+    Haskell pipes differ from Unix pipes because they can receive and transmit
+    typed values and they are not limited to textual input and output.
 -}
 
 {- $easytounderstand
@@ -204,6 +210,53 @@ import qualified Pipes.Prelude as P
     * we don't connect an open end to a closed end, and
 
     * we don't leave a dangling input or output end.
+-}
+
+{- $theory1
+    ('>->') has the very nice property that it is associative: meaning that it
+    behaves the exact same way no matter how you group composition:
+
+> -- Associativity
+> (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
+
+    ... so you can always safely omit the parentheses since the meaning is
+    unambiguous:
+
+> p1 >-> p2 >-> p3
+
+    This guarantees that you can reason about each pipe's behavior independently
+    of other pipes, otherwise composition wouldn't be associative.
+
+    Also, we can prove that pipe composition does not leak any side effects or
+    implementation details.  We only need to define an empty test pipe named
+    'pull', which auto-forwards all values and never tampers with the stream:
+
+> -- The true implementation is more general
+> pull :: (Monad m) => () -> Pipe a a m r
+> pull () = forever $ do
+>     a <- request ()
+>     respond a
+
+    We expect that if composition does not leak any information then composing
+    'pull' should have no effect:
+
+> -- Left Identity
+> pull >-> p = p
+>
+> -- Right Identity
+> p >-> pull = p
+
+    ... and this turns out to be true, guaranteeing that pipe composition is
+    invisible.
+
+    Fascinatingly, this means that pipes are a 'Category' in disguise, where
+    ('>->') is the composition operator and 'pull' is the identity.  The above
+    equations are the 'Category' laws.
+
+    @pipes@ leverages category theory pervasively in order to eliminate large
+    classes of bugs and promote intuitive behavior.  Unlike Unix pipes, you will
+    never encounter dark corners of the @pipes@ API that give weird behavior
+    because all the primitives are built on a proven mathematical foundation.
 -}
 
 {- $types1
@@ -336,6 +389,13 @@ Left "Could not parse an integer"
 
     Note that ('.') has higher precedence than ('>->') so you can use ('.') to
     easily modify pipes while ignoring their initial argument.
+
+    Also, you don't need to 'hoist' several pipes in a row.  'hoist' has the
+    nice property that it distributes over composition:
+
+> hoist lift . p1 >-> hoist lift . p2 = hoist lift . (p1 >-> p2)
+>
+> hoist lift . pull = pull
 -}
 
 {- $folds
