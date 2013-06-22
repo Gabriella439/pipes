@@ -747,40 +747,6 @@ f <\\ p = p //> f
 >
 > return />/ a = return
 
-    Also, proxies obey these uncategorized laws:
-
-> p \>\ lift . f = lift . f
->
-> p \>\ respond  = respond
->
-> lift . f />/ p = lift . f
->
-> request />/  p = request
->
-> pull = request >=> respond >=> pull
->
-> push = respond >=> request >=> push
->
-> p1 >-> lift . f = lift . f
->
-> p1 >-> (lift . f >=> respond >=> p2) = lift . f >=> respond >=> (p1 >-> p2)
->
-> (lift . g >=> respond >=> p1) >-> (lift . f >=> request >=> lift . h >=> p2)
->     = lift . (f >=> g >=> h) >=> (p1 >-> p2)
->
-> (lift . g >=> request >=> p1) >-> (lift . f >=> request >=> p2)
->     = lift . (f >=> g) >=> request >=> (p1 >~> p2)
->
-> lift . f >~> p2 = lift . f
->
-> (lift . f >=> request >=> p1) >~> p2 = lift . f >=> request >=> (p1 >~> p2)
->
-> (lift . f >=> respond >=> lift . h >=> p1) >~> (lift . g >=> request >=> p2)
->     = lift . (f >=> g >=> h) >=> (p1 >~> p2)
->
-> (lift . f >=> respond >=> p1) >~> (lift . g >=> respond >=> p2)
->     = lift . (f >=> g) >=> (p1 >-> p2)
-
 -}
 
 {- $reexports

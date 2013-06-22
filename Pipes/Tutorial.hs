@@ -1,8 +1,6 @@
 {-| @pipes@ is an easy-to-use, powerful, and elegant stream processing library 
 
-    Use @pipes@ to build and connect reusable components like Unix pipes.  In
-    fact, this tutorial explains @pipes@ using recurring analogies to Unix
-    pipes.
+    Use @pipes@ to build and connect reusable components like Unix pipes.
 -}
 
 module Pipes.Tutorial (
@@ -27,8 +25,14 @@ module Pipes.Tutorial (
     -- * Types - Part 2
     -- $types2
 
+    -- * Theory - Part 2
+    -- $theory2
+
     -- * Folds
     -- $folds
+
+    -- * Types - Part 3
+    -- $types3
     ) where
 
 import Control.Monad.Trans.Error
@@ -139,7 +143,7 @@ import qualified Pipes.Prelude as P
     'String's.  'Consumer' is a monad transformer that extends the base monad
     with the ability to 'request' new input from upstream.
 
-    'P.stdin' is only slightly more complicated.  We must also remember to check
+    'P.stdin' is only slightly more complicated because we have to also check
     for the end of the input:
 
 > import qualified System.IO as IO
@@ -231,7 +235,7 @@ import qualified Pipes.Prelude as P
     implementation details.  We only need to define an empty test pipe named
     'pull', which auto-forwards all values and never tampers with the stream:
 
-> -- The true implementation is more general
+> -- pull's true implementation is more general
 > pull :: (Monad m) => () -> Pipe a a m r
 > pull () = forever $ do
 >     a <- request ()
@@ -253,16 +257,17 @@ import qualified Pipes.Prelude as P
     ('>->') is the composition operator and 'pull' is the identity.  The above
     equations are the 'Category' laws.
 
-    @pipes@ leverages category theory pervasively in order to eliminate large
-    classes of bugs and promote intuitive behavior.  Unlike Unix pipes, you will
-    never encounter dark corners of the @pipes@ API that give weird behavior
-    because all the primitives are built on a proven mathematical foundation.
+    The @pipes@ library leverages category theory pervasively in order to
+    eliminate large classes of bugs and promote intuitive behavior.  Unlike Unix
+    pipes, you will never encounter dark corners of the @pipes@ API that give
+    weird behavior because all the primitives are built on a proven mathematical
+    foundation.
 -}
 
 {- $types1
-    You might wonder why these pipes all take a @()@ argument.  This is because
-    'Consumer's, 'Producer's, and 'Pipe's are all special cases of fully
-     bidirectional 'Proxy's, and the ('>->') uses this initial argument in the
+    You might wonder why these pipes require an argument of type @()@.  This is
+    because 'Consumer's, 'Producer's, and 'Pipe's are all special cases of fully
+    bidirectional 'Proxy's, and the ('>->') uses this initial argument in the
     general case:
 
 > (>->) :: (b' -> Proxy a' a b' b m r) 
@@ -345,8 +350,8 @@ import qualified Pipes.Prelude as P
 >         []       -> lift $ throwError "Could not parse an integer"
 >         (n, _):_ -> respond n
 
-    However, you will get a type error if you compose it directly with
-    'P.stdout' or 'P.print':
+    However, you will get a type error if you compose it directly with 'P.stdin'
+    or 'P.print':
 
 >>> runErrorT $ runEffect $ (P.stdin >-> parseInts >-> P.print) ()
 <interactive>:2:38:
@@ -363,7 +368,7 @@ import qualified Pipes.Prelude as P
 > hoist :: (Monad m, MFunctor t) => (m a -> n a) -> t m b -> t n b
 
     All pipes implement 'MFunctor' so we can 'hoist' the 'lift' function to make
-    all our pipes agree on using 'ErrorT':
+    our pipes agree on using 'ErrorT String IO' for their base monad:
 
 > P.stdin
 >     :: () -> Producer String IO ()
@@ -389,21 +394,44 @@ Left "Could not parse an integer"
 
     Note that ('.') has higher precedence than ('>->') so you can use ('.') to
     easily modify pipes while ignoring their initial argument.
+-}
 
-    Also, you don't need to 'hoist' several pipes in a row.  'hoist' has the
-    nice property that it distributes over composition:
+{- $theory2
+    You don't need to individually 'hoist' several consecutive pipes in a row.
+    'hoist' has the nice property that you can factor out any consecutive group
+    of 'hoist's into a single call to 'hoist'.
 
-> hoist lift . p1 >-> hoist lift . p2 = hoist lift . (p1 >-> p2)
+> hoist lift . (p1 >-> p2) = hoist lift . p1 >-> hoist lift . p2
 >
 > hoist lift . pull = pull
+
+    These two equations are functor laws in disguise!
+
+    Functors transform one category to another such that:
+
+> fmap (f . g) = fmap f . fmap g
+>
+> fmap id = id
+
+    If you replace 'fmap' with @(hoist lift .)@, replace ('.') with ('>->'), and
+    replace 'id' with 'pull', you get the above two equations for 'hoist'.
+
+    The @pipes@ prelude is full of functors like these.  For example, 'P.map'
+    transforms the category of functions to the category of pipe composition:
+
+> P.map (f . g) = P.map f >-> P.map g
+>
+> P.map id = pull
+
+    See if you can spot some other functors in the prelude.
 -}
 
 {- $folds
     The @pipes@ Prelude provides several folds which store their results in a
-    'WriterT' layer in the base monad.  For example, if you want to count how
-    many lines of input like the @wc@ command, you use the 'P.length' fold:
+    'WriterT' layer in the base monad.  For example, you can count the number of
+    lines of input like the @wc@ command if you use the 'P.length' fold:
 
-> length :: (Monad m) => () -> Consumer a (WriterT (Sum Int) m) r
+> P.length :: (Monad m) => () -> Consumer a (WriterT (Sum Int) m) r
 
     Just don't forget to use 'hoist' since the base monads don't match:
 
@@ -428,17 +456,72 @@ Left "Could not parse an integer"
 > ^D
 > Sum {getSum = 3}
 > $
+
+    However, Haskell pipes can read and transmit typed values, so let's take
+    advantage of that to do some @awk@-like arithmetic.  We'll combine
+    'P.readLn' which 'read's typed values from standard input:
+
+> readLn :: (Read b) => () -> Producer b IO ()
+
+    ... and fold those values using 'P.sum':
+
+> sum :: (Monad m, Num a) => () -> Consumer a (WriterT (Sum a) m) r
+
+    Whenever we fold things using 'WriterT' we have to use 'runWriterT' or
+    'execWriterT' to retrieve the result of the fold:
+
+> -- sum.hs
+>
+> import Control.Monad.Trans.Writer.Strict
+> import Pipes
+> import qualified Pipes.Prelude as P
+>
+> main = do
+>     total <- execWriterT $ runEffect $ (hoist lift . P.readLn >-> P.sum) ()
+>     print total
+
 -}
 
 {- $types3
-    Notice how we return a result from the @wc@ pipeline.
-    Just follow the types to see why this works:
+    You can reason about how @pipes@ behave just by following the types.  In the
+    last pipeline we began from 'P.readLn' (which defaults to 'Integer's):
 
-> hoist lift . P.stdin
->     :: (Monad m) => () -> Producer String (WriterT (Sum Int) IO) ()
+> P.readLn
+>     :: () -> Producer Integer IO ()
 
-    'P.length' has a polymorphic return value, @r@, because it never terminates,
-    so @r@ will type-check as @()@ when we compose these two pipes:
+    ... and 'hoist'ed a 'lift' so that its base monad matches 'P.sum':
 
-> hoist lift . P.stdin >-> 
+> hoist lift . P.readLn
+>     :: (MonadTrans t)
+>     => () -> Producer Integer (t                     IO) ()
+>
+> P.sum
+>     :: (Monad m)
+>     => () -> Consumer Integer (WriterT (Sum Integer) m ) ()
+
+    The \'@t@\' will type-check as @WriterT (Sum Integer@) and the \'@m@\' will
+    type-check as 'IO', so the two base monads match.
+
+    'P.readLn' is a 'Producer' and 'P.sum' is a 'Consumer', so when we compose
+    them we get an 'Effect':
+
+> hoist lift . P.readLn >-> P.sum
+>     :: () -> Effect (WriterT (Sum Integer) IO) ()
+
+    We can't run the 'Effect' until we apply the pipeline to @()@:
+
+> (hoist lift . P.readLn >-> P.sum) ()
+>     :: Effect (WriterT (Sum Integer) IO) ()
+
+    ... and then we retrieve the action in the base monad using 'runEffect':
+
+> runEffect $ (hoist lift . P.readLn >-> P.sum) ()
+>     :: WriterT (Sum Integer) IO ()
+
+    This is the right type for 'execWriterT', which runs the fold:
+
+> execWriterT $ runEffect $ (hoist lift . P.readLn >-> P.sum) ()
+>     :: IO (Sum Integer)
+
+    Now we've built an 'IO' action that folds user input into a 'Sum'.
 -}
