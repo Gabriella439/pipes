@@ -13,6 +13,7 @@ module Pipes.Prelude (
     map,
     mapM,
     mapFoldable,
+    concat,
     take,
     takeWhile,
     drop,
@@ -72,6 +73,7 @@ import Prelude hiding (
     readLn,
     map,
     mapM,
+    concat,
     take,
     takeWhile,
     drop,
@@ -143,10 +145,14 @@ mapM f () = forever $ do
     from 'F.Foldable' container downstream.
 -}
 mapFoldable :: (F.Foldable f, Monad m) => (a -> f b) -> () -> Pipe a b m r
-mapFoldable f () = forever $ do
-     a <- request ()
-     F.mapM_ respond (f a)
+mapFoldable f = map f >-> concat
 {-# INLINABLE mapFoldable #-}
+
+-- | Flatten foldable value and send every value from it downstream.
+concat :: (F.Foldable f, Monad m) =>  () -> Pipe (f a) a m r
+concat () = forever $
+    F.mapM_ respond =<< request ()
+{-# INLINABLE concat #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> () -> Pipe a a m ()
