@@ -110,6 +110,7 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
 
+-- Re-exports
 import Control.Monad.Morph (MFunctor(hoist))
 
 -- | Run a self-contained 'Effect', converting it back to the base monad
@@ -158,20 +159,19 @@ infixl 8 \>\, //<
 {- $categories
     The 'Proxy' type sits at the intersection of five categories:
 
-    * The pull category
+    * The 'pull' category
 
-    * The push category
+    * The 'push' category
 
-    * The request category
+    * The 'request' category
 
-    * The respond category
+    * The 'respond' category
 
     * The 'Control.Arrow.Kleisli' category.
 
-    Composition operation for each category comes in pointfree and
-    pointful variants. They are in same relationship as '>=>' (pointfree)
-    and '>>=' (pointful) operators for Kleisli arrows.
-
+    The composition operators for each category come in both pointfree and
+    pointful flavors, analogous to how ('>=>') is the pointfree composition
+    operator for the Kleisli category and ('>>=') is the pointful equivalent.
 -}
 
 {- $pull

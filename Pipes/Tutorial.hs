@@ -1,6 +1,16 @@
-{-| @pipes@ is an easy-to-use, powerful, and elegant stream processing library 
+{-| @pipes@ is an easy-to-use and powerful stream processing library that lets
+    you build and connect reusable streaming components like Unix pipes.
 
-    Use @pipes@ to build and connect reusable components like Unix pipes.
+    You should use @pipes@ if:
+
+    * you are streaming data,
+
+    * you need \"ListT done right\", or
+
+    * you want a reactive programming system.
+
+    This tutorial covers the first two applications, and the @pipes-concurrency@
+    package provides a separate tutorial covering reactive programming.
 -}
 
 module Pipes.Tutorial (
@@ -66,7 +76,25 @@ import qualified Pipes.Prelude as P
 > main = runEffect $ (P.stdin >-> P.stdout) ()
 > $
 
-    You can 'P.take' 10 lines of input to emulate the @head@ utility:
+    Compare this to the equivalent hand-written loop:
+
+> import Control.Monad
+> import System.IO
+> 
+> main = loop
+>   where
+>     loop = do
+>         eof <- hIsEOF stdin
+>         unless eof $ do
+>             str <- getLine
+>             putStrLn str
+>             loop
+
+    The hand-written version tightly integrates the input and output logic
+    together and is less declarative of our intent.
+
+    When we decouple input and output logic we can easily insert intermediate
+    transformation stages like 'P.take' to emulate the @head@ utility:
 
 > -- head.hs
 > 
@@ -75,7 +103,8 @@ import qualified Pipes.Prelude as P
 > 
 > main = runEffect $ (P.stdin >-> P.take 10 >-> P.stdout) ()
 
-    ... or you can simulate the @yes@ command by replacing 'P.stdin' with an
+    Separating input from output means we can easily switch out new inputs.
+    Let's use this to simulate the @yes@ command by replacing 'P.stdin' with an
     endless list of \"y\"s:
 
 > -- yes.hs
@@ -110,8 +139,8 @@ import qualified Pipes.Prelude as P
 > 
 > main = runEffect $ (P.fromList (repeat "y") >-> P.take 10 >-> P.stdout) ()
 
-    This gives the same behavior, but with the information passing done directly
-    within Haskell:
+    This gives the same behavior, but this time Haskell pipes do all the
+    information passing:
 
 > $ ./combined
 > y
@@ -161,6 +190,11 @@ import qualified Pipes.Prelude as P
     We 'respond' with values of type 'String', so 'P.stdin' is a 'Producer' of
     'String's.  'Producer' is a monad transformer that extends the base monad
     with the ability to 'respond' with new output to send downstream.
+
+    Notice how much 'P.stdin' resembles our original hand-written loop, but this
+    time we use 'respond'  instead of 'putStrLn'.  The 'respond' command hands
+    off the 'String' to a downstream stage which decides how to process the
+    'String'.
 
     The last component is 'P.take' which only transmits a fixed number of
     values:
