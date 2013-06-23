@@ -12,6 +12,8 @@ module Pipes.Prelude (
     -- * Pipes
     map,
     mapM,
+    mapFoldable,
+    concat,
     take,
     takeWhile,
     drop,
@@ -60,8 +62,9 @@ import Control.Monad.Morph (hoist)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict (StateT, get, put)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
-import qualified Data.Monoid as M
-import qualified System.IO as IO
+import qualified Data.Monoid   as M
+import qualified Data.Foldable as F
+import qualified System.IO     as IO
 import Pipes
 import Pipes.Internal
 import Pipes.Lift (evalStateP)
@@ -70,6 +73,7 @@ import Prelude hiding (
     readLn,
     map,
     mapM,
+    concat,
     take,
     takeWhile,
     drop,
@@ -136,6 +140,19 @@ mapM f () = forever $ do
     b <- lift $ f a
     respond b
 {-# INLINABLE mapM #-}
+
+{-| Transform all values using pure function and send every value
+    from 'F.Foldable' container downstream.
+-}
+mapFoldable :: (F.Foldable f, Monad m) => (a -> f b) -> () -> Pipe a b m r
+mapFoldable f = map f >-> concat
+{-# INLINABLE mapFoldable #-}
+
+-- | Flatten foldable value and send every value from it downstream.
+concat :: (F.Foldable f, Monad m) =>  () -> Pipe (f a) a m r
+concat () = forever $
+    F.mapM_ respond =<< request ()
+{-# INLINABLE concat #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> () -> Pipe a a m ()
