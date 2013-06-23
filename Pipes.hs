@@ -166,7 +166,12 @@ infixl 8 \>\, //<
 
     * The respond category
 
-    * The Kleisli category
+    * The 'Control.Arrow.Kleisli' category.
+
+    Composition operation for each category comes in pointfree and
+    pointful variants. They are in same relationship as '>=>' (pointfree)
+    and '>>=' (pointful) operators for Kleisli arrows.
+
 -}
 
 {- $pull
