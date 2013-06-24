@@ -1,5 +1,5 @@
-{-| @pipes@ is an easy-to-use and powerful stream processing library that lets
-    you build and connect reusable streaming components like Unix pipes.
+{-| @pipes@ is a clean and powerful stream processing library that lets you
+    build and connect reusable streaming components like Unix pipes.
 
     You should use @pipes@ if:
 
@@ -68,6 +68,8 @@ import qualified Pipes.Prelude as P
 > $ ./cat
 > Echo<Enter>
 > Echo
+> ABC<Enter>
+> ABC
 > ^D
 > $ ./cat <cat.hs
 > import Pipes
@@ -94,7 +96,8 @@ import qualified Pipes.Prelude as P
     together and is less declarative of our intent.
 
     When we decouple input and output logic we can easily insert intermediate
-    transformation stages like 'P.take' to emulate the @head@ utility:
+    transformation stages.  The next example demonstrates this by inserting a
+    'P.take' processing stage to emulate the @head@ utility:
 
 > -- head.hs
 > 
@@ -103,9 +106,9 @@ import qualified Pipes.Prelude as P
 > 
 > main = runEffect $ (P.stdin >-> P.take 10 >-> P.stdout) ()
 
-    Separating input from output means we can easily switch out new inputs.
-    Let's use this to simulate the @yes@ command by replacing 'P.stdin' with an
-    endless list of \"y\"s:
+    Loose coupling also means that we can easily swap out new inputs and
+    outputs.  Let's use this trick to simulate the @yes@ command by replacing
+    'P.stdin' with an endless list of \"y\"s:
 
 > -- yes.hs
 > 
@@ -154,6 +157,9 @@ import qualified Pipes.Prelude as P
 > y
 > y
 > $
+
+    Haskell pipes promote a compositional approach to stream programming where
+    you mix and match modular components to assemble useful programs.
 -}
 
 {- $easytobuild
@@ -194,7 +200,8 @@ import qualified Pipes.Prelude as P
     Notice how much 'P.stdin' resembles our original hand-written loop, but this
     time we use 'respond'  instead of 'putStrLn'.  The 'respond' command hands
     off the 'String' to a downstream stage which decides how to process the
-    'String'.
+    'String'.  This neatly packages away this messy loop into a self-contained
+    and reusable component so that nobody has to write that loop ever again.
 
     The last component is 'P.take' which only transmits a fixed number of
     values:
