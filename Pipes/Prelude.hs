@@ -433,7 +433,7 @@ tee p () = evalStateP Nothing $ do
 
 -- | Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
 generalize :: (Monad m) => (() -> Pipe a b m r) -> x -> Proxy x a x b m r
-generalize p x0 = evalStateP x0 $ up >\\ hoist lift (p ()) //> dn
+generalize p x0 = evalStateP x0 $ (up \>\ hoist lift . p />/ dn) ()
   where
     up () = do
         x <- lift get
