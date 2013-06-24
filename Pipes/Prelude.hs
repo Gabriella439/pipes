@@ -19,6 +19,7 @@ module Pipes.Prelude (
     filter,
     bind,
     join,
+    read,
 
     -- * Consumers
     stdout,
@@ -60,6 +61,7 @@ module Pipes.Prelude (
 import Control.Monad (when, unless, forever, replicateM_)
 import Control.Monad.Morph (hoist)
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Error (ErrorT, throwError)
 import Control.Monad.Trans.State.Strict (StateT, get, put)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
 import qualified Data.Monoid   as M
@@ -79,6 +81,7 @@ import Prelude hiding (
     drop,
     dropWhile,
     filter,
+    read,
     enumFrom,
     all,
     any,
@@ -216,6 +219,14 @@ join () = forever $ do
     as <- request ()
     F.mapM_ respond as
 {-# INLINABLE join #-}
+
+read :: (Monad m, Read a) => () -> Pipe String a (ErrorT String m) r
+read () = forever $ do
+    str <- request ()
+    case (reads str) of
+        [(a, "")] -> respond a
+        []        -> lift $ throwError "Pipes.Prelude.read: no parse"
+        _         -> lift $ throwError "Pipes.Prelude.read: ambiguous parse"
 
 -- | Write 'String's to 'IO.stdout' using 'putStrLn'
 stdout :: () -> Consumer String IO r
