@@ -12,13 +12,13 @@ module Pipes.Prelude (
     -- * Pipes
     map,
     mapM,
-    bind,
-    join,
     take,
     takeWhile,
     drop,
     dropWhile,
     filter,
+    bind,
+    join,
 
     -- * Consumers
     stdout,
@@ -141,25 +141,6 @@ mapM f () = forever $ do
     respond b
 {-# INLINABLE mapM #-}
 
-{-| Transform all values using a pure function and flatten the 'F.Foldable'
-    result
-
-> bind f = map f >-> join
--}
-bind :: (F.Foldable f, Monad m) => (a -> f b) -> () -> Pipe a b m r
-bind f = map f >-> join
-{-# INLINABLE bind #-}
-
-{-| Flatten 'F.Foldable's and send their individual values downstream
-
-> join = bind id
--}
-join :: (F.Foldable f, Monad m) =>  () -> Pipe (f a) a m r
-join () = forever $ do
-    as <- request ()
-    F.mapM_ respond as
-{-# INLINABLE join #-}
-
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> () -> Pipe a a m ()
 take n () = replicateM_ n $ do
@@ -216,6 +197,25 @@ filter p () = go
                 go
             else go
 {-# INLINABLE filter #-}
+
+{-| Transform all values using a pure function and flatten the 'F.Foldable'
+    result
+
+> bind f = map f >-> join
+-}
+bind :: (F.Foldable f, Monad m) => (a -> f b) -> () -> Pipe a b m r
+bind f = map f >-> join
+{-# INLINABLE bind #-}
+
+{-| Flatten 'F.Foldable's and send their individual values downstream
+
+> join = bind id
+-}
+join :: (F.Foldable f, Monad m) =>  () -> Pipe (f a) a m r
+join () = forever $ do
+    as <- request ()
+    F.mapM_ respond as
+{-# INLINABLE join #-}
 
 -- | Write 'String's to 'IO.stdout' using 'putStrLn'
 stdout :: () -> Consumer String IO r
@@ -332,18 +332,18 @@ foldl' step () = go
 
 -- | Zip two 'Producer's
 zip :: (Monad m)
-    => (() -> Producer  a     m r)
-    -> (() -> Producer     b  m r)
-    -> (() -> Producer (a, b) m r)
+    => (() -> Producer'  a     m r)
+    -> (() -> Producer'     b  m r)
+    -> (() -> Producer  (a, b) m r)
 zip = zipWith (,)
 {-# INLINABLE zip #-}
 
 -- | Zip two 'Producer's using the provided combining function
 zipWith :: (Monad m)
     => (a -> b -> c)
-    -> (() -> Producer a m r)
-    -> (() -> Producer b m r)
-    -> (() -> Producer c m r)
+    -> (() -> Producer' a m r)
+    -> (() -> Producer' b m r)
+    -> (() -> Producer  c m r)
 zipWith f p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
   where
     go1 p1 p2 = M (do
@@ -419,9 +419,9 @@ discard () = go
 {-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
     downstream
 -}
-tee :: (Monad m) => (() -> Consumer a m r) -> (() -> Pipe a a m r)
+tee :: (Monad m) => (() -> Consumer' a m r) -> (() -> Pipe a a m r)
 tee p () = evalStateP Nothing $ do
-    r <- up >\\ hoist lift (p ())
+    r <- (up \>\ (hoist lift . p />/ dn)) ()
     ma <- lift get
     case ma of
         Nothing -> return ()
@@ -436,6 +436,7 @@ tee p () = evalStateP Nothing $ do
         a <- request ()
         lift $ put (Just a)
         return a
+    dn _ = return ()
 {-# INLINABLE tee #-}
 
 -- | Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
