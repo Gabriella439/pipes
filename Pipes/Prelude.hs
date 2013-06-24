@@ -12,8 +12,8 @@ module Pipes.Prelude (
     -- * Pipes
     map,
     mapM,
-    mapFoldable,
-    concat,
+    bind,
+    join,
     take,
     takeWhile,
     drop,
@@ -141,18 +141,24 @@ mapM f () = forever $ do
     respond b
 {-# INLINABLE mapM #-}
 
-{-| Transform all values using pure function and send every value
-    from 'F.Foldable' container downstream.
--}
-mapFoldable :: (F.Foldable f, Monad m) => (a -> f b) -> () -> Pipe a b m r
-mapFoldable f = map f >-> concat
-{-# INLINABLE mapFoldable #-}
+{-| Transform all values using a pure function and flatten the 'F.Foldable'
+    result
 
--- | Flatten foldable value and send every value from it downstream.
-concat :: (F.Foldable f, Monad m) =>  () -> Pipe (f a) a m r
-concat () = forever $
-    F.mapM_ respond =<< request ()
-{-# INLINABLE concat #-}
+> bind f = map f >-> join
+-}
+bind :: (F.Foldable f, Monad m) => (a -> f b) -> () -> Pipe a b m r
+bind f = map f >-> join
+{-# INLINABLE bind #-}
+
+{-| Flatten 'F.Foldable's and send their individual values downstream
+
+> join = bind id
+-}
+join :: (F.Foldable f, Monad m) =>  () -> Pipe (f a) a m r
+join () = forever $ do
+    as <- request ()
+    F.mapM_ respond as
+{-# INLINABLE join #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> () -> Pipe a a m ()
@@ -310,9 +316,10 @@ foldr :: (Monad m) => (a -> b -> b) -> () -> Consumer a (WriterT (M.Endo b) m) r
 foldr step = fold (M.Endo . step)
 {-# INLINABLE foldr #-}
 
--- | Fold equivalent to 'foldl''.
---
--- Uses 'StateT' instead of 'WriterT' to ensure a strict accumulation
+{-| Fold equivalent to 'foldl''.
+
+    Uses 'StateT' instead of 'WriterT' to ensure a strict accumulation
+-}
 foldl' :: (Monad m) => (s -> a -> s) -> () -> Consumer a (StateT s m) r
 foldl' step () = go
   where
