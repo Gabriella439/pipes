@@ -298,11 +298,10 @@ import qualified Pipes.Prelude as P
     ('>->') is the composition operator and 'pull' is the identity.  The above
     equations are the 'Category' laws.
 
-    The @pipes@ library leverages category theory pervasively in order to
-    eliminate large classes of bugs and promote intuitive behavior.  Unlike Unix
-    pipes, you will never encounter dark corners of the @pipes@ API that give
-    weird behavior because all the primitives are built on a proven mathematical
-    foundation.
+    The @pipes@ library uses category theory pervasively to eliminate large
+    classes of bugs and promote intuitive behavior.  Unlike Unix pipes, you will
+    not encounter dark corners of the @pipes@ API that give weird behavior
+    because all the primitives are built on a proven mathematical foundation.
 -}
 
 {- $types1
@@ -345,7 +344,7 @@ import qualified Pipes.Prelude as P
 >     => (a -> b -> c)
 >     -> (() -> Producer a m r)
 >     -> (() -> Producer b m r)
->     -> (() -> Producer c m r)
+>     -> (() -> Producer  c m r)
 
     Using these two functions we can implement the @nl@ utility to number all
     lines:
