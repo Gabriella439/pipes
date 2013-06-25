@@ -157,38 +157,53 @@ infixr 8 /</, >\\ -- either of these lines end with '\'
 infixl 8 \>\, //<
 
 {- $categories
-    The 'Proxy' type sits at the intersection of five categories:
+    A 'Control.Category.Category' is a set of components that you can connect
+    with a composition operator, ('Control.Category..'), that has an identity,
+    'Control.Category.id'.  The ('Control.Category..') and 'Control.Category.id'    must satisfy the following three 'Control.Category.Category' laws:
 
-    * The 'pull' category
+> -- Left identity 
+> id . f = f
+>
+> -- Right identity
+> f . id = f
+>
+> -- Associativity
+> (f . g) . h = f . (g . h)
 
-    * The 'push' category
+    The 'Proxy' type sits at the intersection of five separate categories, four
+    of which are named after their identity:
 
-    * The 'request' category
+@
+                     Identity   | Composition |  Point-ful
+                  +-------------+-------------+-------------+
+    pull category |    'pull'     |     '>->'     |     '->>'     |
+    push category |    'push'     |     '>~>'     |     '>>~'     |
+ request category |   'respond'   |     '\>\'     |     '>\\'     |
+ respond category |   'request'   |     '/>/'     |     '//>'     |
+ Kleisli category |   'return'    |     '>=>'     |     '>>='     |
+                  +-------------+-------------+-------------+
+@
 
-    * The 'respond' category
+    Each composition operator has a \"point-ful\" version, analogous to how
+    ('>>=') is the point-ful version of ('>=>').
 
-    * The 'Control.Arrow.Kleisli' category.
-
-    The composition operators for each category come in both pointfree and
-    pointful flavors, analogous to how ('>=>') is the pointfree composition
-    operator for the Kleisli category and ('>>=') is the pointful equivalent.
 -}
 
 {- $pull
     The pull category lets you interleave pull-based streams, beginning from the
     most downstream component:
 
->         b'           c'                   c'
->         |            |                    |
->      +--|--+      +--|--+            +----|----+
->      |  v  |      |  v  |            |    v    |
->  a' <==   <== b' <==   <== c'    a' <==       <== c'
->      |  f  |      |  g  |     =      | f >-> g |
->  a  ==>   ==> b  ==>   ==> c     a  ==>       ==> c
->      |  |  |      |  |  |            |    |    |
->      +--|--+      +--|--+            +----|----+
->         v            v                    v
->         r            r                    r
+>           b'               c'                     c'
+>           |                |                      |
+>      +----|----+      +----|----+            +----|----+
+>      |    v    |      |    v    |            |    v    |
+>  a' <==       <== b' <==       <== c'    a' <==       <== c'
+>      |    f    |      |    g    |     =      | f >-> g |
+>  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
+>      |    |    |      |    |    |            |    |    |
+>      +----|----+      +----|----+            +----|----+
+>           v                v                      v
+>           r                r                      r
 
     The pull category obeys the category laws:
 
@@ -246,17 +261,17 @@ fb' ->> p = case p of
     The push category lets you interleave push-based streams, beginning from the
     most upstream component:
 
->         a            b                    a
->         |            |                    |
->      +--|--+      +--|--+            +----|----+
->      |  v  |      |  v  |            |    v    |
->  a' <==   <== b' <==   <== c'    a' <==       <== c'
->      |  f  |      |  g  |     =      | f >~> g |
->  a  ==>   ==> b  ==>   ==> c     a  ==>       ==> c
->      |  |  |      |  |  |            |    |    |
->      +--|--+      +--|--+            +----|----+
->         v            v                    v
->         r            r                    r
+>           a                b                    a
+>           |                |                    |
+>      +----|----+      +----|----+            +----|----+
+>      |    v    |      |    v    |            |    v    |
+>  a' <==       <== b' <==       <== c'    a' <==       <== c'
+>      |    f    |      |    g    |     =      | f >~> g |
+>  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
+>      |    |    |      |    |    |            |    |    |
+>      +----|----+      +----|----+            +----|----+
+>           v                v                      v
+>           r                r                      r
 
     The pull category obeys the category laws:
 
@@ -313,17 +328,17 @@ p >>~ fb = case p of
 {- $request
     The request category lets you substitute 'request's with proxies.
 
->         b' <===\             c'                   c'
->         |      \\            |                    |
->      +--|--+    \\        +--|--+            +----|----+
->      |  v  |     \\       |  v  |            |    v    |
->  a' <==   <== y'  \== b' <==   <== y'    a' <==       <== y'
->      |  f  |              |  g  |     =      | f \>\ g |
->  a  ==>   ==> y   /=> b  ==>   ==> y     a  ==>       ==> y
->      |  |  |     //       |  |  |            |    |    |
->      +--|--+    //        +--|--+            +----|----+
->         v      //            v                    v
->         b =====/             c                    c
+>           b'<======\               c'                     c'
+>           |        \\              |                      |
+>      +----|----+    \\        +----|----+            +----|----+
+>      |    v    |     \\       |    v    |            |    v    |
+>  a' <==       <== y'  \== b' <==       <== y'    a' <==       <== y'
+>      |    f    |              |    g    |     =      | f \>\ g |
+>  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
+>      |    |    |     //       |    |    |            |    |    |
+>      +----|----+    //        +----|----+            +----|----+
+>           v        //              v                      v
+>           b =======/               c                      c
 
     The request category obeys the category laws:
 
@@ -388,17 +403,17 @@ fb' >\\ p0 = go p0
 {- $respond
     The respond category lets you substitute 'respond's with proxies.
 
->         a               /===> b                    a
->         |              //     |                    |
->      +--|--+          //   +--|--+            +----|----+
->      |  v  |         //    |  v  |            |    v    |
->  x' <==   <== b' <=\// x' <==   <== c'    x' <==       <== c'
->      |  f  |       \\      |  g  |     =      | f />/ g |
->  x  ==>   ==> b  ==/\\ x  ==>   ==> c     x  ==>       ==> c'
->      |  |  |         \\    |  |  |            |    |    |
->      +--|--+          \\   +--|--+            +----|----+
->         v              \\     v                    v
->         a'              \==== b'                   a'
+>           a                 /=====> b                      a
+>           |                //       |                      |
+>      +----|----+          //   +----|----+            +----|----+
+>      |    v    |         //    |    v    |            |    v    |
+>  x' <==       <== b' <=\// x' <==       <== c'    x' <==       <== c'
+>      |    f    |       \\      |    g    |     =      | f />/ g |
+>  x  ==>       ==> b  ==/\\ x  ==>       ==> c     x  ==>       ==> c'
+>      |    |    |         \\    |    |    |            |    |    |
+>      +----|----+          \\   +----|----+            +----|----+
+>           v                \\       v                      v
+>           a'                \====== b'                     a'
 
     The respond category obeys the category laws:
 

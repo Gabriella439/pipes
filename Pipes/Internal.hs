@@ -26,14 +26,28 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 
-{-| A 'Proxy' is a monad transformer that receives and sends information on two
-    separate interfaces:
+{-| A 'Proxy' is a monad transformer that receives and sends information on an
+    upstream and downstream interface.  The 'request' command communicates with
+    the upstream interface and the 'respond' command communicates with the
+    downstream interface.
+
+    You can connect proxies together in five different ways:
+
+    * ('>->'): connect pull-based streams
+
+    * ('>~>'): connect push-based streams
+
+    * ('\>\'): connect folds
+
+    * ('/>/'): connect unfolds
+
+    * ('>=>'): sequence proxies
 
     The type variables signify:
 
-    * @a'@ and @a@ - The upstream output and input
+    * @a'@ and @a@ - The upstream interface (@a'@s go out and @a@s come in)
 
-    * @b'@ and @b@ - The downstream input and output
+    * @b'@ and @b@ - The downstream interface (@b@s go out and @b'@s come in)
 
     * @m @ - The base monad
 
@@ -42,13 +56,13 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
     Diagrammatically:
 
 > Upstream | Downstream
->      +-------+
->      |       |
->  a' <==     <== b'
->      |       |
->  a  ==>     ==> b
->      |   |   |
->      +---|---+
+>     +---------+
+>     |         |
+> a' <==       <== b'
+>     |         |
+> a  ==>       ==> b
+>     |    |    |
+>     +----|----+
 >          v
 >          r
 
