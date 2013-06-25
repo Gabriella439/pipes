@@ -220,6 +220,7 @@ join () = forever $ do
     F.mapM_ respond as
 {-# INLINABLE join #-}
 
+-- | Parse 'Read'able values, throwing an error in 'ErrorT' on failed parses
 read :: (Monad m, Read a) => () -> Pipe String a (ErrorT String m) r
 read () = forever $ do
     str <- request ()

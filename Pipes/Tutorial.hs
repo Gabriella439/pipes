@@ -9,8 +9,11 @@
 
     * you want a reactive programming system.
 
+    * you like message passing
+
     This tutorial covers the first two applications, and the @pipes-concurrency@
-    package provides a separate tutorial covering reactive programming.
+    package provides a separate tutorial covering reactive programming and
+    message passing.
 -}
 
 module Pipes.Tutorial (
