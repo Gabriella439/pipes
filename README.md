@@ -16,7 +16,7 @@ Then fire up ` ghci`:
 
 ... and echo standard input to standard output until you enter `quit`.
 
-    Prelude P> runProxy $ (P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout) ()
+    Prelude P> runEffect $ (P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout) ()
     Test[Enter]
     Test
     Apple[Enter]
