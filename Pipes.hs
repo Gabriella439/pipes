@@ -55,6 +55,7 @@ module Pipes (
     -- * ListT Monad Transformers
     -- $listT
     ListT(..),
+    runListT,
     RespondT(..),
     RequestT(..),
 
@@ -537,21 +538,26 @@ reflect = go
     ('>>=') corresponds to ('//>'), calling the second computation once for each
     time the first computation branches.
 -}
-newtype ListT m b = ListT { runListT :: Producer' b m () }
+newtype ListT m b = ListT { unListT :: Producer' b m () }
+
+-- | Run a complete 'ListT' action, converting back to the base monad
+runListT :: (Monad m) => ListT m C -> m ()
+runListT = runEffect . unListT
+{-# INLINABLE runListT #-}
 
 instance (Monad m) => Functor (ListT m) where
-    fmap f l = ListT (runListT l //> \a -> respond (f a))
+    fmap f l = ListT (unListT l //> \a -> respond (f a))
 
 instance (Monad m) => Applicative (ListT m) where
     pure a    = ListT (respond a)
     mf <*> mx = ListT (
-        runListT mf //> \f ->
-        runListT mx //> \x ->
+        unListT mf //> \f ->
+        unListT mx //> \x ->
         respond (f x) )
 
 instance (Monad m) => Monad (ListT m) where
     return a = ListT (respond a)
-    m >>= f  = ListT (runListT m //> \r -> runListT (f r))
+    m >>= f  = ListT (unListT m //> \r -> unListT (f r))
 
 instance MonadTrans ListT where
     lift m = ListT (do
@@ -564,8 +570,8 @@ instance (MonadIO m) => MonadIO (ListT m) where
 instance (Monad m) => Alternative (ListT m) where
     empty = ListT (return mempty)
     l1 <|> l2 = ListT (do
-        runListT l1
-        runListT l2 )
+        unListT l1
+        unListT l2 )
 
 instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
