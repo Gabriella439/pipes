@@ -54,6 +54,7 @@ module Pipes (
 
     -- * ListT Monad Transformers
     -- $listT
+    ListT(..),
     RespondT(..),
     RequestT(..),
 
@@ -62,25 +63,21 @@ module Pipes (
     Producer,
     Consumer,
     Effect,
-    ListT,
     Client,
     Server,
     CoPipe,
     CoProducer,
     CoConsumer,
-    CoListT,
 
     -- * Concrete Type Synonyms
     C,
     Producer',
     Consumer',
     Effect',
-    ListT',
     Client',
     Server',
     CoProducer',
     CoConsumer',
-    CoListT',
 
     -- ** Flipped operators
     (<-<),
@@ -104,7 +101,7 @@ module Pipes (
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (forever, (>=>), (<=<))
-import qualified Control.Monad as M
+import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Data.Monoid (Monoid(mempty, mappend))
@@ -512,17 +509,67 @@ reflect = go
 {-# INLINABLE reflect #-}
 
 {- $listT
-    The 'RespondT' monad transformer is equivalent to 'ListT' over the
+    'ListT' is a 'Proxy'-based implementation of \"ListT done right\", and is
+    correct by construction.  This makes it easy to convert back and forth
+    between 'ListT' and 'Proxy', and you can use 'toListT' and 'fromListT' from
+    "Pipes.Prelude" to convert between 'ListT' and pull-based proxies.
+
+    The 'RespondT' monad transformer is a generalized 'ListT' over the
     downstream output.  The 'RespondT' Kleisli category corresponds to the
     respond category.
 
-    The 'RequestT' monad transformer is equivalent to 'ListT' over the upstream
+    The 'RequestT' monad transformer is a generalized 'ListT' over the upstream
     output.  The 'RequestT' Kleisli category corresponds to the request
     category.
 
-    Unlike 'ListT' from @transformers@, these monad transformers are correct by
-    construction and always satisfy the monad and monad transformer laws.
+    Note that 'ListT' is a special case of 'RespondT':
+
+> ListT m b ~ RespondT C () () m b
+
+    ... but 'ListT' is important enough to deserve its own newtype rather than a
+    type synonym.
 -}
+
+{-| The list monad transformer, which extends a monad with non-determinism
+
+    'return' corresponds to 'respond', yielding a single value
+
+    ('>>=') corresponds to ('//>'), calling the second computation once for each
+    time the first computation branches.
+-}
+newtype ListT m b = ListT { runListT :: Producer' b m () }
+
+instance (Monad m) => Functor (ListT m) where
+    fmap f l = ListT (runListT l //> \a -> respond (f a))
+
+instance (Monad m) => Applicative (ListT m) where
+    pure a    = ListT (respond a)
+    mf <*> mx = ListT (
+        runListT mf //> \f ->
+        runListT mx //> \x ->
+        respond (f x) )
+
+instance (Monad m) => Monad (ListT m) where
+    return a = ListT (respond a)
+    m >>= f  = ListT (runListT m //> \r -> runListT (f r))
+
+instance MonadTrans ListT where
+    lift m = ListT (do
+        a <- lift m
+        respond a )
+
+instance (MonadIO m) => MonadIO (ListT m) where
+    liftIO m = lift (liftIO m)
+
+instance (Monad m) => Alternative (ListT m) where
+    empty = ListT (return mempty)
+    l1 <|> l2 = ListT (do
+        runListT l1
+        runListT l2 )
+
+instance (Monad m) => MonadPlus (ListT m) where
+    mzero = empty
+    mplus = (<|>)
 
 -- | A monad transformer over a proxy's downstream output
 newtype RespondT a' a b' m b = RespondT { runRespondT :: Proxy a' a b' b m b' }
@@ -556,7 +603,7 @@ instance (Monad m, Monoid b') => Alternative (RespondT a' a b' m) where
         r2 <- runRespondT p2
         return (mappend r1 r2) )
 
-instance (Monad m, Monoid b') => M.MonadPlus (RespondT a' a b' m) where
+instance (Monad m, Monoid b') => MonadPlus (RespondT a' a b' m) where
     mzero = empty
     mplus = (<|>)
 
@@ -592,7 +639,7 @@ instance (Monad m, Monoid a) => Alternative (RequestT a b' b m) where
         r2 <- runRequestT p2
         return (mappend r1 r2) )
 
-instance (Monad m, Monoid a) => M.MonadPlus (RequestT a b' b m) where
+instance (Monad m, Monoid a) => MonadPlus (RequestT a b' b m) where
     mzero = empty
     mplus = (<|>)
 
@@ -616,9 +663,6 @@ type Consumer a m r = forall y' y . Proxy () a y' y m r
     'Effect's never 'request' or 'respond'.
 -}
 type Effect m r = forall x' x y' y . Proxy x' x y' y m r
-
--- | The list monad transformer
-type ListT m b = forall x' x . RespondT x' x () m b
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
@@ -649,9 +693,6 @@ type CoProducer a' = Proxy a' () () C
 -}
 type CoConsumer b' = Proxy C () b' ()
 
--- | The list monad transformer for values flowing upstream
-type CoListT = RequestT () () C
-
 -- | The empty type, denoting a \'@C@\'losed end
 data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
 
@@ -664,9 +705,6 @@ type Consumer' a = Proxy () a () C
 -- | Like 'Effect', but with concrete types
 type Effect' = Proxy C () () C
 
--- | Like 'ListT', but with concrete types
-type ListT' = RespondT C () ()
-
 -- | Like 'Server', but with concrete types
 type Server' b' b = Proxy C () b' b
 
@@ -678,9 +716,6 @@ type CoProducer' a' = Proxy a' () () C
 
 -- | Like 'CoConsumer', but with concrete types
 type CoConsumer' b' = Proxy C () b' ()
-
--- | Like 'CoListT', but with concrete types
-type CoListT' = RequestT () () C
 
 -- | Equivalent to ('>->') with the arguments flipped
 (<-<)

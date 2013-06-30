@@ -44,6 +44,8 @@ module Pipes.Prelude (
     zipWith,
 
     -- * ListT
+    toListT,
+    fromListT,
     each,
 
     -- * ArrowChoice
@@ -375,9 +377,19 @@ zipWith f p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
         M         m   -> m >>= step
 {-# INLINABLE zipWith #-}
 
+-- | Convert a 'ListT' to a 'Producer'
+fromListT :: (Monad m) => ListT m b -> () -> Producer b m ()
+fromListT l () = (\_ -> return ()) >\\ runListT l
+{-# INLINABLE fromListT #-}
+
+-- | Convert a 'Producer' to a 'ListT'
+toListT :: (() -> Producer' b m ()) -> ListT m b
+toListT p = ListT (p ())
+{-# INLINABLE toListT #-}
+
 -- | Non-deterministically choose from all values in the given list
 each :: (Monad m) => [b] -> ListT m b
-each bs = RespondT (fromList bs ())
+each bs = toListT (fromList bs)
 {-# INLINABLE each #-}
 
 {- $choice
