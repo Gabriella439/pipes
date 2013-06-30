@@ -386,18 +386,18 @@ import qualified Pipes.Prelude as P
 
 > read :: (Monad m, Read a) => () -> Pipe String a (ErrorT String m) r
 
-    However, you will get a type error if you compose 'P.read' directly with
-    'P.stdin' or 'P.print':
+    However, if we try to compose 'P.read' with 'P.stdin':
 
->>> runErrorT $ runEffect $ (P.stdin >-> parseInts >-> P.print) ()
-<interactive>:2:38:
-    Couldn't match expected type `IO'
-                with actual type `ErrorT String m0'
-    ...
+> readInt = P.stdin >-> P.read
 
-    The type-checker complains that the base monads don't match: 'P.stdin' and
-    'P.print' use 'IO' as their base monad, but 'P.read' uses
-    @(ErrorT String m)@.
+    ... then we will get a type error:
+
+>    Couldn't match expected type `IO'
+>                with actual type `ErrorT String m0'
+>    ...
+
+    The type-checker complains that the base monads don't match: 'P.stdin' uses
+    'IO' as the base monad, but 'P.read' uses @(ErrorT String m)@.
 
     To unify their base monads we use 'hoist' from the 'MFunctor' class which
     applies transformations to base monads:
@@ -412,16 +412,16 @@ import qualified Pipes.Prelude as P
 >
 > hoist lift . P.stdin
 >     :: () -> Producer String (ErrorT String IO) ()
->
-> P.print
->     :: (Show a) => () -> Consumer a IO ()
->
-> hoist lift . P.print
->     :: (Show a) => () -> Consumer a (ErrorT String IO) ()
 
     Once they agree on the base monad we can compose them directly:
 
->>> runErrorT $ runEffect $ (hoist lift . P.stdin >-> parseInts >-> hoist lift . P.print) ()
+> readInt :: () -> Producer Int (ErrorT String IO) ()
+> readInt = hoist lift . P.stdin >-> P.read
+
+    Now we can validate that all input lines are 'Int's before 'print'ing them:
+
+>>> -- Remember, we need to hoist P.print, too!
+>>> runErrorT $ runEffect $ (readInt >-> hoist lift . P.print) ()
 42<Enter>
 42
 555<Enter>
@@ -430,7 +430,7 @@ Four<Enter>
 Left "Could not parse an integer"
 
     Note that ('.') has higher precedence than ('>->') so you can use ('.') to
-    easily modify pipes while ignoring their initial argument.
+    easily modify pipes in the middle of a composition chain.
 -}
 
 {- $theory2
@@ -489,7 +489,7 @@ Left "Could not parse an integer"
 > $ ./wc
 > How<Enter>
 > many<Enter>
-> lines<Enter>
+> lines?<Enter>
 > ^D
 > Sum {getSum = 3}
 > $
@@ -498,6 +498,7 @@ Left "Could not parse an integer"
     advantage of that to do some @awk@-like arithmetic.  We'll combine
     'P.readLn' which 'read's typed values from standard input:
 
+> -- Like our 'readInt', except throws exceptions on failed parses
 > readLn :: (Read b) => () -> Producer b IO ()
 
     ... and fold those values using 'P.sum':
