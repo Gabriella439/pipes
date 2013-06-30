@@ -126,19 +126,34 @@ readLn () = go
             go
 {-# INLINABLE readLn #-}
 
--- | Convert a list into a 'Producer'
+{-| Convert a list into a 'Producer'
+
+> fromList (xs ++ ys) = fromList xs >=> fromList ys
+>
+> fromList [] = return
+-}
 fromList :: (Monad m) => [b] -> () -> Producer b m ()
 fromList bs () = mapM_ respond bs
 {-# INLINABLE fromList #-}
 
--- | Transform all values using a pure function
+{-| Transform all values using a pure function
+
+> map (g . f) = map f >-> map g
+>
+> map id = pull
+-}
 map :: (Monad m) => (a -> b) -> () -> Pipe a b m r
 map f () = forever $ do
     a <- request ()
     respond (f a)
 {-# INLINABLE map #-}
 
--- | Transform all values using a monadic function
+{-| Transform all values using a monadic function
+
+> mapM (f >=> g) = mapM f >-> mapM g
+>
+> mapM return = pull
+-}
 mapM :: (Monad m) => (a -> m b) -> () -> Pipe a b m r
 mapM f () = forever $ do
     a <- request ()
@@ -190,6 +205,10 @@ dropWhile p () = go
 
 {-| @(filter p)@ discards values going downstream if they fail the predicate
     @p@
+
+> filter (\a -> f a && g a) = filter f >-> filter g
+>
+> filter (\_ -> True) = pull
 -}
 filter :: (Monad m) => (a -> Bool) -> () -> Pipe a a m r
 filter p () = go
@@ -250,7 +269,12 @@ print () = forever $ do
     lift $ Prelude.print a
 {-# INLINABLE print #-}
 
--- | Strict fold over the input using the provided 'M.Monoid'
+{-| Strict fold over the input using the provided 'M.Monoid'
+
+> fold (\a -> f a <> g a) = fold f >-> fold g
+>
+> fold (\_ -> mempty) = pull
+-}
 fold :: (Monad m, M.Monoid w) => (a -> w) -> () -> Consumer a (WriterT w m) r
 fold f () =  forever $ do
     a <- request ()
@@ -377,19 +401,29 @@ zipWith f p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
         M         m   -> m >>= step
 {-# INLINABLE zipWith #-}
 
--- | Convert a 'ListT' to a 'Producer'
-fromListT :: (Monad m) => ListT m b -> () -> Producer b m ()
-fromListT l () = (\_ -> return ()) >\\ runListT l
+{-| Convert a 'ListT' to a 'Producer'
+
+> fromListT . (f >=> g) = fromListT . f />/ fromListT . g
+>
+> fromListT . return = respond
+-}
+fromListT :: (Monad m) => ListT m b -> Producer b m ()
+fromListT l = (\_ -> return ()) >\\ unListT l
 {-# INLINABLE fromListT #-}
 
--- | Convert a 'Producer' to a 'ListT'
-toListT :: (() -> Producer' b m ()) -> ListT m b
-toListT p = ListT (p ())
+{-| Convert a 'Producer' to a 'ListT'
+
+> toListT . (f />/ g) = toListT . f >=> toListT . g
+>
+> toListT . respond = return
+-}
+toListT :: Producer' b m () -> ListT m b
+toListT = ListT
 {-# INLINABLE toListT #-}
 
 -- | Non-deterministically choose from all values in the given list
 each :: (Monad m) => [b] -> ListT m b
-each bs = toListT (fromList bs)
+each bs = toListT (fromList bs ())
 {-# INLINABLE each #-}
 
 {- $choice
@@ -463,7 +497,12 @@ tee p () = evalStateP Nothing $ do
     dn _ = return ()
 {-# INLINABLE tee #-}
 
--- | Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
+{-| Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
+
+> generalize (f >-> g) = generalize f >-> generalize g
+>
+> generalize pull = pull
+-}
 generalize :: (Monad m) => (() -> Pipe a b m r) -> x -> Proxy x a x b m r
 generalize p x0 = evalStateP x0 $ (up \>\ hoist lift . p />/ dn) ()
   where

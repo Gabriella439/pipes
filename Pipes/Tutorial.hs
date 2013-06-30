@@ -5,11 +5,11 @@
 
     * you are streaming data,
 
-    * you need \"ListT done right\", or
+    * you need to easily build or consume 'ListT' computations,
 
-    * you want a reactive programming system.
+    * you want a reactive programming system, or
 
-    * you like message passing
+    * you like message passing.
 
     This tutorial covers the first two applications, and the @pipes-concurrency@
     package provides a separate tutorial covering reactive programming and
@@ -81,7 +81,7 @@ import qualified Pipes.Prelude as P
 > main = runEffect $ (P.stdin >-> P.stdout) ()
 > $
 
-    Compare this to the equivalent hand-written loop:
+    Compare the @pipes@ program to the equivalent hand-written loop:
 
 > import Control.Monad
 > import System.IO
@@ -145,7 +145,7 @@ import qualified Pipes.Prelude as P
 > 
 > main = runEffect $ (P.fromList (repeat "y") >-> P.take 10 >-> P.stdout) ()
 
-    This gives the same behavior, but this time Haskell pipes do all the
+    This gives the same behavior, but this time the Haskell pipes do all the
     information passing:
 
 > $ ./combined
@@ -202,9 +202,10 @@ import qualified Pipes.Prelude as P
 
     Notice how much 'P.stdin' resembles our original hand-written loop, but this
     time we use 'respond'  instead of 'putStrLn'.  The 'respond' command hands
-    off the 'String' to a downstream stage which decides how to process the
-    'String'.  This neatly packages away this messy loop into a self-contained
-    and reusable component so that nobody has to write that loop ever again.
+    off the 'String' to an unspecified downstream stage which will decide how to
+    process the 'String'.  This decouples the 'String' creation logic from the
+    'String' consumption logic so that we can mix and match different sources
+    and sinks.
 
     The last component is 'P.take' which only transmits a fixed number of
     values:
@@ -246,7 +247,7 @@ import qualified Pipes.Prelude as P
 >       -> (() -> Consumer b m r)
 >       -> (() -> Consumer a m r)
 
-    You can only run self-contained 'Effect's, using 'runEffect':
+    Finally, you can only run self-contained 'Effect's, using 'runEffect':
 
 > runEffect :: Effect m r -> m r
 
@@ -347,7 +348,7 @@ import qualified Pipes.Prelude as P
 >     => (a -> b -> c)
 >     -> (() -> Producer a m r)
 >     -> (() -> Producer b m r)
->     -> (() -> Producer  c m r)
+>     -> (() -> Producer c m r)
 
     Using these two functions we can implement the @nl@ utility to number all
     lines:
@@ -381,20 +382,12 @@ import qualified Pipes.Prelude as P
     ('>->') combines pipes by interleaving their actions in the base monad.
     Therefore, you can only compose two pipes if they share the same base monad.
 
-    For example, you might define a simple parsing pipe that throw errors upon
-    failed parses:
+    For example, the 'P.read' pipe fails in 'ErrorT' if it cannot parse a value:
 
-> import Control.Monad.Trans.Error
->
-> parseInts :: (Monad m) => () -> Pipe String Int (ErrorT String m) r
-> parseInts () = forever $ do
->     str <- request ()
->     case reads str of
->         []       -> lift $ throwError "Could not parse an integer"
->         (n, _):_ -> respond n
+> read :: (Monad m, Read a) => () -> Pipe String a (ErrorT String m) r
 
-    However, you will get a type error if you compose it directly with 'P.stdin'
-    or 'P.print':
+    However, you will get a type error if you compose 'P.read' directly with
+    'P.stdin' or 'P.print':
 
 >>> runErrorT $ runEffect $ (P.stdin >-> parseInts >-> P.print) ()
 <interactive>:2:38:
@@ -403,7 +396,8 @@ import qualified Pipes.Prelude as P
     ...
 
     The type-checker complains that the base monads don't match: 'P.stdin' and
-    'P.print' use 'IO' as their base monad, but @parseInts@ uses 'ErrorT'.
+    'P.print' use 'IO' as their base monad, but 'P.read' uses
+    @(ErrorT String m)@.
 
     To unify their base monads we use 'hoist' from the 'MFunctor' class which
     applies transformations to base monads:
