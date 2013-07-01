@@ -46,6 +46,12 @@ module Pipes.Tutorial (
 
     -- * Types - Part 3
     -- $types3
+
+    -- * Nest Pipelines
+    -- $nest
+
+    -- * Catch Errors
+    -- $catch
     ) where
 
 import Control.Monad.Trans.Error
@@ -453,14 +459,15 @@ Left "Could not parse an integer"
     If you replace 'fmap' with @(hoist lift .)@, replace ('.') with ('>->'), and
     replace 'id' with 'pull', you get the above two equations for 'hoist'.
 
-    The @pipes@ prelude is full of functors like these.  For example, 'P.map'
-    transforms the category of functions to the category of pipe composition:
+    The @pipes@ prelude is full of functions that exhibit this functor pattern.
+    For example, 'P.map' transforms the category of functions to the category of
+    pipe composition:
 
 > P.map (f . g) = P.map f >-> P.map g
 >
 > P.map id = pull
 
-    See if you can spot some other functors in the prelude.
+    See if you can spot other functions like these in the prelude.
 -}
 
 {- $folds
@@ -521,8 +528,8 @@ Left "Could not parse an integer"
 -}
 
 {- $types3
-    You can reason about how @pipes@ behave just by following the types.  In the
-    last pipeline we began from 'P.readLn' (which defaults to 'Integer's):
+    You can reason about how @pipes@ behave by following the types.  In the last
+    pipeline we began from 'P.readLn' (which defaulted to 'Integer's):
 
 > P.readLn
 >     :: () -> Producer Integer IO ()
@@ -562,4 +569,45 @@ Left "Could not parse an integer"
 >     :: IO (Sum Integer)
 
     Now we've built an 'IO' action that folds user input into a 'Sum'.
+-}
+
+{- $nest
+    You can nest sub-pipelines within the pipe monad.  For example, let's say
+    we want to build an input source that begins with a few pre-defined values,
+    but then hands off control to a human when it exhausts those pre-defined
+    values:
+
+> source :: () -> Producer String IO ()
+> source () = do
+>     P.fromList ["Test", "123"] ()
+>     (P.stdout >-> P.takeWhile (/= "quit)) ()
+>
+> -- or:
+> source = P.fromList ["Test", "123"] >=> (P.stdout >-> P.takeWhile (/= "quit))
+
+    This works because the result of pipe composition is still a pipe, and
+    therefore can be sequenced within the pipe monad.
+-}
+
+{- $catch
+    Use 'PL.catchError' from "Pipes.Lift" if you want to catch any errors raised
+    in 'ErrorT'.  Here's an example program that recovers from 'P.read' errors
+    by printing the error and retrying the read:
+
+> import Control.Monad.Trans.Error
+> import Pipes
+> import qualified Pipes.Lift as PL
+> import qualified Pipes.Prelude as P
+> 
+> keepReading :: () -> Producer Int (ErrorT String IO) ()
+> keepReading () = loop
+>   where
+>     loop =
+>         (hoist lift . P.stdin >-> P.read) ()
+>       `PL.catchError` (\e -> do
+>         lift $ lift $ putStrLn e
+>         loop )
+> 
+> main = runErrorT $ runEffect $ (keepReading >-> hoist lift . P.print) ()
+
 -}

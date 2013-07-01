@@ -23,6 +23,7 @@ module Pipes.Lift (
     execStateP,
 
     -- * WriterT
+    -- $writert
     runWriterP,
     execWriterP
     ) where
@@ -154,6 +155,11 @@ execStateP
     :: (Monad m) => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m s
 execStateP s = fmap snd . runStateP s
 {-# INLINABLE execStateP #-}
+
+{- $writert
+    Note that 'runWriterP' and 'execWriterP' will keep the accumulator in
+    weak-head-normal form so that folds run in constant space when possible.
+-}
 
 -- | Run 'W.WriterT' in the base monad
 runWriterP
