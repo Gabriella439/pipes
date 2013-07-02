@@ -34,8 +34,7 @@ Then fire up ` ghci`:
     quit[Enter]
     Prelude P> -- Done!
 
-A new tutorial for version 4.0.0 is in progress.  For now, you can read [the
-tutorial for version 3.3.0](http://hackage.haskell.org/packages/archive/pipes/3.3.0/doc/html/Control-Proxy-Tutorial.html).
+A new tutorial for version 4.0.0 is in progress, which you can find [here](https://github.com/Gabriel439/Haskell-Pipes-Library/blob/master/Pipes/Tutorial.hs).
 
 ## Features
 
