@@ -1,7 +1,17 @@
 # Pipes v4.0.0
 
-`pipes` is an easy, elegant, and powerful framework for describing streaming
-behaviors.
+`pipes` is a clean and powerful stream processing library that lets you build
+and connect reusable streaming components like Unix pipes.
+
+You should use `pipes` if:
+
+* you are streaming data,
+
+* you need to build or consume 'ListT' computations,
+
+* you want a reactive programming system, or:
+
+* you like concurrent message passing.
 
 ## Quick start
 
@@ -11,7 +21,7 @@ behaviors.
 Then fire up ` ghci`:
 
     $ ghci
-    Prelude> import Pipes
+    Prelude> import Pipes as P
     Prelude P> import qualified Pipes.Prelude as P
 
 ... and echo standard input to standard output until you enter `quit`.
@@ -44,6 +54,51 @@ tutorial for version 3.3.0](http://hackage.haskell.org/packages/archive/pipes/3.
 
 * *Extensive Documentation*: Second to none!
 
+## Philosophy
+
+The `pipes` library emphasizes the following three design precepts:
+
+* Emphasize elegance
+
+Inelegant libraries get replaced by more elegant libraries, so I use elegance to
+defend the future of the `pipes` ecosystem.
+
+* Theory everywhere
+
+Theoretically principled design promotes intuitive behavior and avoids large
+classes of bugs.
+
+* Minimize dependencies and emphasize portability
+
+Libraries with minimal dependencies and extensions can spread more easily.
+
+## Outline
+
+The core `pipes` ecosystem consists of the following four libraries:
+
+* `pipes`: The elegant, theoretically-principled core.
+
+* `pipes-concurrency`: Message passing and reactive programming
+
+* `pipes-parse`: Utilities for parsing streams
+
+* `pipes-safe`: Resource management and exception safety
+
+These represent the core areas that I envision for `pipes`.  The latter three
+libraries represent the more pragmatic face of the ecosystem and make design
+tradeoffs where there is no known elegant solution.
+
+# Development Status
+
+The `pipes` ecosystem is in the middle of a transition to use the new 4.0.0 API.
+This version should be the last significant API change for the core `pipes`
+library, although downstream libraries may still exhibit some API instability
+for a couple of months as they experiment with a few new features enabled by the
+4.0.0 API.
+
+All development work currently focuses on transitioning downstream libraries to
+use `pipes-4.0.0` and building out the `pipes` ecosystem.
+
 ## Community Resources
 
 * [Haskell wiki page](http://www.haskell.org/haskellwiki/Pipes)
@@ -58,7 +113,7 @@ tutorial for version 3.3.0](http://hackage.haskell.org/packages/archive/pipes/3.
 
 * Write `pipes` tutorials
 
-## License
+## License (BSD 3-clause)
 
 Copyright (c) 2012, 2013 Gabriel Gonzalez
 All rights reserved.
