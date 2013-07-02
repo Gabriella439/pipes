@@ -48,8 +48,6 @@ tutorial for version 3.3.0](http://hackage.haskell.org/packages/archive/pipes/3.
 
 * *Elegant semantics*: Use practical category theory
 
-* *ListT*: Correct implementation of `ListT` that interconverts with pipes 
-
 * *Bidirectionality*: Implement duplex channels 
 
 * *Extensive Documentation*: Second to none!
@@ -58,19 +56,11 @@ tutorial for version 3.3.0](http://hackage.haskell.org/packages/archive/pipes/3.
 
 The `pipes` library emphasizes the following three design precepts:
 
-* Emphasize elegance
+* Emphasize elegance - Elegant libraries replace inelegant libraries
 
-Inelegant libraries get replaced by more elegant libraries, so I use elegance to
-defend the future of the `pipes` ecosystem.
+* Theory everywhere - Principled design promotes intuitive behavior
 
-* Theory everywhere
-
-Theoretically principled design promotes intuitive behavior and avoids large
-classes of bugs.
-
-* Minimize dependencies and emphasize portability
-
-Libraries with minimal dependencies and extensions can spread more easily.
+* Minimize dependencies - Small dependency profiles maximizes portability
 
 ## Outline
 
@@ -88,7 +78,7 @@ These represent the core areas that I envision for `pipes`.  The latter three
 libraries represent the more pragmatic face of the ecosystem and make design
 tradeoffs where there is no known elegant solution.
 
-# Development Status
+## Development Status
 
 The `pipes` ecosystem is in the middle of a transition to use the new 4.0.0 API.
 This version should be the last significant API change for the core `pipes`
