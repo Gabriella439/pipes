@@ -35,6 +35,9 @@ module Pipes.Tutorial (
     -- * Prelude
     -- $prelude
 
+    -- * Sequence Pipes
+    -- $sequence
+
     -- * Types - Part 2
     -- $types2
 
@@ -46,9 +49,6 @@ module Pipes.Tutorial (
 
     -- * Types - Part 3
     -- $types3
-
-    -- * Nest Pipelines
-    -- $nest
 
     -- * Catch Errors
     -- $catch
@@ -384,6 +384,78 @@ import qualified Pipes.Prelude as P
 
 -}
 
+
+{- $sequence
+    All pipes are special cases of the 'Proxy' type, and the 'Proxy' type is a
+    'Monad', therefore you can combine pre-existing pipes by sequencing them
+    using @do@ notation.
+
+    For example, we can build a 'Producer' that begins with a pre-defined script
+    and then have a human take over if the downstream 'Consumer' exhausts our
+    script:
+
+> serve :: () -> Producer String IO ()
+> serve () = do
+>     -- Lead with the script
+>     P.fromList ["Hi, my name is Gabriel.", "How may I help you?"] ()
+>     -- Then the human continues
+>     P.stdin ()
+
+    If downstream requests two lines of input, our human is off the hook:
+
+>>> runEffect $ (serve >-> P.take 2 >-> P.stdout) ()
+Hi, my name is Gabriel.
+How may I help you?
+>>>
+
+    If downstream requests more, then the 'P.stdin' proxy takes over and we can
+    type in new input:
+
+>>> runEffect $ (serve >-> P.take 3 >-> P.stdout) ()
+Hi, my name is Gabriel.
+How may I help you?
+Give me one second.<Enter>
+Give me one second.
+
+    You can sequence 'Pipe's and 'Consumer's, too.  For example, the following
+    pipeline tries to speed things up a little bit after three messages:
+
+> hurryUp :: (Monad m) => () -> Pipe String String m ()
+> hurryUp () = do
+>     P.take 3 ()  -- 'take' is a 'Pipe'
+>     respond "Will that be all?"
+>     pull ()      -- 'pull' is a 'Pipe'
+
+
+    You can even nest sub-pipelines within the 'Proxy' monad.  For example,
+    we can refine our original script by shutting down the 'Producer' when the
+    human types @"Bye"@:
+
+> serve :: () -> Producer String IO ()
+> serve () = do
+>     P.fromList ["Hi, my name is Gabriel.", "How may I help you?"] ()
+>     (P.stdin >-> P.takeWhile (/= "Bye")) ()
+
+    This works because the result of pipe composition is still a pipe, and
+    therefore can be sequenced just like any other pipe.  Let's verify that this
+    actually works:
+
+>>> runEffect $ (serve >-> hurryUp >-> P.stdout) ()
+Hi, my name is Gabriel.
+How may I help you?
+Give me one second.<Enter>
+Give me one second.
+Will that be all?
+Bye<Enter>
+>>>
+
+    You can also sequence mixtures of 'Producer's, 'Consumer's, and 'Pipe's.
+    This works because the 'Producer' and 'Consumer' type synonyms are subsets
+    of the 'Pipe' type synonym, meaning that they will type-check anywhere that
+    expects a 'Pipe'.  Similarly, an 'Effect' is a subset of of all other type
+    synonyms, so an 'Effect' will type-check anywhere.
+-}
+
 {- $types2
     ('>->') combines pipes by interleaving their actions in the base monad.
     Therefore, you can only compose two pipes if they share the same base monad.
@@ -402,8 +474,9 @@ import qualified Pipes.Prelude as P
 >                with actual type `ErrorT String m0'
 >    ...
 
-    The type-checker complains that the base monads don't match: 'P.stdin' uses
-    'IO' as the base monad, but 'P.read' uses @(ErrorT String m)@.
+    The type-checker complains that the base monads don't match: 'P.stdin' needs
+    'IO' as the base monad, but 'P.read' needs @(ErrorT String m)@ as the base
+    monad.
 
     To unify their base monads we use 'hoist' from the 'MFunctor' class which
     applies transformations to base monads:
@@ -411,7 +484,7 @@ import qualified Pipes.Prelude as P
 > hoist :: (Monad m, MFunctor t) => (m a -> n a) -> t m b -> t n b
 
     All pipes implement 'MFunctor' so we can 'hoist' the 'lift' function to make
-    our pipes agree on using 'ErrorT String IO' for their base monad:
+    our pipes agree on using @(ErrorT String IO)@ for their base monad:
 
 > P.stdin
 >     :: () -> Producer String IO ()
@@ -433,41 +506,52 @@ import qualified Pipes.Prelude as P
 555<Enter>
 555
 Four<Enter>
-Left "Could not parse an integer"
+Left "Pipes.Prelude.read: no parse"
 
     Note that ('.') has higher precedence than ('>->') so you can use ('.') to
-    easily modify pipes in the middle of a composition chain.
+    easily modify pipes in the middle of a composition chain without using
+    parentheses.
 -}
 
 {- $theory2
     You don't need to individually 'hoist' several consecutive pipes in a row.
-    'hoist' has the nice property that you can factor out any consecutive group
-    of 'hoist's into a single call to 'hoist'.
+    If you have the following pattern:
 
-> hoist lift . (p1 >-> p2) = hoist lift . p1 >-> hoist lift . p2
+> hoist lift . p1 >-> hoist lift . p2
+
+    ... you can instead condense these into a single call to 'hoist':
+
+> hoist lift . (p1 >-> p2)
+
+    In fact, 'hoist' has the nice property that you can factor or distribute
+    'hoist' over the category of pipe composition:
+
+> hoist k . (p1 >-> p2) = hoist k . p1 >-> hoist k . p2
 >
-> hoist lift . pull = pull
+> hoist k . pull = pull
 
-    These two equations are functor laws in disguise!
+    Interestingly, these two equations are functor laws in disguise!
 
-    Functors transform one category to another such that:
+    To see how, remember that functors transform one category to another such
+    that:
 
 > fmap (f . g) = fmap f . fmap g
 >
 > fmap id = id
 
-    If you replace 'fmap' with @(hoist lift .)@, replace ('.') with ('>->'), and
-    replace 'id' with 'pull', you get the above two equations for 'hoist'.
+    If you replace 'fmap' with @(hoist k .)@, replace ('.') with ('>->'), and
+    replace 'id' with 'pull', you get the above functor laws for 'hoist'.
 
-    The @pipes@ prelude is full of functions that exhibit this functor pattern.
-    For example, 'P.map' transforms the category of functions to the category of
-    pipe composition:
+    The @pipes@ prelude is full of functions that define their behavior in terms
+    of functor laws.  For example, 'P.map' transforms the category of functions
+    to the category of pipe composition:
 
 > P.map (f . g) = P.map f >-> P.map g
 >
 > P.map id = pull
 
-    See if you can spot other functions like these in the prelude.
+    Functor laws like these let you easily reason about the behavior of @pipes@
+    utilities.  See if you can spot other functor laws in "Pipes.Prelude".
 -}
 
 {- $folds
@@ -569,24 +653,6 @@ Left "Could not parse an integer"
 >     :: IO (Sum Integer)
 
     Now we've built an 'IO' action that folds user input into a 'Sum'.
--}
-
-{- $nest
-    You can nest sub-pipelines within the pipe monad.  For example, let's say
-    we want to build an input source that begins with a few pre-defined values,
-    but then hands off control to a human when it exhausts those pre-defined
-    values:
-
-> source :: () -> Producer String IO ()
-> source () = do
->     P.fromList ["Test", "123"] ()
->     (P.stdout >-> P.takeWhile (/= "quit)) ()
->
-> -- or:
-> source = P.fromList ["Test", "123"] >=> (P.stdout >-> P.takeWhile (/= "quit))
-
-    This works because the result of pipe composition is still a pipe, and
-    therefore can be sequenced within the pipe monad.
 -}
 
 {- $catch
