@@ -44,14 +44,14 @@ module Pipes.Tutorial (
     -- * Theory - Part 2
     -- $theory2
 
+    -- * Catch Errors
+    -- $catch
+
     -- * Folds
     -- $folds
 
     -- * Types - Part 3
     -- $types3
-
-    -- * Catch Errors
-    -- $catch
     ) where
 
 import Control.Monad.Trans.Error
@@ -554,6 +554,44 @@ Left "Pipes.Prelude.read: no parse"
     utilities.  See if you can spot other functor laws in "Pipes.Prelude".
 -}
 
+{- $catch
+    Use 'PL.catchError' from "Pipes.Lift" if you want to catch any errors raised
+    in 'ErrorT'.  Here's an example program that recovers from 'P.read' errors
+    by printing the error and retrying the read:
+
+> -- catch.hs
+> 
+> import Control.Monad.Trans.Error
+> import Pipes
+> import qualified Pipes.Lift as PL
+> import qualified Pipes.Prelude as P
+> 
+> keepReading :: () -> Producer Int (ErrorT String IO) ()
+> keepReading () = loop
+>   where
+>     loop =
+>         (hoist lift . P.stdin >-> P.read) ()
+>       `PL.catchError` (\e -> do
+>         lift $ lift $ putStrLn e
+>         loop )
+> 
+> main = runErrorT $ runEffect $ (keepReading >-> hoist lift . P.print) ()
+
+    This prints the error to the console and continues reading if the user input
+    does not parse to an 'Int':
+
+> $ ./catch
+> 134<Enter>
+> 134
+> Test
+> Pipes.Prelude.read: no parse
+> 79<Enter>
+> 79
+> ^D
+> $
+
+-}
+
 {- $folds
     The @pipes@ Prelude provides several folds which store their results in a
     'WriterT' layer in the base monad.  For example, you can count the number of
@@ -575,7 +613,7 @@ Left "Pipes.Prelude.read: no parse"
 
     Let's try it:
 
-> $ ./wc <wc.hs
+> $ ./wc < wc.hs
 > Sum {getSum = 9}
 > $ ./wc
 > How<Enter>
@@ -653,27 +691,4 @@ Left "Pipes.Prelude.read: no parse"
 >     :: IO (Sum Integer)
 
     Now we've built an 'IO' action that folds user input into a 'Sum'.
--}
-
-{- $catch
-    Use 'PL.catchError' from "Pipes.Lift" if you want to catch any errors raised
-    in 'ErrorT'.  Here's an example program that recovers from 'P.read' errors
-    by printing the error and retrying the read:
-
-> import Control.Monad.Trans.Error
-> import Pipes
-> import qualified Pipes.Lift as PL
-> import qualified Pipes.Prelude as P
-> 
-> keepReading :: () -> Producer Int (ErrorT String IO) ()
-> keepReading () = loop
->   where
->     loop =
->         (hoist lift . P.stdin >-> P.read) ()
->       `PL.catchError` (\e -> do
->         lift $ lift $ putStrLn e
->         loop )
-> 
-> main = runErrorT $ runEffect $ (keepReading >-> hoist lift . P.print) ()
-
 -}
