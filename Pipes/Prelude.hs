@@ -25,6 +25,7 @@ module Pipes.Prelude (
     stdout,
     toHandle,
     print,
+    mapM_,
 
     -- ** Folds
     fold,
@@ -77,6 +78,7 @@ import Prelude hiding (
     readLn,
     map,
     mapM,
+    mapM_,
     concat,
     take,
     takeWhile,
@@ -133,7 +135,7 @@ readLn () = go
 > fromList [] = return
 -}
 fromList :: (Monad m) => [b] -> () -> Producer b m ()
-fromList bs () = mapM_ respond bs
+fromList bs () = Prelude.mapM_ respond bs
 {-# INLINABLE fromList #-}
 
 {-| Transform all values using a pure function
@@ -160,6 +162,13 @@ mapM f () = forever $ do
     b <- lift $ f a
     respond b
 {-# INLINABLE mapM #-}
+
+-- | Execute monadic action for every value.
+mapM_ :: (Monad m) => (a -> m b) -> () -> Consumer a m r
+mapM_ f () = forever $ do
+    a <- request ()
+    lift $ f a
+{-# INLINABLE mapM_ #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> () -> Pipe a a m ()
