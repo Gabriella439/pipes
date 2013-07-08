@@ -327,10 +327,10 @@ import qualified Pipes.Prelude as P
     'Consumer's, 'Producer's, and 'Pipe's are all type synonyms around the
     'Proxy' type, which is why you can reuse ('>->') to connect all of them:
 
-> type Producer a   m r = forall x' x      . Proxy x' x () a m r
-> type Pipe     a b m r =                    Proxy () a () b m r
-> type Consumer   b m r = forall      y' y . Proxy () b y' y m r
-> type Effect       m r = forall x' x y' y . Proxy x' x y' y m r
+> type Producer a   m r = Proxy C  () () a m r
+> type Pipe     a b m r = Proxy () a  () b m r
+> type Consumer   b m r = Proxy () b  () C m r
+> type Effect       m r = Proxy C  () () C m r
 
     See the advanced section on bidirectionality if you want to learn more.
     Otherwise, just remember that your pipes require an argument of type @()@ if
