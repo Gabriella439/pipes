@@ -59,7 +59,8 @@ module Pipes (
     RespondT(..),
     RequestT(..),
 
-    -- * Polymorphic Type Synonyms
+    -- * Concrete Type Synonyms
+    C,
     Pipe,
     Producer,
     Consumer,
@@ -70,8 +71,7 @@ module Pipes (
     CoProducer,
     CoConsumer,
 
-    -- * Concrete Type Synonyms
-    C,
+    -- * Polymorphic Type Synonyms
     Producer',
     Consumer',
     Effect',
@@ -112,7 +112,7 @@ import Pipes.Internal
 import Control.Monad.Morph (MFunctor(hoist))
 
 -- | Run a self-contained 'Effect', converting it back to the base monad
-runEffect :: (Monad m) => Effect' m r -> m r
+runEffect :: (Monad m) => Effect m r -> m r
 runEffect p = go p
   where
     go p = case p of
@@ -538,7 +538,7 @@ reflect = go
     ('>>=') corresponds to ('//>'), calling the second computation once for each
     time the first computation branches.
 -}
-newtype ListT m b = ListT { unListT :: Producer' b m () }
+newtype ListT m b = ListT { unListT :: Producer b m () }
 
 -- | Run a complete 'ListT' action, converting back to the base monad
 runListT :: (Monad m) => ListT m C -> m ()
@@ -656,33 +656,33 @@ type Pipe a b = Proxy () a () b
 
     'Producer's never 'request'.
 -}
-type Producer b m r = forall x' x . Proxy x' x () b m r
+type Producer b = Proxy C () () b
 
 {-| A 'Pipe' that consumes values
 
     'Consumer's never 'respond'.
 -}
-type Consumer a m r = forall y' y . Proxy () a y' y m r
+type Consumer a = Proxy () a () C
 
 {-| An effect in the base monad
 
     'Effect's never 'request' or 'respond'.
 -}
-type Effect m r = forall x' x y' y . Proxy x' x y' y m r
+type Effect = Proxy C () () C
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
     'Client's never 'respond'.
 -}
-type Client a' a m r = forall y' y . Proxy a' a y' y m r
+type Client a' a = Proxy a' a () C
 
 {-| @Server b' b@ receives requests of type @b'@ and sends responses of type
     @b@.
 
     'Server's never 'request'.
 -}
-type Server b' b m r = forall x' x . Proxy x' x b' b m r
+type Server b' b = Proxy C () b' b
 
 -- | A 'Pipe' where everything flows upstream
 type CoPipe a' b' = Proxy a' () b' ()
@@ -702,26 +702,26 @@ type CoConsumer b' = Proxy C () b' ()
 -- | The empty type, denoting a \'@C@\'losed end
 data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
 
--- | Like 'Producer', but with concrete types
-type Producer' b = Proxy C () () b
+-- | Like 'Producer', but with a polymorphic type
+type Producer' b m r = forall x' x . Proxy x' x () b m r
 
--- | Like 'Consumer', but with concrete types
-type Consumer' a = Proxy () a () C
+-- | Like 'Consumer', but with a polymorphic type
+type Consumer' a m r = forall y' y . Proxy () a y' y m r
 
--- | Like 'Effect', but with concrete types
-type Effect' = Proxy C () () C
+-- | Like 'Effect', but with a polymorphic type
+type Effect' m r = forall x' x y' y . Proxy x' x y' y m r
 
--- | Like 'Server', but with concrete types
-type Server' b' b = Proxy C () b' b
+-- | Like 'Server', but with a polymorphic type
+type Server' b' b m r = forall x' x . Proxy x' x b' b m r
 
--- | Like 'Client', but with concrete types
-type Client' a' a = Proxy a' a () C
+-- | Like 'Client', but with a polymorphic type
+type Client' a' a m r = forall y' y . Proxy a' a y' y m r
 
--- | Like 'CoProducer', but with concrete types
-type CoProducer' a' = Proxy a' () () C
+-- | Like 'CoProducer', but with a polymorphic type
+type CoProducer' a' m r = forall y' y . Proxy a' () y' y m r
 
--- | Like 'CoConsumer', but with concrete types
-type CoConsumer' b' = Proxy C () b' ()
+-- | Like 'CoConsumer', but with a polymorphic type
+type CoConsumer' b' m r = forall x' x . Proxy x' x b' () m r
 
 -- | Equivalent to ('>->') with the arguments flipped
 (<-<)

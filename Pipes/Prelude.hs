@@ -100,12 +100,12 @@ import Prelude hiding (
 import qualified Prelude
 
 -- | Read 'String's from 'IO.stdin' using 'getLine'
-stdin :: () -> Producer String IO ()
+stdin :: () -> Producer' String IO ()
 stdin = fromHandle IO.stdin
 {-# INLINABLE stdin #-}
 
 -- | Read 'String's from a 'IO.Handle' using 'IO.hGetLine'
-fromHandle :: IO.Handle -> () -> Producer String IO ()
+fromHandle :: IO.Handle -> () -> Producer' String IO ()
 fromHandle h () = go
   where
     go = do
@@ -117,7 +117,7 @@ fromHandle h () = go
 {-# INLINABLE fromHandle #-}
 
 -- | 'read' from 'IO.stdin' using 'Prelude.readLn'
-readLn :: (Read b) => () -> Producer b IO ()
+readLn :: (Read b) => () -> Producer' b IO ()
 readLn () = go
   where
     go = do
@@ -134,7 +134,7 @@ readLn () = go
 >
 > fromList [] = return
 -}
-fromList :: (Monad m) => [b] -> () -> Producer b m ()
+fromList :: (Monad m) => [b] -> () -> Producer' b m ()
 fromList bs () = Prelude.mapM_ respond bs
 {-# INLINABLE fromList #-}
 
@@ -164,7 +164,7 @@ mapM f () = forever $ do
 {-# INLINABLE mapM #-}
 
 -- | Execute monadic action for every value.
-mapM_ :: (Monad m) => (a -> m b) -> () -> Consumer a m r
+mapM_ :: (Monad m) => (a -> m b) -> () -> Consumer' a m r
 mapM_ f () = forever $ do
     a <- request ()
     lift $ f a
@@ -260,19 +260,19 @@ read () = forever $ do
         _         -> lift $ throwError "Pipes.Prelude.read: ambiguous parse"
 
 -- | Write 'String's to 'IO.stdout' using 'putStrLn'
-stdout :: () -> Consumer String IO r
+stdout :: () -> Consumer' String IO r
 stdout = toHandle IO.stdout
 {-# INLINABLE stdout #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
-toHandle :: IO.Handle -> () -> Consumer String IO r
+toHandle :: IO.Handle -> () -> Consumer' String IO r
 toHandle handle () = forever $ do
     str <- request ()
     lift $ IO.hPutStrLn handle str
 {-# INLINABLE toHandle #-}
 
 -- | 'show' to 'IO.stdout' using 'Prelude.print'
-print :: (Show a) => () -> Consumer a IO r
+print :: (Show a) => () -> Consumer' a IO r
 print () = forever $ do
     a <- request ()
     lift $ Prelude.print a
@@ -284,7 +284,7 @@ print () = forever $ do
 >
 > fold (\_ -> mempty) = pull
 -}
-fold :: (Monad m, M.Monoid w) => (a -> w) -> () -> Consumer a (WriterT w m) r
+fold :: (Monad m, M.Monoid w) => (a -> w) -> () -> Consumer' a (WriterT w m) r
 fold f () =  forever $ do
     a <- request ()
     lift $ tell (f a)
@@ -294,7 +294,7 @@ fold f () =  forever $ do
 
     'all' terminates on the first value that fails the predicate.
 -}
-all :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.All m) ()
+all :: (Monad m) => (a -> Bool) -> () -> Consumer' a (WriterT M.All m) ()
 all predicate () = go
   where
     go = do
@@ -308,7 +308,7 @@ all predicate () = go
 
     'any' terminates on the first value that satisfies the predicate.
 -}
-any :: (Monad m) => (a -> Bool) -> () -> Consumer a (WriterT M.Any m) ()
+any :: (Monad m) => (a -> Bool) -> () -> Consumer' a (WriterT M.Any m) ()
 any predicate () = go
   where
     go = do
@@ -319,17 +319,17 @@ any predicate () = go
 {-# INLINABLE any #-}
 
 -- | Compute the 'M.Sum' of all input values
-sum :: (Monad m, Num a) => () -> Consumer a (WriterT (M.Sum a) m) r
+sum :: (Monad m, Num a) => () -> Consumer' a (WriterT (M.Sum a) m) r
 sum = fold M.Sum
 {-# INLINABLE sum #-}
 
 -- | Compute the 'M.Product' of all input values
-product :: (Monad m, Num a) => () -> Consumer a (WriterT (M.Product a) m) r
+product :: (Monad m, Num a) => () -> Consumer' a (WriterT (M.Product a) m) r
 product = fold M.Product
 {-# INLINABLE product #-}
 
 -- | Count the number of input values
-length :: (Monad m) => () -> Consumer a (WriterT (M.Sum Int) m) r
+length :: (Monad m) => () -> Consumer' a (WriterT (M.Sum Int) m) r
 length = fold (\_ -> M.Sum 1)
 {-# INLINABLE length #-}
 
@@ -337,19 +337,19 @@ length = fold (\_ -> M.Sum 1)
 
     'head' terminates on the first value it receives.
 -}
-head :: (Monad m) => () -> Consumer a (WriterT (M.First a) m) ()
+head :: (Monad m) => () -> Consumer' a (WriterT (M.First a) m) ()
 head () = do
     a <- request ()
     lift $ tell $ M.First (Just a)
 {-# INLINABLE head #-}
 
 -- | Retrieve the 'M.Last' input value
-last :: (Monad m) => () -> Consumer a (WriterT (M.Last a) m) r
+last :: (Monad m) => () -> Consumer' a (WriterT (M.Last a) m) r
 last = fold (M.Last . Just)
 {-# INLINABLE last #-}
 
 -- | Fold input values into a list
-toList :: (Monad m) => () -> Consumer a (WriterT [a] m) r
+toList :: (Monad m) => () -> Consumer' a (WriterT [a] m) r
 toList = fold (\x -> [x])
 {-# INLINABLE toList #-}
 
@@ -359,7 +359,8 @@ toList = fold (\x -> [x])
 
 > foldr :: (a -> b -> b) -> [a] -> Endo b
 -}
-foldr :: (Monad m) => (a -> b -> b) -> () -> Consumer a (WriterT (M.Endo b) m) r
+foldr
+    :: (Monad m) => (a -> b -> b) -> () -> Consumer' a (WriterT (M.Endo b) m) r
 foldr step = fold (M.Endo . step)
 {-# INLINABLE foldr #-}
 
@@ -367,7 +368,7 @@ foldr step = fold (M.Endo . step)
 
     Uses 'StateT' instead of 'WriterT' to ensure a strict accumulation
 -}
-foldl' :: (Monad m) => (s -> a -> s) -> () -> Consumer a (StateT s m) r
+foldl' :: (Monad m) => (s -> a -> s) -> () -> Consumer' a (StateT s m) r
 foldl' step () = go
   where
     go = do
@@ -379,18 +380,18 @@ foldl' step () = go
 
 -- | Zip two 'Producer's
 zip :: (Monad m)
-    => (() -> Producer'  a     m r)
-    -> (() -> Producer'     b  m r)
-    -> (() -> Producer  (a, b) m r)
+    => (() -> Producer   a     m r)
+    -> (() -> Producer      b  m r)
+    -> (() -> Producer' (a, b) m r)
 zip = zipWith (,)
 {-# INLINABLE zip #-}
 
 -- | Zip two 'Producer's using the provided combining function
 zipWith :: (Monad m)
     => (a -> b -> c)
-    -> (() -> Producer' a m r)
-    -> (() -> Producer' b m r)
-    -> (() -> Producer  c m r)
+    -> (() -> Producer  a m r)
+    -> (() -> Producer  b m r)
+    -> (() -> Producer' c m r)
 zipWith f p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
   where
     go1 p1 p2 = M (do
@@ -416,7 +417,7 @@ zipWith f p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
 >
 > fromListT . return = respond
 -}
-fromListT :: (Monad m) => ListT m b -> Producer b m ()
+fromListT :: (Monad m) => ListT m b -> Producer' b m ()
 fromListT l = (\_ -> return ()) >\\ unListT l
 {-# INLINABLE fromListT #-}
 
@@ -426,7 +427,7 @@ fromListT l = (\_ -> return ()) >\\ unListT l
 >
 > toListT . respond = return
 -}
-toListT :: Producer' b m () -> ListT m b
+toListT :: Producer b m () -> ListT m b
 toListT = ListT
 {-# INLINABLE toListT #-}
 
@@ -475,7 +476,7 @@ right k = up \>\ (k />/ dn)
 {-# INLINABLE right #-}
 
 -- | Discards all input values
-discard :: (Monad m) => () -> Consumer a m r
+discard :: (Monad m) => () -> Consumer' a m r
 discard () = go
   where
     go = do
@@ -486,7 +487,7 @@ discard () = go
 {-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
     downstream
 -}
-tee :: (Monad m) => (() -> Consumer' a m r) -> (() -> Pipe a a m r)
+tee :: (Monad m) => (() -> Consumer a m r) -> (() -> Pipe a a m r)
 tee p () = evalStateP Nothing $ do
     r <- (up \>\ (hoist lift . p />/ dn)) ()
     ma <- lift get
