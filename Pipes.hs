@@ -1,8 +1,7 @@
 {-| The core functionality for the 'Proxy' monad transformer
 
-    Read "Pipes.Tutorial" if you want a practical tutorial explaining how to use
-    this library.  The documentation in this module focuses more on the theory
-    behind the type.
+    Read "Pipes.Tutorial" if you want a beginners tutorial explaining how to use
+    this library.  The documentation in this module targets more advanced users.
 -}
 
 {-# LANGUAGE CPP, RankNTypes #-}
@@ -188,8 +187,8 @@ infixl 8 \>\, //<
 -}
 
 {- $pull
-    The pull category lets you interleave pull-based streams, beginning from the
-    most downstream component:
+    The 'pull' category lets you interleave pull-based streams, beginning from
+    the most downstream component.
 
 >           b'               c'                     c'
 >           |                |                      |
@@ -203,13 +202,35 @@ infixl 8 \>\, //<
 >           v                v                      v
 >           r                r                      r
 
-    The pull category obeys the category laws:
+    The 'pull' category obeys the category laws:
 
 > pull >-> f = f
 >
 > f >-> pull = f
 >
 > (f >-> g) >-> h = f >-> (g >-> h)
+
+    You can more easily understand 'pull' and ('>->') by studying their types
+    when specialized to 'Pipe's:
+
+> pull  :: (Monad m)
+>       =>  () -> Pipe a a m r
+>
+> (>->) :: (Monad m)
+>       => (() -> Pipe a b m r)
+>       => (() -> Pipe b c m r)
+>       => (() -> Pipe a c m r)
+
+    However, the more general bidirectional types allow you to also
+    simultaneously transmit information upstream by parametrizing 'request's
+    with an argument.
+
+    The 'pull' category provides the most user-friendly composition operator,
+    because all 'Pipe's require an argument of type @()@.  This category also
+    most closely matches Haskell's lazy semantics since control begins from
+    downstream and this category favors linear pipelines resembling function
+    composition.  All the pipes in "Pipes.Prelude" are built to use this
+    category.
 -}
 
 {-| Forward requests followed by responses:
@@ -256,8 +277,8 @@ fb' ->> p = case p of
 {-# INLINABLE (->>) #-}
 
 {- $push
-    The push category lets you interleave push-based streams, beginning from the
-    most upstream component:
+    The 'push' category lets you interleave push-based streams, beginning from
+    the most upstream component:
 
 >           a                b                    a
 >           |                |                    |
@@ -278,6 +299,26 @@ fb' ->> p = case p of
 > f >~> push = f
 >
 > (f >~> g) >~> h = f >~> (g >~> h)
+
+    You can more easily understand 'push' and ('>~>') by studying their types
+    when specialized to 'Pipe's:
+
+> push  :: (Monad m)
+>       =>  a -> Pipe a a m r
+>
+> (>~>) :: (Monad m)
+>       => (a -> Pipe a b m r)
+>       => (b -> Pipe b c m r)
+>       => (c -> Pipe a c m r)
+
+    'Pipe's require an extra argument of the same type as their input when
+    you compose them with push-based composition since they cannot begin until
+    upstream pushes the first value.
+
+    The 'push' category is the best suited for directed acyclic graphs because
+    it is the only category that permits an 'Control.Arrow.Arrow' instance when
+    specialized to 'Pipe's.  The upcoming @pipes-arrows@ package will provide
+    this 'Control.Arrow.Arrow' instance and corresponding utilities.
 -}
 
 {-| Forward responses followed by requests
@@ -345,6 +386,22 @@ p >>~ fb = case p of
 > f \>\ request = f
 >
 > (f \>\ g) \>\ h = f \>\ (g \>\ h)
+
+    You can more easily understand 'request' and ('\>\') by studying their types
+    when specialized to 'Consumer's:
+
+> request :: (Monad m)
+>         =>  () -> Consumer a m a
+>
+> (\>\)   :: (Monad m)
+>         => (() -> Consumer a m b)
+>         => (() -> Consumer b m c)
+>         => (() -> Consumer a m c)
+
+    The composition operator, ('\>\'), composes folds, but in a way that is
+    significantly more optimal than the equivalent code written in the 'pull' or
+   'push' categories.  The disadvantage is that pipes that are not folds are
+    awkward to write in this category (such as 'Pipes.Prelude.take').
 -}
 
 {-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
@@ -420,6 +477,22 @@ fb' >\\ p0 = go p0
 > f />/ respond = f
 >
 > (f />/ g) />/ h = f />/ (g />/ h)
+
+    You can more easily understand 'respond' and ('/>/') by studying their types
+    when specialized to 'Producer's:
+
+> respond :: (Monad m)
+>         =>  a -> Producer a m ()
+>
+> (/>/)   :: (Monad m)
+>         => (a -> Producer b m ())
+>         => (b -> Producer c m ())
+>         => (a -> Producer c m ())
+
+    The composition operator, ('/>/'), composes unfolds, but in a way that is
+    significantly more optimal than the equivalent code written in the 'pull' or
+   'push' categories.  The disadvantage is that pipes that are not unfolds are
+    awkward to write in this category (such as 'Pipes.Prelude.take').
 -}
 
 {-| Send a value of type @b@ downstream and block waiting for a reply of type
