@@ -55,6 +55,9 @@ module Pipes.Tutorial (
 
     -- * Run base monads
     -- $run
+
+    -- * Conclusion
+    -- $conclusion
     ) where
 
 import Control.Monad.Trans.Error
@@ -336,10 +339,11 @@ import qualified Pipes.Prelude as P
 > type Consumer   b m r = Proxy () b  () C m r
 > type Effect       m r = Proxy C  () () C m r
 
-    See the advanced section on bidirectionality if you want to learn more.
-    Otherwise, just remember that your pipes require an argument of type @()@ if
-    you stick to the common case of composing unidirectional pipes using
-    ('>->').
+    To learn more about this, you can read the documentation in the "Pipes"
+    module, which discusses how these extra type parameters are used to
+    implement several advanced streaming features.  Otherwise, just remember
+    that your pipes require an argument of type @()@ if you stick to the common
+    case of composing unidirectional pipes using ('>->').
 -}
 
 {- $prelude
@@ -747,4 +751,8 @@ Left "Pipes.Prelude.read: no parse"
     This makes it easy to extend pipes by just stashing all the desired
     functionality in the base monad.  Then you can unwrap the monad transformers
     when you are done using them, without having to leave the 'Proxy' monad.
+-}
+
+{- $conclusion
+    This concludes the tutorial, which covers 
 -}
