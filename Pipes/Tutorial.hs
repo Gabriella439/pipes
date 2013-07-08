@@ -52,11 +52,15 @@ module Pipes.Tutorial (
 
     -- * Types - Part 3
     -- $types3
+
+    -- * Run base monads
+    -- $run
     ) where
 
 import Control.Monad.Trans.Error
 import Control.Monad.Trans.Writer.Strict
 import Pipes
+import Pipes.Lift
 import qualified Pipes.Prelude as P
 
 {- $easytouse
@@ -401,15 +405,23 @@ import qualified Pipes.Prelude as P
 >     -- Then the human continues
 >     P.stdin ()
 
-    If downstream requests two lines of input, our human is off the hook:
+    Since composable 'Proxy's require an initial argument, we must supply that
+    argument if we wish to sequence them.  This is why we apply 'P.fromList' and
+    'P.stdin' to their initial @()@ argument in order to call them in the
+    'Proxy' monad.
+
+    When we sequence two 'Proxy's, the first 'Proxy' handles as much input or
+    output as possible.  So if downstream requests two lines of input then our
+    'P.fromList' handles it all and the 'P.stdin' never kicks in, so our human
+    is off the hook:
 
 >>> runEffect $ (serve >-> P.take 2 >-> P.stdout) ()
 Hi, my name is Gabriel.
 How may I help you?
 >>>
 
-    If downstream requests more, then the 'P.stdin' proxy takes over and we can
-    type in new input:
+    However, if downstream exhausts 'P.fromList', then the 'P.stdin' proxy
+    takes over and then we must type in the remaining lines:
 
 >>> runEffect $ (serve >-> P.take 3 >-> P.stdout) ()
 Hi, my name is Gabriel.
@@ -417,8 +429,8 @@ How may I help you?
 Give me one second.<Enter>
 Give me one second.
 
-    You can sequence 'Pipe's and 'Consumer's, too.  For example, the following
-    pipeline tries to speed things up a little bit after three messages:
+    You can sequence 'Pipe's or 'Consumer's, too.  For example, the following
+    'Pipe' tries to speed things up a little bit after three messages:
 
 > hurryUp :: (Monad m) => () -> Pipe String String m ()
 > hurryUp () = do
@@ -426,19 +438,18 @@ Give me one second.
 >     respond "Will that be all?"
 >     pull ()      -- 'pull' is a 'Pipe'
 
-
-    You can even nest sub-pipelines within the 'Proxy' monad.  For example,
+    You can even nest composed 'Proxy's within the 'Proxy' monad.  For example,
     we can refine our original script by shutting down the 'Producer' when the
-    human types @"Bye"@:
+    human types @\"Bye\"@:
 
 > serve :: () -> Producer String IO ()
 > serve () = do
 >     P.fromList ["Hi, my name is Gabriel.", "How may I help you?"] ()
 >     (P.stdin >-> P.takeWhile (/= "Bye")) ()
 
-    This works because the result of pipe composition is still a pipe, and
-    therefore can be sequenced just like any other pipe.  Let's verify that this
-    actually works:
+    This works because the result of 'Proxy' composition is still a 'Proxy', and
+    therefore can be sequenced just like any other 'Proxy' once we apply its
+    initial argument.  Let's verify that this actually works:
 
 >>> runEffect $ (serve >-> hurryUp >-> P.stdout) ()
 Hi, my name is Gabriel.
@@ -449,11 +460,6 @@ Will that be all?
 Bye<Enter>
 >>>
 
-    You can also sequence mixtures of 'Producer's, 'Consumer's, and 'Pipe's.
-    This works because the 'Producer' and 'Consumer' type synonyms are subsets
-    of the 'Pipe' type synonym, meaning that they will type-check anywhere that
-    expects a 'Pipe'.  Similarly, an 'Effect' is a subset of of all other type
-    synonyms, so an 'Effect' will type-check anywhere.
 -}
 
 {- $types2
@@ -628,13 +634,13 @@ Left "Pipes.Prelude.read: no parse"
     'P.readLn' which 'read's typed values from standard input:
 
 > -- Like our 'readInt', except throws exceptions on failed parses
-> readLn :: (Read b) => () -> Producer b IO ()
+> P.readLn :: (Read b) => () -> Producer b IO ()
 
     ... and fold those values using 'P.sum':
 
-> sum :: (Monad m, Num a) => () -> Consumer a (WriterT (Sum a) m) r
+> P.sum :: (Monad m, Num a) => () -> Consumer a (WriterT (Sum a) m) r
 
-    Whenever we fold things using 'WriterT' we have to use 'runWriterT' or
+    Whenever we fold things using 'WriterT' we can use 'runWriterT' or
     'execWriterT' to retrieve the result of the fold:
 
 > -- sum.hs
@@ -646,7 +652,6 @@ Left "Pipes.Prelude.read: no parse"
 > main = do
 >     total <- execWriterT $ runEffect $ (hoist lift . P.readLn >-> P.sum) ()
 >     print total
-
 -}
 
 {- $types3
@@ -691,4 +696,55 @@ Left "Pipes.Prelude.read: no parse"
 >     :: IO (Sum Integer)
 
     Now we've built an 'IO' action that folds user input into a 'Sum'.
+-}
+
+{- $run
+    The above folds will not run in constant space because both 'WriterT'
+    implementations in @transformers@ are not sufficiently strict.  Fortunately,
+    you can use 'execWriterP' to work around this, which has the following type
+    signature:
+
+> execWriterP
+>     :: (Monad m, Monoid w)
+>     => Proxy a' a b' b (WriterT w m) r -> Proxy a' a b' b m w
+
+    'runWriterP' and 'execWriterP' let you unwrap 'WriterT' layers in the base
+    monad without having to unwrap the 'Proxy' layer.  As a bonus, they both
+    keeps the 'WriterT' accumulator strict, so they serve a dual purpose.  You
+    will see the difference if you try to use 'execWriterP' versus
+    'execWriterT' for large folds:
+
+> import Control.Monad.Trans.Writer.Strict
+> import Pipes
+> import Pipes.Lift
+> import qualified Pipes.Prelude as P
+> 
+> main = do
+>     -- This version overflows
+>     -- total <- execWriterT $ runEffect $
+>     --      (P.fromList [(1::Int)..10000000] >-> P.sum) ()
+> 
+>     -- This version runs in constant space
+>     total <- runEffect $ execWriterP $
+>         (P.fromList [(1::Int)..10000000] >-> P.sum) ()
+>     print total
+
+    "Pipes.Lift" provides several functions like these which let you unwrap
+    monad transformers in the base monad without unwrapping the 'Proxy' type:
+
+> runErrorP
+>     :: (Monad m)
+>     => Proxy a' a b' b (ErrorT e m) r -> Proxy a' a b' b m (Either e r)
+>
+> runReaderP
+>     :: (Monad m)
+>     => i -> Proxy a' a b' b (ReaderT i m) r -> Proxy a' a b' b m r
+>
+> runStateP
+>     :: (Monad m)
+>     => s -> Proxy a' a b' b (StateT s m) r -> Proxy a' a b' b m (r, s)
+
+    This makes it easy to extend pipes by just stashing all the desired
+    functionality in the base monad.  Then you can unwrap the monad transformers
+    when you are done using them, without having to leave the 'Proxy' monad.
 -}
