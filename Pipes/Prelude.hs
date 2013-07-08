@@ -285,10 +285,13 @@ print () = forever $ do
 > fold (\_ -> mempty) = pull
 -}
 fold :: (Monad m, M.Monoid w) => (a -> w) -> () -> Consumer' a (WriterT w m) r
-fold f () =  forever $ do
-    a <- request ()
-    lift $ tell (f a)
-{-# INLINABLE fold #-}
+fold f () = go
+  where
+    go = do
+        a <- request ()
+        lift $ tell (f a)
+        go
+{-# INLINE fold #-}
 
 {-| Fold that returns whether 'M.All' input values satisfy the predicate
 
