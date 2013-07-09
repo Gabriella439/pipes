@@ -55,9 +55,6 @@ module Pipes.Tutorial (
 
     -- * Run base monads
     -- $run
-
-    -- * Conclusion
-    -- $conclusion
     ) where
 
 import Control.Monad.Trans.Error
@@ -751,8 +748,4 @@ Left "Pipes.Prelude.read: no parse"
     This makes it easy to extend pipes by just stashing all the desired
     functionality in the base monad.  Then you can unwrap the monad transformers
     when you are done using them, without having to leave the 'Proxy' monad.
--}
-
-{- $conclusion
-    This concludes the tutorial, which covers 
 -}
