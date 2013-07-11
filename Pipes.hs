@@ -89,9 +89,6 @@ module Pipes (
     (//<),
     (<\\),
 
-    -- * Laws
-    -- $laws
-
     -- * Re-exports
     -- $reexports
     module Control.Monad,
@@ -891,21 +888,6 @@ p //< f = f >\\ p
     ->       Proxy x' x c' c m a'
 f <\\ p = p //> f
 {-# INLINABLE (<\\) #-}
-
-{- $laws
-    In addition to the category laws, proxies also satisfy the following laws.
-
-    ('\>\') and ('/>/') both define functors between Kleisli categories
-
-> a \>\ (b >=> c) = (a \>\ b) >=> (a \>\ c)
->
-> a \>\ return = return
-
-> (b >=> c) />/ a = (b />/ a) >=> (c />/ a)
->
-> return />/ a = return
-
--}
 
 {- $reexports
     "Control.Monad" re-exports 'forever', ('>=>'), and ('<=<').
