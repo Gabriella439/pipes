@@ -3,19 +3,17 @@
 {-| @pipes@ is a clean and powerful stream processing library that lets you
     build and connect reusable streaming components like Unix pipes.
 
-    You should use @pipes@ if:
+    You should use @pipes@ to:
 
-    * you are streaming data,
+    * stream data,
 
-    * you need to easily build or consume 'ListT' computations,
+    * build a reactive programming system, or
 
-    * you want a reactive programming system, or
+    * implement message passing.
 
-    * you like message passing.
-
-    This tutorial covers the first two applications, and the @pipes-concurrency@
-    package provides a separate tutorial covering reactive programming and
-    message passing.
+    This tutorial covers simple streaming, and the @pipes-concurrency@ package
+    provides a separate tutorial covering reactive programming and message
+    passing.
 -}
 
 module Pipes.Tutorial (
@@ -57,6 +55,9 @@ module Pipes.Tutorial (
 
     -- * Run base monads
     -- $run
+
+    -- * Conclusion
+    -- $conclusion
     ) where
 
 import Control.Monad.Trans.Error
@@ -756,4 +757,30 @@ Left "Pipes.Prelude.read: no parse"
     This makes it easy to extend pipes by just stashing all the desired
     functionality in the base monad.  Then you can unwrap the monad transformers
     when you are done using them, without having to leave the 'Proxy' monad.
+-}
+
+{- $conclusion
+    This tutorial covers the core concepts of connecting, building, and reading
+    @pipes@ code.  However, this library is only the core component in an
+    ecosystem of streaming components.  More powerful libraries that build upon
+    @pipes@ include:
+
+    * @pipes-safe@: Resource management and exception safety for @pipes@
+
+    * @pipes-concurrency@: Concurrent reactive programming and message passing
+
+    * @pipes-parse@: Idioms for stream parsing
+
+    * @pipes-arrow@: Push-based directed acyclic graphs for @pipes@
+
+    These libraries provide functionality specialized to common streaming
+    domains.  Additionally, there are several @pipes@-based libraries on
+    Hackage, which you can find by searching under the \"Pipes\" category or by
+    looking for packages with a @pipes-@ prefix in their name.
+
+    Even these derived packages still do not explore the full range of @pipes@
+    functionality.  Advanced @pipes@ users can explore this library in much
+    greater depth by studying the documentation in the "Pipes" module to learn
+    about the full theory and symmetry behind the underlying 'Proxy' type and
+    operators.
 -}
