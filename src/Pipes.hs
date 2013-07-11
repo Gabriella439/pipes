@@ -220,6 +220,10 @@ infixl 8 \>\, //<
 >      +----|----+      +----|----+            +----|----+
 >           v                v                      v
 >           r                r                      r
+>
+>  f        :: b' -> Proxy a' a b' b m r
+>  g        :: c' -> Proxy b' b c' c m r
+> (f >-> g) :: c' -> Proxy a' a c' c m r
 
     The 'pull' category obeys the category laws, where 'pull' is the identity
     and ('>->') is composition:
@@ -316,6 +320,10 @@ fb' ->> p = case p of
 >      +----|----+      +----|----+            +----|----+
 >           v                v                      v
 >           r                r                      r
+>
+>  f        :: a -> Proxy a' a b' b m r
+>  g        :: b -> Proxy b' b c' c m r
+> (f >~> g) :: a -> Proxy a' a c' c m r
 
     The 'push' category obeys the category laws, where 'push' is the identity
     and ('>~>') is composition:
@@ -405,6 +413,12 @@ p >>~ fb = case p of
 >      +----|----+    //        +----|----+            +----|----+
 >           v        //              v                      v
 >           b =======/               c                      c
+>
+> 
+>
+>  f        :: b' -> Proxy a' a y' y m b
+>  g        :: c' -> Proxy b' b y' y m c
+> (f \>\ g) :: c' -> Proxy a' a y' y m c
 
     The 'request' category obeys the category laws, where 'request' is the
     identity and ('\>\') is composition:
@@ -502,6 +516,10 @@ fb' >\\ p0 = go p0
 >      +----|----+          \\   +----|----+            +----|----+
 >           v                \\       v                      v
 >           a'                \====== b'                     a'
+>
+>  f        :: a -> Proxy x' x b' b m a'
+>  g        :: b -> Proxy x' x c' c m b'
+> (f />/ g) :: a -> Proxy x' x b' b m a'
 
     The 'respond' category obeys the category laws, where 'respond' is the
     identity and ('/>/') is composition:
