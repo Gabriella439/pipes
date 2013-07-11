@@ -59,7 +59,7 @@ module Pipes (
     RequestT(..),
 
     -- * Concrete Type Synonyms
-    C,
+    X,
     Pipe,
     Producer,
     Consumer,
@@ -619,7 +619,7 @@ reflect = go
 
     Note that 'ListT' is a special case of 'RespondT':
 
-> ListT m b ~ RespondT C () () m b
+> ListT m b ~ RespondT X () () m b
 
     ... but 'ListT' is important enough to deserve its own newtype rather than a
     type synonym.
@@ -635,7 +635,7 @@ reflect = go
 newtype ListT m b = ListT { unListT :: Producer b m () }
 
 -- | Run a complete 'ListT' action, converting back to the base monad
-runListT :: (Monad m) => ListT m C -> m ()
+runListT :: (Monad m) => ListT m X -> m ()
 runListT = runEffect . unListT
 {-# INLINABLE runListT #-}
 
@@ -750,33 +750,33 @@ type Pipe a b = Proxy () a () b
 
     'Producer's never 'request'.
 -}
-type Producer b = Proxy C () () b
+type Producer b = Proxy X () () b
 
 {-| A 'Pipe' that consumes values
 
     'Consumer's never 'respond'.
 -}
-type Consumer a = Proxy () a () C
+type Consumer a = Proxy () a () X
 
 {-| An effect in the base monad
 
     'Effect's never 'request' or 'respond'.
 -}
-type Effect = Proxy C () () C
+type Effect = Proxy X () () X
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
     'Client's never 'respond'.
 -}
-type Client a' a = Proxy a' a () C
+type Client a' a = Proxy a' a () X
 
 {-| @Server b' b@ receives requests of type @b'@ and sends responses of type
     @b@.
 
     'Server's never 'request'.
 -}
-type Server b' b = Proxy C () b' b
+type Server b' b = Proxy X () b' b
 
 -- | A 'Pipe' where everything flows upstream
 type CoPipe a' b' = Proxy a' () b' ()
@@ -785,16 +785,13 @@ type CoPipe a' b' = Proxy a' () b' ()
 
     'CoProducer's never 'respond'.
 -}
-type CoProducer a' = Proxy a' () () C
+type CoProducer a' = Proxy a' () () X
 
 {-| A 'CoPipe' that consumes values flowing upstream
 
     'CoConsumer's never 'request'
 -}
-type CoConsumer b' = Proxy C () b' ()
-
--- | The empty type, denoting a \'@C@\'losed end
-data C = C -- Constructor not exported, but I include it to avoid EmptyDataDecls
+type CoConsumer b' = Proxy X () b' ()
 
 -- | Like 'Producer', but with a polymorphic type
 type Producer' b m r = forall x' x . Proxy x' x () b m r

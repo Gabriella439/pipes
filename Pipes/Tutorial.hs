@@ -341,12 +341,12 @@ import Prelude hiding ((.), id)
     'Consumer's, 'Producer's, and 'Pipe's are all type synonyms around the
     'Proxy' type, which is why you can reuse ('>->') to connect all of them:
 
-> data C  -- C is uninhabited, and stands for 'C'losed
+> data X  -- X is uninhabited, and represents a closed output
 >
-> type Producer a   m r = Proxy C  () () a m r
+> type Producer a   m r = Proxy X  () () a m r
 > type Pipe     a b m r = Proxy () a  () b m r
-> type Consumer   b m r = Proxy () b  () C m r
-> type Effect       m r = Proxy C  () () C m r
+> type Consumer   b m r = Proxy () b  () X m r
+> type Effect       m r = Proxy X  () () X m r
 
     To learn more about this, you can read the documentation in the "Pipes"
     module, which discusses how these extra type parameters are used to
