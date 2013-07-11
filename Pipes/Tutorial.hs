@@ -3,7 +3,7 @@
 {-| @pipes@ is a clean and powerful stream processing library that lets you
     build and connect reusable streaming components like Unix pipes.
 
-    You should use @pipes@ to:
+    You should use @pipes@ if you need to:
 
     * stream data,
 
@@ -60,11 +60,13 @@ module Pipes.Tutorial (
     -- $conclusion
     ) where
 
+import Control.Category
 import Control.Monad.Trans.Error
 import Control.Monad.Trans.Writer.Strict
 import Pipes
 import Pipes.Lift
 import qualified Pipes.Prelude as P
+import Prelude hiding ((.), id)
 
 {- $easytouse
     Haskell pipes are simple to connect.  For example, here's how you echo
@@ -87,7 +89,7 @@ import qualified Pipes.Prelude as P
 > ABC<Enter>
 > ABC
 > ^D
-> $ ./cat <cat.hs
+> $ ./cat < cat.hs
 > import Pipes
 > import qualified Pipes.Prelude as P
 > 
@@ -190,8 +192,8 @@ import qualified Pipes.Prelude as P
 >     str <- request ()
 >     lift $ putStrLn str
 
-    We 'request' values of type 'String', so 'P.stdout' is a 'Consumer' of
-    'String's.  'Consumer' is a monad transformer that extends the base monad
+    We 'request' values of type @String@, so @stdout@ is a 'Consumer' of
+    @String@s.  'Consumer' is a monad transformer that extends the base monad
     with the ability to 'request' new input from upstream.
 
     'P.stdin' is only slightly more complicated because we have to also check
@@ -209,8 +211,8 @@ import qualified Pipes.Prelude as P
 >             respond str
 >             loop
 
-    We 'respond' with values of type 'String', so 'P.stdin' is a 'Producer' of
-    'String's.  'Producer' is a monad transformer that extends the base monad
+    We 'respond' with values of type @String@, so @stdin@ is a 'Producer' of
+    @String@s.  'Producer' is a monad transformer that extends the base monad
     with the ability to 'respond' with new output to send downstream.
 
     Notice how much 'P.stdin' resembles our original hand-written loop, but this
@@ -260,18 +262,19 @@ import qualified Pipes.Prelude as P
 >       -> (() -> Consumer b m r)
 >       -> (() -> Consumer a m r)
 
-    Finally, you can only run self-contained 'Effect's, using 'runEffect':
+    ('>->') improves upon the traditional Unix pipe operator because the
+    compiler will guarantee that we don't connect pipes with mismatched types
+    or connect an open end to a closed end.  Moreover, we can read the type of
+    a pipe to understand its input and output ends at a glance.
+
+    @pipes@ only lets you run self-contained 'Effect's, using 'runEffect':
 
 > runEffect :: Effect m r -> m r
 
-    This improves upon the traditional Unix pipe operator because the compiler
-    will guarantee that:
+    This ensures that we don't leave a dangling input or output end.  If you
+    have unhandled output, you must 'P.discard' it explicitly:
 
-    * we don't connect pipes with mismatched types,
-
-    * we don't connect an open end to a closed end, and
-
-    * we don't leave a dangling input or output end.
+> discard :: (Monad m) => () -> Consumer a m r
 -}
 
 {- $theory1
@@ -308,8 +311,8 @@ import qualified Pipes.Prelude as P
 > -- Right Identity
 > p >-> pull = p
 
-    ... and this turns out to be true, guaranteeing that pipe composition is
-    invisible.
+    ... and this turns out to be true, reassuring us that pipe composition is
+    invisible and does not have any side effects of its own.
 
     Fascinatingly, this means that pipes are a 'Category' in disguise, where
     ('>->') is the composition operator and 'pull' is the identity.  The above
@@ -444,9 +447,9 @@ Give me one second.
 
 > hurryUp :: (Monad m) => () -> Pipe String String m ()
 > hurryUp () = do
->     P.take 3 ()  -- 'take' is a 'Pipe'
+>     P.take 3 ()
 >     respond "Will that be all?"
->     pull ()      -- 'pull' is a 'Pipe'
+>     pull ()
 
     You can even nest composed 'Proxy's within the 'Proxy' monad.  For example,
     we can refine our original script by shutting down the 'Producer' when the
@@ -720,7 +723,7 @@ Left "Pipes.Prelude.read: no parse"
 
     'runWriterP' and 'execWriterP' let you unwrap 'WriterT' layers in the base
     monad without having to unwrap the 'Proxy' layer.  As a bonus, they both
-    keeps the 'WriterT' accumulator strict, so they serve a dual purpose.  You
+    keep the 'WriterT' accumulator strict, so they serve a dual purpose.  You
     will see the difference if you try to use 'execWriterP' versus
     'execWriterT' for large folds:
 
@@ -769,18 +772,34 @@ Left "Pipes.Prelude.read: no parse"
 
     * @pipes-concurrency@: Concurrent reactive programming and message passing
 
-    * @pipes-parse@: Idioms for stream parsing
+    * @pipes-parse@: Central idioms for stream parsing
 
     * @pipes-arrow@: Push-based directed acyclic graphs for @pipes@
 
     These libraries provide functionality specialized to common streaming
-    domains.  Additionally, there are several @pipes@-based libraries on
-    Hackage, which you can find by searching under the \"Pipes\" category or by
-    looking for packages with a @pipes-@ prefix in their name.
+    domains.  Additionally, there are several derived libraries on Hackage that
+    provide even higher-level functionality, which you can find by searching
+    under the \"Pipes\" category or by looking for packages with a @pipes-@
+    prefix in their name.  Current examples include:
 
-    Even these derived packages still do not explore the full range of @pipes@
-    functionality.  Advanced @pipes@ users can explore this library in much
-    greater depth by studying the documentation in the "Pipes" module to learn
-    about the full theory and symmetry behind the underlying 'Proxy' type and
-    operators.
+    * @pipes-network@/@pipes-tls@: Networking
+
+    * @pipes-zlib@: Compression and decompression
+
+    * @pipes-binary@: Serialization
+
+    * @pipes-attoparsec@: High-performance parsing
+
+    Even these derived packages still do not explore the full potential of
+    @pipes@ functionality.  Advanced @pipes@ users can explore this library in
+    greater detail by studying the documentation in the "Pipes" module to learn
+    about the symmetry behind the underlying 'Proxy' type and operators.
+
+    To learn more about @pipes@, ask questions, or follow @pipes@ development,
+    you can subscribe to the @haskell-pipes@ mailing list at:
+
+    <https://groups.google.com/forum/#!forum/haskell-pipes>
+
+    ... or you can mail the list directly at
+    <mailto:haskell-pipes@googlegroups.com>.
 -}
