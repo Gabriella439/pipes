@@ -1,6 +1,7 @@
 -- | General purpose pipes
 
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 module Pipes.Prelude (
     -- * Producers
@@ -61,9 +62,7 @@ module Pipes.Prelude (
     foreverK
     ) where
 
-import Control.Monad (when, unless, forever, replicateM_)
-import Control.Monad.Morph (hoist)
-import Control.Monad.Trans.Class (lift)
+import Control.Monad (when, unless, replicateM_)
 import Control.Monad.Trans.Error (ErrorT, throwError)
 import Control.Monad.Trans.State.Strict (StateT, get, put)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)

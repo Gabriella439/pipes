@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+
 {-| @pipes@ is a clean and powerful stream processing library that lets you
     build and connect reusable streaming components like Unix pipes.
 
@@ -321,16 +323,22 @@ import qualified Pipes.Prelude as P
 {- $types1
     You might wonder why these pipes require an argument of type @()@.  This is
     because 'Consumer's, 'Producer's, and 'Pipe's are all special cases of fully
-    bidirectional 'Proxy's, and the ('>->') uses this initial argument in the
-    general case:
+    bidirectional 'Proxy's which can send information upstream, too.  The
+    ('>->') uses this initial argument in the general case:
 
 > (>->) :: (b' -> Proxy a' a b' b m r) 
 >       -> (c' -> Proxy b' b c' c m r)
 >       -> (c' -> Proxy a' a b' b m r)
 
+    This is also the same reason that every 'request' so far used an empty @()@
+    argument.  In the general case you can provide a non-empty argument to
+    send upstream to parametrize the 'request'.
+
     'Consumer's, 'Producer's, and 'Pipe's are all type synonyms around the
     'Proxy' type, which is why you can reuse ('>->') to connect all of them:
 
+> data C  -- C is uninhabited, and stands for 'C'losed
+>
 > type Producer a   m r = Proxy C  () () a m r
 > type Pipe     a b m r = Proxy () a  () b m r
 > type Consumer   b m r = Proxy () b  () C m r
@@ -339,8 +347,8 @@ import qualified Pipes.Prelude as P
     To learn more about this, you can read the documentation in the "Pipes"
     module, which discusses how these extra type parameters are used to
     implement several advanced streaming features.  Otherwise, just remember
-    that your pipes require an argument of type @()@ if you stick to the common
-    case of composing unidirectional pipes using ('>->').
+    that your pipes and 'request's require an argument of type @()@ if you stick
+    to the common case of composing unidirectional pipes using ('>->').
 -}
 
 {- $prelude

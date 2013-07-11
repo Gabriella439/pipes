@@ -112,7 +112,7 @@ import Control.Monad.Morph (MFunctor(hoist))
 
 -- | Run a self-contained 'Effect', converting it back to the base monad
 runEffect :: (Monad m) => Effect m r -> m r
-runEffect p = go p
+runEffect = go
   where
     go p = case p of
         Request _ fa  -> go (fa  ())
@@ -187,8 +187,30 @@ infixl 8 \>\, //<
 -}
 
 {- $pull
-    The 'pull' category lets you interleave pull-based streams, beginning from
-    the most downstream component.
+    The 'pull' category interleaves pull-based streams, where control begins
+    from the most downstream component.  You can more easily understand 'pull'
+    and ('>->') by studying their types when specialized to 'Pipe's:
+
+> pull  :: (Monad m)
+>       =>  () -> Pipe a a m r
+>
+> (>->) :: (Monad m)
+>       => (() -> Pipe a b m r)
+>       => (() -> Pipe b c m r)
+>       => (() -> Pipe a c m r)
+
+    The 'pull' category provides the most beginner-friendly composition
+    operator, because all pull-based 'Pipe's require an initial argument of
+    type @()@.  This category also most closely matches Haskell's lazy and
+    functional semantics since control begins from downstream and this category
+    favors linear pipelines resembling function composition chains.  For this
+    reason, all the utilities in "Pipes.Prelude" are built for the 'pull'
+    category.
+
+    In the fully general case, you can also send information upstream by
+    invoking 'request' with a non-@()@ argument.  The upstream 'Proxy' will
+    receive the first value through its initial argument and bind each
+    subsequent value through the return value of 'respond':
 
 >           b'               c'                     c'
 >           |                |                      |
@@ -202,35 +224,17 @@ infixl 8 \>\, //<
 >           v                v                      v
 >           r                r                      r
 
-    The 'pull' category obeys the category laws:
+    The 'pull' category obeys the category laws, where 'pull' is the identity
+    and ('>->') is composition:
 
+> -- Left identity
 > pull >-> f = f
 >
+> -- Right identity
 > f >-> pull = f
 >
+> -- Associativity
 > (f >-> g) >-> h = f >-> (g >-> h)
-
-    You can more easily understand 'pull' and ('>->') by studying their types
-    when specialized to 'Pipe's:
-
-> pull  :: (Monad m)
->       =>  () -> Pipe a a m r
->
-> (>->) :: (Monad m)
->       => (() -> Pipe a b m r)
->       => (() -> Pipe b c m r)
->       => (() -> Pipe a c m r)
-
-    However, the more general bidirectional types allow you to also
-    simultaneously transmit information upstream by parametrizing 'request's
-    with an argument.
-
-    The 'pull' category provides the most user-friendly composition operator,
-    because all 'Pipe's require an argument of type @()@.  This category also
-    most closely matches Haskell's lazy semantics since control begins from
-    downstream and this category favors linear pipelines resembling function
-    composition.  All the pipes in "Pipes.Prelude" are built to use this
-    category.
 -}
 
 {-| Forward requests followed by responses:
@@ -277,11 +281,35 @@ fb' ->> p = case p of
 {-# INLINABLE (->>) #-}
 
 {- $push
-    The 'push' category lets you interleave push-based streams, beginning from
-    the most upstream component:
+    The 'push' category interleaves push-based streams, where control begins
+    from the most upstream component.  You can more easily understand 'push' and
+    ('>~>') by studying their types when specialized to 'Pipe's:
 
->           a                b                    a
->           |                |                    |
+> push  :: (Monad m)
+>       =>  a -> Pipe a a m r
+>
+> (>~>) :: (Monad m)
+>       => (a -> Pipe a b m r)
+>       => (b -> Pipe b c m r)
+>       => (a -> Pipe a c m r)
+
+    Push-based 'Pipe's require an extra argument of the same type as their input
+    since they cannot begin until upstream pushes the first value.  You can
+    think of these 'Pipe's as being initially blocked on a 'request'.
+
+    The 'push' category is the best suited for directed acyclic graphs because
+    it is the only category that permits an 'Control.Arrow.Arrow' instance when
+    specialized to 'Pipe's.  The upcoming @pipes-arrows@ package will provide
+    this 'Control.Arrow.Arrow' instance and corresponding utilities.
+
+    In the fully general case, you can also send information upstream.  In fact,
+    upstream flow in the 'push' category behaves identically to downstream flow
+    in the 'pull' category.  Vice versa, downstream flow in the 'push' category
+    behaves identically to upstream flow in the 'pull' category.  These two
+    categories are duals of each other:
+
+>           a                b                      a
+>           |                |                      |
 >      +----|----+      +----|----+            +----|----+
 >      |    v    |      |    v    |            |    v    |
 >  a' <==       <== b' <==       <== c'    a' <==       <== c'
@@ -292,33 +320,17 @@ fb' ->> p = case p of
 >           v                v                      v
 >           r                r                      r
 
-    The pull category obeys the category laws:
+    The 'push' category obeys the category laws, where 'push' is the identity
+    and ('>~>') is composition:
 
+> -- Left identity
 > push >~> f = f
 >
+> -- Right identity
 > f >~> push = f
 >
+> -- Associativity
 > (f >~> g) >~> h = f >~> (g >~> h)
-
-    You can more easily understand 'push' and ('>~>') by studying their types
-    when specialized to 'Pipe's:
-
-> push  :: (Monad m)
->       =>  a -> Pipe a a m r
->
-> (>~>) :: (Monad m)
->       => (a -> Pipe a b m r)
->       => (b -> Pipe b c m r)
->       => (c -> Pipe a c m r)
-
-    'Pipe's require an extra argument of the same type as their input when
-    you compose them with push-based composition since they cannot begin until
-    upstream pushes the first value.
-
-    The 'push' category is the best suited for directed acyclic graphs because
-    it is the only category that permits an 'Control.Arrow.Arrow' instance when
-    specialized to 'Pipe's.  The upcoming @pipes-arrows@ package will provide
-    this 'Control.Arrow.Arrow' instance and corresponding utilities.
 -}
 
 {-| Forward responses followed by requests
@@ -365,29 +377,8 @@ p >>~ fb = case p of
 {-# INLINABLE (>>~) #-}
 
 {- $request
-    The request category lets you substitute 'request's with proxies.
-
->           b'<======\               c'                     c'
->           |        \\              |                      |
->      +----|----+    \\        +----|----+            +----|----+
->      |    v    |     \\       |    v    |            |    v    |
->  a' <==       <== y'  \== b' <==       <== y'    a' <==       <== y'
->      |    f    |              |    g    |     =      | f \>\ g |
->  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
->      |    |    |     //       |    |    |            |    |    |
->      +----|----+    //        +----|----+            +----|----+
->           v        //              v                      v
->           b =======/               c                      c
-
-    The request category obeys the category laws:
-
-> request \>\ f = f
->
-> f \>\ request = f
->
-> (f \>\ g) \>\ h = f \>\ (g \>\ h)
-
-    You can more easily understand 'request' and ('\>\') by studying their types
+    The 'request' category lets you substitute 'request's with 'Proxy's.  You
+    can more easily understand 'request' and ('\>\') by studying their types
     when specialized to 'Consumer's:
 
 > request :: (Monad m)
@@ -401,7 +392,34 @@ p >>~ fb = case p of
     The composition operator, ('\>\'), composes folds, but in a way that is
     significantly more optimal than the equivalent code written in the 'pull' or
    'push' categories.  The disadvantage is that pipes that are not folds are
-    awkward to write in this category (such as 'Pipes.Prelude.take').
+    awkward to write and use in this category (such as 'Pipes.Prelude.take').
+
+    In the fully general case, composed folds can share the same downstream
+    interface and can also parametrize each 'request' for additional input:
+
+>           b'<======\               c'                     c'
+>           |        \\              |                      |
+>      +----|----+    \\        +----|----+            +----|----+
+>      |    v    |     \\       |    v    |            |    v    |
+>  a' <==       <== y'  \== b' <==       <== y'    a' <==       <== y'
+>      |    f    |              |    g    |     =      | f \>\ g |
+>  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
+>      |    |    |     //       |    |    |            |    |    |
+>      +----|----+    //        +----|----+            +----|----+
+>           v        //              v                      v
+>           b =======/               c                      c
+
+    The 'request' category obeys the category laws, where 'request' is the
+    identity and ('\>\') is composition:
+
+> -- Left identity
+> request \>\ f = f
+>
+> -- Right identity
+> f \>\ request = f
+>
+> -- Associativity
+> (f \>\ g) \>\ h = f \>\ (g \>\ h)
 -}
 
 {-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
@@ -456,30 +474,9 @@ fb' >\\ p0 = go p0
   #-}
 
 {- $respond
-    The respond category lets you substitute 'respond's with proxies.
-
->           a                 /=====> b                      a
->           |                //       |                      |
->      +----|----+          //   +----|----+            +----|----+
->      |    v    |         //    |    v    |            |    v    |
->  x' <==       <== b' <=\// x' <==       <== c'    x' <==       <== c'
->      |    f    |       \\      |    g    |     =      | f />/ g |
->  x  ==>       ==> b  ==/\\ x  ==>       ==> c     x  ==>       ==> c'
->      |    |    |         \\    |    |    |            |    |    |
->      +----|----+          \\   +----|----+            +----|----+
->           v                \\       v                      v
->           a'                \====== b'                     a'
-
-    The respond category obeys the category laws:
-
-> respond />/ f = f
->
-> f />/ respond = f
->
-> (f />/ g) />/ h = f />/ (g />/ h)
-
-    You can more easily understand 'respond' and ('/>/') by studying their types
-    when specialized to 'Producer's:
+    The respond category lets you substitute 'respond's with 'Proxy's.  You can
+    more easily understand 'respond' and ('/>/') by studying their types when
+    specialized to 'Producer's:
 
 > respond :: (Monad m)
 >         =>  a -> Producer a m ()
@@ -493,6 +490,33 @@ fb' >\\ p0 = go p0
     significantly more optimal than the equivalent code written in the 'pull' or
    'push' categories.  The disadvantage is that pipes that are not unfolds are
     awkward to write in this category (such as 'Pipes.Prelude.take').
+
+    In the fully general case, composed unfolds can share the same upstream
+    interface and can also bind values from each 'respond':
+
+>           a                 /=====> b                      a
+>           |                //       |                      |
+>      +----|----+          //   +----|----+            +----|----+
+>      |    v    |         //    |    v    |            |    v    |
+>  x' <==       <== b' <=\// x' <==       <== c'    x' <==       <== c'
+>      |    f    |       \\      |    g    |     =      | f />/ g |
+>  x  ==>       ==> b  ==/\\ x  ==>       ==> c     x  ==>       ==> c'
+>      |    |    |         \\    |    |    |            |    |    |
+>      +----|----+          \\   +----|----+            +----|----+
+>           v                \\       v                      v
+>           a'                \====== b'                     a'
+
+    The 'respond' category obeys the category laws, where 'respond' is the
+    identity and ('/>/') is composition:
+
+> -- Left identity
+> respond />/ f = f
+>
+> -- Right identity
+> f />/ respond = f
+>
+> -- Associativity
+> (f />/ g) />/ h = f />/ (g />/ h)
 -}
 
 {-| Send a value of type @b@ downstream and block waiting for a reply of type

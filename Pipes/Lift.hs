@@ -1,6 +1,6 @@
-{-| Many actions in base monad transformers cannot be automatically 'lift'ed,
-    These following functions lift these remaining actions so that they work in
-    the 'Proxy' monad transformer.
+{-| Many actions in base monad transformers cannot be automatically
+    'Control.Monad.Trans.Class.lift'ed.  These functions lift these remaining
+    actions so that they work in the 'Proxy' monad transformer.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -35,9 +35,6 @@ import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
-
--- For documentation
-import Control.Monad.Trans.Class (lift)
 
 -- | Run 'E.ErrorT' in the base monad
 runErrorP
