@@ -39,6 +39,7 @@ Source-Repository head
     Location: https://github.com/Gabriel439/Haskell-Pipes-Library
 
 Library
+    HS-Source-Dirs: src
     Build-Depends:
         base         >= 4       && < 5  ,
         mmorph       >= 1.0.0   && < 1.1,
