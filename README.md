@@ -59,7 +59,7 @@ The `pipes` library emphasizes the following three design precepts:
 
 * Theory everywhere - Principled design promotes intuitive behavior
 
-* Minimize dependencies - Small dependency profiles maximizes portability
+* Minimize dependencies - Small dependency profiles maximize portability
 
 ## Outline
 
