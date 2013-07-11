@@ -49,4 +49,4 @@ Library
         Pipes.Lift,
         Pipes.Prelude,
         Pipes.Tutorial
-    GHC-Options: -O2
+    GHC-Options: -O2 -Wall
