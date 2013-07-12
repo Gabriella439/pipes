@@ -74,10 +74,10 @@ import Prelude hiding ((.), id)
     arguments:
 
 > -- cat.hs
-> 
+>
 > import Pipes
 > import qualified Pipes.Prelude as P
-> 
+>
 > main = runEffect $ (P.stdin >-> P.stdout) ()
 
     If you compile and run it, it will copy standard input to standard output:
@@ -92,7 +92,7 @@ import Prelude hiding ((.), id)
 > $ ./cat < cat.hs
 > import Pipes
 > import qualified Pipes.Prelude as P
-> 
+>
 > main = runEffect $ (P.stdin >-> P.stdout) ()
 > $
 
@@ -100,7 +100,7 @@ import Prelude hiding ((.), id)
 
 > import Control.Monad
 > import System.IO
-> 
+>
 > main = loop
 >   where
 >     loop = do
@@ -118,10 +118,10 @@ import Prelude hiding ((.), id)
     'P.take' processing stage to emulate the @head@ utility:
 
 > -- head.hs
-> 
+>
 > import Pipes
 > import qualified Pipes.Prelude as P
-> 
+>
 > main = runEffect $ (P.stdin >-> P.take 10 >-> P.stdout) ()
 
     Loose coupling also means that we can easily swap out new inputs and
@@ -129,10 +129,10 @@ import Prelude hiding ((.), id)
     'P.stdin' with an endless list of \"y\"s:
 
 > -- yes.hs
-> 
+>
 > import Pipes
 > import qualified Pipes.Prelude as P
-> 
+>
 > main = runEffect $ (P.fromList (repeat "y") >-> P.stdout) ()
 
     Normally if we wanted to connect two programs we'd do it in Unix-land using
@@ -154,10 +154,10 @@ import Prelude hiding ((.), id)
     ... but with @pipes@ we can keep all the logic in Haskell:
 
 > -- combined.hs
-> 
+>
 > import Pipes
 > import qualified Pipes.Prelude as P
-> 
+>
 > main = runEffect $ (P.fromList (repeat "y") >-> P.take 10 >-> P.stdout) ()
 
     This gives the same behavior, but this time the Haskell pipes do all the
@@ -330,7 +330,7 @@ import Prelude hiding ((.), id)
     bidirectional 'Proxy's which can send information upstream, too.  The
     ('>->') uses this initial argument in the general case:
 
-> (>->) :: (b' -> Proxy a' a b' b m r) 
+> (>->) :: (b' -> Proxy a' a b' b m r)
 >       -> (c' -> Proxy b' b c' c m r)
 >       -> (c' -> Proxy a' a b' b m r)
 
@@ -380,7 +380,7 @@ import Prelude hiding ((.), id)
 >
 > numbers :: (Monad m) => () -> Producer String m ()
 > numbers = P.fromList [(1::Int)..] >-> P.map (printf "%6d\t")
-> 
+>
 > main = runEffect $ (P.zipWith (++) numbers P.stdin >-> P.stdout) ()
 
     Or you can print all natural numbers by combining 'P.fromList':
@@ -579,12 +579,12 @@ Left "Pipes.Prelude.read: no parse"
     by printing the error and retrying the read:
 
 > -- catch.hs
-> 
+>
 > import Control.Monad.Trans.Error
 > import Pipes
 > import qualified Pipes.Lift as PL
 > import qualified Pipes.Prelude as P
-> 
+>
 > keepReading :: () -> Producer Int (ErrorT String IO) ()
 > keepReading () = loop
 >   where
@@ -593,7 +593,7 @@ Left "Pipes.Prelude.read: no parse"
 >       `PL.catchError` (\e -> do
 >         lift $ lift $ putStrLn e
 >         loop )
-> 
+>
 > main = runErrorT $ runEffect $ (keepReading >-> hoist lift . P.print) ()
 
     This prints the error to the console and continues reading if the user input
@@ -731,12 +731,12 @@ Left "Pipes.Prelude.read: no parse"
 > import Pipes
 > import Pipes.Lift
 > import qualified Pipes.Prelude as P
-> 
+>
 > main = do
 >     -- This version overflows
 >     -- total <- execWriterT $ runEffect $
 >     --      (P.fromList [(1::Int)..10000000] >-> P.sum) ()
-> 
+>
 >     -- This version runs in constant space
 >     total <- runEffect $ execWriterP $
 >         (P.fromList [(1::Int)..10000000] >-> P.sum) ()
@@ -782,11 +782,11 @@ Left "Pipes.Prelude.read: no parse"
     under the \"Pipes\" category or by looking for packages with a @pipes-@
     prefix in their name.  Current examples include:
 
-    * @pipes-network@/@pipes-tls@: Networking
+    * @pipes-network@/@pipes-network-tls@: Networking
 
     * @pipes-zlib@: Compression and decompression
 
-    * @pipes-binary@: Serialization
+    * @pipes-binary@: Binary serialization
 
     * @pipes-attoparsec@: High-performance parsing
 
