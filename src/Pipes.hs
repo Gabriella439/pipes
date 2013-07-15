@@ -4,7 +4,7 @@
     this library.  The documentation in this module targets more advanced users.
 -}
 
-{-# LANGUAGE CPP, RankNTypes #-}
+{-# LANGUAGE CPP, RankNTypes, EmptyDataDecls #-}
 
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
@@ -760,6 +760,9 @@ instance (Monad m, Monoid a) => Alternative (RequestT a b' b m) where
 instance (Monad m, Monoid a) => MonadPlus (RequestT a b' b m) where
     mzero = empty
     mplus = (<|>)
+
+-- | The empty type, denoting a closed output
+data X
 
 -- | A unidirectional 'Proxy'.
 type Pipe a b = Proxy () a () b
