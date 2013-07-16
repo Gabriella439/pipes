@@ -54,7 +54,6 @@ module Pipes (
     -- * ListT Monad Transformers
     -- $listT
     ListT(..),
-    runListT,
     RespondT(..),
     RequestT(..),
 
@@ -651,11 +650,6 @@ reflect = go
     time the first computation branches.
 -}
 newtype ListT m b = ListT { unListT :: Producer b m () }
-
--- | Run a complete 'ListT' action, converting back to the base monad
-runListT :: (Monad m) => ListT m X -> m ()
-runListT = runEffect . unListT
-{-# INLINABLE runListT #-}
 
 instance (Monad m) => Functor (ListT m) where
     fmap f l = ListT (unListT l //> \a -> respond (f a))
