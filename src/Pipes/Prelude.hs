@@ -5,10 +5,11 @@
 
 module Pipes.Prelude (
     -- * Producers
+    next,
     stdin,
     fromHandle,
     readLn,
-    fromList,
+    range,
 
     -- * Pipes
     map,
@@ -48,6 +49,7 @@ module Pipes.Prelude (
     -- * ListT
     toListT,
     fromListT,
+    for,
     each,
 
     -- * ArrowChoice
@@ -98,6 +100,20 @@ import Prelude hiding (
     zipWith )
 import qualified Prelude
 
+{-| Consume the first value from a 'Producer'
+
+    'next' either fails with a 'Left' if the 'Producer' terminates or succeeds
+    with a 'Right' providing the next value and the remainder of the 'Producer'.
+-}
+next :: (Monad m) => Producer a m r -> m (Either r (a, Producer a m r))
+next = go
+  where
+    go p = case p of
+        Request _ fu -> go (fu ())
+        Respond a fu -> return (Right (a, fu ()))
+        M         m  -> m >>= go
+        Pure      r  -> return (Left r)
+
 -- | Read 'String's from 'IO.stdin' using 'getLine'
 stdin :: () -> Producer' String IO ()
 stdin = fromHandle IO.stdin
@@ -129,13 +145,13 @@ readLn () = go
 
 {-| Convert a list into a 'Producer'
 
-> fromList (xs ++ ys) = fromList xs >=> fromList ys
+> range (xs ++ ys) = range xs >=> range ys
 >
-> fromList [] = return
+> range [] = return
 -}
-fromList :: (Monad m) => [b] -> () -> Producer' b m ()
-fromList bs () = Prelude.mapM_ respond bs
-{-# INLINABLE fromList #-}
+range :: (Monad m) => [b] -> () -> Producer' b m ()
+range bs () = Prelude.mapM_ respond bs
+{-# INLINABLE range #-}
 
 {-| Transform all values using a pure function
 
@@ -429,13 +445,21 @@ fromListT l = (\_ -> return ()) >\\ unListT l
 >
 > toListT . respond = return
 -}
-toListT :: Producer b m () -> ListT m b
+toListT :: Producer a m () -> ListT m a
 toListT = ListT
 {-# INLINABLE toListT #-}
 
--- | Non-deterministically choose from all values in the given list
-each :: (Monad m) => [b] -> ListT m b
-each bs = toListT (fromList bs ())
+{-| Iterate over a 'ListT', applying the given function to each element
+
+> for (each [1..3]) $ \i -> do
+>     print i
+-}
+for :: (Monad m) => ListT m a -> (a -> m ()) -> m ()
+for l f = runEffect $ fromListT l //> lift . f
+
+-- | Upgrade a list to a 'ListT'
+each :: (Monad m) => [a] -> ListT m a
+each bs = toListT (range bs ())
 {-# INLINABLE each #-}
 
 {- $choice
