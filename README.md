@@ -34,7 +34,7 @@ Then fire up ` ghci`:
     quit[Enter]
     Prelude P> -- Done!
 
-A new tutorial for version 4.0.0 is in progress, which you can find [here](https://github.com/Gabriel439/Haskell-Pipes-Library/blob/master/Pipes/Tutorial.hs).
+A new tutorial for version 4.0.0 is in progress, which you can find [here](https://github.com/Gabriel439/Haskell-Pipes-Library/blob/master/src/Pipes/Tutorial.hs).
 
 ## Features
 
