@@ -18,8 +18,7 @@
 
 module Pipes.Internal (
     Proxy(..),
-    observe,
-    X(..)
+    observe
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
@@ -155,6 +154,3 @@ observe p0 = M (go p0) where
         Request a' fa  -> return (Request a' (\a  -> observe (fa  a )))
         Respond b  fb' -> return (Respond b  (\b' -> observe (fb' b')))
 {-# INLINABLE observe #-}
-
--- | The empty type, denoting a closed output
-data X = X X
