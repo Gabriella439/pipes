@@ -53,7 +53,6 @@ module Pipes (
 
     -- * ListT Monad Transformers
     -- $listT
-    ListT(..),
     RespondT(..),
     RequestT(..),
 
@@ -61,9 +60,12 @@ module Pipes (
     await,
     yield,
     for,
+    each,
+    select,
 
     -- * Concrete Type Synonyms
     X,
+    ListT,
     Pipe,
     Producer,
     Consumer,
@@ -75,6 +77,7 @@ module Pipes (
     CoConsumer,
 
     -- * Polymorphic Type Synonyms
+    ListT',
     Producer',
     Consumer',
     Effect',
@@ -627,9 +630,8 @@ reflect = go
 
 {- $listT
     'ListT' is a 'Proxy'-based implementation of \"ListT done right\", and is
-    correct by construction.  This makes it easy to convert back and forth
-    between 'ListT' and 'Proxy', and you can use 'toListT' and 'fromListT' from
-    "Pipes.Prelude" to convert between 'ListT' and pull-based proxies.
+    correct by construction.  You can convert from a 'Producer' to a 'ListT'
+    using 'select', and convert from a 'ListT' to a 'Producer' using 'each'.
 
     The 'RespondT' monad transformer is a generalized 'ListT' over the
     downstream output.  The 'RespondT' Kleisli category corresponds to the
@@ -638,55 +640,7 @@ reflect = go
     The 'RequestT' monad transformer is a generalized 'ListT' over the upstream
     output.  The 'RequestT' Kleisli category corresponds to the request
     category.
-
-    Note that 'ListT' is a special case of 'RespondT':
-
-> ListT m b ~ RespondT X () () m b
-
-    ... but 'ListT' is important enough to deserve its own newtype rather than a
-    type synonym.
 -}
-
-{-| The list monad transformer, which extends a monad with non-determinism
-
-    'return' corresponds to 'respond', yielding a single value
-
-    ('>>=') corresponds to ('//>'), calling the second computation once for each
-    time the first computation branches.
--}
-newtype ListT m b = Select { each :: Producer b m () }
-
-instance (Monad m) => Functor (ListT m) where
-    fmap f l = Select (each l //> \a -> respond (f a))
-
-instance (Monad m) => Applicative (ListT m) where
-    pure a    = Select (respond a)
-    mf <*> mx = Select (
-        each mf //> \f ->
-        each mx //> \x ->
-        respond (f x) )
-
-instance (Monad m) => Monad (ListT m) where
-    return a = Select (respond a)
-    m >>= f  = Select (each m //> \r -> each (f r))
-
-instance MonadTrans ListT where
-    lift m = Select (do
-        a <- lift m
-        respond a )
-
-instance (MonadIO m) => MonadIO (ListT m) where
-    liftIO m = lift (liftIO m)
-
-instance (Monad m) => Alternative (ListT m) where
-    empty = Select (return mempty)
-    l1 <|> l2 = Select (do
-        each l1
-        each l2 )
-
-instance (Monad m) => MonadPlus (ListT m) where
-    mzero = empty
-    mplus = (<|>)
 
 -- | A monad transformer over a proxy's downstream output
 newtype RespondT a' a b' m b = RespondT { runRespondT :: Proxy a' a b' b m b' }
@@ -760,17 +714,27 @@ instance (Monad m, Monoid a) => MonadPlus (RequestT a b' b m) where
     mzero = empty
     mplus = (<|>)
 
--- | Synonym for 'respond'
-yield :: (Monad m) => a -> Proxy x' x a' a m a'
-yield = respond
-{-# INLINE yield #-}
+{-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
 
--- | Synonym for 'request'
+    Synonym for 'request'
+-}
 await :: (Monad m) => a' -> Proxy a' a y' y m a
 await = request
 {-# INLINE await #-}
 
--- | Synonym for ('//>')
+{-| Send a value of type @b@ downstream and block waiting for a reply of type
+    @b'@
+
+    Synonym for 'respond'
+-}
+yield :: (Monad m) => a -> Proxy x' x a' a m a'
+yield = respond
+{-# INLINE yield #-}
+
+{-| @(for p f)@ replaces each 'yield' in @p@ with @f@.
+
+    Synonym for ('//>')
+-}
 for
     :: (Monad m)
     =>       Proxy x' x b' b m a'
@@ -779,8 +743,33 @@ for
 for = (//>)
 {-# INLINE for #-}
 
+{-| Convert a 'Producer' to a 'ListT'
+
+    Synonym for 'RespondT'
+-}
+select :: Proxy a' a b' b m b' -> RespondT a' a b' m b
+select = RespondT
+{-# INLINE select #-}
+
+{-| Convert a 'ListT' to a 'Producer'
+
+    Synonym for 'runRespondT'
+-}
+each :: RespondT a' a b' m b -> Proxy a' a b' b m b'
+each = runRespondT
+{-# INLINE each #-}
+
 -- | The empty type, denoting a closed output
 data X
+
+{-| The list monad transformer, which extends a monad with non-determinism
+
+    'return' corresponds to 'yield', yielding a single value
+
+    ('>>=') corresponds to ('for') calling the second computation once for each
+    time the first computation 'yield's.
+-}
+type ListT = RespondT X () ()
 
 -- | A unidirectional 'Proxy'.
 type Pipe a b = Proxy () a () b
@@ -831,6 +820,9 @@ type CoProducer a' = Proxy a' () () X
     'CoConsumer's never 'request'
 -}
 type CoConsumer b' = Proxy X () b' ()
+
+-- | Like 'ListT', but with a polymorphic type
+type ListT' m a = forall x' x . RespondT x' x () m a
 
 -- | Like 'Producer', but with a polymorphic type
 type Producer' b m r = forall x' x . Proxy x' x () b m r
