@@ -57,6 +57,11 @@ module Pipes (
     RespondT(..),
     RequestT(..),
 
+    -- * Synonyms
+    await,
+    yield,
+    foreach,
+
     -- * Concrete Type Synonyms
     X,
     Pipe,
@@ -754,6 +759,25 @@ instance (Monad m, Monoid a) => Alternative (RequestT a b' b m) where
 instance (Monad m, Monoid a) => MonadPlus (RequestT a b' b m) where
     mzero = empty
     mplus = (<|>)
+
+-- | Synonym for 'respond'
+yield :: (Monad m) => a -> Proxy x' x a' a m a'
+yield = respond
+{-# INLINE yield #-}
+
+-- | Synonym for 'request'
+await :: (Monad m) => a' -> Proxy a' a y' y m a
+await = request
+{-# INLINE await #-}
+
+-- | Synonym for ('//>')
+foreach
+    :: (Monad m)
+    =>       Proxy x' x b' b m a'
+    -> (b -> Proxy x' x c' c m b')
+    ->       Proxy x' x c' c m a'
+foreach = (//>)
+{-# INLINE foreach #-}
 
 -- | The empty type, denoting a closed output
 data X
