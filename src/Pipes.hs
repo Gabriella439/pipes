@@ -57,8 +57,6 @@ module Pipes (
     RequestT(..),
 
     -- * Synonyms
-    await,
-    yield,
     for,
     each,
     select,
@@ -67,9 +65,6 @@ module Pipes (
     X,
     Effect,
     Producer,
-    Generator,
-    Iterator,
-    Enumerator,
     Pipe,
     Consumer,
     Client,
@@ -712,23 +707,6 @@ instance (Monad m, Monoid a) => MonadPlus (RequestT a b' b m) where
     mzero = empty
     mplus = (<|>)
 
-{-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
-
-    Synonym for 'request'
--}
-await :: (Monad m) => a' -> Proxy a' a y' y m a
-await = request
-{-# INLINE await #-}
-
-{-| Send a value of type @b@ downstream and block waiting for a reply of type
-    @b'@
-
-    Synonym for 'respond'
--}
-yield :: (Monad m) => a -> Proxy x' x a' a m a'
-yield = respond
-{-# INLINE yield #-}
-
 {-| @(for p f)@ replaces each 'yield' in @p@ with @f@.
 
     Synonym for ('//>')
@@ -766,27 +744,13 @@ data X
 -}
 type Effect = Proxy X () () X
 
-{-| A 'Pipe' that produces values
-
-    'Producer's never 'request'.
--}
+-- | 'Producer's only 'respond' and never 'request'.
 type Producer b = Proxy X () () b
-
--- | A synonym for 'Producer'
-type Generator b = Producer b
-
--- | A synonym for 'Producer'
-type Iterator b = Producer b
-
--- | A synonym for 'Producer'
-type Enumerator b = Producer b
 
 -- | A unidirectional 'Proxy'.
 type Pipe a b = Proxy () a () b
 
-{-| A 'Pipe' that consumes values
-
-    'Consumer's never 'respond'.
+{-| 'Consumer's only 'request' and never 'respond'.
 -}
 type Consumer a = Proxy () a () X
 
