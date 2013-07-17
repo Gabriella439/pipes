@@ -398,6 +398,8 @@ p >>~ fb = case p of
     significantly more optimal than the equivalent code written in the 'pull' or
    'push' categories.  The disadvantage is that pipes that are not folds are
     awkward to write and use in this category (such as 'Pipes.Prelude.take').
+    Instead, you should use the pull category if you want to compose pipes that
+    are not folds.
 
     In the fully general case, composed folds can share the same downstream
     interface and can also parametrize each 'request' for additional input:
@@ -500,7 +502,9 @@ fb' >\\ p0 = go p0
     The composition operator, ('/>/'), composes unfolds, but in a way that is
     significantly more optimal than the equivalent code written in the 'pull' or
    'push' categories.  The disadvantage is that pipes that are not unfolds are
-    awkward to write in this category (such as 'Pipes.Prelude.take').
+    awkward to write and use in this category (such as 'Pipes.Prelude.take').
+    Instead, you should use the push category to compose pipes that are not
+    unfolds.
 
     In the fully general case, composed unfolds can share the same upstream
     interface and can also bind values from each 'respond':
@@ -532,6 +536,15 @@ fb' >\\ p0 = go p0
 >
 > -- Associativity
 > (f />/ g) />/ h = f />/ (g />/ h)
+
+    Note that when written using 'for', these laws summarize our intuition for
+   how 'for' should iterate over 'Producer's:
+
+> for (respond x) f = f x
+>
+> for m respond = m
+>
+> for (for m f) g = for m (\a -> for (f a) g)
 -}
 
 {-| Send a value of type @b@ downstream and block waiting for a reply of type
@@ -721,6 +734,8 @@ for = (//>)
 
 {-| Convert a 'Producer' to a 'ListT'
 
+> select :: (Monad m) => Producer b m () -> ListT m b
+
     Synonym for 'RespondT'
 -}
 select :: Proxy a' a b' b m b' -> RespondT a' a b' m b
@@ -728,6 +743,8 @@ select = RespondT
 {-# INLINE select #-}
 
 {-| Convert a 'ListT' to a 'Producer'
+
+> each :: (Monad m) => ListT m b -> Producer b m ()
 
     Synonym for 'runRespondT'
 -}
@@ -772,7 +789,7 @@ type Server b' b = Proxy X () b' b
 
     'return' corresponds to 'respond', yielding a single value
 
-    ('>>=') corresponds to ('for') calling the second computation once for each
+    ('>>=') corresponds to 'for', calling the second computation once for each
     time the first computation 'respond's.
 -}
 type ListT = RespondT X () ()
