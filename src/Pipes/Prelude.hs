@@ -48,8 +48,8 @@ module Pipes.Prelude (
 
     -- * ListT
     for,
+    toListT,
     each,
-    fromListT,
 
     -- * ArrowChoice
     -- $choice
@@ -428,34 +428,25 @@ zipWith f p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
         M         m   -> m >>= step
 {-# INLINABLE zipWith #-}
 
-{-| Iterate over a 'ListT', applying the given function to each element
-
-> -- Prints 1 to 3
-> for (each (range [1..3])) $ \i -> do
->     print i
--}
-for :: (Monad m) => ListT m a -> (a -> m ()) -> m ()
-for l f = runEffect $ fromListT l //> lift . f
-
 {-| Convert a 'Producer' to a 'ListT'
 
-> each . (f />/ g) = each . f >=> each . g
+> toListT . (f />/ g) = toListT . f >=> toListT . g
 >
-> each . respond = return
+> toListT . respond = return
 -}
-each :: Producer a m () -> ListT m a
-each = ListT
-{-# INLINABLE each #-}
+toListT :: Producer a m () -> ListT m a
+toListT = ListT
+{-# INLINABLE toListT #-}
 
 {-| Convert a 'ListT' to a 'Producer'
 
-> fromListT . (f >=> g) = fromListT . f />/ fromListT . g
+> each . (f >=> g) = each . f />/ each . g
 >
-> fromListT . return = respond
+> each . return = respond
 -}
-fromListT :: (Monad m) => ListT m b -> Producer' b m ()
-fromListT l = (\_ -> return ()) >\\ unListT l
-{-# INLINABLE fromListT #-}
+each :: (Monad m) => ListT m b -> Producer' b m ()
+each l = (\_ -> return ()) >\\ unListT l
+{-# INLINABLE each #-}
 
 {- $choice
     'left' and 'right' satisfy the 'ArrowChoice' laws using

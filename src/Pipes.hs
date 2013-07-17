@@ -60,7 +60,7 @@ module Pipes (
     -- * Synonyms
     await,
     yield,
-    foreach,
+    for,
 
     -- * Concrete Type Synonyms
     X,
@@ -771,13 +771,13 @@ await = request
 {-# INLINE await #-}
 
 -- | Synonym for ('//>')
-foreach
+for
     :: (Monad m)
     =>       Proxy x' x b' b m a'
     -> (b -> Proxy x' x c' c m b')
     ->       Proxy x' x c' c m a'
-foreach = (//>)
-{-# INLINE foreach #-}
+for = (//>)
+{-# INLINE for #-}
 
 -- | The empty type, denoting a closed output
 data X
