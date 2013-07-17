@@ -654,24 +654,24 @@ reflect = go
     ('>>=') corresponds to ('//>'), calling the second computation once for each
     time the first computation branches.
 -}
-newtype ListT m b = ListT { unListT :: Producer b m () }
+newtype ListT m b = Select { each :: Producer b m () }
 
 instance (Monad m) => Functor (ListT m) where
-    fmap f l = ListT (unListT l //> \a -> respond (f a))
+    fmap f l = Select (each l //> \a -> respond (f a))
 
 instance (Monad m) => Applicative (ListT m) where
-    pure a    = ListT (respond a)
-    mf <*> mx = ListT (
-        unListT mf //> \f ->
-        unListT mx //> \x ->
+    pure a    = Select (respond a)
+    mf <*> mx = Select (
+        each mf //> \f ->
+        each mx //> \x ->
         respond (f x) )
 
 instance (Monad m) => Monad (ListT m) where
-    return a = ListT (respond a)
-    m >>= f  = ListT (unListT m //> \r -> unListT (f r))
+    return a = Select (respond a)
+    m >>= f  = Select (each m //> \r -> each (f r))
 
 instance MonadTrans ListT where
-    lift m = ListT (do
+    lift m = Select (do
         a <- lift m
         respond a )
 
@@ -679,10 +679,10 @@ instance (MonadIO m) => MonadIO (ListT m) where
     liftIO m = lift (liftIO m)
 
 instance (Monad m) => Alternative (ListT m) where
-    empty = ListT (return mempty)
-    l1 <|> l2 = ListT (do
-        unListT l1
-        unListT l2 )
+    empty = Select (return mempty)
+    l1 <|> l2 = Select (do
+        each l1
+        each l2 )
 
 instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty

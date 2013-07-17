@@ -46,11 +46,6 @@ module Pipes.Prelude (
     zip,
     zipWith,
 
-    -- * ListT
-    for,
-    toListT,
-    each,
-
     -- * ArrowChoice
     -- $choice
     left,
@@ -427,26 +422,6 @@ zipWith f p1_0 p2_0 () = go1 (p1_0 ()) (p2_0 ())
         Pure    r     -> return (Left r)
         M         m   -> m >>= step
 {-# INLINABLE zipWith #-}
-
-{-| Convert a 'Producer' to a 'ListT'
-
-> toListT . (f />/ g) = toListT . f >=> toListT . g
->
-> toListT . respond = return
--}
-toListT :: Producer a m () -> ListT m a
-toListT = ListT
-{-# INLINABLE toListT #-}
-
-{-| Convert a 'ListT' to a 'Producer'
-
-> each . (f >=> g) = each . f />/ each . g
->
-> each . return = respond
--}
-each :: (Monad m) => ListT m b -> Producer' b m ()
-each l = (\_ -> return ()) >\\ unListT l
-{-# INLINABLE each #-}
 
 {- $choice
     'left' and 'right' satisfy the 'ArrowChoice' laws using
