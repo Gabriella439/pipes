@@ -707,7 +707,7 @@ instance (Monad m, Monoid a) => MonadPlus (RequestT a b' b m) where
     mzero = empty
     mplus = (<|>)
 
-{-| @(for p f)@ replaces each 'yield' in @p@ with @f@.
+{-| @(for p f)@ replaces each 'respond' in @p@ with @f@.
 
     Synonym for ('//>')
 -}
@@ -770,10 +770,10 @@ type Server b' b = Proxy X () b' b
 
 {-| The list monad transformer, which extends a monad with non-determinism
 
-    'return' corresponds to 'yield', yielding a single value
+    'return' corresponds to 'respond', yielding a single value
 
     ('>>=') corresponds to ('for') calling the second computation once for each
-    time the first computation 'yield's.
+    time the first computation 'respond's.
 -}
 type ListT = RespondT X () ()
 
