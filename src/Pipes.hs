@@ -65,26 +65,24 @@ module Pipes (
 
     -- * Concrete Type Synonyms
     X,
-    ListT,
-    Pipe,
-    Producer,
-    Consumer,
     Effect,
+    Producer,
+    Generator,
+    Iterator,
+    Enumerator,
+    Pipe,
+    Consumer,
     Client,
     Server,
-    CoPipe,
-    CoProducer,
-    CoConsumer,
+    ListT,
 
     -- * Polymorphic Type Synonyms
-    ListT',
+    Effect',
     Producer',
     Consumer',
-    Effect',
     Client',
     Server',
-    CoProducer',
-    CoConsumer',
+    ListT',
 
     -- ** Flipped operators
     (<-<),
@@ -762,17 +760,11 @@ each = runRespondT
 -- | The empty type, denoting a closed output
 data X
 
-{-| The list monad transformer, which extends a monad with non-determinism
+{-| An effect in the base monad
 
-    'return' corresponds to 'yield', yielding a single value
-
-    ('>>=') corresponds to ('for') calling the second computation once for each
-    time the first computation 'yield's.
+    'Effect's never 'request' or 'respond'.
 -}
-type ListT = RespondT X () ()
-
--- | A unidirectional 'Proxy'.
-type Pipe a b = Proxy () a () b
+type Effect = Proxy X () () X
 
 {-| A 'Pipe' that produces values
 
@@ -780,17 +772,23 @@ type Pipe a b = Proxy () a () b
 -}
 type Producer b = Proxy X () () b
 
+-- | A synonym for 'Producer'
+type Generator b = Producer b
+
+-- | A synonym for 'Producer'
+type Iterator b = Producer b
+
+-- | A synonym for 'Producer'
+type Enumerator b = Producer b
+
+-- | A unidirectional 'Proxy'.
+type Pipe a b = Proxy () a () b
+
 {-| A 'Pipe' that consumes values
 
     'Consumer's never 'respond'.
 -}
 type Consumer a = Proxy () a () X
-
-{-| An effect in the base monad
-
-    'Effect's never 'request' or 'respond'.
--}
-type Effect = Proxy X () () X
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
@@ -806,23 +804,17 @@ type Client a' a = Proxy a' a () X
 -}
 type Server b' b = Proxy X () b' b
 
--- | A 'Pipe' where everything flows upstream
-type CoPipe a' b' = Proxy a' () b' ()
+{-| The list monad transformer, which extends a monad with non-determinism
 
-{-| A 'CoPipe' that produces values flowing upstream
+    'return' corresponds to 'yield', yielding a single value
 
-    'CoProducer's never 'respond'.
+    ('>>=') corresponds to ('for') calling the second computation once for each
+    time the first computation 'yield's.
 -}
-type CoProducer a' = Proxy a' () () X
+type ListT = RespondT X () ()
 
-{-| A 'CoPipe' that consumes values flowing upstream
-
-    'CoConsumer's never 'request'
--}
-type CoConsumer b' = Proxy X () b' ()
-
--- | Like 'ListT', but with a polymorphic type
-type ListT' m a = forall x' x . RespondT x' x () m a
+-- | Like 'Effect', but with a polymorphic type
+type Effect' m r = forall x' x y' y . Proxy x' x y' y m r
 
 -- | Like 'Producer', but with a polymorphic type
 type Producer' b m r = forall x' x . Proxy x' x () b m r
@@ -830,20 +822,14 @@ type Producer' b m r = forall x' x . Proxy x' x () b m r
 -- | Like 'Consumer', but with a polymorphic type
 type Consumer' a m r = forall y' y . Proxy () a y' y m r
 
--- | Like 'Effect', but with a polymorphic type
-type Effect' m r = forall x' x y' y . Proxy x' x y' y m r
-
 -- | Like 'Server', but with a polymorphic type
 type Server' b' b m r = forall x' x . Proxy x' x b' b m r
 
 -- | Like 'Client', but with a polymorphic type
 type Client' a' a m r = forall y' y . Proxy a' a y' y m r
 
--- | Like 'CoProducer', but with a polymorphic type
-type CoProducer' a' m r = forall y' y . Proxy a' () y' y m r
-
--- | Like 'CoConsumer', but with a polymorphic type
-type CoConsumer' b' m r = forall x' x . Proxy x' x b' () m r
+-- | Like 'ListT', but with a polymorphic type
+type ListT' m a = forall x' x . RespondT x' x () m a
 
 -- | Equivalent to ('>->') with the arguments flipped
 (<-<)
