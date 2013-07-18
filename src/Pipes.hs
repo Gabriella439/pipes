@@ -63,6 +63,7 @@ module Pipes (
     each,
     every,
     select,
+    discard,
 
     -- * Concrete Type Synonyms
     X,
@@ -747,6 +748,11 @@ every= runListT . toListT
 select :: Producer b m () -> ListT m b
 select = ListT
 {-# INLINE select #-}
+
+-- | Discards all input values
+discard :: (Monad m) => a -> Effect' m ()
+discard _ = return ()
+{-# INLINABLE discard #-}
 
 -- | The empty type, denoting a closed output
 data X

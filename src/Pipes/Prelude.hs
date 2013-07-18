@@ -26,7 +26,6 @@ module Pipes.Prelude (
     toHandle,
     print,
     mapM_,
-    discard,
     fold,
     sum,
     product,
@@ -220,11 +219,6 @@ toHandle handle = mapM_ (IO.hPutStrLn handle)
 print :: (Show a) => a -> Effect' IO ()
 print = mapM_ Prelude.print
 {-# INLINABLE print #-}
-
--- | Discards all input values
-discard :: (Monad m) => a -> Effect' m ()
-discard _ = return ()
-{-# INLINABLE discard #-}
 
 {-| Strict fold over the input using the provided 'M.Monoid'
 
