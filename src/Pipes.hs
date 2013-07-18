@@ -51,16 +51,17 @@ module Pipes (
     -- $reflect
     reflect,
 
-    -- * ListT Monad Transformers
-    -- $listT
+    -- * ListT
     ListT(..),
 
-    -- * Enumerable
-    Enumerable(..),
+    -- * Iterable
+    Iterable(..),
 
     -- * Utilities
     next,
     for,
+    each,
+    every,
     select,
 
     -- * Concrete Type Synonyms
@@ -101,6 +102,9 @@ import Control.Monad (forever, (>=>), (<=<))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
+import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
+import Control.Monad.Trans.Error (ErrorT(runErrorT))
+import qualified Data.Foldable as F
 import Pipes.Internal
 
 -- Re-exports
@@ -633,20 +637,6 @@ reflect = go
         Pure       r   -> Pure r
 {-# INLINABLE reflect #-}
 
-{- $listT
-    'ListT' is a 'Proxy'-based implementation of \"ListT done right\", and is
-    correct by construction.  You can convert from a 'Producer' to a 'ListT'
-    using 'select', and convert from a 'ListT' to a 'Producer' using 'each'.
-
-    The 'ListT' monad transformer is a generalized 'ListT' over the
-    downstream output.  The 'ListT' Kleisli category corresponds to the
-    respond category.
-
-    The 'RequestT' monad transformer is a generalized 'ListT' over the upstream
-    output.  The 'RequestT' Kleisli category corresponds to the request
-    category.
--}
-
 {-| The list monad transformer, which extends a monad with non-determinism
 
     'return' corresponds to 'respond', yielding a single value
@@ -688,14 +678,31 @@ instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
 
-{-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
+instance MFunctor ListT where
+    hoist morph = ListT . hoist morph . runListT
+
+{-| 'Iterable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'Producer's.
 -}
-class Enumerable f where
-    each :: (Monad m) => f a -> Producer' a m ()
+class Iterable t where
+    toListT :: (Monad m) => t m a -> ListT m a
 
-instance Enumerable [] where
-    each = mapM_ respond
+instance Iterable ListT where
+    toListT = id
+
+instance Iterable MaybeT where
+    toListT m = ListT $ do
+        x <- lift $ runMaybeT m
+        case x of
+            Nothing -> return ()
+            Just a  -> respond a
+
+instance Iterable (ErrorT e) where
+    toListT m = ListT $ do
+        x <- lift $ runErrorT m
+        case x of
+            Left  _ -> return ()
+            Right a -> respond a
 
 {-| Consume the first value from a 'Producer'
 
@@ -723,9 +730,17 @@ for
 for = (//>)
 {-# INLINE for #-}
 
-{-| Convert a 'Producer' to a 'ListT'
+-- | Convert a 'F.Foldable' to a 'Producer'
+each :: (Monad m, F.Foldable f) => f a -> Producer a m ()
+each = F.mapM_ respond
+{-# INLINABLE each #-}
 
-> select :: (Monad m) => Producer b m () -> ListT m b
+-- | Convert an 'Iterable' to a 'Producer'
+every :: (Monad m, Iterable t) => t m a -> Producer a m ()
+every= runListT . toListT
+{-# INLINABLE every #-}
+
+{-| Convert a 'Producer' to a 'ListT'
 
     Synonym for 'ListT'
 -}
