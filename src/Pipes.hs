@@ -738,13 +738,13 @@ for = (//>)
 {-# INLINE for #-}
 
 -- | Convert a 'F.Foldable' to a 'Producer'
-each :: (Monad m, F.Foldable f) => f a -> Producer a m ()
+each :: (Monad m, F.Foldable f) => f a -> Producer' a m ()
 each = F.mapM_ respond
 {-# INLINABLE each #-}
 
 -- | Convert an 'Iterable' to a 'Producer'
-every :: (Monad m, Iterable t) => t m a -> Producer a m ()
-every= runListT . toListT
+every :: (Monad m, Iterable t) => t m a -> Producer' a m ()
+every it = discard >\\ runListT (toListT it)
 {-# INLINABLE every #-}
 
 {-| Convert a 'Producer' to a 'ListT'
