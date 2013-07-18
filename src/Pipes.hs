@@ -33,7 +33,7 @@ module Pipes (
     -- $push
     push,
     (>~>),
-    (>>~),
+    (~>),
 
     -- ** Request
     -- $request
@@ -87,7 +87,7 @@ module Pipes (
     (/</),
     (\<\),
     (<<-),
-    (~<<),
+    (<~),
     (//<),
     (<\\),
 
@@ -148,8 +148,8 @@ runEffect = go
 -}
 infixr 5 <-<, ->>
 infixl 5 >->, <<-
-infixr 6 >~>, ~<<
-infixl 6 <~<, >>~
+infixr 6 >~>, <~
+infixl 6 <~<, ~>
 infixl 7 \<\, //>
 infixr 7 />/, <\\ -- GHC will raise a parse error if 
 infixr 8 /</, >\\ -- either of these lines end with '\'
@@ -176,7 +176,7 @@ infixl 8 \>\, //<
                      Identity   | Composition |  Point-ful
                   +-------------+-------------+-------------+
     pull category |    'pull'     |     '>->'     |     '->>'     |
-    push category |    'push'     |     '>~>'     |     '>>~'     |
+    push category |    'push'     |     '>~>'     |     '~>'      |
  request category |   'respond'   |     '\>\'     |     '>\\'     |
  respond category |   'request'   |     '/>/'     |     '//>'     |
  Kleisli category |   'return'    |     '>=>'     |     '>>='     |
@@ -280,7 +280,7 @@ pull = go
     ->        Proxy b' b c' c m r
     ->        Proxy a' a c' c m r
 fb' ->> p = case p of
-    Request b' fb  -> fb' b' >>~ fb
+    Request b' fb  -> fb' b' ~> fb
     Respond c  fc' -> Respond c (\c' -> fb' ->> fc' c')
     M          m   -> M (m >>= \p' -> return (fb' ->> p'))
     Pure       r   -> Pure r
@@ -358,7 +358,7 @@ push = go
 {-| Compose two proxies blocked on a 'request', creating a new proxy blocked on
     a 'request'
 
-> (f >~> g) x = f x >>~ g
+> (f >~> g) x = f x ~> g
 
     ('>~>') is the composition operator of the push category.
 -}
@@ -367,24 +367,24 @@ push = go
     => (_a -> Proxy a' a b' b m r)
     -> ( b -> Proxy b' b c' c m r)
     -> (_a -> Proxy a' a c' c m r)
-(fa >~> fb) a = fa a >>~ fb
+(fa >~> fb) a = fa a ~> fb
 {-# INLINABLE (>~>) #-}
 
-{-| @(p >>~ f)@ pairs each 'respond' in @p@ with a 'request' in @f@.
+{-| @(p ~> f)@ pairs each 'respond' in @p@ with a 'request' in @f@.
 
     Point-ful version of ('>~>')
 -}
-(>>~)
+(~>)
     :: (Monad m)
     =>       Proxy a' a b' b m r
     -> (b -> Proxy b' b c' c m r)
     ->       Proxy a' a c' c m r
-p >>~ fb = case p of
-    Request a' fa  -> Request a' (\a -> fa a >>~ fb)
+p ~> fb = case p of
+    Request a' fa  -> Request a' (\a -> fa a ~> fb)
     Respond b  fb' -> fb' ->> fb b
-    M          m   -> M (m >>= \p' -> return (p' >>~ fb))
+    M          m   -> M (m >>= \p' -> return (p' ~> fb))
     Pure       r   -> Pure r
-{-# INLINABLE (>>~) #-}
+{-# INLINABLE (~>) #-}
 
 {- $request
     The 'request' category lets you substitute 'request's with 'Proxy's.  You
@@ -858,14 +858,14 @@ p1 \<\ p2 = p2 />/ p1
 k <<- p = p ->> k
 {-# INLINABLE (<<-) #-}
 
--- | Equivalent to ('>>~') with the arguments flipped
-(~<<)
+-- | Equivalent to ('~>') with the arguments flipped
+(<~)
     :: (Monad m)
     => (b  -> Proxy b' b c' c m r)
     ->        Proxy a' a b' b m r
     ->        Proxy a' a c' c m r
-k ~<< p = p >>~ k
-{-# INLINABLE (~<<) #-}
+k <~ p = p ~> k
+{-# INLINABLE (<~) #-}
 
 -- | Equivalent to ('>\\') with the arguments flipped
 (//<)
