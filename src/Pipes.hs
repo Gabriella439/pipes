@@ -58,7 +58,8 @@ module Pipes (
     -- * Enumerable
     Enumerable(..),
 
-    -- * Synonyms
+    -- * Utilities
+    next,
     for,
     select,
 
@@ -695,6 +696,20 @@ class Enumerable f where
 
 instance Enumerable [] where
     each = mapM_ respond
+
+{-| Consume the first value from a 'Producer'
+
+    'next' either fails with a 'Left' if the 'Producer' terminates or succeeds
+    with a 'Right' providing the next value and the remainder of the 'Producer'.
+-}
+next :: (Monad m) => Producer a m r -> m (Either r (a, Producer a m r))
+next = go
+  where
+    go p = case p of
+        Request _ fu -> go (fu ())
+        Respond a fu -> return (Right (a, fu ()))
+        M         m  -> m >>= go
+        Pure      r  -> return (Left r)
 
 {-| @(for p f)@ replaces each 'respond' in @p@ with @f@.
 
