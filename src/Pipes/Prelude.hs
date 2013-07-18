@@ -9,7 +9,6 @@ module Pipes.Prelude (
     stdin,
     fromHandle,
     readLn,
-    range,
 
     -- * Pipes
     map,
@@ -20,7 +19,6 @@ module Pipes.Prelude (
     dropWhile,
     filter,
     bind,
-    join,
     read,
 
     -- * Consumers
@@ -58,12 +56,11 @@ module Pipes.Prelude (
     foreverK
     ) where
 
-import Control.Monad (when, unless, replicateM_)
+import Control.Monad (unless)
 import Control.Monad.Trans.Error (ErrorT, throwError)
 import Control.Monad.Trans.State.Strict (StateT, get, put)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
 import qualified Data.Monoid   as M
-import qualified Data.Foldable as F
 import qualified System.IO     as IO
 import Pipes
 import Pipes.Internal
@@ -109,13 +106,13 @@ next = go
         Pure      r  -> return (Left r)
 
 -- | Read 'String's from 'IO.stdin' using 'getLine'
-stdin :: () -> Producer' String IO ()
+stdin :: Producer' String IO ()
 stdin = fromHandle IO.stdin
 {-# INLINABLE stdin #-}
 
 -- | Read 'String's from a 'IO.Handle' using 'IO.hGetLine'
-fromHandle :: IO.Handle -> () -> Producer' String IO ()
-fromHandle h () = go
+fromHandle :: IO.Handle -> Producer' String IO ()
+fromHandle h = go
   where
     go = do
         eof <- lift $ IO.hIsEOF h
@@ -126,8 +123,8 @@ fromHandle h () = go
 {-# INLINABLE fromHandle #-}
 
 -- | 'read' from 'IO.stdin' using 'Prelude.readLn'
-readLn :: (Read b) => () -> Producer' b IO ()
-readLn () = go
+readLn :: (Read b) => Producer' b IO ()
+readLn = go
   where
     go = do
         eof <- lift $ IO.hIsEOF IO.stdin
@@ -137,73 +134,72 @@ readLn () = go
             go
 {-# INLINABLE readLn #-}
 
-{-| Convert a list into a 'Producer'
-
-> range (xs ++ ys) = range xs >=> range ys
->
-> range [] = return
--}
-range :: (Monad m) => [b] -> () -> Producer' b m ()
-range bs () = Prelude.mapM_ respond bs
-{-# INLINABLE range #-}
-
 {-| Transform all values using a pure function
 
-> map (g . f) = map f >-> map g
+> map (g . f) = map f />/ map g
 >
-> map id = pull
+> map id = respond
 -}
-map :: (Monad m) => (a -> b) -> () -> Pipe a b m r
-map f () = forever $ do
-    a <- request ()
-    respond (f a)
+map :: (Monad m) => (a -> b) -> a -> Producer' b m ()
+map f = respond . f
 {-# INLINABLE map #-}
 
 {-| Transform all values using a monadic function
 
-> mapM (f >=> g) = mapM f >-> mapM g
+> mapM (f >=> g) = mapM f />/ mapM g
 >
-> mapM return = pull
+> mapM return = respond
 -}
-mapM :: (Monad m) => (a -> m b) -> () -> Pipe a b m r
-mapM f () = forever $ do
-    a <- request ()
-    b <- lift $ f a
+mapM :: (Monad m) => (a -> m b) -> a -> Producer' b m ()
+mapM f a = do
+    b <- lift (f a)
     respond b
 {-# INLINABLE mapM #-}
 
 -- | Execute monadic action for every value.
-mapM_ :: (Monad m) => (a -> m b) -> () -> Consumer' a m r
-mapM_ f () = forever $ do
-    a <- request ()
-    lift $ f a
+mapM_ :: (Monad m) => (a -> m b) -> a -> Effect' m b
+mapM_ f = lift . f
 {-# INLINABLE mapM_ #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
-take :: (Monad m) => Int -> () -> Pipe a a m ()
-take n () = replicateM_ n $ do
-    a <- request ()
-    respond a
+take :: (Monad m) => Int -> a -> Pipe a a m a
+take = go
+  where
+    go n a =
+        if (n <= 0)
+        then return a
+        else do
+            respond a
+            a2 <- request ()
+            go (n - 1) a2
 {-# INLINABLE take #-}
 
 {-| @(takeWhile p)@ allows values to pass downstream so long as they satisfy
     the predicate @p@.
 -}
-takeWhile :: (Monad m) => (a -> Bool) -> () -> Pipe a a m ()
-takeWhile predicate () = go
+takeWhile :: (Monad m) => (a -> Bool) -> a -> Pipe a a m a
+takeWhile predicate = go
   where
-    go = do
-        a <- request ()
-        when (predicate a) $ do
+    go a =
+        if (predicate a)
+        then do
             respond a
-            go
+            a2 <- request ()
+            go a2
+        else return a
 {-# INLINABLE takeWhile #-}
 
 -- | @(drop n)@ discards @n@ values going downstream
-drop :: (Monad m) => Int -> () -> Pipe a a m r
-drop n () = do
-    replicateM_ n $ request ()
-    pull ()
+drop :: (Monad m) => Int -> a -> Pipe a a m r
+drop = go
+  where
+    go n a =
+        if (n <= 0)
+        then push a
+        else do
+            respond a
+            a2 <- request ()
+            go (n - 1) a2
 {-# INLINABLE drop #-}
 
 {-| @(dropWhile p)@ discards values going downstream until one violates the
@@ -243,21 +239,11 @@ filter p () = go
 {-| Transform all values using a pure function and flatten the 'F.Foldable'
     result
 
-> bind f = map f >-> join
+> bind f = map f />/ range
 -}
-bind :: (F.Foldable f, Monad m) => (a -> f b) -> () -> Pipe a b m r
-bind f = map f >-> join
+bind :: (Enumerable f, Monad m) => (a -> f b) -> a -> Producer' b m ()
+bind f = map f />/ each
 {-# INLINABLE bind #-}
-
-{-| Flatten 'F.Foldable's and send their individual values downstream
-
-> join = bind id
--}
-join :: (F.Foldable f, Monad m) =>  () -> Pipe (f a) a m r
-join () = forever $ do
-    as <- request ()
-    F.mapM_ respond as
-{-# INLINABLE join #-}
 
 -- | Parse 'Read'able values, throwing an error in 'ErrorT' on failed parses
 read :: (Monad m, Read a) => () -> Pipe String a (ErrorT String m) r
@@ -269,22 +255,18 @@ read () = forever $ do
         _         -> lift $ throwError "Pipes.Prelude.read: ambiguous parse"
 
 -- | Write 'String's to 'IO.stdout' using 'putStrLn'
-stdout :: () -> Consumer' String IO r
-stdout = toHandle IO.stdout
+stdout :: String -> Effect' IO ()
+stdout = mapM_ putStrLn
 {-# INLINABLE stdout #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
-toHandle :: IO.Handle -> () -> Consumer' String IO r
-toHandle handle () = forever $ do
-    str <- request ()
-    lift $ IO.hPutStrLn handle str
+toHandle :: IO.Handle -> String -> Effect' IO ()
+toHandle handle = mapM_ (IO.hPutStrLn handle)
 {-# INLINABLE toHandle #-}
 
 -- | 'show' to 'IO.stdout' using 'Prelude.print'
-print :: (Show a) => () -> Consumer' a IO r
-print () = forever $ do
-    a <- request ()
-    lift $ Prelude.print a
+print :: (Show a) => a -> Effect' IO ()
+print = mapM_ Prelude.print
 {-# INLINABLE print #-}
 
 {-| Strict fold over the input using the provided 'M.Monoid'
@@ -293,27 +275,23 @@ print () = forever $ do
 >
 > fold (\_ -> mempty) = pull
 -}
-fold :: (Monad m, M.Monoid w) => (a -> w) -> () -> Consumer' a (WriterT w m) r
-fold f () = go
-  where
-    go = do
-        a <- request ()
-        lift $ tell (f a)
-        go
+fold :: (Monad m, M.Monoid w) => (a -> w) -> a -> Effect' (WriterT w m) ()
+fold f = mapM_ (tell . f)
 {-# INLINE fold #-}
 
 {-| Fold that returns whether 'M.All' input values satisfy the predicate
 
     'all' terminates on the first value that fails the predicate.
 -}
-all :: (Monad m) => (a -> Bool) -> () -> Consumer' a (WriterT M.All m) ()
-all predicate () = go
+all :: (Monad m) => (a -> Bool) -> a -> Consumer' a (WriterT M.All m) ()
+all predicate = go
   where
-    go = do
-        a <- request ()
+    go a =
         if (predicate a)
-            then go
-            else lift $ tell (M.All False)
+        then do
+            a2 <- request ()
+            go a2
+        else lift $ tell (M.All False)
 {-# INLINABLE all #-}
 
 {-| Fold that returns whether 'M.Any' input value satisfies the predicate
@@ -331,17 +309,17 @@ any predicate () = go
 {-# INLINABLE any #-}
 
 -- | Compute the 'M.Sum' of all input values
-sum :: (Monad m, Num a) => () -> Consumer' a (WriterT (M.Sum a) m) r
+sum :: (Monad m, Num a) => a -> Effect' (WriterT (M.Sum a) m) ()
 sum = fold M.Sum
 {-# INLINABLE sum #-}
 
 -- | Compute the 'M.Product' of all input values
-product :: (Monad m, Num a) => () -> Consumer' a (WriterT (M.Product a) m) r
+product :: (Monad m, Num a) => a -> Effect' (WriterT (M.Product a) m) ()
 product = fold M.Product
 {-# INLINABLE product #-}
 
 -- | Count the number of input values
-length :: (Monad m) => () -> Consumer' a (WriterT (M.Sum Int) m) r
+length :: (Monad m) => a -> Effect' (WriterT (M.Sum Int) m) ()
 length = fold (\_ -> M.Sum 1)
 {-# INLINABLE length #-}
 
@@ -349,19 +327,17 @@ length = fold (\_ -> M.Sum 1)
 
     'head' terminates on the first value it receives.
 -}
-head :: (Monad m) => () -> Consumer' a (WriterT (M.First a) m) ()
-head () = do
-    a <- request ()
-    lift $ tell $ M.First (Just a)
+head :: (Monad m) => a -> Consumer' a (WriterT (M.First a) m) ()
+head a = lift $ tell $ M.First (Just a)
 {-# INLINABLE head #-}
 
 -- | Retrieve the 'M.Last' input value
-last :: (Monad m) => () -> Consumer' a (WriterT (M.Last a) m) r
+last :: (Monad m) => a -> Effect' (WriterT (M.Last a) m) ()
 last = fold (M.Last . Just)
 {-# INLINABLE last #-}
 
 -- | Fold input values into a list
-toList :: (Monad m) => () -> Consumer' a (WriterT [a] m) r
+toList :: (Monad m )=> a -> Effect' (WriterT [a] m) ()
 toList = fold (\x -> [x])
 {-# INLINABLE toList #-}
 
@@ -371,8 +347,7 @@ toList = fold (\x -> [x])
 
 > foldr :: (a -> b -> b) -> [a] -> Endo b
 -}
-foldr
-    :: (Monad m) => (a -> b -> b) -> () -> Consumer' a (WriterT (M.Endo b) m) r
+foldr :: (Monad m) => (a -> b -> b) -> a -> Effect' (WriterT (M.Endo b) m) ()
 foldr step = fold (M.Endo . step)
 {-# INLINABLE foldr #-}
 
