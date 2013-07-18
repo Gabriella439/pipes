@@ -53,12 +53,13 @@ module Pipes (
 
     -- * ListT Monad Transformers
     -- $listT
-    RespondT(..),
-    RequestT(..),
+    ListT(..),
+
+    -- * Enumerable
+    Enumerable(..),
 
     -- * Synonyms
     for,
-    each,
     select,
 
     -- * Concrete Type Synonyms
@@ -69,7 +70,6 @@ module Pipes (
     Consumer,
     Client,
     Server,
-    ListT,
 
     -- * Polymorphic Type Synonyms
     Effect',
@@ -77,7 +77,6 @@ module Pipes (
     Consumer',
     Client',
     Server',
-    ListT',
 
     -- ** Flipped operators
     (<-<),
@@ -101,7 +100,6 @@ import Control.Monad (forever, (>=>), (<=<))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
 
 -- Re-exports
@@ -639,8 +637,8 @@ reflect = go
     correct by construction.  You can convert from a 'Producer' to a 'ListT'
     using 'select', and convert from a 'ListT' to a 'Producer' using 'each'.
 
-    The 'RespondT' monad transformer is a generalized 'ListT' over the
-    downstream output.  The 'RespondT' Kleisli category corresponds to the
+    The 'ListT' monad transformer is a generalized 'ListT' over the
+    downstream output.  The 'ListT' Kleisli category corresponds to the
     respond category.
 
     The 'RequestT' monad transformer is a generalized 'ListT' over the upstream
@@ -648,77 +646,55 @@ reflect = go
     category.
 -}
 
--- | A monad transformer over a proxy's downstream output
-newtype RespondT a' a b' m b = RespondT { runRespondT :: Proxy a' a b' b m b' }
+{-| The list monad transformer, which extends a monad with non-determinism
 
-instance (Monad m) => Functor (RespondT a' a b' m) where
-    fmap f p = RespondT (runRespondT p //> \a -> respond (f a))
+    'return' corresponds to 'respond', yielding a single value
 
-instance (Monad m) => Applicative (RespondT a' a b' m) where
-    pure a = RespondT (respond a)
-    mf <*> mx = RespondT (
-        runRespondT mf //> \f ->
-        runRespondT mx //> \x ->
+    ('>>=') corresponds to 'for', calling the second computation once for each
+    time the first computation 'respond's.
+-}
+newtype ListT m a = ListT { runListT :: Producer a m () }
+
+instance (Monad m) => Functor (ListT m) where
+    fmap f p = ListT (runListT p //> \a -> respond (f a))
+
+instance (Monad m) => Applicative (ListT m) where
+    pure a = ListT (respond a)
+    mf <*> mx = ListT (
+        runListT mf //> \f ->
+        runListT mx //> \x ->
         respond (f x) )
 
-instance (Monad m) => Monad (RespondT a' a b' m) where
-    return a = RespondT (respond a)
-    m >>= f  = RespondT (runRespondT m //> \a -> runRespondT (f a))
+instance (Monad m) => Monad (ListT m) where
+    return a = ListT (respond a)
+    m >>= f  = ListT (runListT m //> \a -> runListT (f a))
 
-instance MonadTrans (RespondT a' a b') where
-    lift m = RespondT (do
+instance MonadTrans ListT where
+    lift m = ListT (do
         a <- lift m
         respond a )
 
-instance (MonadIO m) => MonadIO (RespondT a' a b' m) where
+instance (MonadIO m) => MonadIO (ListT m) where
     liftIO m = lift (liftIO m)
 
-instance (Monad m, Monoid b') => Alternative (RespondT a' a b' m) where
-    empty = RespondT (return mempty)
-    p1 <|> p2 = RespondT (do
-        r1 <- runRespondT p1
-        r2 <- runRespondT p2
-        return (mappend r1 r2) )
+instance (Monad m) => Alternative (ListT m) where
+    empty = ListT (return ())
+    p1 <|> p2 = ListT (do
+        runListT p1
+        runListT p2 )
 
-instance (Monad m, Monoid b') => MonadPlus (RespondT a' a b' m) where
+instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
 
--- | A monad transformer over a proxy's upstream output
-newtype RequestT a b' b m a' = RequestT { runRequestT :: Proxy a' a b' b m a }
+{-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
+    containers to 'Producer's.
+-}
+class Enumerable f where
+    each :: (Monad m) => f a -> Producer' a m ()
 
-instance (Monad m) => Functor (RequestT a b' b m) where
-    fmap f p = RequestT (runRequestT p //< \a -> request (f a))
-
-instance (Monad m) => Applicative (RequestT a b' b m) where
-    pure a = RequestT (request a)
-    mf <*> mx = RequestT (
-        runRequestT mf //< \f ->
-        runRequestT mx //< \x ->
-        request (f x) )
-
-instance (Monad m) => Monad (RequestT a b' b m) where
-    return a = RequestT (request a)
-    m >>= f  = RequestT (runRequestT m //< \a -> runRequestT (f a))
-
-instance MonadTrans (RequestT a' a b') where
-    lift m = RequestT (do
-        a <- lift m
-        request a )
-
-instance (MonadIO m) => MonadIO (RequestT a b' b m) where
-    liftIO m = lift (liftIO m)
-
-instance (Monad m, Monoid a) => Alternative (RequestT a b' b m) where
-    empty = RequestT (return mempty)
-    p1 <|> p2 = RequestT (do
-        r1 <- runRequestT p1
-        r2 <- runRequestT p2
-        return (mappend r1 r2) )
-
-instance (Monad m, Monoid a) => MonadPlus (RequestT a b' b m) where
-    mzero = empty
-    mplus = (<|>)
+instance Enumerable [] where
+    each = mapM_ respond
 
 {-| @(for p f)@ replaces each 'respond' in @p@ with @f@.
 
@@ -736,21 +712,11 @@ for = (//>)
 
 > select :: (Monad m) => Producer b m () -> ListT m b
 
-    Synonym for 'RespondT'
+    Synonym for 'ListT'
 -}
-select :: Proxy a' a b' b m b' -> RespondT a' a b' m b
-select = RespondT
+select :: Producer b m () -> ListT m b
+select = ListT
 {-# INLINE select #-}
-
-{-| Convert a 'ListT' to a 'Producer'
-
-> each :: (Monad m) => ListT m b -> Producer b m ()
-
-    Synonym for 'runRespondT'
--}
-each :: RespondT a' a b' m b -> Proxy a' a b' b m b'
-each = runRespondT
-{-# INLINE each #-}
 
 -- | The empty type, denoting a closed output
 data X
@@ -785,15 +751,6 @@ type Client a' a = Proxy a' a () X
 -}
 type Server b' b = Proxy X () b' b
 
-{-| The list monad transformer, which extends a monad with non-determinism
-
-    'return' corresponds to 'respond', yielding a single value
-
-    ('>>=') corresponds to 'for', calling the second computation once for each
-    time the first computation 'respond's.
--}
-type ListT = RespondT X () ()
-
 -- | Like 'Effect', but with a polymorphic type
 type Effect' m r = forall x' x y' y . Proxy x' x y' y m r
 
@@ -808,9 +765,6 @@ type Server' b' b m r = forall x' x . Proxy x' x b' b m r
 
 -- | Like 'Client', but with a polymorphic type
 type Client' a' a m r = forall y' y . Proxy a' a y' y m r
-
--- | Like 'ListT', but with a polymorphic type
-type ListT' m a = forall x' x . RespondT x' x () m a
 
 -- | Equivalent to ('>->') with the arguments flipped
 (<-<)
