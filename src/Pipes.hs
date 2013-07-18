@@ -103,6 +103,7 @@ import Control.Monad (forever, (>=>), (<=<))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
+import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
 import qualified Data.Foldable as F
@@ -690,6 +691,11 @@ class Iterable t where
 
 instance Iterable ListT where
     toListT = id
+
+instance Iterable IdentityT where
+    toListT m = ListT $ do
+        a <- lift $ runIdentityT m
+        respond a
 
 instance Iterable MaybeT where
     toListT m = ListT $ do
