@@ -341,6 +341,19 @@ fb' ->> p = case p of
 >
 > -- Associativity
 > (f >~> g) >~> h = f >~> (g >~> h)
+
+    When you write these laws in terms of ('~>'), these laws summarize our
+    intuition for how implicit iteration should work:
+
+> -- Iterating over a reforwarding returns the original iterator
+> push a ~> f = f a
+>
+> -- Reforwarding all elements does nothing
+> m ~> push = m
+>
+> -- Nested iterations can become sequential iterations if the inner iteration
+> -- limits itself only to input that the outer iteration reforwards
+> m ~> (\a -> f a ~> g) = m ~> f ~> g
 -}
 
 {-| Forward responses followed by requests
@@ -542,14 +555,18 @@ fb' >\\ p0 = go p0
 > -- Associativity
 > (f />/ g) />/ h = f />/ (g />/ h)
 
-    Note that when written using 'for', these laws summarize our intuition for
-   how 'for' should iterate over 'Producer's:
+    When you write these laws in terms of 'for', these laws summarize our
+    intuition for how 'for' loops should work:
 
+> -- Iterating over a single element can be simplified to function application
 > for (respond x) f = f x
 >
+> -- Reyielding every element returns the original stream
 > for m respond = m
 >
-> for (for m f) g = for m (\a -> for (f a) g)
+> -- Nested loops can become sequential loops if the loop body ignores the outer
+> -- loop variable
+> for m (\a -> for (f a) g) = for (for m f) g
 -}
 
 {-| Send a value of type @b@ downstream and block waiting for a reply of type
