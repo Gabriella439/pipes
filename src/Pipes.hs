@@ -99,7 +99,7 @@ module Pipes (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
-import Control.Monad (forever, (>=>), (<=<))
+import Control.Monad (void, (>=>), (<=<))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
@@ -881,7 +881,7 @@ f <\\ p = p //> f
 {-# INLINABLE (<\\) #-}
 
 {- $reexports
-    "Control.Monad" re-exports 'forever', ('>=>'), and ('<=<').
+    "Control.Monad" re-exports 'void', ('>=>'), and ('<=<').
 
     "Control.Monad.Trans.Class" re-exports 'MonadTrans'.
 
