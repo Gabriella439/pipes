@@ -684,7 +684,7 @@ instance MFunctor ListT where
     hoist morph = ListT . hoist morph . runListT
 
 {-| 'Iterable' generalizes 'Data.Foldable.Foldable', converting effectful
-    containers to 'Producer's.
+    containers to 'ListT's.
 -}
 class Iterable t where
     toListT :: (Monad m) => t m a -> ListT m a
@@ -726,6 +726,11 @@ next = go
         Pure      r  -> return (Left r)
 
 {-| @(for p f)@ replaces each 'respond' in @p@ with @f@.
+
+    Think of the type as being one of the following more specialized types:
+
+> for :: (Monad m) => Producer a m r -> (a -> Effect     m ()) -> Effect     m ()
+> for :: (Monad m) => Producer a m r -> (a -> Producer b m ()) -> Producer b m ()
 
     Synonym for ('//>')
 -}
