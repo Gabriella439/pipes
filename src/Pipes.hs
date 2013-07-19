@@ -39,7 +39,7 @@ module Pipes (
     -- $request
     request,
     (\>\),
-    (>\\),
+    feed,
 
     -- ** Respond
     -- $respond
@@ -87,7 +87,6 @@ module Pipes (
     (\<\),
     (-<),
     (<~),
-    (//<),
 
     -- * Re-exports
     -- $reexports
@@ -149,9 +148,9 @@ infixl 5 >->, -<
 infixr 6 >~>, <~
 infixl 6 <~<, ~>
 infixr 7 />/
-infixl 7 \<\      -- GHC will raise a parse error if either of these lines ends
-infixr 8 /</, >\\ -- with '\', which is why this comment is here
-infixl 8 \>\, //<
+infixl 7 \<\ -- GHC will raise a parse error if either of these lines ends
+infixl 8 \>\ -- with '\', which is why this comment is here
+infixr 8 /</
 
 {- $categories
     A 'Control.Category.Category' is a set of components that you can connect
@@ -175,7 +174,7 @@ infixl 8 \>\, //<
                   +-------------+-------------+-------------+
     pull category |    'pull'     |     '>->'     |     '>-'      |
     push category |    'push'     |     '>~>'     |     '~>'      |
- request category |   'respond'   |     '\>\'     |     '>\\'     |
+ request category |   'respond'   |     '\>\'     |    'feed'     |
  respond category |   'request'   |     '/>/'     |     'for'     |
  Kleisli category |   'return'    |     '>=>'     |     '>>='     |
                   +-------------+-------------+-------------+
@@ -461,7 +460,7 @@ request a' = Request a' Pure
 
 {-| Compose two folds, creating a new fold
 
-> (f \>\ g) x = f >\\ g x
+> (f \>\ g) x = feed (g x) f
 
     ('\>\') is the composition operator of the request category.
 -}
@@ -470,36 +469,36 @@ request a' = Request a' Pure
     => (b' -> Proxy a' a y' y m b)
     -> (c' -> Proxy b' b y' y m c)
     -> (c' -> Proxy a' a y' y m c)
-(fb' \>\ fc') c' = fb' >\\ fc' c'
+(fb' \>\ fc') c' = feed (fc' c') fb'
 {-# INLINABLE (\>\) #-}
 
-{-| @(f >\\\\ p)@ replaces each 'request' in @p@ with @f@.
+{-| @(feed p f)@ replaces each 'request' in @p@ with @f@.
 
     Point-ful version of ('\>\')
 -}
-(>\\)
+feed
     :: (Monad m)
-    => (b' -> Proxy a' a y' y m b)
-    ->        Proxy b' b y' y m c
+    =>        Proxy b' b y' y m c
+    -> (b' -> Proxy a' a y' y m b)
     ->        Proxy a' a y' y m c
-fb' >\\ p0 = go p0
+feed p0 fb' = go p0
   where
     go p = case p of
         Request b' fb  -> fb' b' >>= \b -> go (fb b)
         Respond x  fx' -> Respond x (\x' -> go (fx' x'))
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       a   -> Pure a
-{-# INLINABLE (>\\) #-}
+{-# INLINABLE feed #-}
 
 {-# RULES
-    "fb' >\\ (Request b' fb )" forall fb' b' fb  .
-        fb' >\\ (Request b' fb ) = fb' b' >>= \b -> fb' >\\ fb b;
-    "fb' >\\ (Respond x  fx')" forall fb' x  fx' .
-        fb' >\\ (Respond x  fx') = Respond x (\x' -> fb' >\\ fx' x');
-    "fb' >\\ (M          m  )" forall fb'    m   .
-        fb' >\\ (M          m  ) = M (m >>= \p' -> return (fb' >\\ p'));
-    "fb' >\\ (Pure    a     )" forall fb' a      .
-        fb' >\\ (Pure    a     ) = Pure a;
+    "feed (Request b' fb ) fb'" forall fb' b' fb  .
+        feed (Request b' fb ) fb' = fb' b' >>= \b -> feed (fb b) fb';
+    "feed (Respond x  fx') fb'" forall fb' x  fx' .
+        feed (Respond x  fx') fb' = Respond x (\x' -> feed (fx' x') fb');
+    "feed (M          m  ) fb'" forall fb'    m   .
+        feed (M          m  ) fb' = M (m >>= \p' -> return (feed p' fb'));
+    "feed (Pure    a     ) fb'" forall fb' a      .
+        feed (Pure    a     ) fb' = Pure a;
   #-}
 
 {- $respond
@@ -747,7 +746,7 @@ each = F.mapM_ respond
 
 -- | Convert an 'Iterable' to a 'Producer'
 every :: (Monad m, Iterable t) => t m a -> Producer' a m ()
-every it = discard >\\ runListT (toListT it)
+every it = feed (runListT (toListT it)) discard
 {-# INLINABLE every #-}
 
 {-| Convert a 'Producer' to a 'ListT'
@@ -864,15 +863,6 @@ k -< p = p >- k
     ->        Proxy a' a c' c m r
 k <~ p = p ~> k
 {-# INLINABLE (<~) #-}
-
--- | Equivalent to ('>\\') with the arguments flipped
-(//<)
-    :: (Monad m)
-    =>        Proxy b' b x' x m c
-    -> (b' -> Proxy a' a x' x m b)
-    ->        Proxy a' a x' x m c
-p //< f = f >\\ p
-{-# INLINABLE (//<) #-}
 
 {- $reexports
     "Control.Monad" re-exports 'void', ('>=>'), and ('<=<').
