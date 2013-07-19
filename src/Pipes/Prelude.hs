@@ -21,21 +21,8 @@ module Pipes.Prelude (
     dropWhile,
     read,
 
-    -- * Effects
-    stdout,
-    toHandle,
-    print,
-    mapM_,
-    fold,
-    sum,
-    product,
-    length,
-    last,
-    toList,
-    foldr,
-    foldl',
-
     -- * Folds
+    -- $folds
     all,
     any,
     head,
@@ -50,8 +37,8 @@ module Pipes.Prelude (
     ) where
 
 import Control.Monad (unless)
-import Control.Monad.Trans.State.Strict (StateT, get, put)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
+import Control.Monad.Trans.State.Strict(get, put)
 import qualified Data.Monoid   as M
 import qualified System.IO     as IO
 import Pipes
@@ -133,11 +120,6 @@ mapM f a = do
     respond b
 {-# INLINABLE mapM #-}
 
--- | Execute monadic action for every value.
-mapM_ :: (Monad m) => (a -> m b) -> a -> Effect' m b
-mapM_ f = lift . f
-{-# INLINABLE mapM_ #-}
-
 {-| @(filter p)@ discards values going downstream if they fail the predicate
     @p@
 
@@ -205,75 +187,24 @@ read str = case (reads str) of
     [(a, "")] -> respond a
     _         -> return ()
 
--- | Write 'String's to 'IO.stdout' using 'putStrLn'
-stdout :: String -> Effect' IO ()
-stdout = mapM_ putStrLn
-{-# INLINABLE stdout #-}
+{- $folds
+    For most folds, just use 'WriterT' in the base monad to store the result.
+    Here are some example folds:
 
--- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
-toHandle :: IO.Handle -> String -> Effect' IO ()
-toHandle handle = mapM_ (IO.hPutStrLn handle)
-{-# INLINABLE toHandle #-}
-
--- | 'show' to 'IO.stdout' using 'Prelude.print'
-print :: (Show a) => a -> Effect' IO ()
-print = mapM_ Prelude.print
-{-# INLINABLE print #-}
-
-{-| Strict fold over the input using the provided 'M.Monoid'
-
-> fold (\a -> f a <> g a) = fold f >-> fold g
+> -- Sum the elements of the list
+> execWriter $ runEffect $
+>     for (each [1..10]) $ \i -> do
+>         lift $ tell (Sum i)
 >
-> fold (\_ -> mempty) = pull
+> -- Get the last element of the list
+> execWriter $ runEffect $
+>     for (each [1..10]) $ \i -> do
+>         lift $ tell $ Last (Just i)
+
+    I provide 'all', 'any' and 'head' because these folds can be smart and
+    terminate early when they are done.  You can also use 'next' instead of
+    'head'.
 -}
-fold :: (Monad m, M.Monoid w) => (a -> w) -> a -> Effect' (WriterT w m) ()
-fold f = mapM_ (tell . f)
-{-# INLINE fold #-}
-
--- | Compute the 'M.Sum' of all input values
-sum :: (Monad m, Num a) => a -> Effect' (WriterT (M.Sum a) m) ()
-sum = fold M.Sum
-{-# INLINABLE sum #-}
-
--- | Compute the 'M.Product' of all input values
-product :: (Monad m, Num a) => a -> Effect' (WriterT (M.Product a) m) ()
-product = fold M.Product
-{-# INLINABLE product #-}
-
--- | Count the number of input values
-length :: (Monad m) => a -> Effect' (WriterT (M.Sum Int) m) ()
-length = fold (\_ -> M.Sum 1)
-{-# INLINABLE length #-}
-
--- | Retrieve the 'M.Last' input value
-last :: (Monad m) => a -> Effect' (WriterT (M.Last a) m) ()
-last = fold (M.Last . Just)
-{-# INLINABLE last #-}
-
--- | Fold input values into a list
-toList :: (Monad m )=> a -> Effect' (WriterT [a] m) ()
-toList = fold (\x -> [x])
-{-# INLINABLE toList #-}
-
-{-| Fold equivalent to 'foldr'
-
-    To see why, consider this isomorphic type for 'foldr':
-
-> foldr :: (a -> b -> b) -> [a] -> Endo b
--}
-foldr :: (Monad m) => (a -> b -> b) -> a -> Effect' (WriterT (M.Endo b) m) ()
-foldr step = fold (M.Endo . step)
-{-# INLINABLE foldr #-}
-
-{-| Fold equivalent to 'foldl''.
-
-    Uses 'StateT' instead of 'WriterT' to ensure a strict accumulation
--}
-foldl' :: (Monad m) => (s -> a -> s) -> a -> Effect' (StateT s m) ()
-foldl' step = mapM_ (\a -> do
-    s <- get
-    put $! step s a ) 
-{-# INLINABLE foldl' #-}
 
 {-| Fold that returns whether 'M.All' input values satisfy the predicate
 
