@@ -339,8 +339,8 @@ fb' >- p = case p of
 > -- Associativity
 > (f >~> g) >~> h = f >~> (g >~> h)
 
-    When you write these laws in terms of ('~>'), these laws summarize our
-    intuition for how implicit iteration should work:
+    When you write these laws in terms of ('~>'), they summarize our intuition
+    for how implicit iteration should work:
 
 > -- Iterating over a reforwarding returns the original iterator
 > push a ~> f = f a
@@ -448,6 +448,19 @@ p ~> fb = case p of
 >
 > -- Associativity
 > (f \>\ g) \>\ h = f \>\ (g \>\ h)
+
+    When you write these laws in terms of 'feed', they summarize our intuition
+    for how 'feed' loops should work:
+
+> -- Feeding a single 'request' simplifies to function application
+> feed (request x) f = f x
+>
+> -- Feeding with a 'request' is the same as not feeding at all
+> feed m request = m
+>
+> -- Nested feed loops can become sequential feed loops if the loop body ignores
+> -- the outer loop variable
+> feed m (\a -> feed (f a) g) = feed (feed m f) g
 -}
 
 {-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
@@ -552,17 +565,17 @@ feed p0 fb' = go p0
 > -- Associativity
 > (f />/ g) />/ h = f />/ (g />/ h)
 
-    When you write these laws in terms of 'for', these laws summarize our
-    intuition for how 'for' loops should work:
+    When you write these laws in terms of 'for', they summarize our intuition
+    for how 'for' loops should work:
 
-> -- Iterating over a single element can be simplified to function application
+> -- Iterating over a single response simplifies to function application
 > for (respond x) f = f x
 >
 > -- Reyielding every element returns the original stream
 > for m respond = m
 >
-> -- Nested loops can become sequential loops if the loop body ignores the outer
-> -- loop variable
+> -- Nested for loops can become sequential for loops if the loop body ignores
+> -- the outer loop variable
 > for m (\a -> for (f a) g) = for (for m f) g
 -}
 
