@@ -5,21 +5,23 @@
 
 module Pipes.Prelude (
     -- * Producers
+    -- $producers
     stdin,
     fromHandle,
-    readLn,
 
     -- * Unfolds
+    -- $unfolds
     map,
     mapM,
     filter,
+    read,
 
     -- * Push-based Pipes
+    -- $push
     take,
     takeWhile,
     drop,
     dropWhile,
-    read,
 
     -- * Folds
     -- $folds
@@ -45,7 +47,6 @@ import Pipes
 import Pipes.Lift (evalStateP)
 import Prelude hiding (
     print,
-    readLn,
     map,
     mapM,
     mapM_,
@@ -69,6 +70,17 @@ import Prelude hiding (
     zipWith )
 import qualified Prelude
 
+{- $producers
+    Use 'for' to iterate over 'Producer's:
+
+> import Pipes
+> import Pipes.Prelude as P
+> 
+> main = runEffect $
+>     for P.stdin $ \str -> do
+>         lift $ putStrLn str
+-}
+
 -- | Read 'String's from 'IO.stdin' using 'getLine'
 stdin :: Producer' String IO ()
 stdin = fromHandle IO.stdin
@@ -86,17 +98,20 @@ fromHandle h = go
             go
 {-# INLINABLE fromHandle #-}
 
--- | 'read' from 'IO.stdin' using 'Prelude.readLn'
-readLn :: (Read b) => Producer' b IO ()
-readLn = go
-  where
-    go = do
-        eof <- lift $ IO.hIsEOF IO.stdin
-        unless eof $ do
-            str <- lift Prelude.readLn
-            respond str
-            go
-{-# INLINABLE readLn #-}
+{- $unfolds
+    You also use 'for' to apply unfolds, like this:
+
+> -- Echo only the values that successfully parse as 'Int's
+> runEffect $
+>     for (for P.stdin P.read) $ \a -> do
+>         lift $ print (a :: Int)
+> 
+> -- This is equivalent, thanks to the respond category laws
+> runEffect $
+>     for P.stdin $ \str -> do
+>         for (P.read str) $ \a -> do
+>             lift $ print (a :: Int)
+-}
 
 {-| Transform all values using a pure function
 
@@ -130,6 +145,24 @@ mapM f a = do
 filter :: (Monad m) => (a -> Bool) -> a -> Producer a m ()
 filter predicate a = if (predicate a) then respond a else return ()
 {-# INLINABLE filter #-}
+
+-- | Parse 'Read'able values, only forwarding the value if the parse succeeds
+read :: (Monad m, Read a) => String -> Producer a m ()
+read str = case (reads str) of
+    [(a, "")] -> respond a
+    _         -> return ()
+{-# INLINABLE read #-}
+
+{- $push
+    Use ('~>') to transform a 'Producer' using a push-based 'Pipe':
+
+> import Pipes
+> import qualified Pipes.Prelude as P
+>
+> main = runEffect $
+>     for (each [1..] ~> P.take 10) $ \i -> do
+>         lift $ print i
+-}
 
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> a -> Pipe a a m ()
@@ -181,29 +214,27 @@ dropWhile predicate = go
         else push a
 {-# INLINABLE dropWhile #-}
 
--- | Parse 'Read'able values, only forwarding the value if the parse succeeds
-read :: (Monad m, Read a) => String -> Producer a m ()
-read str = case (reads str) of
-    [(a, "")] -> respond a
-    _         -> return ()
-
 {- $folds
-    For most folds, just use 'WriterT' in the base monad to store the result.
-    Here are some example folds:
+    Use 'WriterT' in the base monad to fold values:
 
+> import Control.Monad.Trans.Writer.Strict
+> import Data.Monoid
+> import Pipes
+>
 > -- Sum the elements of the list
-> execWriter $ runEffect $
+> sumElems = execWriter $ runEffect $
 >     for (each [1..10]) $ \i -> do
 >         lift $ tell (Sum i)
 >
 > -- Get the last element of the list
-> execWriter $ runEffect $
+> lastElem = execWriter $ runEffect $
 >     for (each [1..10]) $ \i -> do
 >         lift $ tell $ Last (Just i)
 
-    I provide 'all', 'any' and 'head' because these folds can be smart and
-    terminate early when they are done.  You can also use 'next' instead of
-    'head'.
+    Those folds are easy and you can write them yourself.  I only provide the
+    following 'all', 'any' and 'head' because these folds can be smart and
+    terminate early when they are done.  You will often want to use 'next'
+    instead of 'head', but I provide 'head' for completeness.
 -}
 
 {-| Fold that returns whether 'M.All' input values satisfy the predicate
