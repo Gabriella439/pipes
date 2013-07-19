@@ -27,7 +27,7 @@ module Pipes (
     -- $pull
     pull,
     (>->),
-    (->>),
+    (>-),
 
     -- ** Push
     -- $push
@@ -45,7 +45,7 @@ module Pipes (
     -- $respond
     respond,
     (/>/),
-    (//>),
+    for,
 
     -- ** Reflect
     -- $reflect
@@ -59,7 +59,6 @@ module Pipes (
 
     -- * Utilities
     next,
-    for,
     each,
     every,
     select,
@@ -86,10 +85,9 @@ module Pipes (
     (<~<),
     (/</),
     (\<\),
-    (<<-),
+    (-<),
     (<~),
     (//<),
-    (<\\),
 
     -- * Re-exports
     -- $reexports
@@ -146,13 +144,13 @@ runEffect = go
      pull-based computations need not evaluate upstream stages unless absolutely
      necessary.
 -}
-infixr 5 <-<, ->>
-infixl 5 >->, <<-
+infixr 5 <-<, >-
+infixl 5 >->, -<
 infixr 6 >~>, <~
 infixl 6 <~<, ~>
-infixl 7 \<\, //>
-infixr 7 />/, <\\ -- GHC will raise a parse error if 
-infixr 8 /</, >\\ -- either of these lines end with '\'
+infixr 7 />/
+infixl 7 \<\      -- GHC will raise a parse error if either of these lines ends
+infixr 8 /</, >\\ -- with '\', which is why this comment is here
 infixl 8 \>\, //<
 
 {- $categories
@@ -175,10 +173,10 @@ infixl 8 \>\, //<
 @
                      Identity   | Composition |  Point-ful
                   +-------------+-------------+-------------+
-    pull category |    'pull'     |     '>->'     |     '->>'     |
+    pull category |    'pull'     |     '>->'     |     '>-'      |
     push category |    'push'     |     '>~>'     |     '~>'      |
  request category |   'respond'   |     '\>\'     |     '>\\'     |
- respond category |   'request'   |     '/>/'     |     '//>'     |
+ respond category |   'request'   |     '/>/'     |     'for'     |
  Kleisli category |   'return'    |     '>=>'     |     '>>='     |
                   +-------------+-------------+-------------+
 @
@@ -258,7 +256,7 @@ pull = go
 {-| Compose two proxies blocked on a 'respond', creating a new proxy blocked on
     a 'respond'
 
-> (f >-> g) x = f ->> g x
+> (f >-> g) x = f >- g x
 
     ('>->') is the composition operator of the pull category.
 -}
@@ -267,24 +265,24 @@ pull = go
     => ( b' -> Proxy a' a b' b m r)
     -> (_c' -> Proxy b' b c' c m r)
     -> (_c' -> Proxy a' a c' c m r)
-(fb' >-> fc') c' = fb' ->> fc' c'
+(fb' >-> fc') c' = fb' >- fc' c'
 {-# INLINABLE (>->) #-}
 
-{-| @(f ->> p)@ pairs each 'request' in @p@ with a 'respond' in @f@.
+{-| @(f >- p)@ pairs each 'request' in @p@ with a 'respond' in @f@.
 
     Point-ful version of ('>->')
 -}
-(->>)
+(>-)
     :: (Monad m)
     => (b' -> Proxy a' a b' b m r)
     ->        Proxy b' b c' c m r
     ->        Proxy a' a c' c m r
-fb' ->> p = case p of
+fb' >- p = case p of
     Request b' fb  -> fb' b' ~> fb
-    Respond c  fc' -> Respond c (\c' -> fb' ->> fc' c')
-    M          m   -> M (m >>= \p' -> return (fb' ->> p'))
+    Respond c  fc' -> Respond c (\c' -> fb' >- fc' c')
+    M          m   -> M (m >>= \p' -> return (fb' >- p'))
     Pure       r   -> Pure r
-{-# INLINABLE (->>) #-}
+{-# INLINABLE (>-) #-}
 
 {- $push
     The 'push' category interleaves push-based streams, where control begins
@@ -394,7 +392,7 @@ push = go
     ->       Proxy a' a c' c m r
 p ~> fb = case p of
     Request a' fa  -> Request a' (\a -> fa a ~> fb)
-    Respond b  fb' -> fb' ->> fb b
+    Respond b  fb' -> fb' >- fb b
     M          m   -> M (m >>= \p' -> return (p' ~> fb))
     Pure       r   -> Pure r
 {-# INLINABLE (~>) #-}
@@ -580,7 +578,7 @@ respond a = Respond a Pure
 
 {-| Compose two unfolds, creating a new unfold
 
-> (f />/ g) x = f x //> g
+> (f />/ g) x = for (f x) g
 
     ('/>/') is the composition operator of the respond category.
 -}
@@ -589,36 +587,36 @@ respond a = Respond a Pure
     => (a -> Proxy x' x b' b m a')
     -> (b -> Proxy x' x c' c m b')
     -> (a -> Proxy x' x c' c m a')
-(fa />/ fb) a = fa a //> fb
+(fa />/ fb) a = for (fa a) fb
 {-# INLINABLE (/>/) #-}
 
 {-| @(p \/\/> f)@ replaces each 'respond' in @p@ with @f@.
 
     Point-ful version of ('/>/')
 -}
-(//>)
+for
     :: (Monad m)
     =>       Proxy x' x b' b m a'
     -> (b -> Proxy x' x c' c m b')
     ->       Proxy x' x c' c m a'
-p0 //> fb = go p0
+for p0 fb = go p0
   where
     go p = case p of
         Request x' fx  -> Request x' (\x -> go (fx x))
         Respond b  fb' -> fb b >>= \b' -> go (fb' b')
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       a   -> Pure a
-{-# INLINABLE (//>) #-}
+{-# INLINABLE for #-}
 
 {-# RULES
-    "(Request x' fx ) //> fb" forall x' fx  fb .
-        (Request x' fx ) //> fb = Request x' (\x -> fx x //> fb);
-    "(Respond b  fb') //> fb" forall b  fb' fb .
-        (Respond b  fb') //> fb = fb b >>= \b' -> fb' b' //> fb;
-    "(M          m  ) //> fb" forall    m   fb .
-        (M          m  ) //> fb = M (m >>= \p' -> return (p' //> fb));
-    "(Pure    a     ) //> fb" forall a      fb .
-        (Pure    a     ) //> fb = Pure a;
+    "for (Request x' fx ) fb" forall x' fx  fb .
+        for (Request x' fx ) fb = Request x' (\x -> for (fx x) fb);
+    "for (Respond b  fb') fb" forall b  fb' fb .
+        for (Respond b  fb') fb = fb b >>= \b' -> for (fb' b') fb;
+    "for (M          m  ) fb" forall    m   fb .
+        for (M          m  ) fb = M (m >>= \p' -> return (for p' fb));
+    "for (Pure    a     ) fb" forall a      fb .
+        for (Pure    a     ) fb = Pure a;
   #-}
 
 {- $reflect
@@ -666,18 +664,18 @@ reflect = go
 newtype ListT m a = ListT { runListT :: Producer a m () }
 
 instance (Monad m) => Functor (ListT m) where
-    fmap f p = ListT (runListT p //> \a -> respond (f a))
+    fmap f p = ListT (for (runListT p) (\a -> respond (f a)))
 
 instance (Monad m) => Applicative (ListT m) where
     pure a = ListT (respond a)
     mf <*> mx = ListT (
-        runListT mf //> \f ->
-        runListT mx //> \x ->
-        respond (f x) )
+        for (runListT mf) (\f ->
+        for (runListT mx) (\x ->
+        respond (f x) ) ) )
 
 instance (Monad m) => Monad (ListT m) where
     return a = ListT (respond a)
-    m >>= f  = ListT (runListT m //> \a -> runListT (f a))
+    m >>= f  = ListT (for (runListT m) (\a -> runListT (f a)))
 
 instance MonadTrans ListT where
     lift m = ListT (do
@@ -741,23 +739,6 @@ next = go
         Respond a fu -> return (Right (a, fu ()))
         M         m  -> m >>= go
         Pure      r  -> return (Left r)
-
-{-| @(for p f)@ replaces each 'respond' in @p@ with @f@.
-
-    Think of the type as being one of the following more specialized types:
-
-> for :: (Monad m) => Producer a m r -> (a -> Effect     m ()) -> Effect     m ()
-> for :: (Monad m) => Producer a m r -> (a -> Producer b m ()) -> Producer b m ()
-
-    Synonym for ('//>')
--}
-for
-    :: (Monad m)
-    =>       Proxy x' x b' b m a'
-    -> (b -> Proxy x' x c' c m b')
-    ->       Proxy x' x c' c m a'
-for = (//>)
-{-# INLINE for #-}
 
 -- | Convert a 'F.Foldable' to a 'Producer'
 each :: (Monad m, F.Foldable f) => f a -> Producer' a m ()
@@ -866,14 +847,14 @@ p1 /</ p2 = p2 \>\ p1
 p1 \<\ p2 = p2 />/ p1
 {-# INLINABLE (\<\) #-}
 
--- | Equivalent to ('->>') with the arguments flipped
-(<<-)
+-- | Equivalent to ('>-') with the arguments flipped
+(-<)
     :: (Monad m)
     =>         Proxy b' b c' c m r
     -> (b'  -> Proxy a' a b' b m r)
     ->         Proxy a' a c' c m r
-k <<- p = p ->> k
-{-# INLINABLE (<<-) #-}
+k -< p = p >- k
+{-# INLINABLE (-<) #-}
 
 -- | Equivalent to ('~>') with the arguments flipped
 (<~)
@@ -892,15 +873,6 @@ k <~ p = p ~> k
     ->        Proxy a' a x' x m c
 p //< f = f >\\ p
 {-# INLINABLE (//<) #-}
-
--- | Equivalent to ('//>') with the arguments flipped
-(<\\)
-    :: (Monad m)
-    => (b -> Proxy x' x c' c m b')
-    ->       Proxy x' x b' b m a'
-    ->       Proxy x' x c' c m a'
-f <\\ p = p //> f
-{-# INLINABLE (<\\) #-}
 
 {- $reexports
     "Control.Monad" re-exports 'void', ('>=>'), and ('<=<').
