@@ -590,7 +590,7 @@ respond a = Respond a Pure
 (fa />/ fb) a = for (fa a) fb
 {-# INLINABLE (/>/) #-}
 
-{-| @(p \/\/> f)@ replaces each 'respond' in @p@ with @f@.
+{-| @(for p f)@ replaces each 'respond' in @p@ with @f@.
 
     Point-ful version of ('/>/')
 -}
