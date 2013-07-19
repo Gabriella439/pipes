@@ -1,4 +1,14 @@
--- | General purpose pipes
+{-| General purpose utilities
+
+    The names in this module clash heavily with the Haskell Prelude, so I
+    recommend that you import this module qualified:
+
+> import qualified Pipes.Prelude as P
+
+    Note that the most critical functions (like 'for' and 'each') reside in the
+    "Pipes" module.  This module primarily houses utilities that are not as
+    central in importance but are still useful.
+-}
 
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
@@ -23,8 +33,8 @@ module Pipes.Prelude (
     drop,
     dropWhile,
 
-    -- * Folds
-    -- $folds
+    -- * Push-based Consumers
+    -- $consumers
     all,
     any,
     head,
@@ -71,14 +81,21 @@ import Prelude hiding (
 import qualified Prelude
 
 {- $producers
-    Use 'for' to iterate over 'Producer's:
+    Use 'for' to iterate over 'Producer's whenever you want to perform the same
+    action for every element:
 
 > import Pipes
 > import Pipes.Prelude as P
 > 
-> main = runEffect $
+> main1 = runEffect $
 >     for P.stdin $ \str -> do
 >         lift $ putStrLn str
+>
+> -- or equivalently:
+> main2 = runEffect $ for P.stdin (lift . putStrLn)
+
+    Note that 'String'-based 'IO' is inefficient.  These 'Producer's exist only
+    for simple demonstrations without incurring a @text@ dependency.
 -}
 
 -- | Read 'String's from 'IO.stdin' using 'getLine'
@@ -99,15 +116,20 @@ fromHandle h = go
 {-# INLINABLE fromHandle #-}
 
 {- $unfolds
-    You also use 'for' to apply unfolds, like this:
+    You also use 'for' to apply unfolds, generating a new 'Producer' like this:
 
+> import Pipes
+> import qualified Pipes.Prelude as P
+>
+> -- for P.stdin P.read :: (Read a) => Producer a IO ()
+>
 > -- Echo only the values that successfully parse as 'Int's
-> runEffect $
+> main1 = runEffect $
 >     for (for P.stdin P.read) $ \a -> do
 >         lift $ print (a :: Int)
-> 
-> -- This is equivalent, thanks to the respond category laws
-> runEffect $
+>
+> -- This is equivalent, thanks to the category laws for the "respond" category
+> main2 = runEffect $
 >     for P.stdin $ \str -> do
 >         for (P.read str) $ \a -> do
 >             lift $ print (a :: Int)
@@ -162,6 +184,10 @@ read str = case (reads str) of
 > main = runEffect $
 >     for (each [1..] ~> P.take 10) $ \i -> do
 >         lift $ print i
+
+    You do not need to provide the last argument for these 'Pipe's (i.e. the
+    \"@a@\").  That extra argument is what makes these push-based 'Pipe's and
+    this is how ('~>') feeds in their first input.
 -}
 
 -- | @(take n)@ only allows @n@ values to pass through
@@ -214,7 +240,7 @@ dropWhile predicate = go
         else push a
 {-# INLINABLE dropWhile #-}
 
-{- $folds
+{- $consumers
     Use 'WriterT' in the base monad to fold values:
 
 > import Control.Monad.Trans.Writer.Strict
@@ -232,9 +258,24 @@ dropWhile predicate = go
 >         lift $ tell $ Last (Just i)
 
     Those folds are easy and you can write them yourself.  I only provide the
-    following 'all', 'any' and 'head' because these folds can be smart and
+    following 'all', 'any' and 'head' folds because they can be smart and
     terminate early when they are done.  You will often want to use 'next'
     instead of 'head', but I provide 'head' for completeness.
+
+    Use ('~>') to apply these stateful folds and use 'hoist' to 'lift' the
+    source base monad if it does not match the 'WriterT' layer:
+
+> import Control.Monad.Trans.Writer.Strict
+> import Pipes
+> import qualified Pipes.Prelude as P
+>
+> main = do
+>     emptyLine <- execWriterT $ runEffect $ hoist lift P.stdin ~> P.any null
+>     print emptyLine
+
+    You do not need to provide the last argument for these 'Consumer's (i.e. the
+    \"@a@\").  That extra argument is what makes these push-based 'Consumer's
+    and this is how ('~>') feeds in their first input.
 -}
 
 {-| Fold that returns whether 'M.All' input values satisfy the predicate
