@@ -5,9 +5,9 @@
 
 > import qualified Pipes.Prelude as P
 
-    Note that the most critical functions (like 'for' and 'each') reside in the
-    "Pipes" module.  This module primarily houses utilities that are not as
-    central in importance but are still useful.
+    Note that the really important functions (like 'for' and 'each') reside in
+    the "Pipes" module.  This module primarily houses utilities that are not as
+    central in importance but are still nice to have.
 -}
 
 {-# LANGUAGE RankNTypes #-}
@@ -25,6 +25,9 @@ module Pipes.Prelude (
     mapM,
     filter,
     read,
+
+    -- * Effects
+    mapM_,
 
     -- * Push-based Pipes
     -- $push
@@ -95,7 +98,8 @@ import qualified Prelude
 > main2 = runEffect $ for P.stdin (lift . putStrLn)
 
     Note that 'String'-based 'IO' is inefficient.  These 'Producer's exist only
-    for simple demonstrations without incurring a @text@ dependency.
+    for simple demonstrations without incurring a dependency on the @text@
+    package.
 -}
 
 -- | Read 'String's from 'IO.stdin' using 'getLine'
@@ -133,6 +137,9 @@ fromHandle h = go
 >     for P.stdin $ \str -> do
 >         for (P.read str) $ \a -> do
 >             lift $ print (a :: Int)
+>
+> -- This is also equivalent, since ('/>/') is the point-free version of 'for'
+> main3 = runEffect $ for P.stdin (P.read />/ lift . print)
 -}
 
 {-| Transform all values using a pure function
@@ -174,6 +181,11 @@ read str = case (reads str) of
     [(a, "")] -> respond a
     _         -> return ()
 {-# INLINABLE read #-}
+
+-- | Consume all values using a monadic function
+mapM_ :: (Monad m) => (a -> m b) -> a -> Effect' m b
+mapM_ f = lift . f
+{-# INLINABLE mapM_ #-}
 
 {- $push
     Use ('~>') to transform a 'Producer' using a push-based 'Pipe':
