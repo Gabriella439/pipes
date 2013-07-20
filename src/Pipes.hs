@@ -238,6 +238,20 @@ infixr 8 /</
 >
 > -- Associativity
 > (f >-> g) >-> h = f >-> (g >-> h)
+
+    When you write these laws in terms of ('-<'), they summarize our intuition
+    for how pull-based iteration should work:
+
+> -- Reforwarding all elements does nothing
+> pull a -< f = f a
+>
+> -- Iterating over a pull returns the original iterator
+> m -< pull = m
+>
+> -- Nested iterations can become sequential iterations if the inner iteration
+> -- limits itself only to requests from the outer iteration
+> m -< (\a -> f a -< g) = m -< f -< g
+
 -}
 
 {-| Forward requests followed by responses:
@@ -340,16 +354,16 @@ fb' >- p = case p of
 > (f >~> g) >~> h = f >~> (g >~> h)
 
     When you write these laws in terms of ('~>'), they summarize our intuition
-    for how implicit iteration should work:
+    for how push-based iteration should work:
 
-> -- Iterating over a reforwarding returns the original iterator
+> -- Iterating over a push returns the original iterator
 > push a ~> f = f a
 >
-> -- Reforwarding all elements does nothing
+> -- Pushing all elements does nothing
 > m ~> push = m
 >
 > -- Nested iterations can become sequential iterations if the inner iteration
-> -- limits itself only to input that the outer iteration reforwards
+> -- limits itself only to responses from the outer iteration
 > m ~> (\a -> f a ~> g) = m ~> f ~> g
 -}
 
