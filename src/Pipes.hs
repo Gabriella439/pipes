@@ -104,7 +104,7 @@ import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
 import qualified Data.Foldable as F
-import Pipes.Internal
+import Pipes.Internal (Proxy(..))
 
 -- Re-exports
 import Control.Monad.Morph (MFunctor(hoist))
@@ -186,25 +186,22 @@ infixr 8 /</
 -}
 
 {- $pull
-    The 'pull' category interleaves pull-based streams, where control begins
-    from the most downstream component.  You can more easily understand 'pull'
-    and ('>->') by studying their types when specialized to 'Pipe's:
+    The 'pull' category connects pull-based streams, where control begins from
+    the most downstream component.  You can more easily understand 'pull' and
+    ('>->') by studying their types when specialized to 'Pipe's:
 
+> -- pull retransmits all values
 > pull  :: (Monad m)
 >       =>  () -> Pipe a a m r
 >
+> -- (>->) connects two Pipes
 > (>->) :: (Monad m)
 >       => (() -> Pipe a b m r)
 >       => (() -> Pipe b c m r)
 >       => (() -> Pipe a c m r)
 
-    The 'pull' category provides the most beginner-friendly composition
-    operator, because all pull-based 'Pipe's require an initial argument of
-    type @()@.  This category also most closely matches Haskell's lazy and
-    functional semantics since control begins from downstream and this category
-    favors linear pipelines resembling function composition chains.  For this
-    reason, all the utilities in "Pipes.Prelude" are built for the 'pull'
-    category.
+    The 'pull' category closely corresponds to the Unix pipes design pattern and
+    ('>->') behaves like the Unix pipe operator.
 
     In the fully general case, you can also send information upstream by
     invoking 'request' with a non-@()@ argument.  The upstream 'Proxy' will
@@ -243,14 +240,14 @@ infixr 8 /</
     for how pull-based iteration should work:
 
 > -- Reforwarding all elements does nothing
-> pull a -< f = f a
+> f >- pull a = f a
 >
 > -- Iterating over a pull returns the original iterator
-> m -< pull = m
+> m >- pull
 >
 > -- Nested iterations can become sequential iterations if the inner iteration
-> -- limits itself only to requests from the outer iteration
-> m -< (\a -> f a -< g) = m -< f -< g
+> -- does not use the first argument
+> (\x -> f >- g x) >- m = f >- g >- m
 
 -}
 
@@ -298,26 +295,22 @@ fb' >- p = case p of
 {-# INLINABLE (>-) #-}
 
 {- $push
-    The 'push' category interleaves push-based streams, where control begins
-    from the most upstream component.  You can more easily understand 'push' and
+    The 'push' category connects push-based streams, where control begins from
+    the most upstream component.  You can more easily understand 'push' and
     ('>~>') by studying their types when specialized to 'Pipe's:
 
+> -- push retransmits all values
 > push  :: (Monad m)
 >       =>  a -> Pipe a a m r
 >
+> -- (>~>) connects two Pipes
 > (>~>) :: (Monad m)
 >       => (a -> Pipe a b m r)
 >       => (b -> Pipe b c m r)
 >       => (a -> Pipe a c m r)
 
-    Push-based 'Pipe's require an extra argument of the same type as their input
-    since they cannot begin until upstream pushes the first value.  You can
-    think of these 'Pipe's as being initially blocked on a 'request'.
-
-    The 'push' category is the best suited for directed acyclic graphs because
-    it is the only category that permits an 'Control.Arrow.Arrow' instance when
-    specialized to 'Pipe's.  The upcoming @pipes-arrows@ package will provide
-    this 'Control.Arrow.Arrow' instance and corresponding utilities.
+    The 'push' category closely corresponds to implicit iterators and ('~>')
+    resembles the method call of an internal iteration.
 
     In the fully general case, you can also send information upstream.  In fact,
     upstream flow in the 'push' category behaves identically to downstream flow
@@ -363,8 +356,8 @@ fb' >- p = case p of
 > m ~> push = m
 >
 > -- Nested iterations can become sequential iterations if the inner iteration
-> -- limits itself only to responses from the outer iteration
-> m ~> (\a -> f a ~> g) = m ~> f ~> g
+> -- does not use the first output
+> m ~> (\x -> f x ~> g) = m ~> f ~> g
 -}
 
 {-| Forward responses followed by requests
@@ -415,20 +408,18 @@ p ~> fb = case p of
     can more easily understand 'request' and ('\>\') by studying their types
     when specialized to 'Consumer's:
 
+> -- request consumes one input value
 > request :: (Monad m)
 >         =>  () -> Consumer a m a
 >
+> -- (\>\) composes folds
 > (\>\)   :: (Monad m)
 >         => (() -> Consumer a m b)
 >         => (() -> Consumer b m c)
 >         => (() -> Consumer a m c)
 
-    The composition operator, ('\>\'), composes folds, but in a way that is
-    significantly more optimal than the equivalent code written in the 'pull' or
-   'push' categories.  The disadvantage is that pipes that are not folds are
-    awkward to write and use in this category (such as 'Pipes.Prelude.take').
-    Instead, you should use the pull category if you want to compose pipes that
-    are not folds.
+    The 'request' category closely corresponds to external iterators and 'feed'
+    connects an external iterator to a 'Consumer'.
 
     In the fully general case, composed folds can share the same downstream
     interface and can also parametrize each 'request' for additional input:
@@ -533,20 +524,18 @@ feed p0 fb' = go p0
     more easily understand 'respond' and ('/>/') by studying their types when
     specialized to 'Producer's:
 
+> -- respond generates one output value
 > respond :: (Monad m)
 >         =>  a -> Producer a m ()
 >
+> -- (/>/) composes unfolds
 > (/>/)   :: (Monad m)
 >         => (a -> Producer b m ())
 >         => (b -> Producer c m ())
 >         => (a -> Producer c m ())
 
-    The composition operator, ('/>/'), composes unfolds, but in a way that is
-    significantly more optimal than the equivalent code written in the 'pull' or
-   'push' categories.  The disadvantage is that pipes that are not unfolds are
-    awkward to write and use in this category (such as 'Pipes.Prelude.take').
-    Instead, you should use the push category to compose pipes that are not
-    unfolds.
+    The 'respond' category closely corresponds to generators and 'for' iterates
+    over a generator.
 
     In the fully general case, composed unfolds can share the same upstream
     interface and can also bind values from each 'respond':
