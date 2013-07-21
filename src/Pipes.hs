@@ -35,15 +35,15 @@ module Pipes (
     (>~>),
     (~>),
 
-    -- ** Request
-    -- $request
-    request,
+    -- ** Await
+    -- $await
+    await,
     (\>\),
     feed,
 
-    -- ** Respond
-    -- $respond
-    respond,
+    -- ** Yield
+    -- $yield
+    yield,
     (/>/),
     for,
 
@@ -114,10 +114,10 @@ runEffect :: (Monad m) => Effect m r -> m r
 runEffect = go
   where
     go p = case p of
-        Request _ fa  -> go (fa  ())
-        Respond _ fb' -> go (fb' ())
-        M         m   -> m >>= go
-        Pure      r   -> return r
+        Await _ fa  -> go (fa  ())
+        Yield _ fb' -> go (fb' ())
+        M       m   -> m >>= go
+        Pure    r   -> return r
 {-# INLINABLE runEffect #-}
 
 {- * Keep proxy composition lower in precedence than function composition, which
@@ -134,7 +134,7 @@ runEffect = go
 >
 > up >~> p >-> dn
 
-   * Keep 'request' and 'respond' composition lower in precedence than 'pull'
+   * Keep 'await' and 'yield' composition lower in precedence than 'pull'
      and 'push' composition, so that users can do:
 
 > read \>\ pull >-> writer
@@ -172,11 +172,11 @@ infixr 8 /</
 @
                      Identity   | Composition |  Point-ful
                   +-------------+-------------+-------------+
-    pull category |    'pull'     |     '>->'     |     '>-'      |
-    push category |    'push'     |     '>~>'     |     '~>'      |
- request category |   'respond'   |     '\>\'     |    'feed'     |
- respond category |   'request'   |     '/>/'     |     'for'     |
- Kleisli category |   'return'    |     '>=>'     |     '>>='     |
+    pull category |   'pull'      |     '>->'     |    '>-'       |
+    push category |   'push'      |     '>~>'     |    '~>'       |
+   await category |   'await'     |     '\>\'     |    'feed'     |
+   yield category |   'yield'     |     '/>/'     |    'for'      |
+ Kleisli category |   'return'    |     '>=>'     |    '>>='      |
                   +-------------+-------------+-------------+
 @
 
@@ -204,9 +204,9 @@ infixr 8 /</
     ('>->') behaves like the Unix pipe operator.
 
     In the fully general case, you can also send information upstream by
-    invoking 'request' with a non-@()@ argument.  The upstream 'Proxy' will
+    invoking 'await' with a non-@()@ argument.  The upstream 'Proxy' will
     receive the first value through its initial argument and bind each
-    subsequent value through the return value of 'respond':
+    subsequent value through the return value of 'yield':
 
 >           b'               c'                     c'
 >           |                |                      |
@@ -253,18 +253,18 @@ infixr 8 /</
 
 {-| Forward requests followed by responses:
 
-> pull = request >=> respond >=> pull
+> pull = await >=> yield >=> pull
 
     'pull' is the identity of the pull category.
 -}
 pull :: (Monad m) => a' -> Proxy a' a a' a m r
 pull = go
   where
-    go a' = Request a' (\a -> Respond a go)
+    go a' = Await a' (\a -> Yield a go)
 {-# INLINABLE pull #-}
 
-{-| Compose two proxies blocked on a 'respond', creating a new proxy blocked on
-    a 'respond'
+{-| Compose two proxies blocked 'yield'ing data, creating a new proxy blocked
+    'yield'ing data
 
 > (f >-> g) x = f >- g x
 
@@ -278,7 +278,7 @@ pull = go
 (fb' >-> fc') c' = fb' >- fc' c'
 {-# INLINABLE (>->) #-}
 
-{-| @(f >- p)@ pairs each 'request' in @p@ with a 'respond' in @f@.
+{-| @(f >- p)@ pairs each 'await' in @p@ with a 'yield' in @f@.
 
     Point-ful version of ('>->')
 -}
@@ -288,10 +288,10 @@ pull = go
     ->        Proxy b' b c' c m r
     ->        Proxy a' a c' c m r
 fb' >- p = case p of
-    Request b' fb  -> fb' b' ~> fb
-    Respond c  fc' -> Respond c (\c' -> fb' >- fc' c')
-    M          m   -> M (m >>= \p' -> return (fb' >- p'))
-    Pure       r   -> Pure r
+    Await b' fb  -> fb' b' ~> fb
+    Yield c  fc' -> Yield c (\c' -> fb' >- fc' c')
+    M        m   -> M (m >>= \p' -> return (fb' >- p'))
+    Pure     r   -> Pure r
 {-# INLINABLE (>-) #-}
 
 {- $push
@@ -362,18 +362,18 @@ fb' >- p = case p of
 
 {-| Forward responses followed by requests
 
-> push = respond >=> request >=> push
+> push = yield >=> await >=> push
 
     'push' is the identity of the push category.
 -}
 push :: (Monad m) => a -> Proxy a' a a' a m r
 push = go
   where
-    go a = Respond a (\a' -> Request a' go)
+    go a = Yield a (\a' -> Await a' go)
 {-# INLINABLE push #-}
 
-{-| Compose two proxies blocked on a 'request', creating a new proxy blocked on
-    a 'request'
+{-| Compose two proxies blocked 'await'ing data, creating a new proxy blocked
+    'await'ing data
 
 > (f >~> g) x = f x ~> g
 
@@ -387,7 +387,7 @@ push = go
 (fa >~> fb) a = fa a ~> fb
 {-# INLINABLE (>~>) #-}
 
-{-| @(p ~> f)@ pairs each 'respond' in @p@ with a 'request' in @f@.
+{-| @(p ~> f)@ pairs each 'yield' in @p@ with an 'await' in @f@.
 
     Point-ful version of ('>~>')
 -}
@@ -397,19 +397,19 @@ push = go
     -> (b -> Proxy b' b c' c m r)
     ->       Proxy a' a c' c m r
 p ~> fb = case p of
-    Request a' fa  -> Request a' (\a -> fa a ~> fb)
-    Respond b  fb' -> fb' >- fb b
-    M          m   -> M (m >>= \p' -> return (p' ~> fb))
-    Pure       r   -> Pure r
+    Await a' fa  -> Await a' (\a -> fa a ~> fb)
+    Yield b  fb' -> fb' >- fb b
+    M        m   -> M (m >>= \p' -> return (p' ~> fb))
+    Pure     r   -> Pure r
 {-# INLINABLE (~>) #-}
 
-{- $request
-    The 'request' category lets you substitute 'request's with 'Proxy's.  You
-    can more easily understand 'request' and ('\>\') by studying their types
+{- $await
+    The 'await' category lets you substitute 'await's with 'Proxy's.  You
+    can more easily understand 'await' and ('\>\') by studying their types
     when specialized to 'Consumer's:
 
-> -- request consumes one input value
-> request :: (Monad m)
+> -- 'await' consumes one input value
+> await :: (Monad m)
 >         =>  () -> Consumer a m a
 >
 > -- (\>\) composes folds
@@ -418,11 +418,11 @@ p ~> fb = case p of
 >         => (() -> Consumer b m c)
 >         => (() -> Consumer a m c)
 
-    The 'request' category closely corresponds to external iterators and 'feed'
+    The 'await' category closely corresponds to external iterators and 'feed'
     connects an external iterator to a 'Consumer'.
 
     In the fully general case, composed folds can share the same downstream
-    interface and can also parametrize each 'request' for additional input:
+    interface and can also parametrize each 'await' for additional input:
 
 >           b'<======\               c'                     c'
 >           |        \\              |                      |
@@ -442,14 +442,14 @@ p ~> fb = case p of
 >  g        :: c' -> Proxy b' b y' y m c
 > (f \>\ g) :: c' -> Proxy a' a y' y m c
 
-    The 'request' category obeys the category laws, where 'request' is the
+    The 'await' category obeys the category laws, where 'await' is the
     identity and ('\>\') is composition:
 
 > -- Left identity
-> request \>\ f = f
+> await \>\ f = f
 >
 > -- Right identity
-> f \>\ request = f
+> f \>\ await = f
 >
 > -- Associativity
 > (f \>\ g) \>\ h = f \>\ (g \>\ h)
@@ -457,11 +457,11 @@ p ~> fb = case p of
     When you write these laws in terms of 'feed', they summarize our intuition
     for how 'feed' loops should work:
 
-> -- Feeding a single 'request' simplifies to function application
-> feed (request x) f = f x
+> -- Feeding a single 'await' simplifies to function application
+> feed (await x) f = f x
 >
-> -- Feeding with a 'request' is the same as not feeding at all
-> feed m request = m
+> -- Feeding with a 'await' is the same as not feeding at all
+> feed m await = m
 >
 > -- Nested feed loops can become sequential feed loops if the loop body ignores
 > -- the outer loop variable
@@ -470,17 +470,17 @@ p ~> fb = case p of
 
 {-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
 
-    'request' is the identity of the request category.
+    'await' is the identity of the await category.
 -}
-request :: (Monad m) => a' -> Proxy a' a y' y m a
-request a' = Request a' Pure
-{-# INLINABLE request #-}
+await :: (Monad m) => a' -> Proxy a' a y' y m a
+await a' = Await a' Pure
+{-# INLINABLE await #-}
 
 {-| Compose two folds, creating a new fold
 
 > (f \>\ g) x = feed (g x) f
 
-    ('\>\') is the composition operator of the request category.
+    ('\>\') is the composition operator of the await category.
 -}
 (\>\)
     :: (Monad m)
@@ -490,7 +490,7 @@ request a' = Request a' Pure
 (fb' \>\ fc') c' = feed (fc' c') fb'
 {-# INLINABLE (\>\) #-}
 
-{-| @(feed p f)@ replaces each 'request' in @p@ with @f@.
+{-| @(feed p f)@ replaces each 'await' in @p@ with @f@.
 
     Point-ful version of ('\>\')
 -}
@@ -502,30 +502,30 @@ feed
 feed p0 fb' = go p0
   where
     go p = case p of
-        Request b' fb  -> fb' b' >>= \b -> go (fb b)
-        Respond x  fx' -> Respond x (\x' -> go (fx' x'))
-        M          m   -> M (m >>= \p' -> return (go p'))
-        Pure       a   -> Pure a
+        Await b' fb  -> fb' b' >>= \b -> go (fb b)
+        Yield x  fx' -> Yield x (\x' -> go (fx' x'))
+        M        m   -> M (m >>= \p' -> return (go p'))
+        Pure     a   -> Pure a
 {-# INLINABLE feed #-}
 
 {-# RULES
-    "feed (Request b' fb ) fb'" forall fb' b' fb  .
-        feed (Request b' fb ) fb' = fb' b' >>= \b -> feed (fb b) fb';
-    "feed (Respond x  fx') fb'" forall fb' x  fx' .
-        feed (Respond x  fx') fb' = Respond x (\x' -> feed (fx' x') fb');
+    "feed (Await b' fb ) fb'" forall fb' b' fb  .
+        feed (Await b' fb ) fb' = fb' b' >>= \b -> feed (fb b) fb';
+    "feed (Yield x  fx') fb'" forall fb' x  fx' .
+        feed (Yield x  fx') fb' = Yield x (\x' -> feed (fx' x') fb');
     "feed (M          m  ) fb'" forall fb'    m   .
-        feed (M          m  ) fb' = M (m >>= \p' -> return (feed p' fb'));
+        feed (M        m  ) fb' = M (m >>= \p' -> return (feed p' fb'));
     "feed (Pure    a     ) fb'" forall fb' a      .
-        feed (Pure    a     ) fb' = Pure a;
+        feed (Pure  a     ) fb' = Pure a;
   #-}
 
-{- $respond
-    The respond category lets you substitute 'respond's with 'Proxy's.  You can
-    more easily understand 'respond' and ('/>/') by studying their types when
+{- $yield
+    The 'yield' category lets you substitute 'yield's with 'Proxy's.  You can
+    more easily understand 'yield' and ('/>/') by studying their types when
     specialized to 'Producer's:
 
-> -- respond generates one output value
-> respond :: (Monad m)
+> -- 'yield' generates one output value
+> yield :: (Monad m)
 >         =>  a -> Producer a m ()
 >
 > -- (/>/) composes unfolds
@@ -534,11 +534,11 @@ feed p0 fb' = go p0
 >         => (b -> Producer c m ())
 >         => (a -> Producer c m ())
 
-    The 'respond' category closely corresponds to generators and 'for' iterates
+    The 'yield' category closely corresponds to generators and 'for' iterates
     over a generator.
 
     In the fully general case, composed unfolds can share the same upstream
-    interface and can also bind values from each 'respond':
+    interface and can also bind values from each 'yield':
 
 >           a                 /=====> b                      a
 >           |                //       |                      |
@@ -556,14 +556,14 @@ feed p0 fb' = go p0
 >  g        :: b -> Proxy x' x c' c m b'
 > (f />/ g) :: a -> Proxy x' x b' b m a'
 
-    The 'respond' category obeys the category laws, where 'respond' is the
+    The 'yield' category obeys the category laws, where 'yield' is the
     identity and ('/>/') is composition:
 
 > -- Left identity
-> respond />/ f = f
+> yield />/ f = f
 >
 > -- Right identity
-> f />/ respond = f
+> f />/ yield = f
 >
 > -- Associativity
 > (f />/ g) />/ h = f />/ (g />/ h)
@@ -571,11 +571,11 @@ feed p0 fb' = go p0
     When you write these laws in terms of 'for', they summarize our intuition
     for how 'for' loops should work:
 
-> -- Iterating over a single response simplifies to function application
-> for (respond x) f = f x
+> -- Iterating over a single yield simplifies to function application
+> for (yield x) f = f x
 >
 > -- Reyielding every element returns the original stream
-> for m respond = m
+> for m yield = m
 >
 > -- Nested for loops can become sequential for loops if the loop body ignores
 > -- the outer loop variable
@@ -585,17 +585,17 @@ feed p0 fb' = go p0
 {-| Send a value of type @b@ downstream and block waiting for a reply of type
     @b'@
 
-    'respond' is the identity of the respond category.
+    'yield' is the identity of the yield category.
 -}
-respond :: (Monad m) => a -> Proxy x' x a' a m a'
-respond a = Respond a Pure
-{-# INLINABLE respond #-}
+yield :: (Monad m) => a -> Proxy x' x a' a m a'
+yield a = Yield a Pure
+{-# INLINABLE yield #-}
 
 {-| Compose two unfolds, creating a new unfold
 
 > (f />/ g) x = for (f x) g
 
-    ('/>/') is the composition operator of the respond category.
+    ('/>/') is the composition operator of the yield category.
 -}
 (/>/)
     :: (Monad m)
@@ -605,7 +605,7 @@ respond a = Respond a Pure
 (fa />/ fb) a = for (fa a) fb
 {-# INLINABLE (/>/) #-}
 
-{-| @(for p f)@ replaces each 'respond' in @p@ with @f@.
+{-| @(for p f)@ replaces each 'yield ' in @p@ with @f@.
 
     Point-ful version of ('/>/')
 -}
@@ -617,33 +617,33 @@ for
 for p0 fb = go p0
   where
     go p = case p of
-        Request x' fx  -> Request x' (\x -> go (fx x))
-        Respond b  fb' -> fb b >>= \b' -> go (fb' b')
-        M          m   -> M (m >>= \p' -> return (go p'))
-        Pure       a   -> Pure a
+        Await x' fx  -> Await x' (\x -> go (fx x))
+        Yield b  fb' -> fb b >>= \b' -> go (fb' b')
+        M        m   -> M (m >>= \p' -> return (go p'))
+        Pure     a   -> Pure a
 {-# INLINABLE for #-}
 
 {-# RULES
-    "for (Request x' fx ) fb" forall x' fx  fb .
-        for (Request x' fx ) fb = Request x' (\x -> for (fx x) fb);
-    "for (Respond b  fb') fb" forall b  fb' fb .
-        for (Respond b  fb') fb = fb b >>= \b' -> for (fb' b') fb;
-    "for (M          m  ) fb" forall    m   fb .
-        for (M          m  ) fb = M (m >>= \p' -> return (for p' fb));
-    "for (Pure    a     ) fb" forall a      fb .
-        for (Pure    a     ) fb = Pure a;
+    "for (Await x' fx ) fb" forall x' fx  fb .
+        for (Await x' fx ) fb = Await x' (\x -> for (fx x) fb);
+    "for (Yield b  fb') fb" forall b  fb' fb .
+        for (Yield b  fb') fb = fb b >>= \b' -> for (fb' b') fb;
+    "for (M        m  ) fb" forall    m   fb .
+        for (M        m  ) fb = M (m >>= \p' -> return (for p' fb));
+    "for (Pure    a   ) fb" forall a      fb .
+        for (Pure  a     ) fb = Pure a;
   #-}
 
 {- $reflect
     @(reflect .)@ transforms each streaming category into its dual:
 
-    * The request category is the dual of the respond category
+    * The await category is the dual of the yield category
 
-> reflect . request = respond
+> reflect . await = yield
 >
 > reflect . (f \>\ g) = reflect . f \<\ reflect . g
 
-> reflect . respond = request
+> reflect . yield = await
 >
 > reflect . (f />/ g) = reflect . f /</ reflect . g
 
@@ -663,39 +663,39 @@ reflect :: (Monad m) => Proxy a' a b' b m r -> Proxy b b' a a' m r
 reflect = go
   where
     go p = case p of
-        Request a' fa  -> Respond a' (\a  -> go (fa  a ))
-        Respond b  fb' -> Request b  (\b' -> go (fb' b'))
-        M          m   -> M (m >>= \p' -> return (go p'))
-        Pure       r   -> Pure r
+        Await a' fa  -> Yield a' (\a  -> go (fa  a ))
+        Yield b  fb' -> Await b  (\b' -> go (fb' b'))
+        M        m   -> M (m >>= \p' -> return (go p'))
+        Pure  r      -> Pure r
 {-# INLINABLE reflect #-}
 
 {-| The list monad transformer, which extends a monad with non-determinism
 
-    'return' corresponds to 'respond', yielding a single value
+    'return' corresponds to 'yield', yielding a single value
 
     ('>>=') corresponds to 'for', calling the second computation once for each
-    time the first computation 'respond's.
+    time the first computation 'yield's.
 -}
 newtype ListT m a = ListT { runListT :: Producer a m () }
 
 instance (Monad m) => Functor (ListT m) where
-    fmap f p = ListT (for (runListT p) (\a -> respond (f a)))
+    fmap f p = ListT (for (runListT p) (\a -> yield (f a)))
 
 instance (Monad m) => Applicative (ListT m) where
-    pure a = ListT (respond a)
+    pure a = ListT (yield a)
     mf <*> mx = ListT (
         for (runListT mf) (\f ->
         for (runListT mx) (\x ->
-        respond (f x) ) ) )
+        yield (f x) ) ) )
 
 instance (Monad m) => Monad (ListT m) where
-    return a = ListT (respond a)
+    return a = ListT (yield a)
     m >>= f  = ListT (for (runListT m) (\a -> runListT (f a)))
 
 instance MonadTrans ListT where
     lift m = ListT (do
         a <- lift m
-        respond a )
+        yield a )
 
 instance (MonadIO m) => MonadIO (ListT m) where
     liftIO m = lift (liftIO m)
@@ -725,21 +725,21 @@ instance Iterable ListT where
 instance Iterable IdentityT where
     toListT m = ListT $ do
         a <- lift $ runIdentityT m
-        respond a
+        yield a
 
 instance Iterable MaybeT where
     toListT m = ListT $ do
         x <- lift $ runMaybeT m
         case x of
             Nothing -> return ()
-            Just a  -> respond a
+            Just a  -> yield a
 
 instance Iterable (ErrorT e) where
     toListT m = ListT $ do
         x <- lift $ runErrorT m
         case x of
             Left  _ -> return ()
-            Right a -> respond a
+            Right a -> yield a
 
 {-| Consume the first value from a 'Producer'
 
@@ -750,14 +750,14 @@ next :: (Monad m) => Producer a m r -> m (Either r (a, Producer a m r))
 next = go
   where
     go p = case p of
-        Request _ fu -> go (fu ())
-        Respond a fu -> return (Right (a, fu ()))
-        M         m  -> m >>= go
-        Pure      r  -> return (Left r)
+        Await _ fu -> go (fu ())
+        Yield a fu -> return (Right (a, fu ()))
+        M       m  -> m >>= go
+        Pure  r    -> return (Left r)
 
 -- | Convert a 'F.Foldable' to a 'Producer'
 each :: (Monad m, F.Foldable f) => f a -> Producer' a m ()
-each = F.mapM_ respond
+each = F.mapM_ yield
 {-# INLINABLE each #-}
 
 -- | Convert an 'Iterable' to a 'Producer'
@@ -783,31 +783,31 @@ data X
 
 {-| An effect in the base monad
 
-    'Effect's never 'request' or 'respond'.
+    'Effect's never 'await' nor 'yield'.
 -}
 type Effect = Proxy X () () X
 
--- | 'Producer's only 'respond' and never 'request'.
+-- | 'Producer's only 'yield' and never 'await'.
 type Producer b = Proxy X () () b
 
 -- | A unidirectional 'Proxy'.
 type Pipe a b = Proxy () a () b
 
-{-| 'Consumer's only 'request' and never 'respond'.
+{-| 'Consumer's only 'await' and never 'yield'.
 -}
 type Consumer a = Proxy () a () X
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
-    'Client's never 'respond'.
+    'Client's never 'yield'.
 -}
 type Client a' a = Proxy a' a () X
 
 {-| @Server b' b@ receives requests of type @b'@ and sends responses of type
     @b@.
 
-    'Server's never 'request'.
+    'Server's never 'await'.
 -}
 type Server b' b = Proxy X () b' b
 

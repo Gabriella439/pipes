@@ -106,7 +106,7 @@ fromHandle h = go
         eof <- lift $ IO.hIsEOF h
         unless eof $ do
             str <- lift $ IO.hGetLine h
-            respond str
+            yield str
             go
 {-# INLINABLE fromHandle #-}
 
@@ -123,7 +123,7 @@ fromHandle h = go
 >     for (for P.stdin P.read) $ \a -> do
 >         lift $ print (a :: Int)
 >
-> -- This is equivalent, thanks to the category laws for the "respond" category
+> -- This is equivalent, thanks to the category laws for the "yield" category
 > main2 = runEffect $
 >     for P.stdin $ \str -> do
 >         for (P.read str) $ \a -> do
@@ -137,22 +137,22 @@ fromHandle h = go
 
 > map (g . f) = map f />/ map g
 >
-> map id = respond
+> map id = yield
 -}
 map :: (Monad m) => (a -> b) -> a -> Producer' b m ()
-map f = respond . f
+map f = yield . f
 {-# INLINABLE map #-}
 
 {-| Transform all values using a monadic function
 
 > mapM (f >=> g) = mapM f />/ mapM g
 >
-> mapM return = respond
+> mapM return = yield
 -}
 mapM :: (Monad m) => (a -> m b) -> a -> Producer' b m ()
 mapM f a = do
     b <- lift (f a)
-    respond b
+    yield b
 {-# INLINABLE mapM #-}
 
 {-| @(filter p)@ discards values going downstream if they fail the predicate
@@ -160,16 +160,16 @@ mapM f a = do
 
 > filter (\a -> f a && g a) = filter f />/ filter g
 >
-> filter (\_ -> True) = respond
+> filter (\_ -> True) = yield
 -}
 filter :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
-filter predicate a = if (predicate a) then respond a else return ()
+filter predicate a = if (predicate a) then yield a else return ()
 {-# INLINABLE filter #-}
 
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
 read :: (Monad m, Read a) => String -> Producer' a m ()
 read str = case (reads str) of
-    [(a, "")] -> respond a
+    [(a, "")] -> yield a
     _         -> return ()
 {-# INLINABLE read #-}
 
@@ -201,8 +201,8 @@ take = go
         if (n <= 0)
         then return ()
         else do
-            respond a
-            request () >>= go (n - 1)
+            yield a
+            await () >>= go (n - 1)
 {-# INLINABLE take #-}
 
 {-| @(takeWhile p)@ allows values to pass downstream so long as they satisfy
@@ -214,8 +214,8 @@ takeWhile predicate = go
     go a =
         if (predicate a)
         then do
-            respond a
-            request () >>= go
+            yield a
+            await () >>= go
         else return ()
 {-# INLINABLE takeWhile #-}
 
@@ -227,8 +227,8 @@ drop = go
         if (n <= 0)
         then push a
         else do
-            respond a
-            request () >>= go (n - 1)
+            yield a
+            await () >>= go (n - 1)
 {-# INLINABLE drop #-}
 
 {-| @(dropWhile p)@ discards values going downstream until one violates the
@@ -239,7 +239,7 @@ dropWhile predicate = go
   where
     go a =
         if (predicate a)
-        then request () >>= go
+        then await () >>= go
         else push a
 {-# INLINABLE dropWhile #-}
 
@@ -290,7 +290,7 @@ all predicate = go
   where
     go a =
         if (predicate a)
-        then request () >>= go
+        then await () >>= go
         else lift $ tell (M.All False)
 {-# INLINABLE all #-}
 
@@ -304,7 +304,7 @@ any predicate = go
     go a =
         if (predicate a)
         then lift $ tell (M.Any True)
-        else request () >>= go
+        else await () >>= go
 {-# INLINABLE any #-}
 
 {-| Retrieve the 'M.First' input value
@@ -340,7 +340,7 @@ zipWith f = go
                 case e2 of
                     Left r         -> return r
                     Right (b, p2') -> do
-                        respond (f a b)
+                        yield (f a b)
                         go p1' p2'
 {-# INLINABLE zipWith #-}
 
@@ -353,15 +353,15 @@ tee p () = evalStateP Nothing $ do
     ma <- lift get
     case ma of
         Nothing -> return ()
-        Just a  -> respond a
+        Just a  -> yield a
     return r
   where
     up () = do
         ma <- lift get
         case ma of
             Nothing -> return ()
-            Just a  -> respond a
-        a <- request ()
+            Just a  -> yield a
+        a <- await ()
         lift $ put (Just a)
         return a
     dn _ = return ()
@@ -378,8 +378,8 @@ generalize p x0 = evalStateP x0 $ (up \>\ hoist lift . p />/ dn) ()
   where
     up () = do
         x <- lift get
-        request x
+        await x
     dn a = do
-        x <- respond a
+        x <- yield a
         lift $ put x
 {-# INLINABLE generalize #-}

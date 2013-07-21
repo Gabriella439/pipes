@@ -1,19 +1,36 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-{-| @pipes@ is a clean and powerful stream processing library that lets you
-    build and connect reusable streaming components like Unix pipes.
+{-| @pipes@ is a lightweight and powerful stream processing library that
+    encompasses many streaming abstractions.
 
     You should use @pipes@ if you need to:
 
-    * stream data,
+    * incrementally stream impure data,
 
-    * build a reactive programming system, or
+    * create or consume backtracking and effectful computations (i.e. 'ListT')
 
-    * implement message passing.
+    * design a reactive programming system,
 
-    This tutorial covers simple streaming, and the @pipes-concurrency@ package
+    * implement message passing,
+
+    * assemble directed acyclic graphs of streaming components, or:
+
+    * acquire and promptly release streaming resources in an exception-safe way
+
+
+    This tutorial covers incremental streaming and 'ListT'.  The
+    @pipes-concurrency@ package covers reactive programming and message passing.
     provides a separate tutorial covering reactive programming and message
-    passing.
+    passing.  The @pipes-arrow@ package implements directed acyclic streaming
+    graphs.  The @pipes-safe@ package covers resource management and exception
+    safety.
+
+    @pipes@ can actually model an even greater variety of stream programming
+    abstractions, including Unix pipes and networking clients, proxies, and
+    servers, but this tutorial sticks to the simplest and most reusable @pipes@
+    idioms consisting primarily of generators and push-based iterations.  If you
+    want to learn more about the full capabilities of @pipes@, then read the
+    documentation in the "Pipes" module after reading this tutorial.
 -}
 
 module Pipes.Tutorial (
@@ -69,6 +86,27 @@ import qualified Pipes.Prelude as P
 import Prelude hiding ((.), id)
 
 {- $easytouse
+    The simplest type of pipe is a 'Producer', such as 'P.stdin' from
+    "Pipes.Prelude":
+
+>          +--------+-- 'stdin' produces 'String's
+>          |        |
+>          |        |      +-- 'stdin' uses 'IO' to read in these 'String's
+>          |        |      |
+>          |        |      |  +-- 'stdin' returns '()' when done
+>          |        |      |  |
+>          v        v      v  v
+> stdin :: Producer String IO ()
+
+    A 'Producer' is a monad transformer that extends the base monad ('IO' in
+    this case) with the ability to 
+    The simplest way to consume a 'Producer' is to use a 'for' loop:
+
+> -- The true type of 'for' is much more general
+> for :: (Monad m) => Producer a m () -> (a -> Effect m ()) -> Effect m ()
+
+
+
     Haskell pipes are simple to connect.  For example, here's how you echo
     'P.stdin' to 'P.stdout', just like the Unix @cat@ program when given no
     arguments:
