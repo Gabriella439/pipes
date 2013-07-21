@@ -53,35 +53,26 @@ module Pipes.Prelude (
 
 import Control.Monad (unless)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
-import Control.Monad.Trans.State.Strict(get, put)
-import qualified Data.Monoid   as M
-import qualified System.IO     as IO
+import Control.Monad.Trans.State.Strict (get, put)
+import qualified Data.Monoid as M
+import qualified System.IO   as IO
 import Pipes
 import Pipes.Lift (evalStateP)
 import Prelude hiding (
-    print,
     map,
     mapM,
     mapM_,
-    concat,
     take,
     takeWhile,
     drop,
     dropWhile,
     filter,
     read,
-    enumFrom,
     all,
     any,
-    sum,
-    product,
-    length,
     head,
-    last,
-    foldr,
     zip,
     zipWith )
-import qualified Prelude
 
 {- $producers
     Use 'for' to iterate over 'Producer's whenever you want to perform the same
