@@ -171,12 +171,12 @@ mapM f a = do
 >
 > filter (\_ -> True) = respond
 -}
-filter :: (Monad m) => (a -> Bool) -> a -> Producer a m ()
+filter :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
 filter predicate a = if (predicate a) then respond a else return ()
 {-# INLINABLE filter #-}
 
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
-read :: (Monad m, Read a) => String -> Producer a m ()
+read :: (Monad m, Read a) => String -> Producer' a m ()
 read str = case (reads str) of
     [(a, "")] -> respond a
     _         -> return ()
