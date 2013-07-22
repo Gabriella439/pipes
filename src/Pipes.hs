@@ -23,17 +23,11 @@ module Pipes (
     -- * Categories
     -- $categories
 
-    -- ** Pull
-    -- $pull
-    pull,
-    (>->),
-    (>-),
-
-    -- ** Push
-    -- $push
-    push,
-    (>~>),
-    (~>),
+    -- ** Yield
+    -- $yield
+    yield,
+    (/>/),
+    for,
 
     -- ** Await
     -- $await
@@ -41,11 +35,17 @@ module Pipes (
     (\>\),
     feed,
 
-    -- ** Yield
-    -- $yield
-    yield,
-    (/>/),
-    for,
+    -- ** Push
+    -- $push
+    push,
+    (>~>),
+    (~>),
+
+    -- ** Pull
+    -- $pull
+    pull,
+    (>->),
+    (>-),
 
     -- ** Reflect
     -- $reflect
@@ -80,7 +80,7 @@ module Pipes (
     Client',
     Server',
 
-    -- ** Flipped operators
+    -- * Flipped operators
     (<-<),
     (<~<),
     (/</),
@@ -172,10 +172,10 @@ infixr 8 /</
 @
                      Identity   | Composition |  Point-ful
                   +-------------+-------------+-------------+
-    pull category |   'pull'      |     '>->'     |    '>-'       |
-    push category |   'push'      |     '>~>'     |    '~>'       |
-   await category |   'await'     |     '\>\'     |    'feed'     |
    yield category |   'yield'     |     '/>/'     |    'for'      |
+   await category |   'await'     |     '\>\'     |    'feed'     |
+    push category |   'push'      |     '>~>'     |    '~>'       |
+    pull category |   'pull'      |     '>->'     |    '>-'       |
  Kleisli category |   'return'    |     '>=>'     |    '>>='      |
                   +-------------+-------------+-------------+
 @
@@ -185,20 +185,398 @@ infixr 8 /</
 
 -}
 
+{- $yield
+    The 'yield' category closely corresponds to the generator design pattern and
+    consists of three operations, which you can think of as having the following
+    types:
+
+> -- Generates one output value
+> yield :: (Monad m)
+>       =>  a -> Producer a m ()
+>
+> -- Loops over a 'Producer', handling outputs with a 'Producer' or 'Effect'
+> for   :: (Monad m)               |  for   :: (Monad m)
+>       =>       Producer a m ()   |        =>   Producer a m ()
+>       -> (a -> Producer b m ())  |        -> (a -> Effect m ())
+>       ->       Producer b m ()   |        ->       Effect m ())
+>
+> -- Composes unfolds
+> (/>/) :: (Monad m)
+>       => (a -> Producer b m ())
+>       => (b -> Producer c m ())
+>       => (a -> Producer c m ())
+
+    The 'yield' category obeys the category laws, where 'yield' is the
+    identity and ('/>/') is composition:
+
+> -- Left identity
+> yield />/ f = f
+>
+> -- Right identity
+> f />/ yield = f
+>
+> -- Associativity
+> (f />/ g) />/ h = f />/ (g />/ h)
+
+    When you write these laws in terms of 'for', you get the \"for loop laws\":
+
+> -- Looping over a single yield simplifies to function application
+> for (yield x) f = f x
+>
+> -- Re-'yield'ing every element returns the original stream
+> for m yield = m
+>
+> -- Nested for loops can become sequential for loops if the loop body ignores
+> -- the outer loop variable
+> for m (\a -> for (f a) g) = for (for m f) g
+
+    In the fully general case, 'yield' can return a value and connected
+    components share the same upstream interface:
+
+> yield :: (Monad m)
+>       =>  a -> Proxy x' x a' a m a'
+>
+>           a
+>           |
+>      +----|----+
+>      |    |    |
+>  x' <==   \ /==== a'
+>      |     X   |
+>  x  ==>   / \===> a
+>      |    |    |
+>      +----|----+
+>           v 
+>           a'
+>
+> (/>/) :: (Monad m)
+>       => (a -> Proxy x' x b' b m a')
+>       -> (b -> Proxy x' x c' c m b')
+>       -> (a -> Proxy x' x b' b m a')
+>
+>           a                 /=====> b                      a
+>           |                //       |                      |
+>      +----|----+          //   +----|----+            +----|----+
+>      |    v    |         //    |    v    |            |    v    |
+>  x' <==       <== b' <=\// x' <==       <== c'    x' <==       <== c'
+>      |    f    |       \\      |    g    |     =      | f />/ g |
+>  x  ==>       ==> b  ==/\\ x  ==>       ==> c     x  ==>       ==> c'
+>      |    |    |         \\    |    |    |            |    |    |
+>      +----|----+          \\   +----|----+            +----|----+
+>           v                \\       v                      v
+>           a'                \====== b'                     a'
+
+-}
+
+{-| Send a value of type @b@ downstream and block waiting for a reply of type
+    @b'@
+
+    'yield' is the identity of the yield category.
+-}
+yield :: (Monad m) => a -> Proxy x' x a' a m a'
+yield a = Yield a Pure
+{-# INLINABLE yield #-}
+
+{-| Compose two unfolds, creating a new unfold
+
+> (f />/ g) x = for (f x) g
+
+    ('/>/') is the composition operator of the yield category.
+-}
+(/>/)
+    :: (Monad m)
+    => (a -> Proxy x' x b' b m a')
+    -> (b -> Proxy x' x c' c m b')
+    -> (a -> Proxy x' x c' c m a')
+(fa />/ fb) a = for (fa a) fb
+{-# INLINABLE (/>/) #-}
+
+{-| @(for p f)@ replaces each 'yield ' in @p@ with @f@.
+
+    Point-ful version of ('/>/')
+-}
+for
+    :: (Monad m)
+    =>       Proxy x' x b' b m a'
+    -> (b -> Proxy x' x c' c m b')
+    ->       Proxy x' x c' c m a'
+for p0 fb = go p0
+  where
+    go p = case p of
+        Await x' fx  -> Await x' (\x -> go (fx x))
+        Yield b  fb' -> fb b >>= \b' -> go (fb' b')
+        M        m   -> M (m >>= \p' -> return (go p'))
+        Pure     a   -> Pure a
+{-# INLINABLE for #-}
+
+{-# RULES
+    "for (Await x' fx ) fb" forall x' fx  fb .
+        for (Await x' fx ) fb = Await x' (\x -> for (fx x) fb);
+    "for (Yield b  fb') fb" forall b  fb' fb .
+        for (Yield b  fb') fb = fb b >>= \b' -> for (fb' b') fb;
+    "for (M        m  ) fb" forall    m   fb .
+        for (M        m  ) fb = M (m >>= \p' -> return (for p' fb));
+    "for (Pure    a   ) fb" forall a      fb .
+        for (Pure  a     ) fb = Pure a;
+  #-}
+
+{- $await
+    The 'await' category lets you substitute 'await's with 'Proxy's.  You
+    can more easily understand 'await', 'feed' and ('\>\') by studying their
+    types when specialized to 'Consumer's:
+
+> -- 'await' consumes one input value
+> await :: (Monad m)
+>       =>  () -> Consumer a m a
+>
+> -- 'feed' supplies a 'Consumer' using the return value of another 'Consumer'
+> feed  :: (Monad m)
+>       =>        Consumer b m c
+>       -> (() -> Consumer a m b
+>       ->        Consumer a m c
+>
+> -- '\>\' composes folds
+> (\>\) :: (Monad m)
+>       => (() -> Consumer a m b)
+>       => (() -> Consumer b m c)
+>       => (() -> Consumer a m c)
+
+    The 'await' category closely corresponds to external iterators and 'feed'
+    connects an external iterator to a 'Consumer'.
+
+    In the fully general case, composed folds can share the same downstream
+    interface and can also parametrize each 'await' for additional input:
+
+>           b'<======\               c'                     c'
+>           |        \\              |                      |
+>      +----|----+    \\        +----|----+            +----|----+
+>      |    v    |     \\       |    v    |            |    v    |
+>  a' <==       <== y'  \== b' <==       <== y'    a' <==       <== y'
+>      |    f    |              |    g    |     =      | f \>\ g |
+>  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
+>      |    |    |     //       |    |    |            |    |    |
+>      +----|----+    //        +----|----+            +----|----+
+>           v        //              v                      v
+>           b =======/               c                      c
+>
+> 
+>
+>  f        :: b' -> Proxy a' a y' y m b
+>        g  :: c' -> Proxy b' b y' y m c
+> (f \>\ g) :: c' -> Proxy a' a y' y m c
+
+    The 'await' category obeys the category laws, where 'await' is the
+    identity and ('\>\') is composition:
+
+> -- Left identity
+> await \>\ f = f
+>
+> -- Right identity
+> f \>\ await = f
+>
+> -- Associativity
+> (f \>\ g) \>\ h = f \>\ (g \>\ h)
+
+    When you write these laws in terms of 'feed', they summarize our intuition
+    for how 'feed' loops should work:
+
+> -- Feeding a single 'await' simplifies to function application
+> feed (await x) f = f x
+>
+> -- Feeding with an 'await' is the same as not feeding at all
+> feed m await = m
+>
+> -- Nested feed loops can become sequential feed loops if the loop body ignores
+> -- the outer loop variable
+> feed m (\a -> feed (f a) g) = feed (feed m f) g
+-}
+
+{-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
+
+    'await' is the identity of the await category.
+-}
+await :: (Monad m) => a' -> Proxy a' a y' y m a
+await a' = Await a' Pure
+{-# INLINABLE await #-}
+
+{-| Compose two folds, creating a new fold
+
+> (f \>\ g) x = feed (g x) f
+
+    ('\>\') is the composition operator of the await category.
+-}
+(\>\)
+    :: (Monad m)
+    => (b' -> Proxy a' a y' y m b)
+    -> (c' -> Proxy b' b y' y m c)
+    -> (c' -> Proxy a' a y' y m c)
+(fb' \>\ fc') c' = feed (fc' c') fb'
+{-# INLINABLE (\>\) #-}
+
+{-| @(feed p f)@ replaces each 'await' in @p@ with @f@.
+
+    Point-ful version of ('\>\')
+-}
+feed
+    :: (Monad m)
+    =>        Proxy b' b y' y m c
+    -> (b' -> Proxy a' a y' y m b)
+    ->        Proxy a' a y' y m c
+feed p0 fb' = go p0
+  where
+    go p = case p of
+        Await b' fb  -> fb' b' >>= \b -> go (fb b)
+        Yield x  fx' -> Yield x (\x' -> go (fx' x'))
+        M        m   -> M (m >>= \p' -> return (go p'))
+        Pure     a   -> Pure a
+{-# INLINABLE feed #-}
+
+{-# RULES
+    "feed (Await b' fb ) fb'" forall fb' b' fb  .
+        feed (Await b' fb ) fb' = fb' b' >>= \b -> feed (fb b) fb';
+    "feed (Yield x  fx') fb'" forall fb' x  fx' .
+        feed (Yield x  fx') fb' = Yield x (\x' -> feed (fx' x') fb');
+    "feed (M          m  ) fb'" forall fb'    m   .
+        feed (M        m  ) fb' = M (m >>= \p' -> return (feed p' fb'));
+    "feed (Pure    a     ) fb'" forall fb' a      .
+        feed (Pure  a     ) fb' = Pure a;
+  #-}
+
+{- $push
+    The 'push' category connects push-based streams, where control begins from
+    the most upstream component.  You can more easily understand 'push', ('~>')
+    and ('>~>') by studying their types when specialized to 'Pipe's and
+    'Producer's:
+
+> -- 'push' retransmits all values
+> push  :: (Monad m)
+>       =>  a -> Pipe a a m r
+>
+> -- '~>' transforms a 'Producer' by applying a 'Pipe' downstream
+> (~>)  :: (Monad m)
+>       =>       Producer a m r
+>       -> (a -> Pipe   a b m r)
+>       ->       Producer b m r)
+>
+> -- '>~>' connects two Pipes
+> (>~>) :: (Monad m)
+>       => (a -> Pipe a b m r)
+>       => (b -> Pipe b c m r)
+>       => (a -> Pipe a c m r)
+
+    The 'push' category closely corresponds to implicit iterators and ('~>')
+    resembles the method call of an internal iteration.
+
+    In the fully general case, you can also send information upstream.  In fact,
+    upstream flow in the 'push' category behaves identically to downstream flow
+    in the 'pull' category.  Vice versa, downstream flow in the 'push' category
+    behaves identically to upstream flow in the 'pull' category.  These two
+    categories are duals of each other:
+
+>           a                b                      a
+>           |                |                      |
+>      +----|----+      +----|----+            +----|----+
+>      |    v    |      |    v    |            |    v    |
+>  a' <==       <== b' <==       <== c'    a' <==       <== c'
+>      |    f    |      |    g    |     =      | f >~> g |
+>  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
+>      |    |    |      |    |    |            |    |    |
+>      +----|----+      +----|----+            +----|----+
+>           v                v                      v
+>           r                r                      r
+>
+>  f        :: a -> Proxy a' a b' b m r
+>        g  :: b -> Proxy b' b c' c m r
+> (f >~> g) :: a -> Proxy a' a c' c m r
+
+    The 'push' category obeys the category laws, where 'push' is the identity
+    and ('>~>') is composition:
+
+> -- Left identity
+> push >~> f = f
+>
+> -- Right identity
+> f >~> push = f
+>
+> -- Associativity
+> (f >~> g) >~> h = f >~> (g >~> h)
+
+    When you write these laws in terms of ('~>'), they summarize our intuition
+    for how push-based iteration should work:
+
+> -- Iterating over a push is the same as directly applying the iterator
+> push a ~> f = f a
+>
+> -- Pushing all elements does nothing
+> m ~> push = m
+>
+> -- Nested iterations can become sequential iterations if the inner iteration
+> -- does not use the first output
+> m ~> (\x -> f x ~> g) = m ~> f ~> g
+-}
+
+{-| Forward responses followed by requests
+
+> push = yield >=> await >=> push
+
+    'push' is the identity of the push category.
+-}
+push :: (Monad m) => a -> Proxy a' a a' a m r
+push = go
+  where
+    go a = Yield a (\a' -> Await a' go)
+{-# INLINABLE push #-}
+
+{-| Compose two proxies blocked 'await'ing data, creating a new proxy blocked
+    'await'ing data
+
+> (f >~> g) x = f x ~> g
+
+    ('>~>') is the composition operator of the push category.
+-}
+(>~>)
+    :: (Monad m)
+    => (_a -> Proxy a' a b' b m r)
+    -> ( b -> Proxy b' b c' c m r)
+    -> (_a -> Proxy a' a c' c m r)
+(fa >~> fb) a = fa a ~> fb
+{-# INLINABLE (>~>) #-}
+
+{-| @(p ~> f)@ pairs each 'yield' in @p@ with an 'await' in @f@.
+
+    Point-ful version of ('>~>')
+-}
+(~>)
+    :: (Monad m)
+    =>       Proxy a' a b' b m r
+    -> (b -> Proxy b' b c' c m r)
+    ->       Proxy a' a c' c m r
+p ~> fb = case p of
+    Await a' fa  -> Await a' (\a -> fa a ~> fb)
+    Yield b  fb' -> fb' >- fb b
+    M        m   -> M (m >>= \p' -> return (p' ~> fb))
+    Pure     r   -> Pure r
+{-# INLINABLE (~>) #-}
+
 {- $pull
     The 'pull' category connects pull-based streams, where control begins from
-    the most downstream component.  You can more easily understand 'pull' and
-    ('>->') by studying their types when specialized to 'Pipe's:
+    the most downstream component.  You can more easily understand 'pull',
+    ('>-') and ('>->') by studying their types when specialized to 'Pipe's:
 
-> -- pull retransmits all values
+> -- 'pull' retransmits all values
 > pull  :: (Monad m)
 >       =>  () -> Pipe a a m r
 >
-> -- (>->) connects two Pipes
+> -- '>-' transforms a 'Consumer' by applying a 'Pipe' upstream
+> (>-)  :: (Monad m)
+>       => (() -> Pipe a b m r)
+>       ->      Consumer b m r
+>       ->      Consumer a m r
+>
+> -- '>->' connects two Pipes
 > (>->) :: (Monad m)
 >       => (() -> Pipe a b m r)
->       => (() -> Pipe b c m r)
->       => (() -> Pipe a c m r)
+>       -> (() -> Pipe b c m r)
+>       -> (() -> Pipe a c m r)
 
     The 'pull' category closely corresponds to the Unix pipes design pattern and
     ('>->') behaves like the Unix pipe operator.
@@ -221,7 +599,7 @@ infixr 8 /</
 >           r                r                      r
 >
 >  f        :: b' -> Proxy a' a b' b m r
->  g        :: c' -> Proxy b' b c' c m r
+>        g  :: c' -> Proxy b' b c' c m r
 > (f >-> g) :: c' -> Proxy a' a c' c m r
 
     The 'pull' category obeys the category laws, where 'pull' is the identity
@@ -293,346 +671,6 @@ fb' >- p = case p of
     M        m   -> M (m >>= \p' -> return (fb' >- p'))
     Pure     r   -> Pure r
 {-# INLINABLE (>-) #-}
-
-{- $push
-    The 'push' category connects push-based streams, where control begins from
-    the most upstream component.  You can more easily understand 'push' and
-    ('>~>') by studying their types when specialized to 'Pipe's:
-
-> -- push retransmits all values
-> push  :: (Monad m)
->       =>  a -> Pipe a a m r
->
-> -- (>~>) connects two Pipes
-> (>~>) :: (Monad m)
->       => (a -> Pipe a b m r)
->       => (b -> Pipe b c m r)
->       => (a -> Pipe a c m r)
-
-    The 'push' category closely corresponds to implicit iterators and ('~>')
-    resembles the method call of an internal iteration.
-
-    In the fully general case, you can also send information upstream.  In fact,
-    upstream flow in the 'push' category behaves identically to downstream flow
-    in the 'pull' category.  Vice versa, downstream flow in the 'push' category
-    behaves identically to upstream flow in the 'pull' category.  These two
-    categories are duals of each other:
-
->           a                b                      a
->           |                |                      |
->      +----|----+      +----|----+            +----|----+
->      |    v    |      |    v    |            |    v    |
->  a' <==       <== b' <==       <== c'    a' <==       <== c'
->      |    f    |      |    g    |     =      | f >~> g |
->  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
->      |    |    |      |    |    |            |    |    |
->      +----|----+      +----|----+            +----|----+
->           v                v                      v
->           r                r                      r
->
->  f        :: a -> Proxy a' a b' b m r
->  g        :: b -> Proxy b' b c' c m r
-> (f >~> g) :: a -> Proxy a' a c' c m r
-
-    The 'push' category obeys the category laws, where 'push' is the identity
-    and ('>~>') is composition:
-
-> -- Left identity
-> push >~> f = f
->
-> -- Right identity
-> f >~> push = f
->
-> -- Associativity
-> (f >~> g) >~> h = f >~> (g >~> h)
-
-    When you write these laws in terms of ('~>'), they summarize our intuition
-    for how push-based iteration should work:
-
-> -- Iterating over a push returns the original iterator
-> push a ~> f = f a
->
-> -- Pushing all elements does nothing
-> m ~> push = m
->
-> -- Nested iterations can become sequential iterations if the inner iteration
-> -- does not use the first output
-> m ~> (\x -> f x ~> g) = m ~> f ~> g
--}
-
-{-| Forward responses followed by requests
-
-> push = yield >=> await >=> push
-
-    'push' is the identity of the push category.
--}
-push :: (Monad m) => a -> Proxy a' a a' a m r
-push = go
-  where
-    go a = Yield a (\a' -> Await a' go)
-{-# INLINABLE push #-}
-
-{-| Compose two proxies blocked 'await'ing data, creating a new proxy blocked
-    'await'ing data
-
-> (f >~> g) x = f x ~> g
-
-    ('>~>') is the composition operator of the push category.
--}
-(>~>)
-    :: (Monad m)
-    => (_a -> Proxy a' a b' b m r)
-    -> ( b -> Proxy b' b c' c m r)
-    -> (_a -> Proxy a' a c' c m r)
-(fa >~> fb) a = fa a ~> fb
-{-# INLINABLE (>~>) #-}
-
-{-| @(p ~> f)@ pairs each 'yield' in @p@ with an 'await' in @f@.
-
-    Point-ful version of ('>~>')
--}
-(~>)
-    :: (Monad m)
-    =>       Proxy a' a b' b m r
-    -> (b -> Proxy b' b c' c m r)
-    ->       Proxy a' a c' c m r
-p ~> fb = case p of
-    Await a' fa  -> Await a' (\a -> fa a ~> fb)
-    Yield b  fb' -> fb' >- fb b
-    M        m   -> M (m >>= \p' -> return (p' ~> fb))
-    Pure     r   -> Pure r
-{-# INLINABLE (~>) #-}
-
-{- $await
-    The 'await' category lets you substitute 'await's with 'Proxy's.  You
-    can more easily understand 'await' and ('\>\') by studying their types
-    when specialized to 'Consumer's:
-
-> -- 'await' consumes one input value
-> await :: (Monad m)
->         =>  () -> Consumer a m a
->
-> -- (\>\) composes folds
-> (\>\)   :: (Monad m)
->         => (() -> Consumer a m b)
->         => (() -> Consumer b m c)
->         => (() -> Consumer a m c)
-
-    The 'await' category closely corresponds to external iterators and 'feed'
-    connects an external iterator to a 'Consumer'.
-
-    In the fully general case, composed folds can share the same downstream
-    interface and can also parametrize each 'await' for additional input:
-
->           b'<======\               c'                     c'
->           |        \\              |                      |
->      +----|----+    \\        +----|----+            +----|----+
->      |    v    |     \\       |    v    |            |    v    |
->  a' <==       <== y'  \== b' <==       <== y'    a' <==       <== y'
->      |    f    |              |    g    |     =      | f \>\ g |
->  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
->      |    |    |     //       |    |    |            |    |    |
->      +----|----+    //        +----|----+            +----|----+
->           v        //              v                      v
->           b =======/               c                      c
->
-> 
->
->  f        :: b' -> Proxy a' a y' y m b
->  g        :: c' -> Proxy b' b y' y m c
-> (f \>\ g) :: c' -> Proxy a' a y' y m c
-
-    The 'await' category obeys the category laws, where 'await' is the
-    identity and ('\>\') is composition:
-
-> -- Left identity
-> await \>\ f = f
->
-> -- Right identity
-> f \>\ await = f
->
-> -- Associativity
-> (f \>\ g) \>\ h = f \>\ (g \>\ h)
-
-    When you write these laws in terms of 'feed', they summarize our intuition
-    for how 'feed' loops should work:
-
-> -- Feeding a single 'await' simplifies to function application
-> feed (await x) f = f x
->
-> -- Feeding with a 'await' is the same as not feeding at all
-> feed m await = m
->
-> -- Nested feed loops can become sequential feed loops if the loop body ignores
-> -- the outer loop variable
-> feed m (\a -> feed (f a) g) = feed (feed m f) g
--}
-
-{-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
-
-    'await' is the identity of the await category.
--}
-await :: (Monad m) => a' -> Proxy a' a y' y m a
-await a' = Await a' Pure
-{-# INLINABLE await #-}
-
-{-| Compose two folds, creating a new fold
-
-> (f \>\ g) x = feed (g x) f
-
-    ('\>\') is the composition operator of the await category.
--}
-(\>\)
-    :: (Monad m)
-    => (b' -> Proxy a' a y' y m b)
-    -> (c' -> Proxy b' b y' y m c)
-    -> (c' -> Proxy a' a y' y m c)
-(fb' \>\ fc') c' = feed (fc' c') fb'
-{-# INLINABLE (\>\) #-}
-
-{-| @(feed p f)@ replaces each 'await' in @p@ with @f@.
-
-    Point-ful version of ('\>\')
--}
-feed
-    :: (Monad m)
-    =>        Proxy b' b y' y m c
-    -> (b' -> Proxy a' a y' y m b)
-    ->        Proxy a' a y' y m c
-feed p0 fb' = go p0
-  where
-    go p = case p of
-        Await b' fb  -> fb' b' >>= \b -> go (fb b)
-        Yield x  fx' -> Yield x (\x' -> go (fx' x'))
-        M        m   -> M (m >>= \p' -> return (go p'))
-        Pure     a   -> Pure a
-{-# INLINABLE feed #-}
-
-{-# RULES
-    "feed (Await b' fb ) fb'" forall fb' b' fb  .
-        feed (Await b' fb ) fb' = fb' b' >>= \b -> feed (fb b) fb';
-    "feed (Yield x  fx') fb'" forall fb' x  fx' .
-        feed (Yield x  fx') fb' = Yield x (\x' -> feed (fx' x') fb');
-    "feed (M          m  ) fb'" forall fb'    m   .
-        feed (M        m  ) fb' = M (m >>= \p' -> return (feed p' fb'));
-    "feed (Pure    a     ) fb'" forall fb' a      .
-        feed (Pure  a     ) fb' = Pure a;
-  #-}
-
-{- $yield
-    The 'yield' category lets you substitute 'yield's with 'Proxy's.  You can
-    more easily understand 'yield' and ('/>/') by studying their types when
-    specialized to 'Producer's:
-
-> -- 'yield' generates one output value
-> yield :: (Monad m)
->         =>  a -> Producer a m ()
->
-> -- (/>/) composes unfolds
-> (/>/)   :: (Monad m)
->         => (a -> Producer b m ())
->         => (b -> Producer c m ())
->         => (a -> Producer c m ())
-
-    The 'yield' category closely corresponds to generators and 'for' iterates
-    over a generator.
-
-    In the fully general case, composed unfolds can share the same upstream
-    interface and can also bind values from each 'yield':
-
->           a                 /=====> b                      a
->           |                //       |                      |
->      +----|----+          //   +----|----+            +----|----+
->      |    v    |         //    |    v    |            |    v    |
->  x' <==       <== b' <=\// x' <==       <== c'    x' <==       <== c'
->      |    f    |       \\      |    g    |     =      | f />/ g |
->  x  ==>       ==> b  ==/\\ x  ==>       ==> c     x  ==>       ==> c'
->      |    |    |         \\    |    |    |            |    |    |
->      +----|----+          \\   +----|----+            +----|----+
->           v                \\       v                      v
->           a'                \====== b'                     a'
->
->  f        :: a -> Proxy x' x b' b m a'
->  g        :: b -> Proxy x' x c' c m b'
-> (f />/ g) :: a -> Proxy x' x b' b m a'
-
-    The 'yield' category obeys the category laws, where 'yield' is the
-    identity and ('/>/') is composition:
-
-> -- Left identity
-> yield />/ f = f
->
-> -- Right identity
-> f />/ yield = f
->
-> -- Associativity
-> (f />/ g) />/ h = f />/ (g />/ h)
-
-    When you write these laws in terms of 'for', they summarize our intuition
-    for how 'for' loops should work:
-
-> -- Iterating over a single yield simplifies to function application
-> for (yield x) f = f x
->
-> -- Reyielding every element returns the original stream
-> for m yield = m
->
-> -- Nested for loops can become sequential for loops if the loop body ignores
-> -- the outer loop variable
-> for m (\a -> for (f a) g) = for (for m f) g
--}
-
-{-| Send a value of type @b@ downstream and block waiting for a reply of type
-    @b'@
-
-    'yield' is the identity of the yield category.
--}
-yield :: (Monad m) => a -> Proxy x' x a' a m a'
-yield a = Yield a Pure
-{-# INLINABLE yield #-}
-
-{-| Compose two unfolds, creating a new unfold
-
-> (f />/ g) x = for (f x) g
-
-    ('/>/') is the composition operator of the yield category.
--}
-(/>/)
-    :: (Monad m)
-    => (a -> Proxy x' x b' b m a')
-    -> (b -> Proxy x' x c' c m b')
-    -> (a -> Proxy x' x c' c m a')
-(fa />/ fb) a = for (fa a) fb
-{-# INLINABLE (/>/) #-}
-
-{-| @(for p f)@ replaces each 'yield ' in @p@ with @f@.
-
-    Point-ful version of ('/>/')
--}
-for
-    :: (Monad m)
-    =>       Proxy x' x b' b m a'
-    -> (b -> Proxy x' x c' c m b')
-    ->       Proxy x' x c' c m a'
-for p0 fb = go p0
-  where
-    go p = case p of
-        Await x' fx  -> Await x' (\x -> go (fx x))
-        Yield b  fb' -> fb b >>= \b' -> go (fb' b')
-        M        m   -> M (m >>= \p' -> return (go p'))
-        Pure     a   -> Pure a
-{-# INLINABLE for #-}
-
-{-# RULES
-    "for (Await x' fx ) fb" forall x' fx  fb .
-        for (Await x' fx ) fb = Await x' (\x -> for (fx x) fb);
-    "for (Yield b  fb') fb" forall b  fb' fb .
-        for (Yield b  fb') fb = fb b >>= \b' -> for (fb' b') fb;
-    "for (M        m  ) fb" forall    m   fb .
-        for (M        m  ) fb = M (m >>= \p' -> return (for p' fb));
-    "for (Pure    a   ) fb" forall a      fb .
-        for (Pure  a     ) fb = Pure a;
-  #-}
 
 {- $reflect
     @(reflect .)@ transforms each streaming category into its dual:
