@@ -192,7 +192,7 @@ infixr 8 /</
     consists of three operations, which you can think of as having the following
     types:
 
-> -- Generates one output value
+> -- Produces one output value
 > yield :: (Monad m)
 >       =>  a -> Producer a m ()
 >
@@ -228,8 +228,8 @@ infixr 8 /</
 > -- Re-'yield'ing every element returns the original stream
 > for m yield = m
 >
-> -- Nested for loops can become sequential for loops if the loop body ignores
-> -- the outer loop variable
+> -- Nested for loops can become sequential for loops if the inner loop body
+> -- ignores the outer loop variable
 > for m (\a -> for (f a) g) = for (for m f) g
 
     In the fully general case, 'yield' can return a value and connected
@@ -287,8 +287,11 @@ yield a = Yield a Pure
 (/>/)
     :: (Monad m)
     => (a -> Proxy x' x b' b m a')
+    -- ^
     -> (b -> Proxy x' x c' c m b')
+    -- ^
     -> (a -> Proxy x' x c' c m a')
+    -- ^
 (fa />/ fb) a = for (fa a) fb
 {-# INLINABLE (/>/) #-}
 
@@ -299,8 +302,11 @@ yield a = Yield a Pure
 for
     :: (Monad m)
     =>       Proxy x' x b' b m a'
+    -- ^
     -> (b -> Proxy x' x c' c m b')
+    -- ^
     ->       Proxy x' x c' c m a'
+    -- ^
 for p0 fb = go p0
   where
     go p = case p of
@@ -322,49 +328,25 @@ for p0 fb = go p0
   #-}
 
 {- $await
-    The 'await' category lets you substitute 'await's with 'Proxy's.  You
-    can more easily understand 'await', 'feed' and ('\>\') by studying their
-    types when specialized to 'Consumer's:
+    The 'await' category closely corresponds to the iteratee design pattern and
+    consists of three operations, which you can think of as having the following
+    types:
 
-> -- 'await' consumes one input value
+> -- Consumes one input value
 > await :: (Monad m)
 >       =>  () -> Consumer a m a
 >
-> -- 'feed' supplies a 'Consumer' using the return value of another 'Consumer'
-> feed  :: (Monad m)
->       =>        Consumer b m c
->       -> (() -> Consumer a m b
->       ->        Consumer a m c
+> -- Loops over a 'Consumer', handling inputs with a 'Consumer' or 'Effect'
+> feed  :: (Monad m)              |  feed  :: (Monad m)
+>       =>        Consumer b m c  |        =>    Consumer b m c
+>       -> (() -> Consumer a m b  |        -> (() -> Effect m b
+>       ->        Consumer a m c  |        ->        Effect m c
 >
-> -- '\>\' composes folds
+> -- Composes folds
 > (\>\) :: (Monad m)
 >       => (() -> Consumer a m b)
 >       => (() -> Consumer b m c)
 >       => (() -> Consumer a m c)
-
-    The 'await' category closely corresponds to external iterators and 'feed'
-    connects an external iterator to a 'Consumer'.
-
-    In the fully general case, composed folds can share the same downstream
-    interface and can also parametrize each 'await' for additional input:
-
->           b'<======\               c'                     c'
->           |        \\              |                      |
->      +----|----+    \\        +----|----+            +----|----+
->      |    v    |     \\       |    v    |            |    v    |
->  a' <==       <== y'  \== b' <==       <== y'    a' <==       <== y'
->      |    f    |              |    g    |     =      | f \>\ g |
->  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
->      |    |    |     //       |    |    |            |    |    |
->      +----|----+    //        +----|----+            +----|----+
->           v        //              v                      v
->           b =======/               c                      c
->
-> 
->
->  f        :: b' -> Proxy a' a y' y m b
->        g  :: c' -> Proxy b' b y' y m c
-> (f \>\ g) :: c' -> Proxy a' a y' y m c
 
     The 'await' category obeys the category laws, where 'await' is the
     identity and ('\>\') is composition:
@@ -378,8 +360,8 @@ for p0 fb = go p0
 > -- Associativity
 > (f \>\ g) \>\ h = f \>\ (g \>\ h)
 
-    When you write these laws in terms of 'feed', they summarize our intuition
-    for how 'feed' loops should work:
+    When you write these laws in terms of 'feed', you get the \"feed loop
+    laws\":
 
 > -- Feeding a single 'await' simplifies to function application
 > feed (await x) f = f x
@@ -387,9 +369,44 @@ for p0 fb = go p0
 > -- Feeding with an 'await' is the same as not feeding at all
 > feed m await = m
 >
-> -- Nested feed loops can become sequential feed loops if the loop body ignores
-> -- the outer loop variable
+> -- Nested feed loops can become sequential feed loops if the inner loop body
+> -- ignores the outer loop variable
 > feed m (\a -> feed (f a) g) = feed (feed m f) g
+
+    In the fully general case, 'await' can send an argument upstream and
+    connected components share the same downstream interface:
+
+> await :: (Monad m)
+>       =>  a' -> Proxy a' a y' y m a
+>
+>           a'
+>           |
+>      +----|----+
+>      |    |    |
+>  a' <====/    <== y'
+>      |         |
+>  a  =====\    ==> y
+>      |    |    |
+>      +----|----+
+>           v 
+>           a 
+>
+> (\>\) :: (Monad m)
+>       => (b' -> Proxy a' a y' y m b)
+>       -> (c' -> Proxy b' b y' y m c)
+>       -> (c' -> Proxy a' a y' y m c)
+>
+>           b'<======\               c'                     c'
+>           |        \\              |                      |
+>      +----|----+    \\        +----|----+            +----|----+
+>      |    v    |     \\       |    v    |            |    v    |
+>  a' <==       <== y'  \== b' <==       <== y'    a' <==       <== y'
+>      |    f    |              |    g    |     =      | f \>\ g |
+>  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
+>      |    |    |     //       |    |    |            |    |    |
+>      +----|----+    //        +----|----+            +----|----+
+>           v        //              v                      v
+>           b =======/               c                      c
 -}
 
 {-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
@@ -409,8 +426,11 @@ await a' = Await a' Pure
 (\>\)
     :: (Monad m)
     => (b' -> Proxy a' a y' y m b)
+    -- ^
     -> (c' -> Proxy b' b y' y m c)
+    -- ^
     -> (c' -> Proxy a' a y' y m c)
+    -- ^
 (fb' \>\ fc') c' = feed (fc' c') fb'
 {-# INLINABLE (\>\) #-}
 
@@ -421,8 +441,11 @@ await a' = Await a' Pure
 feed
     :: (Monad m)
     =>        Proxy b' b y' y m c
+    -- ^
     -> (b' -> Proxy a' a y' y m b)
+    -- ^
     ->        Proxy a' a y' y m c
+    -- ^
 feed p0 fb' = go p0
   where
     go p = case p of
@@ -444,6 +467,9 @@ feed p0 fb' = go p0
   #-}
 
 {- $push
+    The 'push' category closely corresponds to internal iterators and ('~>')
+    is designed to resemble the method call of an internal iteration.
+
     The 'push' category connects push-based streams, where control begins from
     the most upstream component.  You can more easily understand 'push', ('~>')
     and ('>~>') by studying their types when specialized to 'Pipe's and
@@ -464,9 +490,6 @@ feed p0 fb' = go p0
 >       => (a -> Pipe a b m r)
 >       => (b -> Pipe b c m r)
 >       => (a -> Pipe a c m r)
-
-    The 'push' category closely corresponds to implicit iterators and ('~>')
-    resembles the method call of an internal iteration.
 
     In the fully general case, you can also send information upstream.  In fact,
     upstream flow in the 'push' category behaves identically to downstream flow
@@ -538,8 +561,11 @@ push = go
 (>~>)
     :: (Monad m)
     => (_a -> Proxy a' a b' b m r)
+    -- ^
     -> ( b -> Proxy b' b c' c m r)
+    -- ^
     -> (_a -> Proxy a' a c' c m r)
+    -- ^
 (fa >~> fb) a = fa a ~> fb
 {-# INLINABLE (>~>) #-}
 
@@ -550,8 +576,11 @@ push = go
 (~>)
     :: (Monad m)
     =>       Proxy a' a b' b m r
+    -- ^
     -> (b -> Proxy b' b c' c m r)
+    -- ^
     ->       Proxy a' a c' c m r
+    -- ^
 p ~> fb = case p of
     Await a' fa  -> Await a' (\a -> fa a ~> fb)
     Yield b  fb' -> fb' >- fb b
@@ -653,8 +682,11 @@ pull = go
 (>->)
     :: (Monad m)
     => ( b' -> Proxy a' a b' b m r)
+    -- ^
     -> (_c' -> Proxy b' b c' c m r)
+    -- ^
     -> (_c' -> Proxy a' a c' c m r)
+    -- ^
 (fb' >-> fc') c' = fb' >- fc' c'
 {-# INLINABLE (>->) #-}
 
@@ -665,8 +697,11 @@ pull = go
 (>-)
     :: (Monad m)
     => (b' -> Proxy a' a b' b m r)
+    -- ^
     ->        Proxy b' b c' c m r
+    -- ^
     ->        Proxy a' a c' c m r
+    -- ^
 fb' >- p = case p of
     Await b' fb  -> fb' b' ~> fb
     Yield c  fc' -> Yield c (\c' -> fb' >- fc' c')
@@ -870,8 +905,11 @@ type Client' a' a m r = forall y' y . Proxy a' a y' y m r
 (<-<)
     :: (Monad m)
     => (c' -> Proxy b' b c' c m r)
+    -- ^
     -> (b' -> Proxy a' a b' b m r)
+    -- ^
     -> (c' -> Proxy a' a c' c m r)
+    -- ^
 p1 <-< p2 = p2 >-> p1
 {-# INLINABLE (<-<) #-}
 
@@ -879,8 +917,11 @@ p1 <-< p2 = p2 >-> p1
 (<~<)
     :: (Monad m)
     => (b -> Proxy b' b c' c m r)
+    -- ^
     -> (a -> Proxy a' a b' b m r)
+    -- ^
     -> (a -> Proxy a' a c' c m r)
+    -- ^
 p1 <~< p2 = p2 >~> p1
 {-# INLINABLE (<~<) #-}
 
@@ -888,8 +929,11 @@ p1 <~< p2 = p2 >~> p1
 (/</)
     :: (Monad m)
     => (c' -> Proxy b' b x' x m c)
+    -- ^
     -> (b' -> Proxy a' a x' x m b)
+    -- ^
     -> (c' -> Proxy a' a x' x m c)
+    -- ^
 p1 /</ p2 = p2 \>\ p1
 {-# INLINABLE (/</) #-}
 
@@ -897,8 +941,11 @@ p1 /</ p2 = p2 \>\ p1
 (\<\)
     :: (Monad m)
     => (b -> Proxy x' x c' c m b')
+    -- ^
     -> (a -> Proxy x' x b' b m a')
+    -- ^
     -> (a -> Proxy x' x c' c m a')
+    -- ^
 p1 \<\ p2 = p2 />/ p1
 {-# INLINABLE (\<\) #-}
 
@@ -906,8 +953,11 @@ p1 \<\ p2 = p2 />/ p1
 (-<)
     :: (Monad m)
     =>         Proxy b' b c' c m r
+    -- ^
     -> (b'  -> Proxy a' a b' b m r)
+    -- ^
     ->         Proxy a' a c' c m r
+    -- ^
 k -< p = p >- k
 {-# INLINABLE (-<) #-}
 
@@ -915,8 +965,11 @@ k -< p = p >- k
 (<~)
     :: (Monad m)
     => (b  -> Proxy b' b c' c m r)
+    -- ^
     ->        Proxy a' a b' b m r
+    -- ^
     ->        Proxy a' a c' c m r
+    -- ^
 k <~ p = p ~> k
 {-# INLINABLE (<~) #-}
 
