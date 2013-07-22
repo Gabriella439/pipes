@@ -92,7 +92,8 @@ module Pipes (
     -- $reexports
     module Control.Monad,
     module Control.Monad.Trans.Class,
-    module Control.Monad.Morph
+    module Control.Monad.Morph,
+    module Data.Foldable
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -103,6 +104,7 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
+import Data.Foldable (Foldable)
 import qualified Data.Foldable as F
 import Pipes.Internal (Proxy(..))
 
@@ -924,4 +926,6 @@ k <~ p = p ~> k
     "Control.Monad.Trans.Class" re-exports 'MonadTrans'.
 
     "Control.Monad.Morph" re-exports 'MFunctor'.
+
+    "Data.Foldable" re-exports 'Foldable' (the class name only)
 -}
