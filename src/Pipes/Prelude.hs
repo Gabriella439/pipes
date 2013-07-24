@@ -36,6 +36,8 @@ module Pipes.Prelude (
 
     -- * Push-based Consumers
     -- $consumers
+    foldl',
+    foldM,
     all,
     any,
     find,
@@ -272,6 +274,30 @@ findIndices predicate = loop 0
     \"@a@\").  That extra argument is what makes these push-based 'Consumer's
     and this is how ('~>') feeds in their first input.
 -}
+
+-- | Strict fold of the elements of a 'Producer'
+foldl' :: (Monad m) => (b -> a -> b) -> b -> Producer a m r -> m b
+foldl' step b0 p0 = loop p0 b0
+  where
+    loop p b = do
+        x <- next p
+        case x of
+            Left   _      -> return b
+            Right (a, p') -> loop p' $! step b a
+{-# INLINABLE foldl' #-}
+
+-- | Strict, monadic fold of the elements of a 'Producer'
+foldM :: (Monad m) => (b -> a -> m b) -> b -> Producer a m r -> m b
+foldM step b0 p0 = loop p0 b0
+  where
+    loop p b = do
+        x <- next p
+        case x of
+            Left   _      -> return b
+            Right (a, p') -> do
+                b' <- step b a
+                loop p' $! b'
+{-# INLINABLE foldM #-}
 
 {-| Fold that returns whether 'M.All' input values satisfy the predicate
 
