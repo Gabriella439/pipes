@@ -50,18 +50,12 @@ module Pipes.Prelude (
 
     -- * Zips
     zip,
-    zipWith,
-
-    -- * Utilities
-    tee,
-    generalize
+    zipWith
     ) where
 
 import Control.Monad (liftM, replicateM_, when, unless)
-import Control.Monad.Trans.State.Strict (get, put)
 import qualified System.IO   as IO
 import Pipes
-import Pipes.Lift (evalStateP)
 import Prelude hiding (
     all,
     any,
@@ -384,43 +378,3 @@ zipWith f = go
                         yield (f a b)
                         go p1' p2'
 {-# INLINABLE zipWith #-}
-
-{-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
-    downstream
--}
-tee :: (Monad m) => (() -> Consumer a m r) -> (() -> Pipe a a m r)
-tee p () = evalStateP Nothing $ do
-    r <- (up \>\ (hoist lift . p />/ dn)) ()
-    ma <- lift get
-    case ma of
-        Nothing -> return ()
-        Just a  -> yield a
-    return r
-  where
-    up () = do
-        ma <- lift get
-        case ma of
-            Nothing -> return ()
-            Just a  -> yield a
-        a <- await ()
-        lift $ put (Just a)
-        return a
-    dn _ = return ()
-{-# INLINABLE tee #-}
-
-{-| Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
-
-> generalize (f >-> g) = generalize f >-> generalize g
->
-> generalize pull = pull
--}
-generalize :: (Monad m) => (() -> Pipe a b m r) -> x -> Proxy x a x b m r
-generalize p x0 = evalStateP x0 $ (up \>\ hoist lift . p />/ dn) ()
-  where
-    up () = do
-        x <- lift get
-        await x
-    dn a = do
-        x <- yield a
-        lift $ put x
-{-# INLINABLE generalize #-}
