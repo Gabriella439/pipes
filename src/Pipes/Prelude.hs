@@ -89,8 +89,10 @@ import Prelude hiding (
     for simple demonstrations without incurring a dependency on the @text@
     package.
 
-    Also, don't forget about 'each', exported by the main "Pipes" module.  Or
-    you can build your own custom 'Producer's using 'yield' and the 'Monad'
+    Don't forget about 'each', exported by the main "Pipes" module if you want
+    to transform lists or 'Data.Foldable.Foldable's into 'Producer's.
+
+    You can also build your own custom 'Producer's using 'yield' and the 'Monad'
     instance for 'Producer's.
 -}
 
