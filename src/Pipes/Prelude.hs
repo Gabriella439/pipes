@@ -37,7 +37,7 @@ module Pipes.Prelude (
 
     -- * Push-based Consumers
     -- $consumers
-    foldl',
+    foldl,
     foldM,
     all,
     any,
@@ -66,6 +66,7 @@ import Prelude hiding (
     takeWhile,
     drop,
     dropWhile,
+    foldl,
     read,
     all,
     any,
@@ -289,15 +290,15 @@ scanl step b0 a0 = loop a0 b0
 -}
 
 -- | Strict fold of the elements of a 'Producer'
-foldl' :: (Monad m) => (b -> a -> b) -> b -> Producer a m r -> m b
-foldl' step b0 p0 = loop p0 b0
+foldl :: (Monad m) => (b -> a -> b) -> b -> Producer a m r -> m b
+foldl step b0 p0 = loop p0 b0
   where
     loop p b = do
         x <- next p
         case x of
             Left   _      -> return b
             Right (a, p') -> loop p' $! step b a
-{-# INLINABLE foldl' #-}
+{-# INLINABLE foldl #-}
 
 -- | Strict, monadic fold of the elements of a 'Producer'
 foldM :: (Monad m) => (b -> a -> m b) -> b -> Producer a m r -> m b
