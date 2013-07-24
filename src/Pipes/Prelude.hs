@@ -33,6 +33,7 @@ module Pipes.Prelude (
     drop,
     dropWhile,
     findIndices,
+    scanl,
 
     -- * Push-based Consumers
     -- $consumers
@@ -69,6 +70,7 @@ import Prelude hiding (
     all,
     any,
     head,
+    scanl,
     zip,
     zipWith )
 
@@ -236,6 +238,17 @@ findIndices predicate = loop 0
         when (predicate a) (yield n)
         await () >>= (loop $! n + 1)
 {-# INLINABLE findIndices #-}
+
+-- | Strict left scan
+scanl :: (Monad m) => (b -> a -> b) -> b -> a -> Pipe a b m r
+scanl step b0 a0 = loop a0 b0
+  where
+    loop a b = do
+        yield b
+        let b' = step b a
+        a' <- await ()
+        loop a' $! b'
+{-# INLINABLE scanl #-}
 
 {- $consumers
     Use 'WriterT' in the base monad to fold values:
