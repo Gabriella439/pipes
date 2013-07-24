@@ -34,15 +34,19 @@ module Pipes.Prelude (
     dropWhile,
     findIndices,
     scanl,
+    scanM,
 
-    -- * Push-based Consumers
-    -- $consumers
+    -- * Folds
     foldl,
     foldM,
     all,
     any,
     find,
+    findIndex,
     head,
+    index,
+    last,
+    null,
 
     -- * Zips
     zip,
@@ -53,25 +57,25 @@ module Pipes.Prelude (
     generalize
     ) where
 
-import Control.Monad (replicateM_, when, unless)
-import Control.Monad.Trans.Writer.Strict (WriterT, tell)
+import Control.Monad (liftM, replicateM_, when, unless)
 import Control.Monad.Trans.State.Strict (get, put)
-import qualified Data.Monoid as M
 import qualified System.IO   as IO
 import Pipes
 import Pipes.Lift (evalStateP)
 import Prelude hiding (
-    replicate,
-    take,
-    takeWhile,
+    all,
+    any,
     drop,
     dropWhile,
     foldl,
     read,
-    all,
-    any,
     head,
+    last,
+    null,
+    replicate,
     scanl,
+    take,
+    takeWhile,
     zip,
     zipWith )
 
@@ -246,48 +250,21 @@ scanl step b0 a0 = loop a0 b0
   where
     loop a b = do
         yield b
-        let b' = step b a
         a' <- await ()
+        let b' = step b a
         loop a' $! b'
 {-# INLINABLE scanl #-}
 
-{- $consumers
-    Use 'WriterT' in the base monad to fold values:
-
-> import Control.Monad.Trans.Writer.Strict
-> import Data.Monoid
-> import Pipes
->
-> -- Sum the elements of the list
-> sumElems = execWriter $ runEffect $
->     for (each [1..10]) $ \i -> do
->         lift $ tell (Sum i)
->
-> -- Get the last element of the list
-> lastElem = execWriter $ runEffect $
->     for (each [1..10]) $ \i -> do
->         lift $ tell $ Last (Just i)
-
-    Those folds are easy and you can write them yourself.  I only provide the
-    following 'all', 'any' and 'head' folds because they can be smart and
-    terminate early when they are done.  You will often want to use 'next'
-    instead of 'head', but I provide 'head' for completeness.
-
-    Use ('~>') to apply these stateful folds and use 'hoist' to 'lift' the
-    source base monad if it does not match the 'WriterT' layer:
-
-> import Control.Monad.Trans.Writer.Strict
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> main = do
->     emptyLine <- execWriterT $ runEffect $ hoist lift P.stdin ~> P.any null
->     print emptyLine
-
-    You do not need to provide the last argument for these 'Consumer's (i.e. the
-    \"@a@\").  That extra argument is what makes these push-based 'Consumer's
-    and this is how ('~>') feeds in their first input.
--}
+-- | Strict, monadic left scan
+scanM :: (Monad m) => (b -> a -> m b) -> b -> a -> Pipe a b m r
+scanM step b0 a0 = loop a0 b0
+  where
+    loop a b = do
+        yield b
+        a' <- await ()
+        b' <- lift (step b a)
+        loop a' $! b'
+{-# INLINABLE scanM #-}
 
 -- | Strict fold of the elements of a 'Producer'
 foldl :: (Monad m) => (b -> a -> b) -> b -> Producer a m r -> m b
@@ -313,52 +290,71 @@ foldM step b0 p0 = loop p0 b0
                 loop p' $! b'
 {-# INLINABLE foldM #-}
 
-{-| Fold that returns whether 'M.All' input values satisfy the predicate
+{-| @(all predicate p)@ determines whether all the elements of @p@ satisfy the
+    predicate.
 
-    'all' terminates on the first value that fails the predicate.
+    'all' stops drawing elements if any element fails the predicate
 -}
-all :: (Monad m) => (a -> Bool) -> a -> Consumer' a (WriterT M.All m) ()
-all predicate = go
-  where
-    go a =
-        if (predicate a)
-        then await () >>= go
-        else lift $ tell (M.All False)
+all :: (Monad m) => (a -> Bool) -> Producer a m r -> m Bool
+all predicate p = null $ for p (yieldIf (not . predicate))
 {-# INLINABLE all #-}
 
-{-| Fold that returns whether 'M.Any' input value satisfies the predicate
+{-| @(any predicate p)@ determines whether any element of @p@ satisfies the
+    predicate.
 
-    'any' terminates on the first value that satisfies the predicate.
+    'any' stops drawing elements if any element satisfies the predicate
 -}
-any :: (Monad m) => (a -> Bool) -> a -> Consumer' a (WriterT M.Any m) ()
-any predicate = go
-  where
-    go a =
-        if (predicate a)
-        then lift $ tell (M.Any True)
-        else await () >>= go
+any :: (Monad m) => (a -> Bool) -> Producer a m r -> m Bool
+any predicate p = liftM not $ null $ for p (yieldIf predicate)
 {-# INLINABLE any #-}
 
-{-| that returns the 'M.First' value that satisfies the predicate
-
-    'find' terminates on the first value that satisfies the predicate.
--}
-find :: (Monad m) => (a -> Bool) -> a -> Consumer' a (WriterT (M.First a) m) ()
-find predicate = go
-  where
-    go a =
-        if (predicate a)
-        then lift $ tell (M.First (Just a))
-        else await () >>= go
+-- | Find the first value that satisfies the predicate
+find :: (Monad m) => (a -> Bool) -> Producer a m r -> m (Maybe a)
+find predicate p = head $ for p (yieldIf predicate)
 {-# INLINABLE find #-}
 
-{-| Retrieve the 'M.First' input value
+-- | Find the index of the first value that satisfies the predicate
+findIndex :: (Monad m) => (a -> Bool) -> Producer a m r -> m (Maybe Int)
+findIndex predicate p = head (p ~> findIndices predicate)
+{-# INLINABLE findIndex #-}
 
-    'head' terminates on the first value it receives.
--}
-head :: (Monad m) => a -> Consumer' a (WriterT (M.First a) m) ()
-head a = lift $ tell $ M.First (Just a)
+-- | Retrieve the first value from a 'Producer'
+head :: (Monad m) => Producer a m r -> m (Maybe a)
+head p = do
+    x <- next p
+    case x of
+        Left   _     -> return Nothing
+        Right (a, _) -> return (Just a)
 {-# INLINABLE head #-}
+
+-- | Index into a 'Producer'
+index :: (Monad m) => Int -> Producer a m r -> m (Maybe a)
+index n p = head (p ~> drop n)
+{-# INLINABLE index #-}
+
+-- | Retrieve the last value from a 'Producer'
+last :: (Monad m) => Producer a m r -> m (Maybe a)
+last p0 = do
+    x <- next p0
+    case x of
+        Left   _      -> return Nothing
+        Right (a, p') -> loop a p'
+  where
+    loop a p = do
+        x <- next p
+        case x of
+            Left   _       -> return (Just a)
+            Right (a', p') -> loop a' p'
+{-# INLINABLE last #-}
+
+-- | Determine if a 'Producer' is empty
+null :: (Monad m) => Producer a m r -> m Bool
+null p = do
+    x <- next p
+    return $ case x of
+        Left  _ -> True
+        Right _ -> False
+{-# INLINABLE null #-}
 
 -- | Zip two 'Producer's
 zip :: (Monad m)
