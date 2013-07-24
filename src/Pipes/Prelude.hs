@@ -36,6 +36,7 @@ module Pipes.Prelude (
     -- $consumers
     all,
     any,
+    find,
     head,
 
     -- * Zips
@@ -277,6 +278,19 @@ any predicate = go
         then lift $ tell (M.Any True)
         else await () >>= go
 {-# INLINABLE any #-}
+
+{-| that returns the 'M.First' value that satisfies the predicate
+
+    'find' terminates on the first value that satisfies the predicate.
+-}
+find :: (Monad m) => (a -> Bool) -> a -> Consumer' a (WriterT (M.First a) m) ()
+find predicate = go
+  where
+    go a =
+        if (predicate a)
+        then lift $ tell (M.First (Just a))
+        else await () >>= go
+{-# INLINABLE find #-}
 
 {-| Retrieve the 'M.First' input value
 
