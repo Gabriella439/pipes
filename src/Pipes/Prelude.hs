@@ -22,6 +22,7 @@ module Pipes.Prelude (
     -- * Unfolds
     -- $unfolds
     replicate,
+    replicateM,
     yieldIf,
     read,
 
@@ -133,10 +134,19 @@ fromHandle h = go
 > main3 = runEffect $ for P.stdin (P.replicate 2 />/ lift . putStrLn)
 -}
 
--- | @(replicate n a)@ 'yield's the value \'@a@\' for a total of \'@n@\' times
+-- | @(replicate n a)@ 'yield's the value \'@a@\' a total of \'@n@\' times.
 replicate :: (Monad m) => Int -> a -> Producer' a m ()
 replicate n a = replicateM_ n (yield a)
 {-# INLINABLE replicate #-}
+
+{-| @(replicateM n m)@ calls \'@m@\' a total of \'@n@\' times, 'yield'ing each
+    result.
+-}
+replicateM :: (Monad m) => Int -> m a -> Producer' a m ()
+replicateM n m = replicateM_ n $ do
+    a <- lift m
+    yield a
+{-# INLINABLE replicateM #-}
 
 -- | @(yieldIf pred a)@ only re-'yield's @a@ if it satisfies the predicate @p@
 yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
