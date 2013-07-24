@@ -852,7 +852,7 @@ select :: Producer b m () -> ListT m b
 select = ListT
 {-# INLINE select #-}
 
--- | Discards all input values
+-- | Discards all values
 discard :: (Monad m) => a -> Effect' m ()
 discard _ = return ()
 {-# INLINABLE discard #-}
