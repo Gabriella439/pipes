@@ -31,6 +31,7 @@ module Pipes.Prelude (
     takeWhile,
     drop,
     dropWhile,
+    findIndices,
 
     -- * Push-based Consumers
     -- $consumers
@@ -48,7 +49,7 @@ module Pipes.Prelude (
     generalize
     ) where
 
-import Control.Monad (replicateM_, unless)
+import Control.Monad (replicateM_, when, unless)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
 import Control.Monad.Trans.State.Strict (get, put)
 import qualified Data.Monoid as M
@@ -214,6 +215,15 @@ dropWhile predicate = go
         then await () >>= go
         else push a
 {-# INLINABLE dropWhile #-}
+
+-- | Outputs the indices of all elements that satisfied the predicate
+findIndices :: (Monad m) => (a -> Bool) -> a -> Pipe a Int m r
+findIndices predicate = loop 0
+  where
+    loop n a = do
+        when (predicate a) (yield n)
+        await () >>= (loop $! n + 1)
+{-# INLINABLE findIndices #-}
 
 {- $consumers
     Use 'WriterT' in the base monad to fold values:
