@@ -21,8 +21,8 @@ module Pipes.Prelude (
 
     -- * Unfolds
     -- $unfolds
-    mapM,
-    filter,
+    replicate,
+    yieldIf,
     read,
 
     -- * Push-based Pipes
@@ -47,7 +47,7 @@ module Pipes.Prelude (
     generalize
     ) where
 
-import Control.Monad (unless)
+import Control.Monad (replicateM_, unless)
 import Control.Monad.Trans.Writer.Strict (WriterT, tell)
 import Control.Monad.Trans.State.Strict (get, put)
 import qualified Data.Monoid as M
@@ -55,13 +55,11 @@ import qualified System.IO   as IO
 import Pipes
 import Pipes.Lift (evalStateP)
 import Prelude hiding (
-    map,
-    mapM,
+    replicate,
     take,
     takeWhile,
     drop,
     dropWhile,
-    filter,
     read,
     all,
     any,
@@ -73,19 +71,21 @@ import Prelude hiding (
     Use 'for' to iterate over 'Producer's whenever you want to perform the same
     action for every element:
 
-> import Pipes
-> import Pipes.Prelude as P
-> 
-> main1 = runEffect $
+> -- Echo all lines from standard input to standard output
+> runEffect $
 >     for P.stdin $ \str -> do
 >         lift $ putStrLn str
 >
-> -- or equivalently:
-> main2 = runEffect $ for P.stdin (lift . putStrLn)
+> -- or more concisely:
+> runEffect $ for P.stdin (lift . putStrLn)
 
     Note that 'String'-based 'IO' is inefficient.  These 'Producer's exist only
     for simple demonstrations without incurring a dependency on the @text@
     package.
+
+    Also, don't forget about 'each', exported by the main "Pipes" module.  Or
+    you can build your own custom 'Producer's using 'yield' and the 'Monad'
+    instance for 'Producer's.
 -}
 
 -- | Read 'String's from 'IO.stdin' using 'getLine'
@@ -106,50 +106,40 @@ fromHandle h = go
 {-# INLINABLE fromHandle #-}
 
 {- $unfolds
-    You also use 'for' to apply unfolds, generating a new 'Producer' like this:
+    You also use 'for' to apply an unfold to a stream, generating a new
+    'Producer' like this:
 
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> -- for P.stdin P.read :: (Read a) => Producer a IO ()
->
-> -- Echo only the values that successfully parse as 'Int's
-> main1 = runEffect $
->     for (for P.stdin P.read) $ \a -> do
->         lift $ print (a :: Int)
->
-> -- This is equivalent, thanks to the category laws for the "yield" category
-> main2 = runEffect $
->     for P.stdin $ \str -> do
->         for (P.read str) $ \a -> do
->             lift $ print (a :: Int)
->
-> -- This is also equivalent, since ('/>/') is the point-free version of 'for'
-> main3 = runEffect $ for P.stdin (P.read />/ lift . print)
+> -- Duplicate every input string
+> for P.stdin (P.replicate 2) :: Producer String IO ()
+
+    To apply an additional handler, you can either iterate over the newly minted
+    'Producer' using another 'for' loop:
+
+> runEffect $
+>     for (for P.stdin (P.replicate 2)) $ \str -> do
+>         lift $ putStrLn str
+
+    ... or you can nest 'for' loops:
+
+> runEffect $
+>     for P.stdin $ \str1 -> do
+>         for (P.replicate 2 str1) $ \str2 -> do
+>             lift $ putStrLn str2
+
+    ... or you can compose the two handlers using ('/>/'):
+
+> main3 = runEffect $ for P.stdin (P.replicate 2 />/ lift . putStrLn)
 -}
 
-{-| Transform all values using a monadic function
+-- | @(replicate n a)@ 'yield's the value \'@a@\' for a total of \'@n@\' times
+replicate :: (Monad m) => Int -> a -> Producer' a m ()
+replicate n a = replicateM_ n (yield a)
+{-# INLINABLE replicate #-}
 
-> mapM (f >=> g) = mapM f />/ mapM g
->
-> mapM return = yield
--}
-mapM :: (Monad m) => (a -> m b) -> a -> Producer' b m ()
-mapM f a = do
-    b <- lift (f a)
-    yield b
-{-# INLINABLE mapM #-}
-
-{-| @(filter p)@ discards values going downstream if they fail the predicate
-    @p@
-
-> filter (\a -> f a && g a) = filter f />/ filter g
->
-> filter (\_ -> True) = yield
--}
-filter :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
-filter predicate a = if (predicate a) then yield a else return ()
-{-# INLINABLE filter #-}
+-- | @(yieldIf pred a)@ only re-'yield's @a@ if it satisfies the predicate @p@
+yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
+yieldIf predicate a = if (predicate a) then yield a else return ()
+{-# INLINABLE yieldIf #-}
 
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
 read :: (Monad m, Read a) => String -> Producer' a m ()
@@ -161,12 +151,13 @@ read str = case (reads str) of
 {- $push
     Use ('~>') to transform a 'Producer' using a push-based 'Pipe':
 
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> main = runEffect $
->     for (each [1..] ~> P.take 10) $ \i -> do
->         lift $ print i
+>>> runEffect $ for (P.stdin ~> P.takeWhile (/= "quit")) (lift . putStrLn)
+Test<Enter>
+Test
+ABC<Enter>
+ABC
+quit<Enter>
+>>>
 
     You do not need to provide the last argument for these 'Pipe's (i.e. the
     \"@a@\").  That extra argument is what makes these push-based 'Pipe's and
