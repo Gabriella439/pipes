@@ -21,13 +21,9 @@ module Pipes.Prelude (
 
     -- * Unfolds
     -- $unfolds
-    map,
     mapM,
     filter,
     read,
-
-    -- * Effects
-    mapM_,
 
     -- * Push-based Pipes
     -- $push
@@ -61,7 +57,6 @@ import Pipes.Lift (evalStateP)
 import Prelude hiding (
     map,
     mapM,
-    mapM_,
     take,
     takeWhile,
     drop,
@@ -133,16 +128,6 @@ fromHandle h = go
 > main3 = runEffect $ for P.stdin (P.read />/ lift . print)
 -}
 
-{-| Transform all values using a pure function
-
-> map (g . f) = map f />/ map g
->
-> map id = yield
--}
-map :: (Monad m) => (a -> b) -> a -> Producer' b m ()
-map f = yield . f
-{-# INLINABLE map #-}
-
 {-| Transform all values using a monadic function
 
 > mapM (f >=> g) = mapM f />/ mapM g
@@ -172,11 +157,6 @@ read str = case (reads str) of
     [(a, "")] -> yield a
     _         -> return ()
 {-# INLINABLE read #-}
-
--- | Consume all values using a monadic function
-mapM_ :: (Monad m) => (a -> m b) -> a -> Effect' m b
-mapM_ f = lift . f
-{-# INLINABLE mapM_ #-}
 
 {- $push
     Use ('~>') to transform a 'Producer' using a push-based 'Pipe':
