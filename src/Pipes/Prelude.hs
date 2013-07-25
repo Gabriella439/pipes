@@ -4,10 +4,6 @@
     recommend that you import this module qualified:
 
 > import qualified Pipes.Prelude as P
-
-    Note that the really important functions (like 'for' and 'each') reside in
-    the "Pipes" module.  This module primarily houses utilities that are not as
-    central in importance but are still nice to have.
 -}
 
 {-# LANGUAGE RankNTypes #-}
@@ -37,6 +33,7 @@ module Pipes.Prelude (
     scanM,
 
     -- * Folds
+    -- $folds
     foldl,
     foldM,
     all,
@@ -81,16 +78,30 @@ import Prelude hiding (
 > runEffect $
 >     for P.stdin $ \str -> do
 >         lift $ putStrLn str
->
-> -- or more concisely:
-> runEffect $ for P.stdin (lift . putStrLn)
+
+    ... or more concisely:
+
+>>> runEffect $ for P.stdin (lift . putStrLn)
+Test<Enter>
+Test
+ABC<Enter>
+ABC
+...
 
     Note that 'String'-based 'IO' is inefficient.  These 'Producer's exist only
     for simple demonstrations without incurring a dependency on the @text@
     package.
 
-    Don't forget about 'each', exported by the main "Pipes" module if you want
-    to transform lists or 'Data.Foldable.Foldable's into 'Producer's.
+    Don't forget about 'each', exported by the main "Pipes" module, if you want
+    to transform 'Foldable's (like lists) into 'Producer's.  This is designed to
+    resemble foreach notation:
+
+>>> runEffect $ for (each [1..3]) (lift . print)
+1
+2
+3
+
+    Similarly, 'every' transforms  'Iterable's (like 'ListT') into 'Producer's.
 
     You can also build your own custom 'Producer's using 'yield' and the 'Monad'
     instance for 'Producer's.
@@ -114,10 +125,12 @@ fromHandle h = go
 {-# INLINABLE fromHandle #-}
 
 {- $unfolds
-    You also use 'for' to apply an unfold to a stream, generating a new
-    'Producer' like this:
+    An unfold is a 'Producer' which can also be used to transform a stream.
 
-> -- Duplicate every input string
+    You use 'for' to apply an unfold to a stream.  This behaves like a
+    'concatMap' generating a new 'Producer':
+
+> -- Outputs two copies of every input string
 > for P.stdin (P.replicate 2) :: Producer String IO ()
 
     To apply an additional handler, you can either iterate over the newly minted
@@ -136,7 +149,30 @@ fromHandle h = go
 
     ... or you can compose the two handlers using ('/>/'):
 
-> main3 = runEffect $ for P.stdin (P.replicate 2 />/ lift . putStrLn)
+>>> runEffect $ for P.stdin (P.replicate 2 />/ lift . putStrLn)
+Test<Enter>
+Test
+Test
+ABC<Enter>
+ABC
+ABC
+...
+
+    All of these must behave identically, thanks to the associativity law for
+    the yield category.
+
+    Note that 'each' is also an unfold and can be used to flatten streams of
+    'Foldable' elements:
+
+>>> runEffect $ for (each [[1, 2], [4, 5]]) (lift . print)
+[1,2]
+[3,4]
+>>> runEffect $ for (each [[1, 2], [3, 4]]) (each />/ lift . print)
+1
+2
+3
+4
+
 -}
 
 -- | @(replicate n a)@ 'yield's the value \'@a@\' a total of \'@n@\' times.
@@ -176,9 +212,10 @@ ABC
 quit<Enter>
 >>>
 
-    You do not need to provide the last argument for these 'Pipe's (i.e. the
-    \"@a@\").  That extra argument is what makes these push-based 'Pipe's and
-    this is how ('~>') feeds in their first input.
+    You do not need to provide the final argument for these 'Pipe's (i.e. the
+    \'@a@\').  That extra argument is what makes these push-based 'Pipe's
+    because it guarantees that they must receive at least one input and this is
+    how ('~>') feeds in their first input.
 -}
 
 -- | @(take n)@ only allows @n@ values to pass through
@@ -262,6 +299,20 @@ scanM step b0 a0 = loop a0 b0
         loop a' $! b'
 {-# INLINABLE scanM #-}
 
+{- $folds
+    Use these to fold the output of a 'Producer'.  Many of these folds are lazy,
+    meaning that they will draw the minimum number of values necessary to
+    compute a result:
+
+>>> P.any null P.stdin
+Test<Enter>
+ABC<Enter>
+<Enter>
+True
+>>>
+
+-}
+
 -- | Strict fold of the elements of a 'Producer'
 foldl :: (Monad m) => (b -> a -> b) -> b -> Producer a m r -> m b
 foldl step b0 p0 = loop p0 b0
@@ -288,8 +339,6 @@ foldM step b0 p0 = loop p0 b0
 
 {-| @(all predicate p)@ determines whether all the elements of @p@ satisfy the
     predicate.
-
-    'all' stops drawing elements if any element fails the predicate
 -}
 all :: (Monad m) => (a -> Bool) -> Producer a m r -> m Bool
 all predicate p = null $ for p (yieldIf (not . predicate))
@@ -297,8 +346,6 @@ all predicate p = null $ for p (yieldIf (not . predicate))
 
 {-| @(any predicate p)@ determines whether any element of @p@ satisfies the
     predicate.
-
-    'any' stops drawing elements if any element satisfies the predicate
 -}
 any :: (Monad m) => (a -> Bool) -> Producer a m r -> m Bool
 any predicate p = liftM not $ null $ for p (yieldIf predicate)
