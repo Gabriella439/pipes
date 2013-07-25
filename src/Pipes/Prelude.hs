@@ -249,9 +249,7 @@ drop = go
     go n a =
         if (n <= 0)
         then push a
-        else do
-            yield a
-            await () >>= go (n - 1)
+        else await () >>= go (n - 1)
 {-# INLINABLE drop #-}
 
 {-| @(dropWhile p)@ discards values going downstream until one violates the
