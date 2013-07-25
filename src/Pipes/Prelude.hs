@@ -75,13 +75,12 @@ import Prelude hiding (
     action for every element:
 
 > -- Echo all lines from standard input to standard output
-> runEffect $
->     for P.stdin $ \str -> do
->         lift $ putStrLn str
+> run $ for P.stdin $ \str -> do
+>     lift $ putStrLn str
 
     ... or more concisely:
 
->>> runEffect $ for P.stdin (lift . putStrLn)
+>>> run $ for P.stdin (lift . putStrLn)
 Test<Enter>
 Test
 ABC<Enter>
@@ -96,7 +95,7 @@ ABC
     to transform 'Foldable's (like lists) into 'Producer's.  This is designed to
     resemble foreach notation:
 
->>> runEffect $ for (each [1..3]) (lift . print)
+>>> run $ for (each [1..3]) (lift . print)
 1
 2
 3
@@ -136,20 +135,19 @@ fromHandle h = go
     To apply an additional handler, you can either iterate over the newly minted
     'Producer' using another 'for' loop:
 
-> runEffect $
->     for (for P.stdin (P.replicate 2)) $ \str -> do
->         lift $ putStrLn str
+> run $ for (for P.stdin (P.replicate 2)) $ \str -> do
+>     lift $ putStrLn str
 
     ... or you can nest 'for' loops:
 
-> runEffect $
+> run $
 >     for P.stdin $ \str1 -> do
 >         for (P.replicate 2 str1) $ \str2 -> do
 >             lift $ putStrLn str2
 
     ... or you can compose the two handlers using ('/>/'):
 
->>> runEffect $ for P.stdin (P.replicate 2 />/ lift . putStrLn)
+>>> run $ for P.stdin (P.replicate 2 />/ lift . putStrLn)
 Test<Enter>
 Test
 Test
@@ -164,10 +162,10 @@ ABC
     Note that 'each' is also an unfold and can be used to flatten streams of
     'Foldable' elements:
 
->>> runEffect $ for (each [[1, 2], [4, 5]]) (lift . print)
+>>> run $ for (each [[1, 2], [4, 5]]) (lift . print)
 [1,2]
 [3,4]
->>> runEffect $ for (each [[1, 2], [3, 4]]) (each />/ lift . print)
+>>> run $ for (each [[1, 2], [3, 4]]) (each />/ lift . print)
 1
 2
 3
@@ -204,7 +202,7 @@ read str = case (reads str) of
 {- $push
     Use ('~>') to transform a 'Producer' using a push-based 'Pipe':
 
->>> runEffect $ for (P.stdin ~> P.takeWhile (/= "quit")) (lift . putStrLn)
+>>> run $ for (P.stdin ~> P.takeWhile (/= "quit")) (lift . putStrLn)
 Test<Enter>
 Test
 ABC<Enter>
