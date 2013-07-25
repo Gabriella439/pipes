@@ -53,6 +53,7 @@ module Pipes.Prelude (
 import Control.Monad (liftM, replicateM_, when, unless)
 import qualified System.IO   as IO
 import Pipes
+import Pipes.Internal
 import Prelude hiding (
     all,
     any,
@@ -315,17 +316,32 @@ True
 foldl :: (Monad m) => (b -> a -> b) -> b -> Producer a m r -> m b
 foldl step b0 p0 = loop p0 b0
   where
+    loop p b = case p of
+        Pure  _     -> return b
+        Await _  fu -> loop (fu ()) b
+        Yield a  fu -> loop (fu ()) $! step b a
+        M        m  -> m >>= \p' -> loop p' b
+{-
     loop p b = do
         x <- next p
         case x of
             Left   _      -> return b
             Right (a, p') -> loop p' $! step b a
+-}
 {-# INLINABLE foldl #-}
 
 -- | Strict, monadic fold of the elements of a 'Producer'
 foldM :: (Monad m) => (b -> a -> m b) -> b -> Producer a m r -> m b
 foldM step b0 p0 = loop p0 b0
   where
+    loop p b = case p of
+        Pure  _     -> return b
+        Await _  fu -> loop (fu ()) b
+        Yield a  fu -> do
+            b' <- step b a
+            loop (fu ()) $! b'
+        M        m  -> m >>= \p' -> loop p' b
+{-
     loop p b = do
         x <- next p
         case x of
@@ -333,6 +349,7 @@ foldM step b0 p0 = loop p0 b0
             Right (a, p') -> do
                 b' <- step b a
                 loop p' $! b'
+-}
 {-# INLINABLE foldM #-}
 
 {-| @(all predicate p)@ determines whether all the elements of @p@ satisfy the
