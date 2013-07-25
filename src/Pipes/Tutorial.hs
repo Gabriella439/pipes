@@ -1,80 +1,24 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-{-| @pipes@ is a lightweight and powerful stream processing library that
-    encompasses many streaming abstractions.
+{-| @pipes@ is a lightweight and powerful library for stream processing with
+    effects.
 
-    You should use @pipes@ if you need to:
-
-    * incrementally stream impure data,
-
-    * create or consume backtracking and effectful computations (i.e. 'ListT')
-
-    * design a reactive programming system,
-
-    * implement message passing,
-
-    * assemble directed acyclic graphs of streaming components, or:
-
-    * acquire and promptly release streaming resources in an exception-safe way
-
-
-    This tutorial covers incremental streaming and 'ListT'.  The
-    @pipes-concurrency@ package covers reactive programming and message passing.
-    provides a separate tutorial covering reactive programming and message
-    passing.  The @pipes-arrow@ package implements directed acyclic streaming
-    graphs.  The @pipes-safe@ package covers resource management and exception
-    safety.
-
-    @pipes@ can actually model an even greater variety of stream programming
-    abstractions, including Unix pipes and networking clients, proxies, and
-    servers, but this tutorial sticks to the simplest and most reusable @pipes@
-    idioms consisting primarily of generators and push-based iterations.  If you
-    want to learn more about the full capabilities of @pipes@, then read the
-    documentation in the "Pipes" module after reading this tutorial.
+    You can find derived libraries that provide additional functionality on
+    Hackage under the \"Pipes\" category.
 -}
 
 module Pipes.Tutorial (
-    -- * Easy to use
-    -- $easytouse
+    -- * Producers
+    -- $producers
 
-    -- * Easy to build
-    -- $easytobuild
+    -- * Theory
+    -- $theory
 
-    -- * Easy to understand
-    -- $easytounderstand
+    -- * Pipes
+    -- $pipes
 
-    -- * Theory - Part 1
-    -- $theory1
-
-    -- * Types - Part 1
-    -- $types1
-
-    -- * Prelude
-    -- $prelude
-
-    -- * Sequence Pipes
-    -- $sequence
-
-    -- * Types - Part 2
-    -- $types2
-
-    -- * Theory - Part 2
-    -- $theory2
-
-    -- * Catch Errors
-    -- $catch
-
-    -- * Folds
-    -- $folds
-
-    -- * Types - Part 3
-    -- $types3
-
-    -- * Run base monads
-    -- $run
-
-    -- * Conclusion
-    -- $conclusion
+    -- * Appendix
+    -- $appendix
     ) where
 
 import Control.Category
@@ -85,719 +29,267 @@ import Pipes.Lift
 import qualified Pipes.Prelude as P
 import Prelude hiding ((.), id)
 
-{- $easytouse
-    The simplest type of pipe is a 'Producer', such as 'P.stdin' from
-    "Pipes.Prelude":
+{- $producers
+    The library represents effectful streams of input using 'Producer's.  A
+    'Producer' is a monad transformer that extends the base monad with the
+    ability to incrementally 'yield' output, such as the following code:
 
->          +--------+-- 'stdin' produces 'String's
->          |        |
->          |        |      +-- 'stdin' uses 'IO' to read in these 'String's
->          |        |      |
->          |        |      |  +-- 'stdin' returns '()' when done
->          |        |      |  |
->          v        v      v  v
-> stdin :: Producer String IO ()
-
-    A 'Producer' is a monad transformer that extends the base monad ('IO' in
-    this case) with the ability to 
-    The simplest way to consume a 'Producer' is to use a 'for' loop:
-
-> -- The true type of 'for' is much more general
-> for :: (Monad m) => Producer a m () -> (a -> Effect m ()) -> Effect m ()
-
-
-
-    Haskell pipes are simple to connect.  For example, here's how you echo
-    'P.stdin' to 'P.stdout', just like the Unix @cat@ program when given no
-    arguments:
-
-> -- cat.hs
+> -- echo.hs
 >
+> import Control.Monad (unless)
 > import Pipes
-> import qualified Pipes.Prelude as P
+> import qualified System.IO as IO
 >
-> main = runEffect $ (P.stdin >-> P.stdout) ()
+> --       +--------+-- A 'Producer' of 'String's
+> --       |        |
+> --       |        |      +-- The base monad is 'IO'
+> --       |        |      |
+> --       |        |      |  +-- Returns '()' when finished
+> --       |        |      |  |
+> --       v        v      v  v
+> stdin :: Producer String IO ()
+> stdin = do
+>     eof <- lift $ IO.hIsEOF IO.stdin  -- 'lift' actions from the base monad
+>     unless eof $ do
+>         str <- lift getLine
+>         yield str                     -- 'yield' the next line of input
+>         stdin                         -- Loop
 
-    If you compile and run it, it will copy standard input to standard output:
+    'yield' emits a value, suspending the current 'Producer' until the value is
+    consumed:
 
-> $ ghc -O2 cat.hs
-> $ ./cat
-> Echo<Enter>
-> Echo
+> yield :: (Monad m) => a -> Producer a m ()
+
+    The simplest way to consume a 'Producer' is a 'for' loop, which has the
+    following type:
+
+> for :: (Monad m) => Producer a m r -> (a -> Producer b m r) -> Producer b m r
+
+    This greatly resembles the type of @(flip concatMap)@ (or ('>>=') for the
+    list monad):
+
+> flip concatMap :: [a] -> (a -> [b]) -> [b]
+
+    Here's an example 'for' @loop@:
+
+> -- echo.hs
+>
+> --                            +-- 'loop' does not emit any values, so 'a' is
+> --                            |   polymorphic
+> --                            v
+> loop :: Producer a IO ()
+> loop = for stdin $ \str -> do        -- Read this like: "for (str in stdin):"
+>     lift $ putStrLn str              -- The body of the 'for' loop
+>
+> -- even better: loop = for stdin (lift . putStrLn)
+
+    Notice how 'loop' does not re-emit any values of its own.  @pipes@ defines a
+    type synonym for this special case:
+
+> type Effect m r = forall a . Producer a m r
+
+    So we can change the type signature of @loop@ to:
+
+> loop :: (Monad m) => Effect IO ()
+
+    We can 'run' any 'Effect' and convert it back to the base monad:
+
+> run :: (Monad m) => Effect m r -> m r
+
+    ... so we can complete our program by writing:
+
+> -- echo.hs
+>
+> main :: IO ()
+> main = run loop
+
+    This program loops over standard input and echoes every line to standard
+    output:
+
+> $ ghc -O2 echo.hs
+> $ ./echo
+> Test<Enter>
+> Test
 > ABC<Enter>
 > ABC
 > ^D
-> $ ./cat < cat.hs
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> main = runEffect $ (P.stdin >-> P.stdout) ()
 > $
 
-    Compare the @pipes@ program to the equivalent hand-written loop:
-
-> import Control.Monad
-> import System.IO
->
-> main = loop
->   where
->     loop = do
->         eof <- hIsEOF stdin
->         unless eof $ do
->             str <- getLine
->             putStrLn str
->             loop
-
-    The hand-written version tightly integrates the input and output logic
-    together and is less declarative of our intent.
-
-    When we decouple input and output logic we can easily insert intermediate
-    transformation stages.  The next example demonstrates this by inserting a
-    'P.take' processing stage to emulate the @head@ utility:
-
-> -- head.hs
->
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> main = runEffect $ (P.stdin >-> P.take 10 >-> P.stdout) ()
-
-    Loose coupling also means that we can easily swap out new inputs and
-    outputs.  Let's use this trick to simulate the @yes@ command by replacing
-    'P.stdin' with an endless list of \"y\"s:
-
-> -- yes.hs
->
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> main = runEffect $ (P.fromList (repeat "y") >-> P.stdout) ()
-
-    Normally if we wanted to connect two programs we'd do it in Unix-land using
-    Unix pipes:
-
-> $ ./yes | ./head
-> y
-> y
-> y
-> y
-> y
-> y
-> y
-> y
-> y
-> y
-> $
-
-    ... but with @pipes@ we can keep all the logic in Haskell:
-
-> -- combined.hs
->
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> main = runEffect $ (P.fromList (repeat "y") >-> P.take 10 >-> P.stdout) ()
-
-    This gives the same behavior, but this time the Haskell pipes do all the
-    information passing:
-
-> $ ./combined
-> y
-> y
-> y
-> y
-> y
-> y
-> y
-> y
-> y
-> y
-> $
-
-    Haskell pipes promote a compositional approach to stream programming where
-    you mix and match modular components to assemble useful programs.
+    You can find the full @echo.hs@ program in the Appendix section at the end
+    of this tutorial along with all the other following examples.
 -}
 
-{- $easytobuild
-    Haskell pipes are simple to write.  For example, here's the code for
-    'P.stdout':
+{- $theory
+    You might wonder why the body of a 'for' loop can be a 'Producer'.  Let's
+    test out this feature by defining a new loop body that re-'yield's every
+    value twice:
 
-> import Control.Monad
+> -- nested.hs
+>
 > import Pipes
+> import qualified Pipes.Prelude as P  -- Pipes.Prelude already has 'stdin'
 >
-> stdout :: () -> Consumer String IO r
-> stdout () = forever $ do
->     str <- request ()
->     lift $ putStrLn str
-
-    We 'request' values of type @String@, so @stdout@ is a 'Consumer' of
-    @String@s.  'Consumer' is a monad transformer that extends the base monad
-    with the ability to 'request' new input from upstream.
-
-    'P.stdin' is only slightly more complicated because we have to also check
-    for the end of the input:
-
-> import qualified System.IO as IO
+> body :: (Monad m) => a -> Producer a m ()
+> body x = do
+>     yield x
+>     yield x
 >
-> stdin :: () -> Producer String IO ()
-> stdin () = loop
->   where
->     loop = do
->         eof <- lift $ IO.hIsEOF IO.stdin
->         unless eof $ do
->             str <- lift getLine
->             respond str
->             loop
+> loop :: Producer String IO ()
+> loop = for P.stdin body
+>
+> -- This is the same as:
+> --
+> -- loop = for P.stdin $ \str ->
+> --     yield str
+> --     yield str
 
-    We 'respond' with values of type @String@, so @stdin@ is a 'Producer' of
-    @String@s.  'Producer' is a monad transformer that extends the base monad
-    with the ability to 'respond' with new output to send downstream.
+    This time @loop@ outputs 'String's, specifically two copies of every line
+    read from standard input.
 
-    Notice how much 'P.stdin' resembles our original hand-written loop, but this
-    time we use 'respond'  instead of 'putStrLn'.  The 'respond' command hands
-    off the 'String' to an unspecified downstream stage which will decide how to
-    process the 'String'.  This decouples the 'String' creation logic from the
-    'String' consumption logic so that we can mix and match different sources
-    and sinks.
+    Since @loop@ is itself a 'Producer', we can loop over our @loop@, dawg:
 
-    The last component is 'P.take' which only transmits a fixed number of
-    values:
+> -- nested.hs
+>
+> main  = run $ for loop (lift . putStrLn)
 
-> take :: Int -> () -> Pipe a a IO ()
-> take n () = replicateM_ n $ do
->     a <- request ()
->     respond a
+    This creates a program which echoes every line from standard input to
+    standard output twice:
 
-    We 'request' values of any type, @a@, and 'respond' with values of the same
-    type, @a@, so 'P.take' is a 'Pipe' from @a@ to @a@.  'Pipe' is a monad
-    transformer that extends the base monad with the ability to both 'request'
-    new input and 'respond' with new output.
+> $ ./nested
+> Test<Enter>
+> Test
+> Test
+> ABC<Enter>
+> ABC
+> ABC
+> ^D
 
-    Notice that 'take' can transmit values of any type, not just 'String's.
-    Haskell pipes differ from Unix pipes because they can receive and transmit
-    typed values and they are not limited to textual input and output.
--}
+    But is this feature really necessary?  Couldn't we have written this using
+    a nested for loop instead?
 
-{- $easytounderstand
-    You connect pipes using the ('>->') composition operator.
+> main = run $
+>     for P.stdin $ \str1 ->
+>         for (body str1) $ \str2 ->
+>             lift $ putStrLn str
 
-    If you connect a 'Producer' and a 'Consumer', you get a self-contained
-    'Effect':
+    Yes, we could have!  In fact, this is a special case of the following
+    equality, which always holds no matter what:
 
-> (>->) :: (() -> Producer a m r)
->       -> (() -> Consumer a m r)
->       -> (() -> Effect     m r)
+> -- m :: (Monad m) =>      Producer a m ()  -- i.e. 'P.stdin'
+> -- f :: (Monad m) => a -> Producer b m ()  -- i.e. 'body'
+> -- g :: (Monad m) => b -> Producer c m ()  -- i.e. '(lift . putStrLn)'
+>
+> for (for m f) g = for m (\x -> for (f x) g)
 
-    If you connect a 'Producer' and a 'Pipe', you get a 'Producer':
+    We can understand the rationale behind this equality if we define the
+    following operator that is the point-free counterpart to 'for':
 
-> (>->) :: (() -> Producer a m r)
->       -> (() -> Pipe   a b m r)
->       -> (() -> Producer b m r)
+> (/>/) :: (Monad m)
+>       => (a -> Producer b m r)
+>       -> (b -> Producer c m r)
+>       -> (a -> Producer c m r)
+> (f />/ g) x = for (f x) g
 
-    If you connect a 'Pipe' and a 'Consumer', you get a 'Consumer':
+    Now we can rewrite the equality into an equivalent equality using ('/>/')
+    instead of 'for':
 
-> (>->) :: (() -> Pipe   a b m r)
->       -> (() -> Consumer b m r)
->       -> (() -> Consumer a m r)
-
-    ('>->') improves upon the traditional Unix pipe operator because the
-    compiler will guarantee that we don't connect pipes with mismatched types
-    or connect an open end to a closed end.  Moreover, we can read the type of
-    a pipe to understand its input and output ends at a glance.
-
-    @pipes@ only lets you run self-contained 'Effect's, using 'runEffect':
-
-> runEffect :: Effect m r -> m r
-
-    This ensures that we don't leave a dangling input or output end.  If you
-    have unhandled output, you must 'P.discard' it explicitly:
-
-> discard :: (Monad m) => () -> Consumer a m r
--}
-
-{- $theory1
-    ('>->') has the very nice property that it is associative: meaning that it
-    behaves the exact same way no matter how you group composition:
+> f :: (Monad m) => a -> Producer b m r
+> g :: (Monad m) => b -> Producer c m r
+> h :: (Monad m) => c -> Producer d m r
 
 > -- Associativity
-> (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
+> (f />/ g) />/ h = f />/ (g />/ h)
 
-    ... so you can always safely omit the parentheses since the meaning is
-    unambiguous:
-
-> p1 >-> p2 >-> p3
-
-    This guarantees that you can reason about each pipe's behavior independently
-    of other pipes, otherwise composition wouldn't be associative.
-
-    Also, we can prove that pipe composition does not leak any side effects or
-    implementation details.  We only need to define an empty test pipe named
-    'pull', which auto-forwards all values and never tampers with the stream:
-
-> -- pull's true implementation is more general
-> pull :: (Monad m) => () -> Pipe a a m r
-> pull () = forever $ do
->     a <- request ()
->     respond a
-
-    We expect that if composition does not leak any information then composing
-    'pull' should have no effect:
+    That's much more symmetric.  In fact, it looks just like an associativity
+    law for the composition operator of a 'Control.Category.Category'.  If that
+    were true, then we would also expect two identity laws:
 
 > -- Left Identity
-> pull >-> p = p
+> yield />/ f = f
 >
 > -- Right Identity
-> p >-> pull = p
+> f />/ yield = f
 
-    ... and this turns out to be true, reassuring us that pipe composition is
-    invisible and does not have any side effects of its own.
+    If we translate the left identity law to use 'for' instead of ('/>/') we
+    get:
 
-    Fascinatingly, this means that pipes are a 'Category' in disguise, where
-    ('>->') is the composition operator and 'pull' is the identity.  The above
-    equations are the 'Category' laws.
+> for (yield x) f = f x
 
-    The @pipes@ library uses category theory pervasively to eliminate large
-    classes of bugs and promote intuitive behavior.  Unlike Unix pipes, you will
-    not encounter dark corners of the @pipes@ API that give weird behavior
-    because all the primitives are built on a proven mathematical foundation.
+    This just says that if you iterate over a single-element 'Producer' with no
+    side effects, then you can instead cut out the middle man and directly apply
+    the body of the loop to that element.
+
+    If we translate the right identity law to use 'for' instead of ('/>/') we
+    get:
+
+> for m yield = m
+
+    This just says that if the only thing you do is re-'yield' every element of
+    a stream, you get back your original stream.
+
+    Therefore, these three common-sense \"for loop\" laws:
+
+> for (for m f) g = for m (\x -> for (f x) g)
+>
+> for (yield x) f = f x
+>
+> for m yield = m
+
+    ... are really the 'Control.Category.Category' laws in disguise.
+
+    In fact, we get more out of this than just a bunch of equations.  We also
+    got a useful operator, too: ('/>/').  We can use this operator to condense
+    our original code into the following more succinct form:
+
+> main  = run $ for P.stdin (body />/ lift . putStrLn)
+
+    This means that we can also choose to program in a more functional style and
+    think of stream processing as composing a sequence of transformations using
+    ('/>/') instead of nesting a bunch of 'for' loops.
+
+    The above example is a microcosm of the design philosophy behind the @pipes@
+    library:
+
+    * Define primitives in terms of categories
+
+    * Specify expected behavior in terms of category laws
+
+    * Think compositionally instead of sequentially
 -}
 
-{- $types1
-    You might wonder why these pipes require an argument of type @()@.  This is
-    because 'Consumer's, 'Producer's, and 'Pipe's are all special cases of fully
-    bidirectional 'Proxy's which can send information upstream, too.  The
-    ('>->') uses this initial argument in the general case:
+{- $pipes
+    Sometimes you don't want use a 'for' loop because you don't want to process
+    every value of a 'Producer' the exact same way.  For example, there is no
+    (easy) way to consume only the first few elements of a 'Producer' using a
+    'for' loop.
 
-> (>->) :: (b' -> Proxy a' a b' b m r)
->       -> (c' -> Proxy b' b c' c m r)
->       -> (c' -> Proxy a' a b' b m r)
+    The most general option is to externally iterate over the 'Producer' using
+    the 'next' command:
 
-    This is also the same reason that every 'request' so far used an empty @()@
-    argument.  In the general case you can provide a non-empty argument to
-    send upstream to parametrize the 'request'.
+> next :: (Monad m) => Producer a m r -> m (Either r (a, Producer a m r))
 
-    'Consumer's, 'Producer's, and 'Pipe's are all type synonyms around the
-    'Proxy' type, which is why you can reuse ('>->') to connect all of them:
+    Think of 'next' as pattern matching on the head of the 'Producer'.  This
+    'Either' returns a 'Left' if the 'Producer' is done or it returns a 'Right'
+    containing the next value, @a@, along with the remainder of the 'Producer'.
 
-> data X  -- X is uninhabited, and represents a closed output
->
-> type Producer a   m r = Proxy X  () () a m r
-> type Pipe     a b m r = Proxy () a  () b m r
-> type Consumer   b m r = Proxy () b  () X m r
-> type Effect       m r = Proxy X  () () X m r
+    However, sometimes we can get away with something a little more elegant,
+    like a 'Pipe', which you can think of as a Unix pipe that streams inputs to
+    outputs.  Using 'Pipe's, we can define our own @take@ like this:
 
-    To learn more about this, you can read the documentation in the "Pipes"
-    module, which discusses how these extra type parameters are used to
-    implement several advanced streaming features.  Otherwise, just remember
-    that your pipes and 'request's require an argument of type @()@ if you stick
-    to the common case of composing unidirectional pipes using ('>->').
--}
-
-{- $prelude
-    @pipes@ provides a Prelude of utilities in "Pipes.Prelude" that generalize
-    their list-based counterparts.
-
-    For example, you can 'P.map' a function to convert it to a 'Pipe':
-
-> P.map :: (Monad m) => (a -> b) -> Pipe a b m r
-
-    You can also 'P.zipWith' two 'Producer's the same way you would 'zipWith'
-    lists:
-
-> P.zipWith
->     :: (Monad m)
->     => (a -> b -> c)
->     -> (() -> Producer a m r)
->     -> (() -> Producer b m r)
->     -> (() -> Producer c m r)
-
-    Using these two functions we can implement the @nl@ utility to number all
-    lines:
-
-> import Text.Printf
->
-> numbers :: (Monad m) => () -> Producer String m ()
-> numbers = P.fromList [(1::Int)..] >-> P.map (printf "%6d\t")
->
-> main = runEffect $ (P.zipWith (++) numbers P.stdin >-> P.stdout) ()
-
-    Or you can print all natural numbers by combining 'P.fromList':
-
-> P.fromList :: (Monad m) => [b] -> () -> Producer b m ()
-
-    ... with 'P.print':
-
-> P.print :: (Show a) => () -> Consumer a IO r
-
->>> runEffect $ (P.fromList [0..] >-> P.print) ()
-0
-1
-2
-3
-4
-...
-
--}
-
-
-{- $sequence
-    All pipes are special cases of the 'Proxy' type, and the 'Proxy' type is a
-    'Monad', therefore you can combine pre-existing pipes by sequencing them
-    using @do@ notation.
-
-    For example, we can build a 'Producer' that begins with a pre-defined script
-    and then have a human take over if the downstream 'Consumer' exhausts our
-    script:
-
-> serve :: () -> Producer String IO ()
-> serve () = do
->     -- Lead with the script
->     P.fromList ["Hi, my name is Gabriel.", "How may I help you?"] ()
->     -- Then the human continues
->     P.stdin ()
-
-    Since composable 'Proxy's require an initial argument, we must supply that
-    argument if we wish to sequence them.  This is why we apply 'P.fromList' and
-    'P.stdin' to their initial @()@ argument in order to call them in the
-    'Proxy' monad.
-
-    When we sequence two 'Proxy's, the first 'Proxy' handles as much input or
-    output as possible.  So if downstream requests two lines of input then our
-    'P.fromList' handles it all and the 'P.stdin' never kicks in, so our human
-    is off the hook:
-
->>> runEffect $ (serve >-> P.take 2 >-> P.stdout) ()
-Hi, my name is Gabriel.
-How may I help you?
->>>
-
-    However, if downstream exhausts 'P.fromList', then the 'P.stdin' proxy
-    takes over and then we must type in the remaining lines:
-
->>> runEffect $ (serve >-> P.take 3 >-> P.stdout) ()
-Hi, my name is Gabriel.
-How may I help you?
-Give me one second.<Enter>
-Give me one second.
-
-    You can sequence 'Pipe's or 'Consumer's, too.  For example, the following
-    'Pipe' tries to speed things up a little bit after three messages:
-
-> hurryUp :: (Monad m) => () -> Pipe String String m ()
-> hurryUp () = do
->     P.take 3 ()
->     respond "Will that be all?"
->     pull ()
-
-    You can even nest composed 'Proxy's within the 'Proxy' monad.  For example,
-    we can refine our original script by shutting down the 'Producer' when the
-    human types @\"Bye\"@:
-
-> serve :: () -> Producer String IO ()
-> serve () = do
->     P.fromList ["Hi, my name is Gabriel.", "How may I help you?"] ()
->     (P.stdin >-> P.takeWhile (/= "Bye")) ()
-
-    This works because the result of 'Proxy' composition is still a 'Proxy', and
-    therefore can be sequenced just like any other 'Proxy' once we apply its
-    initial argument.  Let's verify that this actually works:
-
->>> runEffect $ (serve >-> hurryUp >-> P.stdout) ()
-Hi, my name is Gabriel.
-How may I help you?
-Give me one second.<Enter>
-Give me one second.
-Will that be all?
-Bye<Enter>
->>>
-
--}
-
-{- $types2
-    ('>->') combines pipes by interleaving their actions in the base monad.
-    Therefore, you can only compose two pipes if they share the same base monad.
-
-    For example, the 'P.read' pipe fails in 'ErrorT' if it cannot parse a value:
-
-> read :: (Monad m, Read a) => () -> Pipe String a (ErrorT String m) r
-
-    However, if we try to compose 'P.read' with 'P.stdin':
-
-> readInt = P.stdin >-> P.read
-
-    ... then we will get a type error:
-
->    Couldn't match expected type `IO'
->                with actual type `ErrorT String m0'
->    ...
-
-    The type-checker complains that the base monads don't match: 'P.stdin' needs
-    'IO' as the base monad, but 'P.read' needs @(ErrorT String m)@ as the base
-    monad.
-
-    To unify their base monads we use 'hoist' from the 'MFunctor' class which
-    applies transformations to base monads:
-
-> hoist :: (Monad m, MFunctor t) => (m a -> n a) -> t m b -> t n b
-
-    All pipes implement 'MFunctor' so we can 'hoist' the 'lift' function to make
-    our pipes agree on using @(ErrorT String IO)@ for their base monad:
-
-> P.stdin
->     :: () -> Producer String IO ()
->
-> hoist lift . P.stdin
->     :: () -> Producer String (ErrorT String IO) ()
-
-    Once they agree on the base monad we can compose them directly:
-
-> readInt :: () -> Producer Int (ErrorT String IO) ()
-> readInt = hoist lift . P.stdin >-> P.read
-
-    Now we can validate that all input lines are 'Int's before 'print'ing them:
-
->>> -- Remember, we need to hoist P.print, too!
->>> runErrorT $ runEffect $ (readInt >-> hoist lift . P.print) ()
-42<Enter>
-42
-555<Enter>
-555
-Four<Enter>
-Left "Pipes.Prelude.read: no parse"
-
-    Note that ('.') has higher precedence than ('>->') so you can use ('.') to
-    easily modify pipes in the middle of a composition chain without using
-    parentheses.
--}
-
-{- $theory2
-    You don't need to individually 'hoist' several consecutive pipes in a row.
-    If you have the following pattern:
-
-> hoist lift . p1 >-> hoist lift . p2
-
-    ... you can instead condense these into a single call to 'hoist':
-
-> hoist lift . (p1 >-> p2)
-
-    In fact, 'hoist' has the nice property that you can factor or distribute
-    'hoist' over the category of pipe composition:
-
-> hoist k . (p1 >-> p2) = hoist k . p1 >-> hoist k . p2
->
-> hoist k . pull = pull
-
-    Interestingly, these two equations are functor laws in disguise!
-
-    To see how, remember that functors transform one category to another such
-    that:
-
-> fmap (f . g) = fmap f . fmap g
->
-> fmap id = id
-
-    If you replace 'fmap' with @(hoist k .)@, replace ('.') with ('>->'), and
-    replace 'id' with 'pull', you get the above functor laws for 'hoist'.
-
-    The @pipes@ prelude is full of functions that define their behavior in terms
-    of functor laws.  For example, 'P.map' transforms the category of functions
-    to the category of pipe composition:
-
-> P.map (f . g) = P.map f >-> P.map g
->
-> P.map id = pull
-
-    Functor laws like these let you easily reason about the behavior of @pipes@
-    utilities.  See if you can spot other functor laws in "Pipes.Prelude".
--}
-
-{- $catch
-    Use 'PL.catchError' from "Pipes.Lift" if you want to catch any errors raised
-    in 'ErrorT'.  Here's an example program that recovers from 'P.read' errors
-    by printing the error and retrying the read:
-
-> -- catch.hs
->
-> import Control.Monad.Trans.Error
 > import Pipes
-> import qualified Pipes.Lift as PL
-> import qualified Pipes.Prelude as P
+> import Prelude hiding (take)
 >
-> keepReading :: () -> Producer Int (ErrorT String IO) ()
-> keepReading () = loop
->   where
->     loop =
->         (hoist lift . P.stdin >-> P.read) ()
->       `PL.catchError` (\e -> do
->         lift $ lift $ putStrLn e
->         loop )
->
-> main = runErrorT $ runEffect $ (keepReading >-> hoist lift . P.print) ()
-
-    This prints the error to the console and continues reading if the user input
-    does not parse to an 'Int':
-
-> $ ./catch
-> 134<Enter>
-> 134
-> Test
-> Pipes.Prelude.read: no parse
-> 79<Enter>
-> 79
-> ^D
-> $
-
--}
-
-{- $folds
-    The @pipes@ Prelude provides several folds which store their results in a
-    'WriterT' layer in the base monad.  For example, you can count the number of
-    lines of input like the @wc@ command if you use the 'P.length' fold:
-
-> P.length :: (Monad m) => () -> Consumer a (WriterT (Sum Int) m) r
-
-    Just don't forget to use 'hoist' since the base monads don't match:
-
-> -- wc.hs
->
-> import Pipes
-> import qualified Pipes.Prelude as P
-> import Control.Monad.Trans.Writer.Strict
->
-> main = do
->     numLines <- execWriterT $ runEffect $ (hoist lift . P.stdin >-> P.length) ()
->     print numLines
-
-    Let's try it:
-
-> $ ./wc < wc.hs
-> Sum {getSum = 9}
-> $ ./wc
-> How<Enter>
-> many<Enter>
-> lines?<Enter>
-> ^D
-> Sum {getSum = 3}
-> $
-
-    However, Haskell pipes can read and transmit typed values, so let's take
-    advantage of that to do some @awk@-like arithmetic.  We'll combine
-    'P.readLn' which 'read's typed values from standard input:
-
-> -- Like our 'readInt', except throws exceptions on failed parses
-> P.readLn :: (Read b) => () -> Producer b IO ()
-
-    ... and fold those values using 'P.sum':
-
-> P.sum :: (Monad m, Num a) => () -> Consumer a (WriterT (Sum a) m) r
-
-    Whenever we fold things using 'WriterT' we can use 'runWriterT' or
-    'execWriterT' to retrieve the result of the fold:
-
-> -- sum.hs
->
-> import Control.Monad.Trans.Writer.Strict
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> main = do
->     total <- execWriterT $ runEffect $ (hoist lift . P.readLn >-> P.sum) ()
->     print total
--}
-
-{- $types3
-    You can reason about how @pipes@ behave by following the types.  In the last
-    pipeline we began from 'P.readLn' (which defaulted to 'Integer's):
-
-> P.readLn
->     :: () -> Producer Integer IO ()
-
-    ... and 'hoist'ed a 'lift' so that its base monad matches 'P.sum':
-
-> hoist lift . P.readLn
->     :: (MonadTrans t)
->     => () -> Producer Integer (t                     IO) ()
->
-> P.sum
->     :: (Monad m)
->     => () -> Consumer Integer (WriterT (Sum Integer) m ) ()
-
-    The \'@t@\' will type-check as @WriterT (Sum Integer@) and the \'@m@\' will
-    type-check as 'IO', so the two base monads match.
-
-    'P.readLn' is a 'Producer' and 'P.sum' is a 'Consumer', so when we compose
-    them we get an 'Effect':
-
-> hoist lift . P.readLn >-> P.sum
->     :: () -> Effect (WriterT (Sum Integer) IO) ()
-
-    We can't run the 'Effect' until we apply the pipeline to @()@:
-
-> (hoist lift . P.readLn >-> P.sum) ()
->     :: Effect (WriterT (Sum Integer) IO) ()
-
-    ... and then we retrieve the action in the base monad using 'runEffect':
-
-> runEffect $ (hoist lift . P.readLn >-> P.sum) ()
->     :: WriterT (Sum Integer) IO ()
-
-    This is the right type for 'execWriterT', which runs the fold:
-
-> execWriterT $ runEffect $ (hoist lift . P.readLn >-> P.sum) ()
->     :: IO (Sum Integer)
-
-    Now we've built an 'IO' action that folds user input into a 'Sum'.
--}
-
-{- $run
-    The above folds will not run in constant space because both 'WriterT'
-    implementations in @transformers@ are not sufficiently strict.  Fortunately,
-    you can use 'execWriterP' to work around this, which has the following type
-    signature:
-
-> execWriterP
->     :: (Monad m, Monoid w)
->     => Proxy a' a b' b (WriterT w m) r -> Proxy a' a b' b m w
-
-    'runWriterP' and 'execWriterP' let you unwrap 'WriterT' layers in the base
-    monad without having to unwrap the 'Proxy' layer.  As a bonus, they both
-    keep the 'WriterT' accumulator strict, so they serve a dual purpose.  You
-    will see the difference if you try to use 'execWriterP' versus
-    'execWriterT' for large folds:
-
-> import Control.Monad.Trans.Writer.Strict
-> import Pipes
-> import Pipes.Lift
-> import qualified Pipes.Prelude as P
->
-> main = do
->     -- This version overflows
->     -- total <- execWriterT $ runEffect $
->     --      (P.fromList [(1::Int)..10000000] >-> P.sum) ()
->
->     -- This version runs in constant space
->     total <- runEffect $ execWriterP $
->         (P.fromList [(1::Int)..10000000] >-> P.sum) ()
->     print total
-
-    "Pipes.Lift" provides several functions like these which let you unwrap
-    monad transformers in the base monad without unwrapping the 'Proxy' type:
-
-> runErrorP
->     :: (Monad m)
->     => Proxy a' a b' b (ErrorT e m) r -> Proxy a' a b' b m (Either e r)
->
-> runReaderP
->     :: (Monad m)
->     => i -> Proxy a' a b' b (ReaderT i m) r -> Proxy a' a b' b m r
->
-> runStateP
->     :: (Monad m)
->     => s -> Proxy a' a b' b (StateT s m) r -> Proxy a' a b' b m (r, s)
-
-    This makes it easy to extend pipes by just stashing all the desired
-    functionality in the base monad.  Then you can unwrap the monad transformers
-    when you are done using them, without having to leave the 'Proxy' monad.
+> --            Pipes 'a's to 'a's +----+-+
+> --                               |    | |
+> --                               v    v v
+> take :: (Monad m) => Int -> a -> Pipe a a m ()
+> take n a =
+>     if (n <= 0)
+>     then return ()
+>     else do
+>         yield a
+>         a' <- await      -- Get the next value
+>         take (n - 1) a'
 -}
 
 {- $conclusion
@@ -840,4 +332,44 @@ Left "Pipes.Prelude.read: no parse"
 
     ... or you can mail the list directly at
     <mailto:haskell-pipes@googlegroups.com>.
+-}
+
+{- $appendix
+
+> -- echo.hs
+>
+> import Control.Monad (unless)
+> import Pipes
+> import qualified System.IO as IO
+>
+> stdin :: Producer String IO ()
+> stdin = do
+>     eof <- lift $ IO.hIsEOF IO.stdin
+>     unless eof $ do
+>         str <- lift getLine
+>         yield str
+>         stdin
+>
+> loop :: Effect IO ()
+> loop = for stdin $ \str -> do
+>     lift $ putStrLn str
+>
+> main :: IO ()
+> main = run loop
+
+> -- nested.hs
+>
+> import Pipes
+> import qualified Pipes.Prelude as P
+>
+> body :: (Monad m) => a -> Producer a m ()
+> body x = do
+>     yield x
+>     yield x
+>
+> loop :: Producer String IO ()
+> loop = for P.stdin body
+>
+> main  = run $ for loop (lift . putStrLn)
+
 -}
