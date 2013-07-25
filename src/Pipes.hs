@@ -187,8 +187,8 @@ infixr 8 /</
 @
 
     Each composition operator has a \"point-ful\" version, analogous to how
-    ('>>=') is the point-ful version of ('>=>').
-
+    ('>>=') is the point-ful version of ('>=>').  For example, 'for' is the
+    point-ful version of ('\>\').
 -}
 
 {- $yield

@@ -212,8 +212,8 @@ quit<Enter>
 
     You do not need to provide the final argument for these 'Pipe's (i.e. the
     \'@a@\').  That extra argument is what makes these push-based 'Pipe's
-    because it guarantees that they must receive at least one input and this is
-    how ('~>') feeds in their first input.
+    by guaranteeing that they must receive at least one input before beginning.
+    This is also how ('~>') feeds in their first input.
 -}
 
 -- | @(take n)@ only allows @n@ values to pass through
