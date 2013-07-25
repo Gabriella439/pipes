@@ -149,14 +149,16 @@ run = go
      pull-based computations need not evaluate upstream stages unless absolutely
      necessary.
 -}
-infixr 5 <-<, >-
-infixl 5 >->, -<
-infixr 6 >~>, <~
-infixl 6 <~<, ~>
-infixr 7 />/
-infixl 7 \<\ -- GHC will raise a parse error if either of these lines ends
-infixl 8 \>\ -- with '\', which is why this comment is here
-infixr 8 /</
+infixr 4 />/
+infixl 4 \<\ -- GHC will raise a parse error if either of these lines ends
+infixl 5 \>\ -- with '\', which is why this comment is here
+infixr 5 /</
+infixr 6 >-
+infixl 6 -<
+infixr 7 <-<, <~
+infixl 7 >->, ~>
+infixr 8 >~>
+infixl 8 <~<
 
 {- $categories
     A 'Control.Category.Category' is a set of components that you can connect
