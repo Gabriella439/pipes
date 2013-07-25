@@ -473,10 +473,10 @@ feed p0 fb' = go p0
   #-}
 
 {- $push
-    The 'push' category closely corresponds to the internal iterator design
-    pattern, where ('~>') is designed to resemble the method call of an
-    internal iteration.  The 'push' category consists of three operations, which
-    you can think of as having the following types:
+    The 'push' category closely corresponds to push-based Unix pipes, where
+    ('>~>') is designed to resemble the Unix pipe operator.  The 'push' category
+    consists of three operations, which you can think of as having the following
+    types:
 
 > -- 'push' retransmits every values
 > push  :: (Monad m)
@@ -505,19 +505,6 @@ feed p0 fb' = go p0
 >
 > -- Associativity
 > (f >~> g) >~> h = f >~> (g >~> h)
-
-    When you write these laws in terms of ('~>'), they summarize our intuition
-    for how internal iterators should work:
-
-> -- Transforming a 'push' is the same as applying the iterator to the first input
-> push x ~> f = f x
->
-> -- Re-'push'ing all elements does nothing
-> m ~> push = m
->
-> -- Nested iterations can become sequential iterations if the inner iteration
-> -- does not use the first input
-> m ~> (\x -> f x ~> g) = m ~> f ~> g
 
     In the fully general case, you can also send information upstream by
     invoking 'await' with a non-@()@ argument.  The upstream 'Proxy' will
@@ -607,10 +594,10 @@ p ~> fb = case p of
 {-# INLINABLE (~>) #-}
 
 {- $pull
-    The 'pull' category closely corresponds to the Unix pipes design pattern,
-    where ('>->') is designed to resemble the Unix pipe operator.  The 'pull'
-    category consists of three operations, which you can think of as having the
-    following types:
+    The 'pull' category closely corresponds to pull-based Unix pipes, where
+    ('>->') is designed to resemble the Unix pipe operator.  The 'pull' category
+    consists of three operations, which you can think of as having the following
+    types:
 
 > -- 'pull' retransmits all values
 > pull  :: (Monad m)
@@ -639,19 +626,6 @@ p ~> fb = case p of
 >
 > -- Associativity
 > (f >-> g) >-> h = f >-> (g >-> h)
-
-    When you write these laws in terms of ('>-'), they summarize our intuition
-    for how pull-based iteration should work:
-
-> -- Transforming a 'pull' is the same as applying the iterator to the first argument
-> f >- pull x = f x
->
-> -- Re-'pull'ing all elements does nothing
-> pull >- m = m
->
-> -- Nested iterations can become sequential iterations if the inner iteration
-> -- does not use the first argument
-> (\x -> f >- g x) >- m = f >- g >- m
 
     In the fully general case, you can also send information upstream by
     invoking 'await' with a non-@()@ argument.  The upstream 'Proxy' will
