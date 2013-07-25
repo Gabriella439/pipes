@@ -202,15 +202,15 @@ infixr 8 /</
 >
 > -- Loops over a 'Producer', handling outputs with a 'Producer' or 'Effect'
 > for   :: (Monad m)               |  for   :: (Monad m)
->       =>       Producer a m ()   |        =>   Producer a m ()
->       -> (a -> Producer b m ())  |        -> (a -> Effect m ())
->       ->       Producer b m ()   |        ->       Effect m ())
+>       =>       Producer a m ()   |        =>       Producer a m ()
+>       -> (a -> Producer b m ())  |        -> (a -> Effect     m ())
+>       ->       Producer b m ()   |        ->       Effect     m ()
 >
-> -- Composes unfolds
-> (/>/) :: (Monad m)
->       => (a -> Producer b m ())
->       => (b -> Producer c m ())
->       => (a -> Producer c m ())
+> -- Composes unfolds or handlers
+> (/>/) :: (Monad m)               |  (/>/) :: (Monad m)
+>       => (a -> Producer b m ())  |        => (a -> Producer b m ())
+>       => (b -> Producer c m ())  |        -> (b -> Effect     m ())
+>       => (a -> Producer c m ())  |        -> (a -> Effect     m ())
 
     The 'yield' category obeys the category laws, where 'yield' is the
     identity and ('/>/') is composition:
@@ -340,17 +340,17 @@ for p0 fb = go p0
 > await :: (Monad m)
 >       =>  () -> Consumer a m a
 >
-> -- Loops over a 'Consumer', handling inputs with a 'Consumer' or 'Effect'
-> feed  :: (Monad m)              |  feed  :: (Monad m)
->       =>        Consumer b m c  |        =>    Consumer b m c
->       -> (() -> Consumer a m b  |        -> (() -> Effect m b
->       ->        Consumer a m c  |        ->        Effect m c
+> -- Loops over a 'Consumer', supplying inputs with a 'Consumer' or 'Effect'
+> feed  :: (Monad m)               |  feed  :: (Monad m)
+>       =>        Consumer b m c   |        =>        Consumer b m c
+>       -> (() -> Consumer a m b)  |        -> (() -> Effect     m b)
+>       ->        Consumer a m c   |        ->        Effect     m c
 >
-> -- Composes folds
-> (\>\) :: (Monad m)
->       => (() -> Consumer a m b)
->       => (() -> Consumer b m c)
->       => (() -> Consumer a m c)
+> -- Composes folds or suppliers
+> (\>\) :: (Monad m)               |  (\>\) :: (Monad m)
+>       => (() -> Consumer a m b)  |        => (() -> Effect     m a)
+>       => (() -> Consumer b m c)  |        -> (() -> Consumer a m b)
+>       => (() -> Consumer a m c)  |        -> (() -> Effect     m b)
 
     The 'await' category obeys the category laws, where 'await' is the
     identity and ('\>\') is composition:
@@ -471,51 +471,26 @@ feed p0 fb' = go p0
   #-}
 
 {- $push
-    The 'push' category closely corresponds to internal iterators and ('~>')
-    is designed to resemble the method call of an internal iteration.
+    The 'push' category closely corresponds to the internal iterator design
+    pattern, where ('~>') is designed to resemble the method call of an
+    internal iteration.  The 'push' category consists of three operations, which
+    you can think of as having the following types:
 
-    The 'push' category connects push-based streams, where control begins from
-    the most upstream component.  You can more easily understand 'push', ('~>')
-    and ('>~>') by studying their types when specialized to 'Pipe's and
-    'Producer's:
-
-> -- 'push' retransmits all values
+> -- 'push' retransmits every values
 > push  :: (Monad m)
 >       =>  a -> Pipe a a m r
 >
-> -- '~>' transforms a 'Producer' by applying a 'Pipe' downstream
-> (~>)  :: (Monad m)
->       =>       Producer a m r
->       -> (a -> Pipe   a b m r)
->       ->       Producer b m r)
+> -- '~>' transforms a 'Producer' by applying a 'Pipe' or 'Consumer' downstream
+> (~>)  :: (Monad m)              |  (~>)  :: (Monad m)
+>       =>       Producer a m r   |        =>       Producer a m r
+>       -> (a -> Pipe   a b m r)  |        -> (a -> Consumer a m r)
+>       ->       Producer b m r   |        ->       Effect     m r
 >
-> -- '>~>' connects two Pipes
-> (>~>) :: (Monad m)
->       => (a -> Pipe a b m r)
->       => (b -> Pipe b c m r)
->       => (a -> Pipe a c m r)
-
-    In the fully general case, you can also send information upstream.  In fact,
-    upstream flow in the 'push' category behaves identically to downstream flow
-    in the 'pull' category.  Vice versa, downstream flow in the 'push' category
-    behaves identically to upstream flow in the 'pull' category.  These two
-    categories are duals of each other:
-
->           a                b                      a
->           |                |                      |
->      +----|----+      +----|----+            +----|----+
->      |    v    |      |    v    |            |    v    |
->  a' <==       <== b' <==       <== c'    a' <==       <== c'
->      |    f    |      |    g    |     =      | f >~> g |
->  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
->      |    |    |      |    |    |            |    |    |
->      +----|----+      +----|----+            +----|----+
->           v                v                      v
->           r                r                      r
->
->  f        :: a -> Proxy a' a b' b m r
->        g  :: b -> Proxy b' b c' c m r
-> (f >~> g) :: a -> Proxy a' a c' c m r
+> -- '>~>' connects 'Pipe's and 'Consumer's
+> (>~>) :: (Monad m)              |  (>~>) :: (Monad m)
+>       => (a -> Pipe   a b m r)  |        => (a -> Pipe   a b m r)
+>       => (b -> Pipe   b c m r)  |        -> (b -> Consumer b m r)
+>       => (a -> Pipe   a c m r)  |        -> (a -> Consumer a m r)
 
     The 'push' category obeys the category laws, where 'push' is the identity
     and ('>~>') is composition:
@@ -530,17 +505,54 @@ feed p0 fb' = go p0
 > (f >~> g) >~> h = f >~> (g >~> h)
 
     When you write these laws in terms of ('~>'), they summarize our intuition
-    for how push-based iteration should work:
+    for how internal iterators should work:
 
-> -- Iterating over a push is the same as directly applying the iterator
-> push a ~> f = f a
+> -- Transforming a 'push' is the same as applying the iterator to the first input
+> push x ~> f = f x
 >
-> -- Pushing all elements does nothing
+> -- Re-'push'ing all elements does nothing
 > m ~> push = m
 >
 > -- Nested iterations can become sequential iterations if the inner iteration
-> -- does not use the first output
+> -- does not use the first input
 > m ~> (\x -> f x ~> g) = m ~> f ~> g
+
+    In the fully general case, you can also send information upstream by
+    invoking 'await' with a non-@()@ argument.  The upstream 'Proxy' will
+    receive this argument through the return value of 'yield':
+
+> push  :: (Monad m)
+>       =>  a -> Proxy a' a a' a m r
+>
+>           a
+>           |
+>      +----|----+
+>      |    v    |
+>  a' <============ a'
+>      |         |
+>  a  ============> a
+>      |    |    |
+>      +----|----+
+>           v
+>           r
+>
+> (>~>) :: (Monad m)
+>       => (a -> Proxy a' a b' b m r)
+>       -> (b -> Proxy b' b c' c m r)
+>       -> (a -> Proxy a' a c' c m r)
+>
+>           a                b                      a
+>           |                |                      |
+>      +----|----+      +----|----+            +----|----+
+>      |    v    |      |    v    |            |    v    |
+>  a' <==       <== b' <==       <== c'    a' <==       <== c'
+>      |    f    |      |    g    |     =      | f >~> g |
+>  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
+>      |    |    |      |    |    |            |    |    |
+>      +----|----+      +----|----+            +----|----+
+>           v                v                      v
+>           r                r                      r
+
 -}
 
 {-| Forward responses followed by requests
@@ -593,49 +605,26 @@ p ~> fb = case p of
 {-# INLINABLE (~>) #-}
 
 {- $pull
-    The 'pull' category connects pull-based streams, where control begins from
-    the most downstream component.  You can more easily understand 'pull',
-    ('>-') and ('>->') by studying their types when specialized to 'Pipe's:
+    The 'pull' category closely corresponds to the Unix pipes design pattern,
+    where ('>->') is designed to resemble the Unix pipe operator.  The 'pull'
+    category consists of three operations, which you can think of as having the
+    following types:
 
 > -- 'pull' retransmits all values
 > pull  :: (Monad m)
 >       =>  () -> Pipe a a m r
 >
-> -- '>-' transforms a 'Consumer' by applying a 'Pipe' upstream
-> (>-)  :: (Monad m)
->       => (() -> Pipe a b m r)
->       ->      Consumer b m r
->       ->      Consumer a m r
+> -- '>-' transforms a 'Consumer' by applying a 'Pipe' or 'Producer' upstream
+> (>-)  :: (Monad m)               |  (>-)  :: (Monad m)
+>       => (() -> Pipe   a b m r)  |        => (() -> Producer b m r)
+>       ->        Consumer b m r   |        ->        Consumer b m r
+>       ->        Consumer a m r   |        ->        Effect     m r
 >
-> -- '>->' connects two Pipes
-> (>->) :: (Monad m)
->       => (() -> Pipe a b m r)
->       -> (() -> Pipe b c m r)
->       -> (() -> Pipe a c m r)
-
-    The 'pull' category closely corresponds to the Unix pipes design pattern and
-    ('>->') behaves like the Unix pipe operator.
-
-    In the fully general case, you can also send information upstream by
-    invoking 'await' with a non-@()@ argument.  The upstream 'Proxy' will
-    receive the first value through its initial argument and bind each
-    subsequent value through the return value of 'yield':
-
->           b'               c'                     c'
->           |                |                      |
->      +----|----+      +----|----+            +----|----+
->      |    v    |      |    v    |            |    v    |
->  a' <==       <== b' <==       <== c'    a' <==       <== c'
->      |    f    |      |    g    |     =      | f >-> g |
->  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
->      |    |    |      |    |    |            |    |    |
->      +----|----+      +----|----+            +----|----+
->           v                v                      v
->           r                r                      r
->
->  f        :: b' -> Proxy a' a b' b m r
->        g  :: c' -> Proxy b' b c' c m r
-> (f >-> g) :: c' -> Proxy a' a c' c m r
+> -- '>->' connects two 'Pipe's or 'Producer's
+> (>->) :: (Monad m)               |  (>->) :: (Monad m)
+>       => (() -> Pipe   a b m r)  |        -> (() -> Producer b m r)
+>       -> (() -> Pipe   b c m r)  |        -> (() -> Pipe   b c m r)
+>       -> (() -> Pipe   a c m r)  |        -> (() -> Producer c m r)
 
     The 'pull' category obeys the category laws, where 'pull' is the identity
     and ('>->') is composition:
@@ -649,18 +638,55 @@ p ~> fb = case p of
 > -- Associativity
 > (f >-> g) >-> h = f >-> (g >-> h)
 
-    When you write these laws in terms of ('-<'), they summarize our intuition
+    When you write these laws in terms of ('>-'), they summarize our intuition
     for how pull-based iteration should work:
 
-> -- Reforwarding all elements does nothing
-> f >- pull a = f a
+> -- Transforming a 'pull' is the same as applying the iterator to the first argument
+> f >- pull x = f x
 >
-> -- Iterating over a pull returns the original iterator
-> m >- pull
+> -- Re-'pull'ing all elements does nothing
+> pull >- m = m
 >
 > -- Nested iterations can become sequential iterations if the inner iteration
 > -- does not use the first argument
 > (\x -> f >- g x) >- m = f >- g >- m
+
+    In the fully general case, you can also send information upstream by
+    invoking 'await' with a non-@()@ argument.  The upstream 'Proxy' will
+    receive the first value through its initial argument and bind each
+    subsequent value through the return value of 'yield':
+
+> pull  :: (Monad m)
+>       =>  a' -> Proxy a' a a' a m r
+>
+>           a'
+>           |
+>      +----|----+
+>      |    v    |
+>  a' <============ a'
+>      |         |
+>  a  ============> a
+>      |    |    |
+>      +----|----+
+>           v
+>           r
+>
+> (>->) :: (Monad m)
+>       -> (b' -> Proxy a' a b' b m r)
+>       -> (c' -> Proxy b' b c' c m r)
+>       -> (c' -> Proxy a' a c' c m r)
+>
+>           b'               c'                     c'
+>           |                |                      |
+>      +----|----+      +----|----+            +----|----+
+>      |    v    |      |    v    |            |    v    |
+>  a' <==       <== b' <==       <== c'    a' <==       <== c'
+>      |    f    |      |    g    |     =      | f >-> g |
+>  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
+>      |    |    |      |    |    |            |    |    |
+>      +----|----+      +----|----+            +----|----+
+>           v                v                      v
+>           r                r                      r
 
 -}
 
@@ -718,23 +744,23 @@ fb' >- p = case p of
 
     * The await category is the dual of the yield category
 
-> reflect . await = yield
->
-> reflect . (f \>\ g) = reflect . f \<\ reflect . g
-
 > reflect . yield = await
 >
 > reflect . (f />/ g) = reflect . f /</ reflect . g
 
-    * The pull category is the dual of the push category
-
-> reflect . pull = push
+> reflect . await = yield
 >
-> reflect . (f >-> g) = reflect . f <~< reflect . g
+> reflect . (f \>\ g) = reflect . f \<\ reflect . g
+
+    * The pull category is the dual of the push category
 
 > reflect . push = pull
 >
 > reflect . (f >~> g) = reflect . f <-< reflect . g
+
+> reflect . pull = push
+>
+> reflect . (f >-> g) = reflect . f <~< reflect . g
 -}
 
 -- | Switch the upstream and downstream ends
