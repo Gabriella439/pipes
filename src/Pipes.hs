@@ -945,14 +945,14 @@ type Consumer a = Proxy () a () X
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
-    'Client's never 'yield'.
+    'Client's only 'await' and never 'yield'.
 -}
 type Client a' a = Proxy a' a () X
 
 {-| @Server b' b@ receives requests of type @b'@ and sends responses of type
     @b@.
 
-    'Server's never 'await'.
+    'Server's only 'yield' and never 'await'.
 -}
 type Server b' b = Proxy X () b' b
 
