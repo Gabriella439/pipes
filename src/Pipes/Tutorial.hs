@@ -1,10 +1,33 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-{-| @pipes@ is a lightweight and powerful library for stream processing with
-    effects.
+{-| @pipes@ is a lightweight and powerful library for processing effectful
+    streams in constant memory.
 
-    You can find derived libraries that provide additional functionality on
-    Hackage under the \"Pipes\" category.
+    @pipes@ supports a wide variety of stream programming abstractions,
+    including:
+
+    * Generators, for loops, and internal \/ external iterators
+
+    * 'ListT' done right
+
+    * Unix pipes
+
+    * Folds
+
+    * Message passing and reactive programming (using the @pipes-concurrency@
+      library)
+
+    * Stream parsing (using the @pipes-safe@ library)
+
+    * Exception-safe streams (using the @pipes-safe@ library)
+
+    * Directed acyclic graphs (using the @pipes-arrow@ library)
+
+    If you want a really fast Quick Start guide, read the documentation in
+    "Pipes.Prelude" from top to bottom.
+
+    This tutorial is more extensive and explains the @pipes@ API in greater
+    detail and illustrates several idioms.
 -}
 
 module Pipes.Tutorial (
@@ -14,8 +37,8 @@ module Pipes.Tutorial (
     -- * Theory
     -- $theory
 
-    -- * Pipes
-    -- $pipes
+    -- * Consumers
+    -- $consumers
 
     -- * Appendix
     -- $appendix
@@ -32,7 +55,9 @@ import Prelude hiding ((.), id)
 {- $producers
     The library represents effectful streams of input using 'Producer's.  A
     'Producer' is a monad transformer that extends the base monad with the
-    ability to incrementally 'yield' output, such as the following code:
+    ability to incrementally 'yield' output.  The following @stdin@ 'Producer'
+    shows how to incrementally read and 'yield' lines from standard input,
+    terminating when we reach the end of the input:
 
 > -- echo.hs
 >
@@ -51,8 +76,8 @@ import Prelude hiding ((.), id)
 > stdin = do
 >     eof <- lift $ IO.hIsEOF IO.stdin  -- 'lift' actions from the base monad
 >     unless eof $ do
->         str <- lift getLine
->         yield str                     -- 'yield' the next line of input
+>         str <- lift getLine           -- Read a line of input
+>         yield str                     -- 'yield' the line of input
 >         stdin                         -- Loop
 
     'yield' emits a value, suspending the current 'Producer' until the value is
@@ -65,8 +90,8 @@ import Prelude hiding ((.), id)
 
 > for :: (Monad m) => Producer a m r -> (a -> Producer b m r) -> Producer b m r
 
-    This greatly resembles the type of @(flip concatMap)@ (or ('>>=') for the
-    list monad):
+    Notice how this type greatly resembles the type of @(flip concatMap)@ (or
+    ('>>=') for the list monad):
 
 > flip concatMap :: [a] -> (a -> [b]) -> [b]
 
@@ -74,37 +99,43 @@ import Prelude hiding ((.), id)
 
 > -- echo.hs
 >
-> --                            +-- 'loop' does not emit any values, so 'a' is
-> --                            |   polymorphic
-> --                            v
+> --               +-- 'loop' does not emit any values, so 'a' is polymorphic
+> --               |
+> --               v
 > loop :: Producer a IO ()
-> loop = for stdin $ \str -> do        -- Read this like: "for (str in stdin):"
->     lift $ putStrLn str              -- The body of the 'for' loop
+> loop = for stdin $ \str -> do  -- Read this like: "for (str in stdin):"
+>     lift $ putStrLn str        -- The body of the 'for' loop
 >
 > -- even better: loop = for stdin (lift . putStrLn)
 
     Notice how 'loop' does not re-emit any values of its own.  @pipes@ defines a
     type synonym for this special case:
 
-> type Effect m r = forall a . Producer a m r
+> data X  -- The uninhabited type
+>
+> type Effect m r = Producer X m r
 
-    So we can change the type signature of @loop@ to:
+    A 'Producer' only type-checks as an 'Effect' if the 'Producer' never outputs
+    any values, because 'X' is uninhabited.  This means we can change the type
+    signature of @loop@ to:
 
 > loop :: (Monad m) => Effect IO ()
 
-    We can 'run' any 'Effect' and convert it back to the base monad:
+    'Effect's are special because we can 'run' any 'Effect' and convert it back
+    to the base monad:
 
 > run :: (Monad m) => Effect m r -> m r
 
-    ... so we can complete our program by writing:
+    If our @loop@ had any residual unhandled output, then the following 'run'
+    would not type-check:
 
 > -- echo.hs
 >
 > main :: IO ()
 > main = run loop
 
-    This program loops over standard input and echoes every line to standard
-    output:
+    The final program loops over standard input and echoes every line to
+    standard output:
 
 > $ ghc -O2 echo.hs
 > $ ./echo
@@ -139,7 +170,7 @@ import Prelude hiding ((.), id)
 >
 > -- This is the same as:
 > --
-> -- loop = for P.stdin $ \str ->
+> -- loop = for P.stdin $ \str -> do
 > --     yield str
 > --     yield str
 
@@ -164,7 +195,7 @@ import Prelude hiding ((.), id)
 > ABC
 > ^D
 
-    But is this feature really necessary?  Couldn't we have written this using
+    But is this feature really necessary?  Couldn't we have rewritten this using
     a nested for loop instead?
 
 > main = run $
@@ -190,19 +221,21 @@ import Prelude hiding ((.), id)
 >       -> (a -> Producer c m r)
 > (f />/ g) x = for (f x) g
 
-    Now we can rewrite the equality into an equivalent equality using ('/>/')
-    instead of 'for':
+    Using this operator we can transform our original equality into the
+    following more symmetric form:
 
 > f :: (Monad m) => a -> Producer b m r
 > g :: (Monad m) => b -> Producer c m r
 > h :: (Monad m) => c -> Producer d m r
-
+>
 > -- Associativity
 > (f />/ g) />/ h = f />/ (g />/ h)
 
     That's much more symmetric.  In fact, it looks just like an associativity
-    law for the composition operator of a 'Control.Category.Category'.  If that
-    were true, then we would also expect two identity laws:
+    law for the composition operator of a 'Control.Category.Category', where
+    ('/>/') behaves like the composition operator.  If that were true, though,
+    then we would also expect two identity laws and, sure enough, 'yield'
+    behaves like the identity of ('/>/'):
 
 > -- Left Identity
 > yield />/ f = f
@@ -217,7 +250,7 @@ import Prelude hiding ((.), id)
 
     This just says that if you iterate over a single-element 'Producer' with no
     side effects, then you can instead cut out the middle man and directly apply
-    the body of the loop to that element.
+    the body of the loop to that single element.
 
     If we translate the right identity law to use 'for' instead of ('/>/') we
     get:
@@ -227,7 +260,8 @@ import Prelude hiding ((.), id)
     This just says that if the only thing you do is re-'yield' every element of
     a stream, you get back your original stream.
 
-    Therefore, these three common-sense \"for loop\" laws:
+    These three \"for loop\" laws summarize our common-sense intuition for how
+    'for' loops should behave:
 
 > for (for m f) g = for m (\x -> for (f x) g)
 >
@@ -235,7 +269,8 @@ import Prelude hiding ((.), id)
 >
 > for m yield = m
 
-    ... are really the 'Control.Category.Category' laws in disguise.
+    ... and they miraculously fall out of the 'Control.Category.Category' laws
+    for ('/>/') and 'yield'.
 
     In fact, we get more out of this than just a bunch of equations.  We also
     got a useful operator, too: ('/>/').  We can use this operator to condense
@@ -257,7 +292,7 @@ import Prelude hiding ((.), id)
     * Think compositionally instead of sequentially
 -}
 
-{- $pipes
+{- $consumers
     Sometimes you don't want use a 'for' loop because you don't want to process
     every value of a 'Producer' the exact same way.  For example, there is no
     (easy) way to consume only the first few elements of a 'Producer' using a
@@ -273,23 +308,27 @@ import Prelude hiding ((.), id)
     containing the next value, @a@, along with the remainder of the 'Producer'.
 
     However, sometimes we can get away with something a little more elegant,
-    like a 'Pipe', which you can think of as a Unix pipe that streams inputs to
-    outputs.  Using 'Pipe's, we can define our own @take@ like this:
+    like a 'Consumer', which represents an effectful fold.  A 'Consumer' is a
+    monad transformer that extends the base monad with the ability to
+    incrementally 'await' input.  The following @printN@ 'Consumer' shows how to
+    'print' out only the first @n@ elements received:
 
 > import Pipes
-> import Prelude hiding (take)
 >
-> --            Pipes 'a's to 'a's +----+-+
-> --                               |    | |
-> --                               v    v v
-> take :: (Monad m) => Int -> a -> Pipe a a m ()
-> take n a =
+> --                                +--------+-- A 'Consumer' of 'Show'able 'a's
+> --                                |        |
+> --                                v        v
+> printN :: (Show a) => Int -> a -> Consumer a IO ()
+> printN n a =
 >     if (n <= 0)
 >     then return ()
 >     else do
->         yield a
->         a' <- await      -- Get the next value
->         take (n - 1) a'
+>         lift $ print a
+>         a' <- await ()  -- 'await' a new value
+>         printN (n - 1) a'
+
+    'await' is the dual of 'yield': we suspend our 'Pipe' until we are supplied
+    with a new value.
 -}
 
 {- $conclusion

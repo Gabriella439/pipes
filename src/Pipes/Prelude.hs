@@ -1,8 +1,9 @@
 {-| General purpose utilities
 
     The names in this module clash heavily with the Haskell Prelude, so I
-    recommend that you import this module qualified:
+    recommend the following import scheme:
 
+> import Pipes
 > import qualified Pipes.Prelude as P
 -}
 
@@ -103,7 +104,7 @@ ABC
     Similarly, 'every' transforms  'Iterable's (like 'ListT') into 'Producer's.
 
     You can also build your own custom 'Producer's using 'yield' and the 'Monad'
-    instance for 'Producer's.
+    \/ 'MonadTrans' instances for 'Producer'.
 -}
 
 -- | Read 'String's from 'IO.stdin' using 'getLine'
@@ -127,7 +128,7 @@ fromHandle h = go
     An unfold is a 'Producer' which can also be used to transform a stream.
 
     You use 'for' to apply an unfold to a stream.  This behaves like a
-    'concatMap' generating a new 'Producer':
+    'concatMap', generating a new 'Producer':
 
 > -- Outputs two copies of every input string
 > for P.stdin (P.replicate 2) :: Producer String IO ()
@@ -296,9 +297,8 @@ scanM step b0 a0 = loop a0 b0
 {-# INLINABLE scanM #-}
 
 {- $folds
-    Use these to fold the output of a 'Producer'.  Many of these folds are lazy,
-    meaning that they will draw the minimum number of values necessary to
-    compute a result:
+    Use these to fold the output of a 'Producer'.  Certain folds will stop
+    drawing elements if they can compute their result early, like 'any':
 
 >>> P.any null P.stdin
 Test<Enter>
