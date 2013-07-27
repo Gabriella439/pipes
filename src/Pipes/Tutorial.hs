@@ -315,17 +315,13 @@ import Prelude hiding ((.), id)
 
 > import Pipes
 >
-> --                                +--------+-- A 'Consumer' of 'Show'able 'a's
-> --                                |        |
-> --                                v        v
-> printN :: (Show a) => Int -> a -> Consumer a IO ()
-> printN n a =
->     if (n <= 0)
->     then return ()
->     else do
->         lift $ print a
->         a' <- await ()  -- 'await' a new value
->         printN (n - 1) a'
+> --                           +--------+-- A 'Consumer' of 'Show'able 'a's
+> --                           |        |
+> --                           v        v
+> printN :: (Show a) => Int -> Consumer a IO ()
+> printN n = replicateM_ n $ do
+>     a <- await ()  -- 'await' a new input
+>     lift $ print a
 
     'await' is the dual of 'yield': we suspend our 'Pipe' until we are supplied
     with a new value.
