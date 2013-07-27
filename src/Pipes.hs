@@ -39,13 +39,13 @@ module Pipes (
     -- $push
     push,
     (>~>),
-    (~>),
+    (>>~),
 
     -- ** Pull
     -- $pull
     pull,
     (>->),
-    (>-),
+    (->>),
 
     -- ** Reflect
     -- $reflect
@@ -58,6 +58,8 @@ module Pipes (
     Iterable(..),
 
     -- * Utilities
+    (~>),
+    cat,
     next,
     each,
     every,
@@ -87,8 +89,8 @@ module Pipes (
     (<~<),
     (/</),
     (\<\),
-    (-<),
-    (<~),
+    (<<-),
+    (~<<),
 
     -- * Re-exports
     -- $reexports
@@ -153,10 +155,10 @@ infixr 4 />/
 infixl 4 \<\ -- GHC will raise a parse error if either of these lines ends
 infixl 5 \>\ -- with '\', which is why this comment is here
 infixr 5 /</
-infixr 6 >-
-infixl 6 -<
-infixr 7 <-<, <~
-infixl 7 >->, ~>
+infixr 6 ->>
+infixl 6 <<-
+infixr 7 <-<, ~<< 
+infixl 7 >->, >>~
 infixr 8 >~>
 infixl 8 <~<
 
@@ -182,8 +184,8 @@ infixl 8 <~<
                   +-------------+-------------+-------------+
    yield category |   'yield'     |     '/>/'     |     'for'     |
    await category |   'await'     |     '\>\'     |     'feed'    |
-    push category |   'push'      |     '>~>'     |     '~>'      |
-    pull category |   'pull'      |     '>->'     |     '>-'      |
+    push category |   'push'      |     '>~>'     |     '>>~'     |
+    pull category |   'pull'      |     '>->'     |     '->>'     |
  Kleisli category |   'return'    |     '>=>'     |     '>>='     |
                   +-------------+-------------+-------------+
 @
@@ -483,7 +485,7 @@ feed p0 fb' = go p0
 >       =>  a -> Pipe a a m r
 >
 > -- '~>' transforms a 'Producer' by applying a 'Pipe' or 'Consumer' downstream
-> (~>)  :: (Monad m)              |  (~>)  :: (Monad m)
+> (>>~) :: (Monad m)              |  (>>~) :: (Monad m)
 >       =>       Producer a m r   |        =>       Producer a m r
 >       -> (a -> Pipe   a b m r)  |        -> (a -> Consumer a m r)
 >       ->       Producer b m r   |        ->       Effect     m r
@@ -571,14 +573,14 @@ push = go
     -- ^
     -> (_a -> Proxy a' a c' c m r)
     -- ^
-(fa >~> fb) a = fa a ~> fb
+(fa >~> fb) a = fa a >>~ fb
 {-# INLINABLE (>~>) #-}
 
-{-| @(p ~> f)@ pairs each 'yield' in @p@ with an 'await' in @f@.
+{-| @(p >>~ f)@ pairs each 'yield' in @p@ with an 'await' in @f@.
 
     Point-ful version of ('>~>')
 -}
-(~>)
+(>>~)
     :: (Monad m)
     =>       Proxy a' a b' b m r
     -- ^
@@ -586,12 +588,12 @@ push = go
     -- ^
     ->       Proxy a' a c' c m r
     -- ^
-p ~> fb = case p of
-    Await a' fa  -> Await a' (\a -> fa a ~> fb)
-    Yield b  fb' -> fb' >- fb b
-    M        m   -> M (m >>= \p' -> return (p' ~> fb))
+p >>~ fb = case p of
+    Await a' fa  -> Await a' (\a -> fa a >>~ fb)
+    Yield b  fb' -> fb' ->> fb b
+    M        m   -> M (m >>= \p' -> return (p' >>~ fb))
     Pure     r   -> Pure r
-{-# INLINABLE (~>) #-}
+{-# INLINABLE (>>~) #-}
 
 {- $pull
     The 'pull' category closely corresponds to pull-based Unix pipes, where
@@ -603,8 +605,8 @@ p ~> fb = case p of
 > pull  :: (Monad m)
 >       =>  () -> Pipe a a m r
 >
-> -- '>-' transforms a 'Consumer' by applying a 'Pipe' or 'Producer' upstream
-> (>-)  :: (Monad m)               |  (>-)  :: (Monad m)
+> -- '->>' transforms a 'Consumer' by applying a 'Pipe' or 'Producer' upstream
+> (->>) :: (Monad m)               |  (->>) :: (Monad m)
 >       => (() -> Pipe   a b m r)  |        => (() -> Producer b m r)
 >       ->        Consumer b m r   |        ->        Consumer b m r
 >       ->        Consumer a m r   |        ->        Effect     m r
@@ -681,7 +683,7 @@ pull = go
 {-| Compose two proxies blocked 'yield'ing data, creating a new proxy blocked
     'yield'ing data
 
-> (f >-> g) x = f >- g x
+> (f >-> g) x = f ->> g x
 
     ('>->') is the composition operator of the pull category.
 -}
@@ -693,14 +695,14 @@ pull = go
     -- ^
     -> (_c' -> Proxy a' a c' c m r)
     -- ^
-(fb' >-> fc') c' = fb' >- fc' c'
+(fb' >-> fc') c' = fb' ->> fc' c'
 {-# INLINABLE (>->) #-}
 
-{-| @(f >- p)@ pairs each 'await' in @p@ with a 'yield' in @f@.
+{-| @(f ->> p)@ pairs each 'await' in @p@ with a 'yield' in @f@.
 
     Point-ful version of ('>->')
 -}
-(>-)
+(->>)
     :: (Monad m)
     => (b' -> Proxy a' a b' b m r)
     -- ^
@@ -708,12 +710,12 @@ pull = go
     -- ^
     ->        Proxy a' a c' c m r
     -- ^
-fb' >- p = case p of
-    Await b' fb  -> fb' b' ~> fb
-    Yield c  fc' -> Yield c (\c' -> fb' >- fc' c')
-    M        m   -> M (m >>= \p' -> return (fb' >- p'))
+fb' ->> p = case p of
+    Await b' fb  -> fb' b' >>~ fb
+    Yield c  fc' -> Yield c (\c' -> fb' ->> fc' c')
+    M        m   -> M (m >>= \p' -> return (fb' ->> p'))
     Pure     r   -> Pure r
-{-# INLINABLE (>-) #-}
+{-# INLINABLE (->>) #-}
 
 {- $reflect
     @(reflect .)@ transforms each streaming category into its dual:
@@ -821,6 +823,20 @@ instance Iterable (ErrorT e) where
         case x of
             Left  _ -> return ()
             Right a -> yield a
+
+-- | Unidirectional composition
+(~>)
+    :: (Monad m)
+    => Proxy a' a () b m r
+    -> Proxy () b c' c m r
+    -> Proxy a' a c' c m r
+p1 ~> p2 = (\() -> p1) ->> p2
+{-# INLINABLE (~>) #-}
+
+-- | Unidirectional identity
+cat :: (Monad m) => Pipe a a m r
+cat = pull ()
+{-# INLINABLE cat #-}
 
 {-| Consume the first value from a 'Producer'
 
@@ -995,8 +1011,8 @@ p1 /</ p2 = p2 \>\ p1
 p1 \<\ p2 = p2 />/ p1
 {-# INLINABLE (\<\) #-}
 
--- | Equivalent to ('>-') with the arguments flipped
-(-<)
+-- | Equivalent to ('->>') with the arguments flipped
+(<<-)
     :: (Monad m)
     =>         Proxy b' b c' c m r
     -- ^
@@ -1004,11 +1020,11 @@ p1 \<\ p2 = p2 />/ p1
     -- ^
     ->         Proxy a' a c' c m r
     -- ^
-k -< p = p >- k
-{-# INLINABLE (-<) #-}
+k <<- p = p ->> k
+{-# INLINABLE (<<-) #-}
 
--- | Equivalent to ('~>') with the arguments flipped
-(<~)
+-- | Equivalent to ('>>~') with the arguments flipped
+(~<<)
     :: (Monad m)
     => (b  -> Proxy b' b c' c m r)
     -- ^
@@ -1016,8 +1032,8 @@ k -< p = p >- k
     -- ^
     ->        Proxy a' a c' c m r
     -- ^
-k <~ p = p ~> k
-{-# INLINABLE (<~) #-}
+k ~<< p = p >>~ k
+{-# INLINABLE (~<<) #-}
 
 {- $reexports
     "Control.Monad" re-exports ('>=>') and ('<=<').

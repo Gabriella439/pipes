@@ -22,8 +22,8 @@ module Pipes.Prelude (
     yieldIf,
     read,
 
-    -- * Push-based Pipes
-    -- $push
+    -- * Pipes
+    -- $pipes
     take,
     takeWhile,
     drop,
@@ -200,8 +200,8 @@ read str = case (reads str) of
     _         -> return ()
 {-# INLINABLE read #-}
 
-{- $push
-    Use ('~>') to transform a 'Producer' using a push-based 'Pipe':
+{- $pipes
+    Use ('~>') to transform a 'Producer' using a 'Pipe':
 
 >>> run $ for (P.stdin ~> P.takeWhile (/= "quit")) (lift . putStrLn)
 Test<Enter>
@@ -211,89 +211,87 @@ ABC
 quit<Enter>
 >>>
 
-    You do not need to provide the final argument for these 'Pipe's (i.e. the
-    \'@a@\').  That extra argument is what makes these push-based 'Pipe's
-    by guaranteeing that they must receive at least one input before beginning.
-    This is also how ('~>') feeds in their first input.
 -}
 
 -- | @(take n)@ only allows @n@ values to pass through
-take :: (Monad m) => Int -> a -> Pipe a a m ()
-take = go
-  where
-    go n a =
-        if (n <= 0)
-        then return ()
-        else do
-            yield a
-            await () >>= go (n - 1)
+take :: (Monad m) => Int -> Pipe a a m ()
+take n = replicateM_ n $ do
+    a <- await ()
+    yield a
 {-# INLINABLE take #-}
 
 {-| @(takeWhile p)@ allows values to pass downstream so long as they satisfy
     the predicate @p@.
 -}
-takeWhile :: (Monad m) => (a -> Bool) -> a -> Pipe a a m ()
+takeWhile :: (Monad m) => (a -> Bool) -> Pipe a a m ()
 takeWhile predicate = go
   where
-    go a =
+    go = do
+        a <- await ()
         if (predicate a)
-        then do
-            yield a
-            await () >>= go
-        else return ()
+            then do
+                yield a
+                go
+            else return ()
 {-# INLINABLE takeWhile #-}
 
 -- | @(drop n)@ discards @n@ values going downstream
-drop :: (Monad m) => Int -> a -> Pipe a a m r
+drop :: (Monad m) => Int -> Pipe a a m r
 drop = go
   where
-    go n a =
+    go n =
         if (n <= 0)
-        then push a
-        else await () >>= go (n - 1)
+        then cat
+        else do
+            await ()
+            go (n - 1)
 {-# INLINABLE drop #-}
 
 {-| @(dropWhile p)@ discards values going downstream until one violates the
     predicate @p@.
 -}
-dropWhile :: (Monad m) => (a -> Bool) -> a -> Pipe a a m r
+dropWhile :: (Monad m) => (a -> Bool) -> Pipe a a m r
 dropWhile predicate = go
   where
-    go a =
+    go = do
+        a <- await ()
         if (predicate a)
-        then await () >>= go
-        else push a
+            then go
+            else do
+                yield a
+                cat
 {-# INLINABLE dropWhile #-}
 
 -- | Outputs the indices of all elements that satisfied the predicate
-findIndices :: (Monad m) => (a -> Bool) -> a -> Pipe a Int m r
+findIndices :: (Monad m) => (a -> Bool) -> Pipe a Int m r
 findIndices predicate = loop 0
   where
-    loop n a = do
+    loop n = do
+        a <- await ()
         when (predicate a) (yield n)
-        await () >>= (loop $! n + 1)
+        loop $! n + 1
 {-# INLINABLE findIndices #-}
 
 -- | Strict left scan
-scanl :: (Monad m) => (b -> a -> b) -> b -> a -> Pipe a b m r
-scanl step b0 a0 = loop a0 b0
+scanl :: (Monad m) => (b -> a -> b) -> b -> Pipe a b m r
+scanl step = loop
   where
-    loop a b = do
+    loop b = do
         yield b
-        a' <- await ()
+        a <- await ()
         let b' = step b a
-        loop a' $! b'
+        loop $! b'
 {-# INLINABLE scanl #-}
 
 -- | Strict, monadic left scan
-scanM :: (Monad m) => (b -> a -> m b) -> b -> a -> Pipe a b m r
-scanM step b0 a0 = loop a0 b0
+scanM :: (Monad m) => (b -> a -> m b) -> b -> Pipe a b m r
+scanM step = loop
   where
-    loop a b = do
+    loop b = do
         yield b
-        a' <- await ()
+        a <- await ()
         b' <- lift (step b a)
-        loop a' $! b'
+        loop $! b'
 {-# INLINABLE scanM #-}
 
 {- $folds
