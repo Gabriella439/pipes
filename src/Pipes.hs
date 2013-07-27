@@ -63,7 +63,6 @@ module Pipes (
     next,
     each,
     every,
-    select,
     discard,
 
     -- * Concrete Type Synonyms
@@ -794,24 +793,24 @@ reflect = go
     ('>>=') corresponds to 'for', calling the second computation once for each
     time the first computation 'yield's.
 -}
-newtype ListT m a = ListT { runListT :: Producer a m () }
+newtype ListT m a = Select { list :: Producer a m () }
 
 instance (Monad m) => Functor (ListT m) where
-    fmap f p = ListT (for (runListT p) (\a -> yield (f a)))
+    fmap f p = Select (for (list p) (\a -> yield (f a)))
 
 instance (Monad m) => Applicative (ListT m) where
-    pure a = ListT (yield a)
-    mf <*> mx = ListT (
-        for (runListT mf) (\f ->
-        for (runListT mx) (\x ->
+    pure a = Select (yield a)
+    mf <*> mx = Select (
+        for (list mf) (\f ->
+        for (list mx) (\x ->
         yield (f x) ) ) )
 
 instance (Monad m) => Monad (ListT m) where
-    return a = ListT (yield a)
-    m >>= f  = ListT (for (runListT m) (\a -> runListT (f a)))
+    return a = Select (yield a)
+    m >>= f  = Select (for (list m) (\a -> list (f a)))
 
 instance MonadTrans ListT where
-    lift m = ListT (do
+    lift m = Select (do
         a <- lift m
         yield a )
 
@@ -819,17 +818,17 @@ instance (MonadIO m) => MonadIO (ListT m) where
     liftIO m = lift (liftIO m)
 
 instance (Monad m) => Alternative (ListT m) where
-    empty = ListT (return ())
-    p1 <|> p2 = ListT (do
-        runListT p1
-        runListT p2 )
+    empty = Select (return ())
+    p1 <|> p2 = Select (do
+        list p1
+        list p2 )
 
 instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
 
 instance MFunctor ListT where
-    hoist morph = ListT . hoist morph . runListT
+    hoist morph = Select . hoist morph . list
 
 {-| 'Iterable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
@@ -841,19 +840,19 @@ instance Iterable ListT where
     toListT = id
 
 instance Iterable IdentityT where
-    toListT m = ListT $ do
+    toListT m = Select $ do
         a <- lift $ runIdentityT m
         yield a
 
 instance Iterable MaybeT where
-    toListT m = ListT $ do
+    toListT m = Select $ do
         x <- lift $ runMaybeT m
         case x of
             Nothing -> return ()
             Just a  -> yield a
 
 instance Iterable (ErrorT e) where
-    toListT m = ListT $ do
+    toListT m = Select $ do
         x <- lift $ runErrorT m
         case x of
             Left  _ -> return ()
@@ -880,16 +879,8 @@ each = F.mapM_ yield
 
 -- | Convert an 'Iterable' to a 'Producer'
 every :: (Monad m, Iterable t) => t m a -> Producer' a m ()
-every it = feed (runListT (toListT it)) discard
+every it = feed (list (toListT it)) discard
 {-# INLINABLE every #-}
-
-{-| Convert a 'Producer' to a 'ListT'
-
-    Synonym for 'ListT'
--}
-select :: Producer b m () -> ListT m b
-select = ListT
-{-# INLINE select #-}
 
 -- | Discards all values
 discard :: (Monad m) => a -> Effect' m ()
