@@ -100,7 +100,7 @@ module Pipes (
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad ((>=>), (<=<))
-import Control.Monad (MonadPlus(mzero, mplus))
+import qualified Control.Monad as M
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
@@ -823,7 +823,7 @@ instance (Monad m) => Alternative (ListT m) where
         list p1
         list p2 )
 
-instance (Monad m) => MonadPlus (ListT m) where
+instance (Monad m) => M.MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
 
