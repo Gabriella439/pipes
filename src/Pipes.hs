@@ -65,8 +65,6 @@ module Pipes (
     every,
     select,
     discard,
-    tee,
-    generalize,
 
     -- * Concrete Type Synonyms
     X,
@@ -85,12 +83,12 @@ module Pipes (
     Server',
 
     -- * Flipped operators
-    (<-<),
-    (<~<),
-    (/</),
     (\<\),
-    (<<-),
+    (/</),
+    (<~<),
     (~<<),
+    (<-<),
+    (<<-),
     (<~),
 
     -- * Re-exports
@@ -109,11 +107,9 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
-import Control.Monad.Trans.State.Strict (get, put)
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as F
 import Pipes.Internal (Proxy(..))
-import Pipes.Lift (evalStateP)
 
 -- Re-exports
 import Control.Monad.Morph (MFunctor(hoist))
@@ -900,46 +896,6 @@ discard :: (Monad m) => a -> Effect' m ()
 discard _ = return ()
 {-# INLINABLE discard #-}
 
-{-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
-    downstream
--}
-tee :: (Monad m) => (() -> Consumer a m r) -> (() -> Pipe a a m r)
-tee p () = evalStateP Nothing $ do
-    r <- (up \>\ (hoist lift . p />/ dn)) ()
-    ma <- lift get
-    case ma of
-        Nothing -> return ()
-        Just a  -> yield a
-    return r
-  where
-    up () = do
-        ma <- lift get
-        case ma of
-            Nothing -> return ()
-            Just a  -> yield a
-        a <- await ()
-        lift $ put (Just a)
-        return a
-    dn _ = return ()
-{-# INLINABLE tee #-}
-
-{-| Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
-
-> generalize (f >-> g) = generalize f >-> generalize g
->
-> generalize pull = pull
--}
-generalize :: (Monad m) => (() -> Pipe a b m r) -> x -> Proxy x a x b m r
-generalize p x0 = evalStateP x0 $ (up \>\ hoist lift . p />/ dn) ()
-  where
-    up () = do
-        x <- lift get
-        await x
-    dn a = do
-        x <- yield a
-        lift $ put x
-{-# INLINABLE generalize #-}
-
 -- | The empty type, denoting a closed output
 data X
 
@@ -988,29 +944,17 @@ type Server' b' b m r = forall x' x . Proxy x' x b' b m r
 -- | Like 'Client', but with a polymorphic type
 type Client' a' a m r = forall y' y . Proxy a' a y' y m r
 
--- | Equivalent to ('>->') with the arguments flipped
-(<-<)
+-- | Equivalent to ('/>/') with the arguments flipped
+(\<\)
     :: (Monad m)
-    => (c' -> Proxy b' b c' c m r)
+    => (b -> Proxy x' x c' c m b')
     -- ^
-    -> (b' -> Proxy a' a b' b m r)
+    -> (a -> Proxy x' x b' b m a')
     -- ^
-    -> (c' -> Proxy a' a c' c m r)
+    -> (a -> Proxy x' x c' c m a')
     -- ^
-p1 <-< p2 = p2 >-> p1
-{-# INLINABLE (<-<) #-}
-
--- | Equivalent to ('>~>') with the arguments flipped
-(<~<)
-    :: (Monad m)
-    => (b -> Proxy b' b c' c m r)
-    -- ^
-    -> (a -> Proxy a' a b' b m r)
-    -- ^
-    -> (a -> Proxy a' a c' c m r)
-    -- ^
-p1 <~< p2 = p2 >~> p1
-{-# INLINABLE (<~<) #-}
+p1 \<\ p2 = p2 />/ p1
+{-# INLINABLE (\<\) #-}
 
 -- | Equivalent to ('\>\') with the arguments flipped
 (/</)
@@ -1024,29 +968,17 @@ p1 <~< p2 = p2 >~> p1
 p1 /</ p2 = p2 \>\ p1
 {-# INLINABLE (/</) #-}
 
--- | Equivalent to ('/>/') with the arguments flipped
-(\<\)
+-- | Equivalent to ('>~>') with the arguments flipped
+(<~<)
     :: (Monad m)
-    => (b -> Proxy x' x c' c m b')
+    => (b -> Proxy b' b c' c m r)
     -- ^
-    -> (a -> Proxy x' x b' b m a')
+    -> (a -> Proxy a' a b' b m r)
     -- ^
-    -> (a -> Proxy x' x c' c m a')
+    -> (a -> Proxy a' a c' c m r)
     -- ^
-p1 \<\ p2 = p2 />/ p1
-{-# INLINABLE (\<\) #-}
-
--- | Equivalent to ('->>') with the arguments flipped
-(<<-)
-    :: (Monad m)
-    =>         Proxy b' b c' c m r
-    -- ^
-    -> (b'  -> Proxy a' a b' b m r)
-    -- ^
-    ->         Proxy a' a c' c m r
-    -- ^
-k <<- p = p ->> k
-{-# INLINABLE (<<-) #-}
+p1 <~< p2 = p2 >~> p1
+{-# INLINABLE (<~<) #-}
 
 -- | Equivalent to ('>>~') with the arguments flipped
 (~<<)
@@ -1059,6 +991,30 @@ k <<- p = p ->> k
     -- ^
 k ~<< p = p >>~ k
 {-# INLINABLE (~<<) #-}
+
+-- | Equivalent to ('>->') with the arguments flipped
+(<-<)
+    :: (Monad m)
+    => (c' -> Proxy b' b c' c m r)
+    -- ^
+    -> (b' -> Proxy a' a b' b m r)
+    -- ^
+    -> (c' -> Proxy a' a c' c m r)
+    -- ^
+p1 <-< p2 = p2 >-> p1
+{-# INLINABLE (<-<) #-}
+
+-- | Equivalent to ('->>') with the arguments flipped
+(<<-)
+    :: (Monad m)
+    =>         Proxy b' b c' c m r
+    -- ^
+    -> (b'  -> Proxy a' a b' b m r)
+    -- ^
+    ->         Proxy a' a c' c m r
+    -- ^
+k <<- p = p ->> k
+{-# INLINABLE (<<-) #-}
 
 -- | Equivalent to ('~>') with the arguments flipped
 (<~)
