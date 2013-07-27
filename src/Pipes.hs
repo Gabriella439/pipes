@@ -46,6 +46,8 @@ module Pipes (
     pull,
     (>->),
     (->>),
+    cat,
+    (~>),
 
     -- ** Reflect
     -- $reflect
@@ -58,8 +60,6 @@ module Pipes (
     Iterable(..),
 
     -- * Utilities
-    (~>),
-    cat,
     next,
     each,
     every,
@@ -91,6 +91,7 @@ module Pipes (
     (\<\),
     (<<-),
     (~<<),
+    (<~),
 
     -- * Re-exports
     -- $reexports
@@ -475,8 +476,7 @@ feed p0 fb' = go p0
   #-}
 
 {- $push
-    The 'push' category closely corresponds to push-based Unix pipes, where
-    ('>~>') is designed to resemble the Unix pipe operator.  The 'push' category
+    The 'push' category closely corresponds to push-based Unix pipes and
     consists of three operations, which you can think of as having the following
     types:
 
@@ -596,8 +596,7 @@ p >>~ fb = case p of
 {-# INLINABLE (>>~) #-}
 
 {- $pull
-    The 'pull' category closely corresponds to pull-based Unix pipes, where
-    ('>->') is designed to resemble the Unix pipe operator.  The 'pull' category
+    The 'pull' category closely corresponds to pull-based Unix pipes and
     consists of three operations, which you can think of as having the following
     types:
 
@@ -628,6 +627,29 @@ p >>~ fb = case p of
 >
 > -- Associativity
 > (f >-> g) >-> h = f >-> (g >-> h)
+
+    For unidirectional Unix-like pipes, you can use the following simpler
+    operations, which you can think of as having the following types:
+
+> cat  :: (Monad m)
+>      => Pipe a a m r
+>
+> (~>) :: (Monad m)     |  (~>) :: (Monad m)       |  (~>) :: (Monad m) 
+>      => Pipe a b m r  |       => Producer b m r  |       => Pipe   a b m r
+>      -> Pipe b c m r  |       -> Pipe   b c m r  |       -> Consumer a m r
+>      -> Pipe a c m r  |       -> Producer c m r  |       -> Consumer b m r
+
+    When you write the 'pull' category laws in terms of ('~>') and 'cat', you
+    get the category laws for Unix pipes:
+
+> -- Useless use of 'cat'
+> cat ~> f = f
+>
+> -- Redirecting stdout to 'cat' does nothing
+> f ~> cat = f
+>
+> -- The Unix pipe operator is associative
+> (f ~> g) ~> h = f ~> (g ~> h)
 
     In the fully general case, you can also send information upstream by
     invoking 'await' with a non-@()@ argument.  The upstream 'Proxy' will
@@ -716,6 +738,23 @@ fb' ->> p = case p of
     M        m   -> M (m >>= \p' -> return (fb' ->> p'))
     Pure     r   -> Pure r
 {-# INLINABLE (->>) #-}
+
+-- | Unidirectional identity, named after the Unix @cat@ program
+cat :: (Monad m) => Pipe a a m r
+cat = pull ()
+{-# INLINABLE cat #-}
+
+-- | Unidirectional composition, analogous to the Unix pipe operator: @|@.
+(~>)
+    :: (Monad m)
+    => Proxy a' a () b m r
+    -- ^
+    -> Proxy () b c' c m r
+    -- ^
+    -> Proxy a' a c' c m r
+    -- ^
+p1 ~> p2 = (\() -> p1) ->> p2
+{-# INLINABLE (~>) #-}
 
 {- $reflect
     @(reflect .)@ transforms each streaming category into its dual:
@@ -823,20 +862,6 @@ instance Iterable (ErrorT e) where
         case x of
             Left  _ -> return ()
             Right a -> yield a
-
--- | Unidirectional composition
-(~>)
-    :: (Monad m)
-    => Proxy a' a () b m r
-    -> Proxy () b c' c m r
-    -> Proxy a' a c' c m r
-p1 ~> p2 = (\() -> p1) ->> p2
-{-# INLINABLE (~>) #-}
-
--- | Unidirectional identity
-cat :: (Monad m) => Pipe a a m r
-cat = pull ()
-{-# INLINABLE cat #-}
 
 {-| Consume the first value from a 'Producer'
 
@@ -1034,6 +1059,18 @@ k <<- p = p ->> k
     -- ^
 k ~<< p = p >>~ k
 {-# INLINABLE (~<<) #-}
+
+-- | Equivalent to ('~>') with the arguments flipped
+(<~)
+    :: (Monad m)
+    => Proxy () b c' c m r
+    -- ^
+    -> Proxy a' a () b m r
+    -- ^
+    -> Proxy a' a c' c m r
+    -- ^
+p2 <~ p1 = p1 ~> p2
+{-# INLINABLE (<~) #-}
 
 {- $reexports
     "Control.Monad" re-exports ('>=>') and ('<=<').
