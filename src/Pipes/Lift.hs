@@ -57,7 +57,9 @@ runErrorP = go
 catchError
     :: (Monad m) 
     => Proxy a' a b' b (E.ErrorT e m) r
+    -- ^
     -> (e -> Proxy a' a b' b (E.ErrorT f m) r)
+    -- ^
     -> Proxy a' a b' b (E.ErrorT f m) r
 catchError p0 f = go p0
   where
@@ -78,11 +80,11 @@ liftCatchError
     => (   m (Proxy a' a b' b m r)
         -> (e -> m (Proxy a' a b' b m r))
         -> m (Proxy a' a b' b m r) )
-    -- ^ Catch function for the base monad
+    -- ^
     ->    (Proxy a' a b' b m r
         -> (e -> Proxy a' a b' b m r)
         -> Proxy a' a b' b m r)
-    -- ^ Catch function for 'Proxy'
+    -- ^
 liftCatchError c p0 f = go p0
   where
     go p = case p of
