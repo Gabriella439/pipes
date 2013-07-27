@@ -180,11 +180,11 @@ infixl 8 <~<
 @
                      Identity   | Composition |  Point-ful
                   +-------------+-------------+-------------+
-   yield category |   'yield'     |     '/>/'     |    'for'      |
-   await category |   'await'     |     '\>\'     |    'feed'     |
-    push category |   'push'      |     '>~>'     |    '~>'       |
-    pull category |   'pull'      |     '>->'     |    '>-'       |
- Kleisli category |   'return'    |     '>=>'     |    '>>='      |
+   yield category |   'yield'     |     '/>/'     |     'for'     |
+   await category |   'await'     |     '\>\'     |     'feed'    |
+    push category |   'push'      |     '>~>'     |     '~>'      |
+    pull category |   'pull'      |     '>->'     |     '>-'      |
+ Kleisli category |   'return'    |     '>=>'     |     '>>='     |
                   +-------------+-------------+-------------+
 @
 
