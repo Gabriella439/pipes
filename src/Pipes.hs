@@ -27,6 +27,7 @@ module Pipes (
     -- $yield
     yield,
     (/>/),
+    (//>),
     for,
 
     -- ** Await
@@ -182,7 +183,7 @@ infixl 8 <~<
 @
                      Identity   | Composition |  Point-ful
                   +-------------+-------------+-------------+
-   yield category |   'yield'     |     '/>/'     |     'for'     |
+   yield category |   'yield'     |     '/>/'     |     '//>'     |
    await category |   'await'     |     '\>\'     |     'feed'    |
     push category |   'push'      |     '>~>'     |     '>>~'     |
     pull category |   'pull'      |     '>->'     |     '->>'     |
@@ -191,7 +192,7 @@ infixl 8 <~<
 @
 
     Each composition operator has a \"point-ful\" version, analogous to how
-    ('>>=') is the point-ful version of ('>=>').  For example, 'for' is the
+    ('>>=') is the point-ful version of ('>=>').  For example, ('//>') is the
     point-ful version of ('\>\').
 -}
 
@@ -205,7 +206,7 @@ infixl 8 <~<
 >       =>  a -> Producer a m ()
 >
 > -- Loops over a 'Producer', handling outputs with a 'Producer' or 'Effect'
-> for   :: (Monad m)               |  for   :: (Monad m)
+> (//>) :: (Monad m)               |  (//>) :: (Monad m)
 >       =>       Producer a m ()   |        =>       Producer a m ()
 >       -> (a -> Producer b m ())  |        -> (a -> Effect     m ())
 >       ->       Producer b m ()   |        ->       Effect     m ()
@@ -288,7 +289,7 @@ yield a = Yield a Pure
 
 {-| Compose two unfolds, creating a new unfold
 
-> (f />/ g) x = for (f x) g
+> (f />/ g) x = f x //> g
 
     ('/>/') is the composition operator of the yield category.
 -}
@@ -300,12 +301,33 @@ yield a = Yield a Pure
     -- ^
     -> (a -> Proxy x' x c' c m a')
     -- ^
-(fa />/ fb) a = for (fa a) fb
+(fa />/ fb) a = fa a //> fb
 {-# INLINABLE (/>/) #-}
 
-{-| @(for p f)@ replaces each 'yield ' in @p@ with @f@.
+{-| @(p //> f)@ replaces each 'yield' in @p@ with @f@.
 
     Point-ful version of ('/>/')
+-}
+(//>)
+    :: (Monad m)
+    =>       Proxy x' x b' b m a'
+    -- ^
+    -> (b -> Proxy x' x c' c m b')
+    -- ^
+    ->       Proxy x' x c' c m a'
+    -- ^
+p0 //> fb = go p0
+  where
+    go p = case p of
+        Await x' fx  -> Await x' (\x -> go (fx x))
+        Yield b  fb' -> fb b >>= \b' -> go (fb' b')
+        M        m   -> M (m >>= \p' -> return (go p'))
+        Pure     a   -> Pure a
+{-# INLINABLE (//>) #-}
+
+{-| @(for p f)@ replaces each 'yield' in @p@ with @f@.
+
+    Synonym for ('//>')
 -}
 for
     :: (Monad m)
@@ -315,24 +337,18 @@ for
     -- ^
     ->       Proxy x' x c' c m a'
     -- ^
-for p0 fb = go p0
-  where
-    go p = case p of
-        Await x' fx  -> Await x' (\x -> go (fx x))
-        Yield b  fb' -> fb b >>= \b' -> go (fb' b')
-        M        m   -> M (m >>= \p' -> return (go p'))
-        Pure     a   -> Pure a
-{-# INLINABLE for #-}
+for = (//>)
+{-# INLINE for #-}
 
 {-# RULES
-    "for (Await x' fx ) fb" forall x' fx  fb .
-        for (Await x' fx ) fb = Await x' (\x -> for (fx x) fb);
-    "for (Yield b  fb') fb" forall b  fb' fb .
-        for (Yield b  fb') fb = fb b >>= \b' -> for (fb' b') fb;
-    "for (M        m  ) fb" forall    m   fb .
-        for (M        m  ) fb = M (m >>= \p' -> return (for p' fb));
-    "for (Pure    a   ) fb" forall a      fb .
-        for (Pure  a     ) fb = Pure a;
+    "(Await x' fx ) //> fb" forall x' fx  fb .
+        (Await x' fx ) //> fb = Await x' (\x -> fx x //> fb);
+    "(Yield b  fb') //> fb" forall b  fb' fb .
+        (Yield b  fb') //> fb = fb b >>= \b' -> fb' b' //> fb;
+    "(M        m  ) //> fb" forall    m   fb .
+        (M        m  ) //> fb = M (m >>= \p' -> return (p' //> fb));
+    "(Pure    a   ) //> fb" forall a      fb .
+        (Pure  a     ) //> fb = Pure a;
   #-}
 
 {- $await
@@ -896,7 +912,7 @@ discard _ = return ()
 -}
 tee :: (Monad m) => Consumer a m r -> Pipe a a m r
 tee p = evalStateP Nothing $ do
-    r <- feed (for (hoist lift p) dn) up
+    r <- feed (hoist lift p //> dn) up
     ma <- lift get
     case ma of
         Nothing -> return ()
@@ -921,7 +937,7 @@ tee p = evalStateP Nothing $ do
 > generalize cat = pull
 -}
 generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
-generalize p x0 = evalStateP x0 $ feed (for (hoist lift p) dn) up
+generalize p x0 = evalStateP x0 $ feed (hoist lift p //> dn) up
   where
     up () = do
         x <- lift get
