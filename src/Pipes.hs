@@ -34,6 +34,7 @@ module Pipes (
     -- $await
     await,
     (\>\),
+    (>\\),
     feed,
 
     -- ** Push
@@ -90,6 +91,8 @@ module Pipes (
     (<~<),
     (~<<),
     (<-<),
+    (<\\),
+    (//<),
     (<<-),
     (<~),
 
@@ -152,9 +155,11 @@ run = go
      pull-based computations need not evaluate upstream stages unless absolutely
      necessary.
 -}
+infixl 3 //>
+infixr 3 <\\      -- GHC will raise a parse error if either of these lines ends
+infixl 4 \<\, >\\ -- with '\', which is why this comment is here
 infixr 4 />/
-infixl 4 \<\ -- GHC will raise a parse error if either of these lines ends
-infixl 5 \>\ -- with '\', which is why this comment is here
+infixl 5 \>\, //<
 infixr 5 /</
 infixr 6 ->>
 infixl 6 <<-
@@ -184,7 +189,7 @@ infixl 8 <~<
                      Identity   | Composition |  Point-ful
                   +-------------+-------------+-------------+
    yield category |   'yield'     |     '/>/'     |     '//>'     |
-   await category |   'await'     |     '\>\'     |     'feed'    |
+   await category |   'await'     |     '\>\'     |     '>\\'     |
     push category |   'push'      |     '>~>'     |     '>>~'     |
     pull category |   'pull'      |     '>->'     |     '->>'     |
  Kleisli category |   'return'    |     '>=>'     |     '>>='     |
@@ -304,7 +309,7 @@ yield a = Yield a Pure
 (fa />/ fb) a = fa a //> fb
 {-# INLINABLE (/>/) #-}
 
-{-| @(p //> f)@ replaces each 'yield' in @p@ with @f@.
+{-| @(p \/\/> f)@ replaces each 'yield' in @p@ with @f@.
 
     Point-ful version of ('/>/')
 -}
@@ -338,7 +343,7 @@ for
     ->       Proxy x' x c' c m a'
     -- ^
 for = (//>)
-{-# INLINE for #-}
+{-# INLINABLE for #-}
 
 {-# RULES
     "(Await x' fx ) //> fb" forall x' fx  fb .
@@ -361,9 +366,9 @@ for = (//>)
 >       =>  () -> Consumer a m a
 >
 > -- Loops over a 'Consumer', supplying inputs with a 'Consumer' or 'Effect'
-> feed  :: (Monad m)               |  feed  :: (Monad m)
->       =>        Consumer b m c   |        =>        Consumer b m c
->       -> (() -> Consumer a m b)  |        -> (() -> Effect     m b)
+> (>\\) :: (Monad m)               |  (>\\) :: (Monad m)
+>       => (() -> Consumer a m b)  |        => (() -> Effect     m b)
+>       ->        Consumer b m c   |        ->        Consumer b m c
 >       ->        Consumer a m c   |        ->        Effect     m c
 >
 > -- Composes folds or suppliers
@@ -387,15 +392,14 @@ for = (//>)
     When you write these laws in terms of 'feed', you get the \"feed loop
     laws\":
 
-> -- Feeding a single 'await' simplifies to function application
-> feed (await x) f = f x
+> -- Feeding a single 'await' just replaces the 'await'
+> feed (await ()) m = m
 >
 > -- Feeding with an 'await' is the same as not feeding at all
-> feed m await = m
+> feed m (await ()) = m
 >
-> -- Nested feed loops can become sequential feed loops if the inner loop body
-> -- ignores the outer loop variable
-> feed m (\a -> feed (f a) g) = feed (feed m f) g
+> -- Nested feed loops can always be rewritten to sequential feed loops
+> feed m (feed n o) = feed (feed m n) o
 
     In the fully general case, 'await' can send an argument upstream and
     connected components share the same downstream interface:
@@ -443,7 +447,7 @@ await a' = Await a' Pure
 
 {-| Compose two folds, creating a new fold
 
-> (f \>\ g) x = feed (g x) f
+> (f \>\ g) x = f >\\ g x
 
     ('\>\') is the composition operator of the await category.
 -}
@@ -455,39 +459,48 @@ await a' = Await a' Pure
     -- ^
     -> (c' -> Proxy a' a y' y m c)
     -- ^
-(fb' \>\ fc') c' = feed (fc' c') fb'
+(fb' \>\ fc') c' = fb' >\\ fc' c'
 {-# INLINABLE (\>\) #-}
 
-{-| @(feed p f)@ replaces each 'await' in @p@ with @f@.
+{-| @(f >\\\\ p)@ replaces each 'await' in @p@ with @f@.
 
     Point-ful version of ('\>\')
 -}
-feed
+(>\\)
     :: (Monad m)
-    =>        Proxy b' b y' y m c
+    => (b' -> Proxy a' a y' y m b)
     -- ^
-    -> (b' -> Proxy a' a y' y m b)
+    ->        Proxy b' b y' y m c
     -- ^
     ->        Proxy a' a y' y m c
     -- ^
-feed p0 fb' = go p0
+fb' >\\ p0 = go p0
   where
     go p = case p of
         Await b' fb  -> fb' b' >>= \b -> go (fb b)
         Yield x  fx' -> Yield x (\x' -> go (fx' x'))
         M        m   -> M (m >>= \p' -> return (go p'))
         Pure     a   -> Pure a
+{-# INLINABLE (>\\) #-}
+
+-- | @(feed p1 p2)@ replaces each @(await ())@ in @p1@ with @p2@
+feed
+    :: (Monad m)
+    => Proxy () b y' y m c
+    -> Proxy a' a y' y m b
+    -> Proxy a' a y' y m c
+feed p1 p2 = (\() -> p2) >\\ p1
 {-# INLINABLE feed #-}
 
 {-# RULES
-    "feed (Await b' fb ) fb'" forall fb' b' fb  .
-        feed (Await b' fb ) fb' = fb' b' >>= \b -> feed (fb b) fb';
-    "feed (Yield x  fx') fb'" forall fb' x  fx' .
-        feed (Yield x  fx') fb' = Yield x (\x' -> feed (fx' x') fb');
-    "feed (M          m  ) fb'" forall fb'    m   .
-        feed (M        m  ) fb' = M (m >>= \p' -> return (feed p' fb'));
-    "feed (Pure    a     ) fb'" forall fb' a      .
-        feed (Pure  a     ) fb' = Pure a;
+    "fb' >\\ (Await b' fb )" forall fb' b' fb  .
+        fb' >\\ (Await b' fb ) = fb' b' >>= \b -> fb' >\\ fb  b;
+    "fb' >\\ (Yield x  fx')" forall fb' x  fx' .
+        fb' >\\ (Yield x  fx') = Yield x (\x' -> fb' >\\ fx' x');
+    "fb' >\\ (M        m  )" forall fb'    m   .
+        fb' >\\ (M        m  ) = M (m >>= \p' -> return (fb' >\\ p'));
+    "fb' >\\ (Pure  a    )" forall fb' a      .
+        fb' >\\ (Pure  a     ) = Pure a;
   #-}
 
 {- $push
@@ -899,7 +912,7 @@ each = F.mapM_ yield
 
 -- | Convert an 'Iterable' to a 'Producer'
 every :: (Monad m, Iterable t) => t m a -> Producer' a m ()
-every it = feed (list (toListT it)) discard
+every it = discard >\\ list (toListT it)
 {-# INLINABLE every #-}
 
 -- | Discards all values
@@ -912,7 +925,7 @@ discard _ = return ()
 -}
 tee :: (Monad m) => Consumer a m r -> Pipe a a m r
 tee p = evalStateP Nothing $ do
-    r <- feed (hoist lift p //> dn) up
+    r <- up >\\ (hoist lift p //> dn)
     ma <- lift get
     case ma of
         Nothing -> return ()
@@ -937,7 +950,7 @@ tee p = evalStateP Nothing $ do
 > generalize cat = pull
 -}
 generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
-generalize p x0 = evalStateP x0 $ feed (hoist lift p //> dn) up
+generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
   where
     up () = do
         x <- lift get
@@ -1031,18 +1044,6 @@ p1 /</ p2 = p2 \>\ p1
 p1 <~< p2 = p2 >~> p1
 {-# INLINABLE (<~<) #-}
 
--- | Equivalent to ('>>~') with the arguments flipped
-(~<<)
-    :: (Monad m)
-    => (b  -> Proxy b' b c' c m r)
-    -- ^
-    ->        Proxy a' a b' b m r
-    -- ^
-    ->        Proxy a' a c' c m r
-    -- ^
-k ~<< p = p >>~ k
-{-# INLINABLE (~<<) #-}
-
 -- | Equivalent to ('>->') with the arguments flipped
 (<-<)
     :: (Monad m)
@@ -1054,6 +1055,42 @@ k ~<< p = p >>~ k
     -- ^
 p1 <-< p2 = p2 >-> p1
 {-# INLINABLE (<-<) #-}
+
+-- Equivalent to ('//>') with the arguments flipped
+(<\\)
+    :: (Monad m)
+    => (b -> Proxy x' x c' c m b')
+    -- ^
+    ->       Proxy x' x b' b m a'
+    -- ^
+    ->       Proxy x' x c' c m a'
+    -- ^
+f <\\ p = p //> f
+{-# INLINABLE (<\\) #-}
+
+-- Equivalent t0 ('>\\') with the arguments flipped
+(//<)
+    :: (Monad m)
+    =>        Proxy b' b y' y m c
+    -- ^
+    -> (b' -> Proxy a' a y' y m b)
+    -- ^
+    ->        Proxy a' a y' y m c
+    -- ^
+p //< f = f >\\ p
+{-# INLINABLE (//<) #-}
+
+-- | Equivalent to ('>>~') with the arguments flipped
+(~<<)
+    :: (Monad m)
+    => (b  -> Proxy b' b c' c m r)
+    -- ^
+    ->        Proxy a' a b' b m r
+    -- ^
+    ->        Proxy a' a c' c m r
+    -- ^
+k ~<< p = p >>~ k
+{-# INLINABLE (~<<) #-}
 
 -- | Equivalent to ('->>') with the arguments flipped
 (<<-)
