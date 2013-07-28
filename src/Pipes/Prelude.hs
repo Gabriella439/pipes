@@ -101,8 +101,6 @@ ABC
 2
 3
 
-    Similarly, 'every' transforms  'Iterable's (like 'ListT') into 'Producer's.
-
     You can also build your own custom 'Producer's using 'yield' and the 'Monad'
     \/ 'MonadTrans' instances for 'Producer'.
 -}
@@ -125,7 +123,7 @@ fromHandle h = go
 {-# INLINABLE fromHandle #-}
 
 {- $unfolds
-    An unfold is a 'Producer' which can also be used to transform a stream.
+    An unfold is a 'Producer' which can double as a stream transformer.
 
     You use 'for' to apply an unfold to a stream.  This behaves like a
     'concatMap', generating a new 'Producer':
@@ -157,7 +155,7 @@ ABC
 ABC
 ...
 
-    All of these must behave identically, thanks to the associativity law for
+    All of these must behave identically, because of the associativity law for
     the yield category.
 
     Note that 'each' is also an unfold and can be used to flatten streams of
