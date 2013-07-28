@@ -7,6 +7,7 @@
 > import qualified Pipes.Prelude as P
 -}
 
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 module Pipes.Prelude (
