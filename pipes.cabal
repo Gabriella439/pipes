@@ -46,6 +46,7 @@ Library
         transformers >= 0.2.0.0 && < 0.4
     Exposed-Modules:
         Pipes,
+        Pipes.Core,
         Pipes.Internal,
         Pipes.Lift,
         Pipes.Prelude,

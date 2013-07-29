@@ -54,6 +54,7 @@ module Pipes.Prelude (
 import Control.Monad (liftM, replicateM_, when, unless)
 import qualified System.IO   as IO
 import Pipes
+import Pipes.Core
 import Pipes.Internal
 import Prelude hiding (
     all,
@@ -215,7 +216,7 @@ quit<Enter>
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> Pipe a a m ()
 take n = replicateM_ n $ do
-    a <- await ()
+    a <- await
     yield a
 {-# INLINABLE take #-}
 
@@ -226,7 +227,7 @@ takeWhile :: (Monad m) => (a -> Bool) -> Pipe a a m ()
 takeWhile predicate = go
   where
     go = do
-        a <- await ()
+        a <- await
         if (predicate a)
             then do
                 yield a
@@ -242,7 +243,7 @@ drop = go
         if (n <= 0)
         then cat
         else do
-            await ()
+            await
             go (n - 1)
 {-# INLINABLE drop #-}
 
@@ -253,7 +254,7 @@ dropWhile :: (Monad m) => (a -> Bool) -> Pipe a a m r
 dropWhile predicate = go
   where
     go = do
-        a <- await ()
+        a <- await
         if (predicate a)
             then go
             else do
@@ -266,7 +267,7 @@ findIndices :: (Monad m) => (a -> Bool) -> Pipe a Int m r
 findIndices predicate = loop 0
   where
     loop n = do
-        a <- await ()
+        a <- await
         when (predicate a) (yield n)
         loop $! n + 1
 {-# INLINABLE findIndices #-}
@@ -277,7 +278,7 @@ scanl step = loop
   where
     loop b = do
         yield b
-        a <- await ()
+        a <- await
         let b' = step b a
         loop $! b'
 {-# INLINABLE scanl #-}
@@ -288,7 +289,7 @@ scanM step = loop
   where
     loop b = do
         yield b
-        a <- await ()
+        a  <- await
         b' <- lift (step b a)
         loop $! b'
 {-# INLINABLE scanM #-}
@@ -311,10 +312,10 @@ foldl :: (Monad m) => (b -> a -> b) -> b -> Producer a m r -> m b
 foldl step b0 p0 = loop p0 b0
   where
     loop p b = case p of
-        Pure  _     -> return b
-        Await _  fu -> loop (fu ()) b
-        Yield a  fu -> loop (fu ()) $! step b a
-        M        m  -> m >>= \p' -> loop p' b
+        Request _  fu -> loop (fu ()) b
+        Respond a  fu -> loop (fu ()) $! step b a
+        M          m  -> m >>= \p' -> loop p' b
+        Pure    _     -> return b
 {-
     loop p b = do
         x <- next p
@@ -329,12 +330,12 @@ foldM :: (Monad m) => (b -> a -> m b) -> b -> Producer a m r -> m b
 foldM step b0 p0 = loop p0 b0
   where
     loop p b = case p of
-        Pure  _     -> return b
-        Await _  fu -> loop (fu ()) b
-        Yield a  fu -> do
+        Request _  fu -> loop (fu ()) b
+        Respond a  fu -> do
             b' <- step b a
             loop (fu ()) $! b'
-        M        m  -> m >>= \p' -> loop p' b
+        M          m  -> m >>= \p' -> loop p' b
+        Pure    _     -> return b
 {-
     loop p b = do
         x <- next p
@@ -367,7 +368,7 @@ find predicate p = head $ for p (yieldIf predicate)
 
 -- | Find the index of the first value that satisfies the predicate
 findIndex :: (Monad m) => (a -> Bool) -> Producer a m r -> m (Maybe Int)
-findIndex predicate p = head (p ~> findIndices predicate)
+findIndex predicate p = head (p >-> findIndices predicate)
 {-# INLINABLE findIndex #-}
 
 -- | Retrieve the first value from a 'Producer'
@@ -381,7 +382,7 @@ head p = do
 
 -- | Index into a 'Producer'
 index :: (Monad m) => Int -> Producer a m r -> m (Maybe a)
-index n p = head (p ~> drop n)
+index n p = head (p >-> drop n)
 {-# INLINABLE index #-}
 
 -- | Retrieve the last value from a 'Producer'

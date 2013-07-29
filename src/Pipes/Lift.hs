@@ -43,10 +43,10 @@ runErrorP
 runErrorP = go
   where
     go p = case p of
-        Await a' fa  -> Await a' (\a  -> go (fa  a ))
-        Yield b  fb' -> Yield b  (\b' -> go (fb' b'))
-        Pure  r      -> Pure (Right r)
-        M        m   -> M (do
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        Pure    r      -> Pure (Right r)
+        M          m   -> M (do
             x <- E.runErrorT m
             return (case x of
                 Left  e  -> Pure (Left e)
@@ -64,10 +64,10 @@ catchError
 catchError p0 f = go p0
   where
     go p = case p of
-        Await a' fa  -> Await a' (\a  -> go (fa  a ))
-        Yield b  fb' -> Yield b  (\b' -> go (fb' b'))
-        Pure  r      -> Pure r
-        M        m   -> M (E.ErrorT (do
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        Pure    r      -> Pure r
+        M          m   -> M (E.ErrorT (do
             x <- E.runErrorT m
             return (Right (case x of
                 Left  e  -> f  e
@@ -88,10 +88,10 @@ liftCatchError
 liftCatchError c p0 f = go p0
   where
     go p = case p of
-        Await a' fa  -> Await a' (\a  -> go (fa  a ))
-        Yield b  fb' -> Yield b  (\b' -> go (fb' b'))
-        Pure  r      -> Pure r
-        M        m   -> M ((do
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        Pure    r      -> Pure r
+        M          m   -> M ((do
             p' <- m
             return (go p') ) `c` (\e -> return (f e)) )
 {-# INLINABLE liftCatchError #-}
@@ -103,10 +103,10 @@ runMaybeP
 runMaybeP = go
   where
     go p = case p of
-        Await a' fa  -> Await a' (\a  -> go (fa  a ))
-        Yield b  fb' -> Yield b  (\b' -> go (fb' b'))
-        Pure  r      -> Pure (Just r)
-        M        m   -> M (do
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        Pure    r      -> Pure (Just r)
+        M          m   -> M (do
             x <- M.runMaybeT m
             return (case x of
                 Nothing -> Pure Nothing
@@ -120,10 +120,10 @@ runReaderP
 runReaderP i = go
   where
     go p = case p of
-        Await a' fa  -> Await a' (\a  -> go (fa  a ))
-        Yield b  fb' -> Yield b  (\b' -> go (fb' b'))
-        Pure  r      -> Pure r
-        M        m   -> M (do
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        Pure    r      -> Pure r
+        M          m   -> M (do
             p' <- R.runReaderT m i
             return (go p') )
 {-# INLINABLE runReaderP #-}
@@ -135,10 +135,10 @@ runStateP
 runStateP = go
   where
     go s p = case p of
-        Await a' fa  -> Await a' (\a  -> go s (fa  a ))
-        Yield b  fb' -> Yield b  (\b' -> go s (fb' b'))
-        Pure  r      -> Pure (r, s)
-        M        m   -> M (do
+        Request a' fa  -> Request a' (\a  -> go s (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go s (fb' b'))
+        Pure    r      -> Pure (r, s)
+        M          m   -> M (do
             (p', s') <- S.runStateT m s
             return (go s' p') )
 {-# INLINABLE runStateP #-}
@@ -167,8 +167,8 @@ runWriterP
 runWriterP = go mempty
   where
     go w p = case p of
-        Await a' fa  -> Await a' (\a  -> go w (fa  a ))
-        Yield b  fb' -> Yield b  (\b' -> go w (fb' b'))
+        Request a' fa  -> Request a' (\a  -> go w (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go w (fb' b'))
         Pure  r      -> Pure (r, w)
         M        m   -> M (do
             (p', w') <- W.runWriterT m

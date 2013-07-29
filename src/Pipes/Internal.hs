@@ -70,27 +70,27 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 
 -}
 data Proxy a' a b' b m r
-    = Await a' (a  -> Proxy a' a b' b m r )
-    | Yield b  (b' -> Proxy a' a b' b m r )
-    | M        (m    (Proxy a' a b' b m r))
-    | Pure  r
+    = Request a' (a  -> Proxy a' a b' b m r )
+    | Respond b  (b' -> Proxy a' a b' b m r )
+    | M          (m    (Proxy a' a b' b m r))
+    | Pure    r
 
 instance (Monad m) => Functor (Proxy a' a b' b m) where
     fmap f p0 = go p0 where
         go p = case p of
-            Await a' fa  -> Await a' (\a  -> go (fa  a ))
-            Yield b  fb' -> Yield b  (\b' -> go (fb' b'))
-            M        m   -> M (m >>= \p' -> return (go p'))
-            Pure  r      -> Pure (f r)
+            Request a' fa  -> Request a' (\a  -> go (fa  a ))
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+            M          m   -> M (m >>= \p' -> return (go p'))
+            Pure    r      -> Pure (f r)
 
 instance (Monad m) => Applicative (Proxy a' a b' b m) where
     pure      = Pure
     pf <*> px = go pf where
         go p = case p of
-            Await a' fa  -> Await a' (\a  -> go (fa  a ))
-            Yield b  fb' -> Yield b  (\b' -> go (fb' b'))
-            M        m   -> M (m >>= \p' -> return (go p'))
-            Pure   f     -> fmap f px
+            Request a' fa  -> Request a' (\a  -> go (fa  a ))
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+            M          m   -> M (m >>= \p' -> return (go p'))
+            Pure     f     -> fmap f px
 
 instance (Monad m) => Monad (Proxy a' a b' b m) where
     return = Pure
@@ -103,20 +103,20 @@ _bind
     -> Proxy a' a b' b m r'
 p0 `_bind` f = go p0 where
     go p = case p of
-        Await a' fa  -> Await a' (\a  -> go (fa  a ))
-        Yield b  fb' -> Yield b  (\b' -> go (fb' b'))
-        M        m   -> M (m >>= \p' -> return (go p'))
-        Pure   r     -> f r
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        M          m   -> M (m >>= \p' -> return (go p'))
+        Pure     r     -> f r
 
 {-# RULES
-    "_bind (Await a' k) f" forall a' k f .
-        _bind (Await a' k) f = Await a' (\a  -> _bind (k a)  f);
-    "_bind (Yield b  k) f" forall b  k f .
-        _bind (Yield b  k) f = Yield b  (\b' -> _bind (k b') f);
-    "_bind (M        m) f" forall m    f .
-        _bind (M        m) f = M (m >>= \p -> return (_bind p f));
-    "_bind (Pure  r   ) f" forall r    f .
-        _bind (Pure  r   ) f = f r;
+    "_bind (Request a' k) f" forall a' k f .
+        _bind (Request a' k) f = Request a' (\a  -> _bind (k a)  f);
+    "_bind (Respond b  k) f" forall b  k f .
+        _bind (Respond b  k) f = Respond b  (\b' -> _bind (k b') f);
+    "_bind (M          m) f" forall m    f .
+        _bind (M          m) f = M (m >>= \p -> return (_bind p f));
+    "_bind (Pure    r   ) f" forall r    f .
+        _bind (Pure    r   ) f = f r;
   #-}
 
 instance MonadTrans (Proxy a' a b' b) where
@@ -125,10 +125,10 @@ instance MonadTrans (Proxy a' a b' b) where
 instance MFunctor (Proxy a' a b' b) where
     hoist nat p0 = go (observe p0) where
         go p = case p of
-            Await a' fa  -> Await a' (\a  -> go (fa  a ))
-            Yield b  fb' -> Yield b  (\b' -> go (fb' b'))
-            M        m   -> M (nat (m >>= \p' -> return (go p')))
-            Pure     r   -> Pure r
+            Request a' fa  -> Request a' (\a  -> go (fa  a ))
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+            M          m   -> M (nat (m >>= \p' -> return (go p')))
+            Pure       r   -> Pure r
 
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
@@ -149,8 +149,8 @@ instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
 observe :: (Monad m) => Proxy a' a b' b m r -> Proxy a' a b' b m r
 observe p0 = M (go p0) where
     go p = case p of
-        Await a' fa  -> return (Await a' (\a  -> observe (fa  a )))
-        Yield b  fb' -> return (Yield b  (\b' -> observe (fb' b')))
-        M        m'  -> m' >>= go
-        Pure  r      -> return (Pure r)
+        Request a' fa  -> return (Request a' (\a  -> observe (fa  a )))
+        Respond b  fb' -> return (Respond b  (\b' -> observe (fb' b')))
+        M          m'  -> m' >>= go
+        Pure    r      -> return (Pure r)
 {-# INLINABLE observe #-}
