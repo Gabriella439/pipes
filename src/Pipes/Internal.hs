@@ -28,6 +28,18 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
     an upstream and downstream interface.
+
+    The type variables signify:
+
+    * @a'@ and @a@ - The upstream interface, where @(a')@s go out and @(a)@s
+      come in
+
+    * @b'@ and @b@ - The downstream interface, where @(b)@s go out and @(b')@s
+      come in
+
+    * @m @ - The base monad
+
+    * @r @ - The return value
 -}
 data Proxy a' a b' b m r
     = Request a' (a  -> Proxy a' a b' b m r )
