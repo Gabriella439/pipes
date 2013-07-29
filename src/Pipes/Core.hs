@@ -688,7 +688,7 @@ type Server b' b = Proxy X () b' b
 type Effect' m r = forall x' x y' y . Proxy x' x y' y m r
 
 -- | Like 'Producer', but with a polymorphic type
-type Producer' b m r = forall x' x . Proxy x' x () b m r
+type Producer' b m r = forall x' x y' . Proxy x' x y' b m r
 
 -- | Like 'Consumer', but with a polymorphic type
 type Consumer' a m r = forall y' y . Proxy () a y' y m r

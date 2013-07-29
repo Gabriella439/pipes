@@ -196,13 +196,20 @@ replicateM n m = replicateM_ n $ do
 
 -- | @(yieldIf pred a)@ only re-'yield's @a@ if it satisfies the predicate @p@
 yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
-yieldIf predicate a = if (predicate a) then yield a else return ()
+yieldIf predicate a =
+    if (predicate a)
+    then do
+        _ <- yield a
+        return ()
+    else return ()
 {-# INLINABLE yieldIf #-}
 
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
 read :: (Monad m, Read a) => String -> Producer' a m ()
 read str = case (reads str) of
-    [(a, "")] -> yield a
+    [(a, "")] -> do
+        _ <- yield a
+        return ()
     _         -> return ()
 {-# INLINABLE read #-}
 
