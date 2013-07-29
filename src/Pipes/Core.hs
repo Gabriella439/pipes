@@ -1,7 +1,18 @@
 {-| The core functionality for the 'Proxy' monad transformer
 
     Read "Pipes.Tutorial" if you want a beginners tutorial explaining how to use
-    this library.  The documentation in this module targets more advanced users.
+    this library.  The documentation in this module targets more advanced users
+    who want to understand the theory behind this library.
+
+    This module is not exported by default, and I recommend you use the
+    unidirectional operations exported by the "Pipes" module if you can.  You
+    should only use this module if you require advanced features like:
+
+    * bidirectional communication,
+
+    * push-based 'Pipe's, or:
+
+    * polymorphic type synonyms (for library writers).
 -}
 
 {-# LANGUAGE CPP, RankNTypes, EmptyDataDecls #-}
@@ -646,7 +657,7 @@ data X
 
 {-| An effect in the base monad
 
-    'Effect's are completely self-contained
+    'Effect's are completely self-contained: nothing goes in or out
 -}
 type Effect = Proxy X () () X
 
