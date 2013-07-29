@@ -152,9 +152,9 @@ fromHandle h = go
 >         for (P.replicate 2 str1) $ \str2 -> do
 >             lift $ putStrLn str2
 
-    ... or you can compose the two handlers using ('/>/'):
+    ... or you can compose the two handlers using ('~>'):
 
->>> run $ for P.stdin (P.replicate 2 />/ lift . putStrLn)
+>>> run $ for P.stdin (P.replicate 2 ~> lift . putStrLn)
 Test<Enter>
 Test
 Test
@@ -172,7 +172,7 @@ ABC
 >>> run $ for (each [[1, 2], [4, 5]]) (lift . print)
 [1,2]
 [3,4]
->>> run $ for (each [[1, 2], [3, 4]]) (each />/ lift . print)
+>>> run $ for (each [[1, 2], [3, 4]]) (each ~> lift . print)
 1
 2
 3
@@ -214,15 +214,35 @@ read str = case (reads str) of
 {-# INLINABLE read #-}
 
 {- $pipes
-    Use ('~>') to transform a 'Producer' using a 'Pipe':
+    Use ('>->') to transform a 'Producer' using a 'Pipe':
 
->>> run $ for (P.stdin ~> P.takeWhile (/= "quit")) (lift . putStrLn)
+>>> run $ for (P.stdin >-> P.takeWhile (/= "quit")) (lift . putStrLn)
 Test<Enter>
 Test
 ABC<Enter>
 ABC
 quit<Enter>
 >>>
+
+    You can also use ('>->') to connect 'Pipe's:
+
+>>> run $ for (P.stdin >-> (P.drop 2 >-> P.take 2)) (lift . putStrLn)
+1<Enter>
+2<Enter>
+3<Enter>
+3
+4<Enter>
+4
+
+    This gives the same behavior as first connecting the 'Producer', because
+    ('>->') is associative:
+
+>>> run $ for ((P.stdin >-> P.drop 2) >-> P.take 2) (lift . putStrLn)
+
+    ... so you can drop the parentheses altogether since the meaning is
+    unambiguous:
+
+>>> run $ for (P.stdin >-> P.drop 2 >-> P.take 2) (lift . putStrLn)
 
 -}
 

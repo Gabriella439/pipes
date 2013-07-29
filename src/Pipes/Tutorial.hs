@@ -3,26 +3,20 @@
 {-| @pipes@ is a lightweight and powerful library for processing effectful
     streams in constant memory.
 
-    @pipes@ supports a wide variety of stream programming abstractions,
-    including:
+    @pipes@ supports a wide variety of stream programming abstractions, such as:
 
-    * Generators, for loops, and internal \/ external iterators
+    * effectful 'Producer's (like generators),
 
-    * 'ListT' done right
+    * effectful 'Consumer's (like iteratees)
+
+    * effectful 'Pipe's (like Unix pipes), and:
+
+    * 'ListT' done right.
 
     * Unix pipes
 
-    * Folds
-
-    * Message passing and reactive programming (using the @pipes-concurrency@
-      library)
-
-    * Stream parsing (using the @pipes-parse@ library)
-
-    * Exception-safe streams (using the @pipes-safe@ library)
-
-    If you want a really fast Quick Start guide, read the documentation in
-    "Pipes.Prelude" from top to bottom.
+    If you want a Quick Start guide, read the documentation in "Pipes.Prelude"
+    from top to bottom.
 
     This tutorial is more extensive and explains the @pipes@ API in greater
     detail and illustrates several idioms.  Also, you can find the complete code
@@ -93,8 +87,8 @@ import Prelude hiding ((.), id)
 
 > for :: (Monad m) => Producer a m r -> (a -> Producer b m r) -> Producer b m r
 
-    Notice how this type greatly resembles the type of @(flip concatMap)@ (or
-    ('>>=') for the list monad):
+    Notice how this greatly resembles the type of @(flip concatMap)@ (or ('>>=')
+    for the list monad):
 
 > flip concatMap :: [a] -> (a -> [b]) -> [b]
 
@@ -232,11 +226,11 @@ import Prelude hiding ((.), id)
     We can understand the rationale behind this equality if we define the
     following operator that is the point-free counterpart to 'for':
 
-> (/>/) :: (Monad m)
->       => (a -> Producer b m r)
->       -> (b -> Producer c m r)
->       -> (a -> Producer c m r)
-> (f />/ g) x = for (f x) g
+> (~>) :: (Monad m)
+>      => (a -> Producer b m r)
+>      -> (b -> Producer c m r)
+>      -> (a -> Producer c m r)
+> (f ~> g) x = for (f x) g
 
     Using this operator we can transform our original equality into the
     following more symmetric form:
@@ -246,23 +240,23 @@ import Prelude hiding ((.), id)
 > h :: (Monad m) => c -> Producer d m r
 >
 > -- Associativity
-> (f />/ g) />/ h = f />/ (g />/ h)
+> (f ~> g) ~> h = f ~> (g ~> h)
 
-    This looks just like an associativity law.  In fact, ('/>/') has another
-    nice property, which is that 'yield' is its left and right identity:
+    This looks just like an associativity law.  In fact, ('~>') has another nice
+    property, which is that 'yield' is its left and right identity:
 
 > -- Left Identity
-> yield />/ f = f
+> yield ~> f = f
 >
 > -- Right Identity
-> f />/ yield = f
+> f ~> yield = f
 
-    In other words, 'yield' and ('/>/') form a 'Control.Category.Category' where
-    ('/>/') plays the role of the composition operator and 'yield' is the
+    In other words, 'yield' and ('~>') form a 'Control.Category.Category' where
+    ('~>') plays the role of the composition operator and 'yield' is the
     identity.
 
     Notice that if we translate the left identity law to use 'for' instead of
-    ('/>/') we get:
+    ('~>') we get:
 
 > for (yield x) f = f x
 
@@ -270,10 +264,11 @@ import Prelude hiding ((.), id)
     side effects, then you can instead cut out the middle man and directly apply
     the body of the loop to that single element.
 
-    If we translate the right identity law to use 'for' instead of ('/>/') we
+    If we translate the right identity law to use 'for' instead of ('~>') we
     get:
 
 > for m yield = m
+
 
     This just says that if the only thing you do is re-'yield' every element of
     a stream, you get back your original stream.
@@ -288,17 +283,17 @@ import Prelude hiding ((.), id)
 > for m yield = m
 
     ... and they miraculously fall out of the 'Control.Category.Category' laws
-    for ('/>/') and 'yield'.
+    for ('~>') and 'yield'.
 
     In fact, we get more out of this than just a bunch of equations.  We also
-    got a useful operator, too: ('/>/').  We can use this operator to condense
+    got a useful operator, too: ('~>').  We can use this operator to condense
     our original code into the following more succinct form:
 
-> main = run $ for P.stdin (body />/ lift . putStrLn)
+> main = run $ for P.stdin (body ~> lift . putStrLn)
 
     This means that we can also choose to program in a more functional style and
     think of stream processing in terms of composing transformations using
-    ('/>/') instead of nesting a bunch of 'for' loops.
+    ('~>') instead of nesting a bunch of 'for' loops.
 
     The above example is a microcosm of the design philosophy behind the @pipes@
     library:
@@ -325,10 +320,10 @@ import Prelude hiding ((.), id)
     containing the next value, @a@, along with the remainder of the 'Producer'.
 
     However, sometimes we can get away with something a little more elegant,
-    like a 'Consumer', which represents an effectful fold.  A 'Consumer' is a
-    monad transformer that extends the base monad with the ability to
-    incrementally 'await' input.  The following @printN@ 'Consumer' shows how to
-    'print' out only the first @n@ elements received:
+    like a 'Consumer', which represents an effectful sink of values.  A
+    'Consumer' is a monad transformer that extends the base monad with the
+    ability to incrementally 'await' input.  The following @printN@ 'Consumer'
+    shows how to 'print' out only the first @n@ elements received:
 
 > -- printn.hs
 >
@@ -341,13 +336,66 @@ import Prelude hiding ((.), id)
 > --               v        v
 > printN :: Int -> Consumer String IO ()
 > printN n = replicateM_ n $ do  -- Repeat the following block 'n' times
->     str <- await ()            -- 'await' a new 'String'
+>     str <- await               -- 'await' a new 'String'
 >     lift $ putStrLn str        -- Print out the 'String'
 
     'await' is the dual of 'yield': we suspend our 'Pipe' until we are supplied
     with a new value:
 
-> await :: (Monad m) => () -> Consumer a m a
+> await :: (Monad m) => Consumer a m a
+
+    One way to feed a 'Consumer' is to repeatedly feed the same input using
+    using ('>~'):
+
+> (>~) :: (MOnad m) => Effect m b -> Consumer b m c -> Effect m c
+
+    This runs the given 'Effect' every time the 'Consumer' 'await's a value,
+    using the return value of the 'Effect' to supply the input:
+
+>>> run $ lift getLine >~ printN 3
+Test<Enter>
+Test
+ABC<Enter>
+ABC
+42<Enter>
+42
+>>>
+
+    You might wonder why ('>~') uses an 'Effect' instead of a raw action in the
+    base monad.  The reason why is that ('>~') actually permits the following
+    more general type:
+
+> (>~) :: (Monad m) => Consumer a m b -> Consumer b m c -> Consumer a m c
+
+    We can feed a 'Consumer' with another 'Consumer'.  For example, we could
+    define the following intermediate 'Consumer' that requests two 'String's and
+    returns them concatenated:
+
+> -- printn.hs
+>
+> doubleUp :: (Monad m) => Consumer String m String
+> doubleUp = do
+>     str1 <- await
+>     str2 <- await
+>     return (str1 ++ str2)
+>
+> -- even better: doubleUp = (++) <$> await <*> await
+
+    We can now insert this in between and see what happens:
+
+>>> run $ lift getLine >~ doubleUp >~ printN 3
+Test<Enter>
+ing<Enter>
+Testing
+ABC<Enter>
+DEF<Enter>
+ABCDEF
+42<Enter>
+000<Enter>
+42000
+
+    'doubleUp' split every request from 'printN' into two separate requests and
+    then merged the values back into a single result to print.
 
     Use ('~>') to connect a 'Producer' to a 'Consumer':
 

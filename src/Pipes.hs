@@ -90,7 +90,7 @@ f '~>' 'yield' = f
 (f '~>' g) '~>' h = f '~>' (g '~>' h)
 @
 
-    This is equivalent to the following \"for loop laws\":
+    These are equivalent to the following \"for loop laws\":
 
 @
 \ \-\- Looping over a single yield simplifies to function application
