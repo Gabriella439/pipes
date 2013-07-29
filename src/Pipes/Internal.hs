@@ -27,47 +27,7 @@ import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
-    an upstream and downstream interface.  The 'Pipes.await' command
-    communicates with the upstream interface and the 'Pipes.yield' command
-    communicates with the downstream interface.
-
-    You can connect proxies together in five different ways:
-
-    * ('Pipes.>->'): connect pull-based streams
-
-    * ('Pipes.>~>'): connect push-based streams
-
-    * ('Pipes.\>\'): chain folds
-
-    * ('Pipes./>/'): chain unfolds
-
-    * ('Control.Monad.>=>'): sequence proxies
-
-    The type variables signify:
-
-    * @a'@ and @a@ - The upstream interface, where @(a')@s go out and @(a)@s
-      come in
-
-    * @b'@ and @b@ - The downstream interface, where @(b)@s go out and @(b')@s
-      come in
-
-    * @m @ - The base monad
-
-    * @r @ - The return value
-
-    Diagrammatically:
-
-> Upstream | Downstream
->     +---------+
->     |         |
-> a' <==       <== b'
->     |         |
-> a  ==>       ==> b
->     |    |    |
->     +----|----+
->          v
->          r
-
+    an upstream and downstream interface.
 -}
 data Proxy a' a b' b m r
     = Request a' (a  -> Proxy a' a b' b m r )

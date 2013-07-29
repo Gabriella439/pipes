@@ -20,20 +20,24 @@ module Pipes (
     Proxy,
     run,
 
-    -- * Categories
-    -- $categories
+    -- * Synonyms
+    X,
+    Effect,
+    Producer,
+    Consumer,
+    Pipe,
+
 
     -- ** Yield
     -- $yield
     yield,
-    (/>/),
-    (\<\),
     for,
+    (/>/),
 
     -- ** Await
     -- $await
     await,
-    feed,
+    (>~),
 
     -- ** Pull
     -- $pull
@@ -55,33 +59,15 @@ module Pipes (
     tee,
     generalize,
 
-    -- * Concrete Type Synonyms
-    X,
-    Effect,
-    Producer,
-    Pipe,
-    Consumer,
-    Client,
-    Server,
-
-    -- * Polymorphic Type Synonyms
-    Effect',
-    Producer',
-    Consumer',
-    Client',
-    Server',
-
     -- * Re-exports
     -- $reexports
-    module Control.Monad,
     module Control.Monad.Trans.Class,
     module Control.Monad.Morph,
     module Data.Foldable
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
-import Control.Monad ((>=>), (<=<))
-import qualified Control.Monad as M
+import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
@@ -101,100 +87,62 @@ infixr 7 <-<
 infixl 7 >->
 
 {- $yield
-    The 'yield' category closely corresponds to the generator design pattern.
-    In this category, 'yield' is the identity and ('/>/') is the composition
-    operator.  You can think of them as having the following simpler types when
-    you specialize them to unidirectional communication:
+    'yield' and ('/>/') obey the 'Control.Category.Category' laws:
 
-> -- Produce one output value
-> yield :: (Monad m) =>  a -> Producer a m ()
->
-> -- Connect unfolds, optionally terminating with an 'Effect'
-> (/>/) :: (Monad m) => (a -> Producer b m ()) -> (b -> Producer c m ()) -> (a -> Producer c m ())
-> (/>/) :: (Monad m) => (a -> Producer b m ()) -> (b -> Effect     m ()) -> (a -> Effect     m ())
+@
+\ \-\- Left identity
+'yield' '/>/' f
 
-    The 'yield' category obeys the category laws, where 'yield' is the
-    identity and ('/>/') is composition:
+\ \-\- Right identity
+f '/>/' 'yield' = f
 
-> -- Left identity
-> yield />/ f = f
->
-> -- Right identity
-> f />/ yield = f
->
-> -- Associativity
-> (f />/ g) />/ h = f />/ (g />/ h)
+\ \-\- Associativity
+(f '/>/' g) '/>/' h = f '/>/' (g '/>/' h)
+@
 
-    When you write these laws in terms of 'for', you get the \"for loop laws\":
+    This is equivalent to the following \"for loop laws\":
 
-> -- Looping over a single yield simplifies to function application
-> for (yield x) f = f x
->
-> -- Re-'yield'ing every element returns the original stream
-> for m yield = m
->
-> -- Nested for loops can become sequential for loops if the inner loop body
-> -- ignores the outer loop variable
-> for m (\a -> for (f a) g) = for (for m f) g
+@
+\ \-\- Looping over a single yield simplifies to function application
+\ 'for' ('yield' x) f = f x
 
-    In the fully general case, 'yield' can return a value and connected
-    components share the same upstream interface:
+\ \-\- Re-yielding every element of a stream returns the original stream
+\ 'for' m 'yield' = m
 
-> yield :: (Monad m)
->       =>  a -> Proxy x' x a' a m a'
->
->           a
->           |
->      +----|----+
->      |    |    |
->  x' <==   \ /==== a'
->      |     X   |
->  x  ==>   / \===> a
->      |    |    |
->      +----|----+
->           v 
->           a'
->
-> (/>/) :: (Monad m)
->       => (a -> Proxy x' x b' b m a')
->       -> (b -> Proxy x' x c' c m b')
->       -> (a -> Proxy x' x b' b m a')
->
->           a                 /=====> b                      a
->           |                //       |                      |
->      +----|----+          //   +----|----+            +----|----+
->      |    v    |         //    |    v    |            |    v    |
->  x' <==       <== b' <=\// x' <==       <== c'    x' <==       <== c'
->      |    f    |       \\      |    g    |     =      | f />/ g |
->  x  ==>       ==> b  ==/\\ x  ==>       ==> c     x  ==>       ==> c'
->      |    |    |         \\    |    |    |            |    |    |
->      +----|----+          \\   +----|----+            +----|----+
->           v                \\       v                      v
->           a'                \====== b'                     a'
+\ \-\- Nested for loops can become a sequential 'for' loops if the inner loop
+\ \-\- body ignores the outer loop variable
+\ 'for' m (\\a -\> 'for' (f a) g) = 'for' ('for' m f) g = 'for' m (f '/>/' g)
+@
 
 -}
 
-{-| Send a value of type @b@ downstream and block waiting for a reply of type
-    @b'@
+{-| Produce a value
 
-    'yield' is the identity of the yield category.
+@
+ 'yield' :: ('Monad' m) => b -> 'Producer' b m ()
+ 'yield' :: ('Monad' m) => b -> 'Pipe'   a b m ()
+@
 -}
 yield :: (Monad m) => a -> Proxy x' x a' a m a'
 yield = respond
 {-# INLINABLE yield #-}
 
-{-| @(for p f)@ replaces each 'yield' in @p@ with @f@.
+{-| @(for p body)@ loops over @p@ replacing each 'yield' with @body@.
 
-    Synonym for ('//>')
+@
+ 'for' :: ('Monad' m) => 'Producer' b m () -> (b -> 'Effect'       m ()) -> 'Effect'       m ()
+ 'for' :: ('Monad' m) => 'Producer' b m () -> (b -> 'Producer'   c m ()) -> 'Producer'   c m ()
+ 'for' :: ('Monad' m) => 'Pipe'   a b m () -> (b -> 'Effect'       m ()) -> 'Consumer' a   m ()
+ 'for' :: ('Monad' m) => 'Pipe'   a b m () -> (b -> 'Producer'   c m ()) -> 'Pipe'     a c m ()
+ 'for' :: ('Monad' m) => 'Pipe'   a b m () -> (b -> 'Consumer' a   m ()) -> 'Consumer' a   m ()
+ 'for' :: ('Monad' m) => 'Pipe'   a b m () -> (b -> 'Pipe'     a c m ()) -> 'Pipe'     a c m ()
+@
 -}
 for
     :: (Monad m)
     =>       Proxy x' x b' b m a'
-    -- ^
     -> (b -> Proxy x' x c' c m b')
-    -- ^
     ->       Proxy x' x c' c m a'
-    -- ^
 for = (//>)
 {-# INLINABLE for #-}
 
@@ -204,204 +152,86 @@ for = (//>)
     operator.  You can think of them as having the following simpler types when
     you specialize them to unidirectional communication:
 
-> -- Consume one input value
-> await :: (Monad m) =>  () -> Consumer a m a
->
-> -- Connect folds, optionally beginning with an 'Effect'
-> (\>\) :: (Monad m) => (() -> Consumer a m b) -> (() -> Consumer b m c) -> (() -> Consumer a m c)
-> (\>\) :: (Monad m) => (() -> Effect     m a) -> (() -> Consumer a m b) -> (() -> Effect     m b)
+    'await' and ('>~') obey the 'Control.Category.Category' laws:
 
-    'feed' is like ('\>\'), except that the arguments are flipped and they don't
-    require the unnecessary @()@ parameters:
+@
+\ \-\- Feeding with an await is the same as not feeding at all
+\ 'await' '>~' f = f
 
-> feed :: (Monad m) => Consumer b m c -> Consumer a m b -> Consumer a m c
-> feed :: (Monad m) => Consumer a m b -> Effect     m a -> Effect     m b
+\ \-\- Feeding an await just replaces the await
+\ f '>~' 'await' = f
 
-    The 'await' category obeys the category laws, where 'await' is the
-    identity and ('\>\') is composition:
+\ \-\- (>~) is associative
+\ (f '>~' g) '>~' h = f '>~' (g '>~' h)
+@
 
-> -- Left identity
-> await \>\ f = f
->
-> -- Right identity
-> f \>\ await = f
->
-> -- Associativity
-> (f \>\ g) \>\ h = f \>\ (g \>\ h)
-
-    When you write these laws in terms of 'feed', you get the \"feed loop
-    laws\":
-
-> -- Feeding a single 'await' just replaces the 'await'
-> feed (await ()) m = m
->
-> -- Feeding with an 'await' is the same as not feeding at all
-> feed m (await ()) = m
->
-> -- Nested feed loops can always be rewritten to sequential feed loops
-> feed m (feed n o) = feed (feed m n) o
-
-    In the fully general case, 'await' can send an argument upstream and
-    connected components share the same downstream interface:
-
-> await :: (Monad m)
->       =>  a' -> Proxy a' a y' y m a
->
->           a'
->           |
->      +----|----+
->      |    |    |
->  a' <====/    <== y'
->      |         |
->  a  =====\    ==> y
->      |    |    |
->      +----|----+
->           v 
->           a 
->
-> (\>\) :: (Monad m)
->       => (b' -> Proxy a' a y' y m b)
->       -> (c' -> Proxy b' b y' y m c)
->       -> (c' -> Proxy a' a y' y m c)
->
->           b'<======\               c'                     c'
->           |        \\              |                      |
->      +----|----+    \\        +----|----+            +----|----+
->      |    v    |     \\       |    v    |            |    v    |
->  a' <==       <== y'  \== b' <==       <== y'    a' <==       <== y'
->      |    f    |              |    g    |     =      | f \>\ g |
->  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
->      |    |    |     //       |    |    |            |    |    |
->      +----|----+    //        +----|----+            +----|----+
->           v        //              v                      v
->           b =======/               c                      c
 -}
 
-{-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
+{-| Consume a value
 
-    'await' is the identity of the await category.
+@
+ 'await' :: ('Monad' m) => 'Consumer' a   m a
+ 'await' :: ('Monad' m) => 'Pipe'     a b m a
+@
 -}
 await :: (Monad m) => Proxy () a y' y m a
 await = request ()
 {-# INLINABLE await #-}
 
--- | @(feed p1 p2)@ replaces each @(await ())@ in @p1@ with @p2@
-feed
+{-| @(draw >~ p)@ loops over @p@ replacing each 'await' with @draw@
+
+@
+ ('>~') :: ('Monad' m) => 'Effect'       m b -> 'Consumer' b   m d -> 'Effect'       m d
+ ('>~') :: ('Monad' m) => 'Consumer' a   m b -> 'Consumer' b   m d -> 'Consumer' a   m d
+ ('>~') :: ('Monad' m) => 'Effect'       m b -> 'Pipe'     b c m d -> 'Producer'   c m d
+ ('>~') :: ('Monad' m) => 'Consumer' a   m b -> 'Pipe'     b c m d -> 'Pipe'     a c m d
+ ('>~') :: ('Monad' m) => 'Producer'   c m b -> 'Pipe'     b c m d -> 'Producer'   c m d
+ ('>~') :: ('Monad' m) => 'Pipe'     a c m b -> 'Pipe'     b c m d -> 'Pipe'     a c m d
+@
+-}
+(>~)
     :: (Monad m)
-    => Proxy () b y' y m c
-    -> Proxy a' a y' y m b
+    => Proxy a' a y' y m b
+    -> Proxy () b y' y m c
     -> Proxy a' a y' y m c
-feed p1 p2 = (\() -> p2) >\\ p1
-{-# INLINABLE feed #-}
+p1 >~ p2 = (\() -> p1) >\\ p2
+{-# INLINABLE (>~) #-}
 
 {- $pull
-    The 'pull' category closely corresponds to pull-based Unix pipes and
-    consists of three operations, which you can think of as having the following
-    types:
+    'cat' and ('>->') obey the 'Control.Category' laws:
 
-> -- 'pull' retransmits all values
-> pull  :: (Monad m)
->       =>  () -> Pipe a a m r
->
-> -- '+>>' transforms a 'Consumer' by applying a 'Pipe' or 'Producer' upstream
-> (+>>) :: (Monad m)               |  (+>>) :: (Monad m)
->       => (() -> Pipe   a b m r)  |        => (() -> Producer b m r)
->       ->        Consumer b m r   |        ->        Consumer b m r
->       ->        Consumer a m r   |        ->        Effect     m r
->
-> -- '>+>' connects two 'Pipe's or 'Producer's
-> (>+>) :: (Monad m)               |  (>+>) :: (Monad m)
->       => (() -> Pipe   a b m r)  |        -> (() -> Producer b m r)
->       -> (() -> Pipe   b c m r)  |        -> (() -> Pipe   b c m r)
->       -> (() -> Pipe   a c m r)  |        -> (() -> Producer c m r)
+@
+\ \-\- Useless use of cat
+\ 'cat' '>->' f = f
 
-    The 'pull' category obeys the category laws, where 'pull' is the identity
-    and ('>+>') is composition:
+\ \-\- Redirecting output to cat does nothing
+\ f '>->' 'cat' = f
 
-> -- Left identity
-> pull >+> f = f
->
-> -- Right identity
-> f >+> pull = f
->
-> -- Associativity
-> (f >+> g) >+> h = f >+> (g >+> h)
-
-    For unidirectional Unix-like pipes, you can use the following simpler
-    operations, which you can think of as having the following types:
-
-> cat   :: (Monad m) => Pipe   a a m r
->
-> (>->) :: (Monad m) => Producer a m r -> Consumer a m r -> Effect     m r
-> (>->) :: (Monad m) => Producer a m r -> Pipe   a b m r -> Producer b m r
-> (>->) :: (Monad m) => Pipe   a b m r -> Consumer b m r -> Consumer a m r
-> (>->) :: (Monad m) => Pipe   a b m r -> Pipe   b c m r -> Pipe   a c m r
-
-    When you write the 'pull' category laws in terms of ('>->') and 'cat', you
-    get the category laws for Unix pipes:
-
-> -- Useless use of 'cat'
-> cat >-> f = f
->
-> -- Redirecting stdout to 'cat' does nothing
-> f >-> cat = f
->
-> -- The Unix pipe operator is associative
-> (f >-> g) >-> h = f >-> (g >-> h)
-
-    In the fully general case, you can also send information upstream by
-    invoking 'await' with a non-@()@ argument.  The upstream 'Proxy' will
-    receive the first value through its initial argument and bind each
-    subsequent value through the return value of 'yield':
-
-> pull  :: (Monad m)
->       =>  a' -> Proxy a' a a' a m r
->
->           a'
->           |
->      +----|----+
->      |    v    |
->  a' <============ a'
->      |         |
->  a  ============> a
->      |    |    |
->      +----|----+
->           v
->           r
->
-> (>+>) :: (Monad m)
->       -> (b' -> Proxy a' a b' b m r)
->       -> (c' -> Proxy b' b c' c m r)
->       -> (c' -> Proxy a' a c' c m r)
->
->           b'               c'                     c'
->           |                |                      |
->      +----|----+      +----|----+            +----|----+
->      |    v    |      |    v    |            |    v    |
->  a' <==       <== b' <==       <== c'    a' <==       <== c'
->      |    f    |      |    g    |     =      | f >+> g |
->  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
->      |    |    |      |    |    |            |    |    |
->      +----|----+      +----|----+            +----|----+
->           v                v                      v
->           r                r                      r
+\ \-\- The pipe operator is associative
+\ (f '>->' g) '>->' h = f '>->' (g '>->' h)
+@
 
 -}
 
--- | Unidirectional identity, named after the Unix @cat@ program
+-- | The identity 'Pipe', analogous the the Unix @cat@ program
 cat :: (Monad m) => Pipe a a m r
 cat = pull ()
 {-# INLINABLE cat #-}
 
--- | Unidirectional composition, analogous to the Unix pipe operator: @|@.
+{-| 'Pipe' composition, analogous to the Unix pipe operator
+
+@
+('>->') :: ('Monad' m) => 'Producer' b m r -> 'Consumer' b   m r -> 'Effect'       m r
+('>->') :: ('Monad' m) => 'Producer' b m r -> 'Pipe'     b c m r -> 'Producer'   c m r
+('>->') :: ('Monad' m) => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
+('>->') :: ('Monad' m) => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
+@
+-}
 (>->)
     :: (Monad m)
     => Proxy a' a () b m r
-    -- ^
     -> Proxy () b c' c m r
-    -- ^
     -> Proxy a' a c' c m r
-    -- ^
 p1 >-> p2 = (\() -> p1) +>> p2
 {-# INLINABLE (>->) #-}
 
@@ -442,7 +272,7 @@ instance (Monad m) => Alternative (ListT m) where
         list p1
         list p2 )
 
-instance (Monad m) => M.MonadPlus (ListT m) where
+instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
 
@@ -550,17 +380,12 @@ generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
 (<-<)
     :: (Monad m)
     => Proxy () b c' c m r
-    -- ^
     -> Proxy a' a () b m r
-    -- ^
     -> Proxy a' a c' c m r
-    -- ^
 p2 <-< p1 = p1 >-> p2
 {-# INLINABLE (<-<) #-}
 
 {- $reexports
-    "Control.Monad" re-exports ('>=>') and ('<=<').
-
     "Control.Monad.Trans.Class" re-exports 'MonadTrans'.
 
     "Control.Monad.Morph" re-exports 'MFunctor'.

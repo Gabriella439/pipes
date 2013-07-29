@@ -17,6 +17,7 @@
 
 module Pipes.Core (
     -- * Proxy Monad Transformer
+    -- $proxy
     Proxy,
     run,
 
@@ -75,10 +76,51 @@ module Pipes.Core (
     (<+<),
     (<\\),
     (//<),
-    (<<+)
+    (<<+),
+
+    module Pipes.Core
     ) where
 
 import Pipes.Internal (Proxy(..))
+
+{- $proxy
+    You can connect proxies together in five different ways:
+
+    * ('Pipes.>->'): connect pull-based streams
+
+    * ('Pipes.>~>'): connect push-based streams
+
+    * ('Pipes.\>\'): chain folds
+
+    * ('Pipes./>/'): chain unfolds
+
+    * ('Control.Monad.>=>'): sequence proxies
+
+    The type variables signify:
+
+    * @a'@ and @a@ - The upstream interface, where @(a')@s go out and @(a)@s
+      come in
+
+    * @b'@ and @b@ - The downstream interface, where @(b)@s go out and @(b')@s
+      come in
+
+    * @m @ - The base monad
+
+    * @r @ - The return value
+
+    Diagrammatically:
+
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> a' <==       <== b'
+>     |         |
+> a  ==>       ==> b
+>     |    |    |
+>     +----|----+
+>          v
+>          r
+-}
 
 -- | Run a self-contained 'Effect', converting it back to the base monad
 run :: (Monad m) => Effect m r -> m r
@@ -91,7 +133,8 @@ run = go
         Pure    r   -> return r
 {-# INLINABLE run #-}
 
-{- * Keep proxy composition lower in precedence than function composition, which
+{-
+   * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
 
 > lift . k >+> p
@@ -661,18 +704,6 @@ fb' +>> p = case p of
     Pure       r   -> Pure r
 {-# INLINABLE (+>>) #-}
 
--- | Unidirectional composition, analogous to the Unix pipe operator: @|@.
-(>->)
-    :: (Monad m)
-    => Proxy a' a () b m r
-    -- ^
-    -> Proxy () b c' c m r
-    -- ^
-    -> Proxy a' a c' c m r
-    -- ^
-p1 >-> p2 = (\() -> p1) +>> p2
-{-# INLINABLE (>->) #-}
-
 {- $reflect
     @(reflect .)@ transforms each streaming category into its dual:
 
@@ -713,18 +744,17 @@ data X
 
 {-| An effect in the base monad
 
-    'Effect's never 'request' nor 'respond'.
+    'Effect's are completely self-contained
 -}
 type Effect = Proxy X () () X
 
--- | 'Producer's only 'respond' and never 'request'.
+-- | 'Producer's only 'Pipes.yield'
 type Producer b = Proxy X () () b
 
 -- | A unidirectional 'Proxy'.
 type Pipe a b = Proxy () a () b
 
-{-| 'Consumer's only 'request' and never 'respond'.
--}
+-- | 'Consumer's only 'Pipes.await'
 type Consumer a = Proxy () a () X
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
