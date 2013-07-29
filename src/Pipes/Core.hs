@@ -76,9 +76,7 @@ module Pipes.Core (
     (<+<),
     (<\\),
     (//<),
-    (<<+),
-
-    module Pipes.Core
+    (<<+)
     ) where
 
 import Pipes.Internal (Proxy(..))

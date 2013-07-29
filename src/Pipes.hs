@@ -16,39 +16,34 @@
 -}
 
 module Pipes (
-    -- * Proxy Monad Transformer
+    -- * The Proxy Monad Transformer
     Proxy,
-    run,
-
-    -- * Synonyms
     X,
     Effect,
+    run,
+
+    -- ** Producers
+    -- $producers
     Producer,
-    Consumer,
-    Pipe,
-
-
-    -- ** Yield
-    -- $yield
     yield,
     for,
-    (/>/),
+    (~>),
 
-    -- ** Await
-    -- $await
+    -- ** Consumers
+    -- $consumers
+    Consumer,
     await,
     (>~),
 
-    -- ** Pull
-    -- $pull
+    -- ** Pipes
+    -- $pipes
+    Pipe,
     cat,
     (>->),
     (<-<),
 
     -- * ListT
     ListT(..),
-
-    -- * Iterable
     Iterable(..),
 
     -- * Utilities
@@ -86,18 +81,20 @@ import Control.Monad.Morph (MFunctor(hoist))
 infixr 7 <-<
 infixl 7 >->
 
-{- $yield
-    'yield' and ('/>/') obey the 'Control.Category.Category' laws:
+{- $producers
+    Use 'yield' to build 'Producer's and ('~>') \/ 'for' to consume 'Producer's.
+
+    'yield' and ('~>') obey the 'Control.Category.Category' laws:
 
 @
 \ \-\- Left identity
-'yield' '/>/' f
+'yield' '~>' f
 
 \ \-\- Right identity
-f '/>/' 'yield' = f
+f '~>' 'yield' = f
 
 \ \-\- Associativity
-(f '/>/' g) '/>/' h = f '/>/' (g '/>/' h)
+(f '~>' g) '~>' h = f '~>' (g '~>' h)
 @
 
     This is equivalent to the following \"for loop laws\":
@@ -111,7 +108,7 @@ f '/>/' 'yield' = f
 
 \ \-\- Nested for loops can become a sequential 'for' loops if the inner loop
 \ \-\- body ignores the outer loop variable
-\ 'for' m (\\a -\> 'for' (f a) g) = 'for' ('for' m f) g = 'for' m (f '/>/' g)
+\ 'for' m (\\a -\> 'for' (f a) g) = 'for' ('for' m f) g = 'for' m (f '~>' g)
 @
 
 -}
@@ -138,19 +135,34 @@ yield = respond
  'for' :: ('Monad' m) => 'Pipe'   a b m () -> (b -> 'Pipe'     a c m ()) -> 'Pipe'     a c m ()
 @
 -}
-for
-    :: (Monad m)
+for :: (Monad m)
     =>       Proxy x' x b' b m a'
     -> (b -> Proxy x' x c' c m b')
     ->       Proxy x' x c' c m a'
 for = (//>)
 {-# INLINABLE for #-}
 
-{- $await
-    The 'await' category closely corresponds to the iteratee design pattern.  In
-    this category, 'await' is the identity and ('\>\') is the composition
-    operator.  You can think of them as having the following simpler types when
-    you specialize them to unidirectional communication:
+{-| Compose loop bodies
+
+@
+('~>') :: ('Monad' m) => (a -> 'Producer' b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Effect'       m ())
+('~>') :: ('Monad' m) => (a -> 'Producer' b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Producer'   c m ())
+('~>') :: ('Monad' m) => (a -> 'Pipe'   a b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Consumer' a   m ())
+('~>') :: ('Monad' m) => (a -> 'Pipe'   a b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Pipe'     a c m ())
+('~>') :: ('Monad' m) => (a -> 'Pipe'   a b m ()) -> (b -> 'Consumer' a   m ()) -> (a -> 'Consumer' a   m ())
+('~>') :: ('Monad' m) => (a -> 'Pipe'   a b m ()) -> (b -> 'Pipe'     a c m ()) -> (a -> 'Pipe'     a c m ())
+@
+-}
+(~>)
+    :: (Monad m)
+    => (a -> Proxy x' x b' b m a')
+    -> (b -> Proxy x' x c' c m b')
+    -> (a -> Proxy x' x c' c m a')
+(~>) = (/>/)
+{-# INLINABLE (~>) #-}
+
+{- $consumers
+    Use 'await' to build 'Consumer's and ('>~') to feed 'Consumer's.
 
     'await' and ('>~') obey the 'Control.Category.Category' laws:
 
@@ -197,7 +209,9 @@ await = request ()
 p1 >~ p2 = (\() -> p1) >\\ p2
 {-# INLINABLE (>~) #-}
 
-{- $pull
+{- $pipes
+    Use 'await' and 'yield' to build 'Pipe's and ('>->') to connect 'Pipe's.
+
     'cat' and ('>->') obey the 'Control.Category' laws:
 
 @
@@ -221,10 +235,10 @@ cat = pull ()
 {-| 'Pipe' composition, analogous to the Unix pipe operator
 
 @
-('>->') :: ('Monad' m) => 'Producer' b m r -> 'Consumer' b   m r -> 'Effect'       m r
-('>->') :: ('Monad' m) => 'Producer' b m r -> 'Pipe'     b c m r -> 'Producer'   c m r
-('>->') :: ('Monad' m) => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
-('>->') :: ('Monad' m) => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
+ ('>->') :: ('Monad' m) => 'Producer' b m r -> 'Consumer' b   m r -> 'Effect'       m r
+ ('>->') :: ('Monad' m) => 'Producer' b m r -> 'Pipe'     b c m r -> 'Producer'   c m r
+ ('>->') :: ('Monad' m) => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
+ ('>->') :: ('Monad' m) => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
 @
 -}
 (>->)
