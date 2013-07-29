@@ -3,15 +3,15 @@
 `pipes` is a clean and powerful stream processing library that lets you build
 and connect reusable streaming components like Unix pipes.
 
-You should use `pipes` if:
+You should use `pipes` if you need:
 
-* you are streaming data,
+* effectful producers,
 
-* you need to build or consume 'ListT' computations,
+* effectful consumers,
 
-* you want a reactive programming system, or:
+* Unix-like pipes, or:
 
-* you like concurrent message passing.
+* `ListT` done right.
 
 ## Quick start
 
@@ -21,12 +21,12 @@ You should use `pipes` if:
 Then fire up ` ghci`:
 
     $ ghci
-    Prelude> import Pipes as P
-    Prelude P> import qualified Pipes.Prelude as P
+    Prelude> import Pipes
+    Prelude Pipes> import qualified Pipes.Prelude as P
 
 ... and echo standard input to standard output until you enter `quit`.
 
-    Prelude P> runEffect $ (P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout) ()
+    Prelude Pipes P> run $ for (P.stdin >-> P.takeWhile (/= "quit")) (lift . putStrLn)
     Test[Enter]
     Test
     Apple[Enter]
@@ -38,16 +38,16 @@ A new tutorial for version 4.0.0 is in progress, which you can find [here](https
 
 ## Features
 
-* *Concise API*: Use three simple commands: `(>->)`, `request`, and `respond`
+* *Concise API*: Use simple commands like: `yield`, `for`, `await`, and `(>->)`
 
-* *Blazing fast*: Implementation tuned for speed 
+* *Blazing fast*: Implementation tuned for speed
 
 * *Lightweight Dependency*: `pipes` depends only on `transformers` and `mmorph`
   and compiles very rapidly
 
 * *Elegant semantics*: Use practical category theory
 
-* *Bidirectionality*: Implement duplex channels 
+* *Bidirectionality*: Implement duplex channels
 
 * *Extensive Documentation*: Second to none!
 
@@ -87,6 +87,9 @@ for a couple of months as they experiment with a few new features enabled by the
 
 All development work currently focuses on transitioning downstream libraries to
 use `pipes-4.0.0` and building out the `pipes` ecosystem.
+
+The long term goal is to get `pipes` into the Haskell platform and become the
+basic building block for streaming APIs.
 
 ## Community Resources
 
