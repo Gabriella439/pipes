@@ -4,16 +4,7 @@
     library.
 -}
 
-{-# LANGUAGE CPP, RankNTypes, EmptyDataDecls #-}
-
-#if __GLASGOW_HASKELL__ >= 702
-{-# LANGUAGE Trustworthy #-}
-#endif
-{- The rewrite RULES require the 'TrustWorthy' annotation.  Their proofs are
-   pretty trivial since they are just inlining the definition of their
-   respective operators.  GHC doesn't do this inlining automatically for these
-   functions because they are recursive.
--}
+{-# LANGUAGE RankNTypes #-}
 
 module Pipes (
     -- * The Proxy Monad Transformer
