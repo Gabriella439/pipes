@@ -53,8 +53,6 @@ module Pipes (
     each,
     every,
     discard,
-    tee,
-    generalize,
 
     -- * Re-exports
     -- $reexports
@@ -70,12 +68,10 @@ import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
-import Control.Monad.Trans.State.Strict (get, put)
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as F
 import Pipes.Internal (Proxy(..))
 import Pipes.Core
-import Pipes.Lift (evalStateP)
 
 -- Re-exports
 import Control.Monad.Morph (MFunctor(hoist))
@@ -373,46 +369,6 @@ every it = discard >\\ list (toListT it)
 discard :: (Monad m) => a -> Effect' m ()
 discard _ = return ()
 {-# INLINABLE discard #-}
-
-{-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
-    downstream
--}
-tee :: (Monad m) => Consumer a m r -> Pipe a a m r
-tee p = evalStateP Nothing $ do
-    r <- up >\\ (hoist lift p //> dn)
-    ma <- lift get
-    case ma of
-        Nothing -> return ()
-        Just a  -> yield a
-    return r
-  where
-    up () = do
-        ma <- lift get
-        case ma of
-            Nothing -> return ()
-            Just a  -> yield a
-        a <- await
-        lift $ put (Just a)
-        return a
-    dn _ = return ()
-{-# INLINABLE tee #-}
-
-{-| Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
-
-> generalize (f >-> g) = generalize f >+> generalize g
->
-> generalize cat = pull
--}
-generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
-generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
-  where
-    up () = do
-        x <- lift get
-        request x
-    dn a = do
-        x <- respond a
-        lift $ put x
-{-# INLINABLE generalize #-}
 
 -- | ('>->') with the arguments flipped
 (<-<)
