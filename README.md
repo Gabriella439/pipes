@@ -5,11 +5,11 @@ and connect reusable streaming components like Unix pipes.
 
 You should use `pipes` if you need:
 
-* effectful producers,
+* effectful `Producer`s (like generators),
 
-* effectful consumers,
+* effectful `Consumer`s (like iteratees),
 
-* Unix-like pipes, or:
+* effectful `Pipe`s (like Unix pipes), or:
 
 * `ListT` done right.
 
