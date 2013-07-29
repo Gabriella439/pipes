@@ -1,7 +1,7 @@
-{-| The core functionality for the 'Proxy' monad transformer
+{-| This module is the recommended entry point to the @pipes@ library.
 
-    Read "Pipes.Tutorial" if you want a beginners tutorial explaining how to use
-    this library.  The documentation in this module targets more advanced users.
+    Read "Pipes.Tutorial" if you want a tutorial explaining how to use this
+    library.
 -}
 
 {-# LANGUAGE CPP, RankNTypes, EmptyDataDecls #-}
@@ -28,12 +28,14 @@ module Pipes (
     yield,
     for,
     (~>),
+    (<~),
 
     -- ** Consumers
     -- $consumers
     Consumer,
     await,
     (>~),
+    (~<),
 
     -- ** Pipes
     -- $pipes
@@ -78,8 +80,12 @@ import Pipes.Lift (evalStateP)
 -- Re-exports
 import Control.Monad.Morph (MFunctor(hoist))
 
-infixr 7 <-<
+infixl 4 <~
+infixr 4 ~>
+infixl 5 ~<
+infixr 5 >~
 infixl 7 >->
+infixr 7 <-<
 
 {- $producers
     Use 'yield' to build 'Producer's and ('~>') \/ 'for' to consume 'Producer's.
@@ -116,8 +122,8 @@ f '~>' 'yield' = f
 {-| Produce a value
 
 @
- 'yield' :: ('Monad' m) => b -> 'Producer' b m ()
- 'yield' :: ('Monad' m) => b -> 'Pipe'   a b m ()
+ 'yield' :: 'Monad' m => b -> 'Producer' b m ()
+ 'yield' :: 'Monad' m => b -> 'Pipe'   a b m ()
 @
 -}
 yield :: (Monad m) => a -> Proxy x' x a' a m a'
@@ -127,12 +133,12 @@ yield = respond
 {-| @(for p body)@ loops over @p@ replacing each 'yield' with @body@.
 
 @
- 'for' :: ('Monad' m) => 'Producer' b m () -> (b -> 'Effect'       m ()) -> 'Effect'       m ()
- 'for' :: ('Monad' m) => 'Producer' b m () -> (b -> 'Producer'   c m ()) -> 'Producer'   c m ()
- 'for' :: ('Monad' m) => 'Pipe'   a b m () -> (b -> 'Effect'       m ()) -> 'Consumer' a   m ()
- 'for' :: ('Monad' m) => 'Pipe'   a b m () -> (b -> 'Producer'   c m ()) -> 'Pipe'     a c m ()
- 'for' :: ('Monad' m) => 'Pipe'   a b m () -> (b -> 'Consumer' a   m ()) -> 'Consumer' a   m ()
- 'for' :: ('Monad' m) => 'Pipe'   a b m () -> (b -> 'Pipe'     a c m ()) -> 'Pipe'     a c m ()
+ 'for' :: 'Monad' m => 'Producer' b m () -> (b -> 'Effect'       m ()) -> 'Effect'       m ()
+ 'for' :: 'Monad' m => 'Producer' b m () -> (b -> 'Producer'   c m ()) -> 'Producer'   c m ()
+ 'for' :: 'Monad' m => 'Pipe'   a b m () -> (b -> 'Effect'       m ()) -> 'Consumer' a   m ()
+ 'for' :: 'Monad' m => 'Pipe'   a b m () -> (b -> 'Producer'   c m ()) -> 'Pipe'     a c m ()
+ 'for' :: 'Monad' m => 'Pipe'   a b m () -> (b -> 'Consumer' a   m ()) -> 'Consumer' a   m ()
+ 'for' :: 'Monad' m => 'Pipe'   a b m () -> (b -> 'Pipe'     a c m ()) -> 'Pipe'     a c m ()
 @
 -}
 for :: (Monad m)
@@ -145,12 +151,12 @@ for = (//>)
 {-| Compose loop bodies
 
 @
-('~>') :: ('Monad' m) => (a -> 'Producer' b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Effect'       m ())
-('~>') :: ('Monad' m) => (a -> 'Producer' b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Producer'   c m ())
-('~>') :: ('Monad' m) => (a -> 'Pipe'   a b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Consumer' a   m ())
-('~>') :: ('Monad' m) => (a -> 'Pipe'   a b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Pipe'     a c m ())
-('~>') :: ('Monad' m) => (a -> 'Pipe'   a b m ()) -> (b -> 'Consumer' a   m ()) -> (a -> 'Consumer' a   m ())
-('~>') :: ('Monad' m) => (a -> 'Pipe'   a b m ()) -> (b -> 'Pipe'     a c m ()) -> (a -> 'Pipe'     a c m ())
+ ('~>') :: 'Monad' m => (a -> 'Producer' b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Effect'       m ())
+ ('~>') :: 'Monad' m => (a -> 'Producer' b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Producer'   c m ())
+ ('~>') :: 'Monad' m => (a -> 'Pipe'   a b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Consumer' a   m ())
+ ('~>') :: 'Monad' m => (a -> 'Pipe'   a b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Pipe'     a c m ())
+ ('~>') :: 'Monad' m => (a -> 'Pipe'   a b m ()) -> (b -> 'Consumer' a   m ()) -> (a -> 'Consumer' a   m ())
+ ('~>') :: 'Monad' m => (a -> 'Pipe'   a b m ()) -> (b -> 'Pipe'     a c m ()) -> (a -> 'Pipe'     a c m ())
 @
 -}
 (~>)
@@ -160,6 +166,15 @@ for = (//>)
     -> (a -> Proxy x' x c' c m a')
 (~>) = (/>/)
 {-# INLINABLE (~>) #-}
+
+-- | ('~>') with the arguments flipped
+(<~)
+    :: (Monad m)
+    => (b -> Proxy x' x c' c m b')
+    -> (a -> Proxy x' x b' b m a')
+    -> (a -> Proxy x' x c' c m a')
+g <~ f = f ~> g
+{-# INLINABLE (<~) #-}
 
 {- $consumers
     Use 'await' to build 'Consumer's and ('>~') to feed 'Consumer's.
@@ -182,8 +197,8 @@ for = (//>)
 {-| Consume a value
 
 @
- 'await' :: ('Monad' m) => 'Consumer' a   m a
- 'await' :: ('Monad' m) => 'Pipe'     a b m a
+ 'await' :: 'Monad' m => 'Consumer' a   m a
+ 'await' :: 'Monad' m => 'Pipe'     a b m a
 @
 -}
 await :: (Monad m) => Proxy () a y' y m a
@@ -193,12 +208,12 @@ await = request ()
 {-| @(draw >~ p)@ loops over @p@ replacing each 'await' with @draw@
 
 @
- ('>~') :: ('Monad' m) => 'Effect'       m b -> 'Consumer' b   m d -> 'Effect'       m d
- ('>~') :: ('Monad' m) => 'Consumer' a   m b -> 'Consumer' b   m d -> 'Consumer' a   m d
- ('>~') :: ('Monad' m) => 'Effect'       m b -> 'Pipe'     b c m d -> 'Producer'   c m d
- ('>~') :: ('Monad' m) => 'Consumer' a   m b -> 'Pipe'     b c m d -> 'Pipe'     a c m d
- ('>~') :: ('Monad' m) => 'Producer'   c m b -> 'Pipe'     b c m d -> 'Producer'   c m d
- ('>~') :: ('Monad' m) => 'Pipe'     a c m b -> 'Pipe'     b c m d -> 'Pipe'     a c m d
+ ('>~') :: 'Monad' m => 'Effect'       m b -> 'Consumer' b   m d -> 'Effect'       m d
+ ('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Consumer' b   m d -> 'Consumer' a   m d
+ ('>~') :: 'Monad' m => 'Effect'       m b -> 'Pipe'     b c m d -> 'Producer'   c m d
+ ('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Pipe'     b c m d -> 'Pipe'     a c m d
+ ('>~') :: 'Monad' m => 'Producer'   c m b -> 'Pipe'     b c m d -> 'Producer'   c m d
+ ('>~') :: 'Monad' m => 'Pipe'     a c m b -> 'Pipe'     b c m d -> 'Pipe'     a c m d
 @
 -}
 (>~)
@@ -208,6 +223,15 @@ await = request ()
     -> Proxy a' a y' y m c
 p1 >~ p2 = (\() -> p1) >\\ p2
 {-# INLINABLE (>~) #-}
+
+-- | ('>~') with the arguments flipped
+(~<)
+    :: (Monad m)
+    => Proxy () b y' y m c
+    -> Proxy a' a y' y m b
+    -> Proxy a' a y' y m c
+p2 ~< p1 = p1 >~ p2
+{-# INLINABLE (~<) #-}
 
 {- $pipes
     Use 'await' and 'yield' to build 'Pipe's and ('>->') to connect 'Pipe's.
@@ -235,10 +259,10 @@ cat = pull ()
 {-| 'Pipe' composition, analogous to the Unix pipe operator
 
 @
- ('>->') :: ('Monad' m) => 'Producer' b m r -> 'Consumer' b   m r -> 'Effect'       m r
- ('>->') :: ('Monad' m) => 'Producer' b m r -> 'Pipe'     b c m r -> 'Producer'   c m r
- ('>->') :: ('Monad' m) => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
- ('>->') :: ('Monad' m) => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
+ ('>->') :: 'Monad' m => 'Producer' b m r -> 'Consumer' b   m r -> 'Effect'       m r
+ ('>->') :: 'Monad' m => 'Producer' b m r -> 'Pipe'     b c m r -> 'Producer'   c m r
+ ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
+ ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
 @
 -}
 (>->)
@@ -390,7 +414,7 @@ generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
         lift $ put x
 {-# INLINABLE generalize #-}
 
--- | Equivalent to ('>->') with the arguments flipped
+-- | ('>->') with the arguments flipped
 (<-<)
     :: (Monad m)
     => Proxy () b c' c m r

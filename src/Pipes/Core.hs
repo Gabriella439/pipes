@@ -157,8 +157,8 @@ run = go
 -}
 infixl 3 //>
 infixr 3 <\\      -- GHC will raise a parse error if either of these lines ends
-infixl 4 \<\, >\\ -- with '\', which is why this comment is here
-infixr 4 />/, //<
+infixr 4 />/, >\\ -- with '\', which is why this comment is here
+infixl 4 \<\, //<
 infixl 5 \>\      -- Same thing here
 infixr 5 /</
 infixl 6 <<+
