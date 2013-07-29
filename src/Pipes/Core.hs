@@ -204,9 +204,6 @@ infixr 8 >~>
 
 {- $respond
     The 'respond' category closely corresponds to the generator design pattern.
-    In this category, 'respond' is the identity and ('/>/') is the composition
-    operator.  You can think of them as having the following simpler types when
-    you specialize them to unidirectional communication:
 
     The 'respond' category obeys the category laws, where 'respond' is the
     identity and ('/>/') is composition:
@@ -220,8 +217,7 @@ infixr 8 >~>
 > -- Associativity
 > (f />/ g) />/ h = f />/ (g />/ h)
 
-    In the fully general case, 'respond' can return a value and connected
-    components share the same upstream interface:
+    The following diagrams show the flow of information:
 
 > respond :: (Monad m)
 >         =>  a -> Proxy x' x a' a m a'
@@ -317,22 +313,6 @@ p0 //> fb = go p0
 
 {- $request
     The 'request' category closely corresponds to the iteratee design pattern.
-    In this category, 'request' is the identity and ('\>\') is the composition
-    operator.  You can think of them as having the following simpler types when
-    you specialize them to unidirectional communication:
-
-> -- Consume one input value
-> request :: (Monad m) =>  () -> Consumer a m a
->
-> -- Connect folds, optionally beginning with an 'Effect'
-> (\>\) :: (Monad m) => (() -> Consumer a m b) -> (() -> Consumer b m c) -> (() -> Consumer a m c)
-> (\>\) :: (Monad m) => (() -> Effect     m a) -> (() -> Consumer a m b) -> (() -> Effect     m b)
-
-    'feed' is like ('\>\'), except that the arguments are flipped and they don't
-    require the unnecessary @()@ parameters:
-
-> feed :: (Monad m) => Consumer b m c -> Consumer a m b -> Consumer a m c
-> feed :: (Monad m) => Consumer a m b -> Effect     m a -> Effect     m b
 
     The 'request' category obeys the category laws, where 'request' is the
     identity and ('\>\') is composition:
@@ -346,8 +326,7 @@ p0 //> fb = go p0
 > -- Associativity
 > (f \>\ g) \>\ h = f \>\ (g \>\ h)
 
-    In the fully general case, 'request' can send an argument upstream and
-    connected components share the same downstream interface:
+    The following diagrams show the flow of information:
 
 > request :: (Monad m)
 >         =>  a' -> Proxy a' a y' y m a
@@ -440,25 +419,7 @@ fb' >\\ p0 = go p0
   #-}
 
 {- $push
-    The 'push' category closely corresponds to push-based Unix pipes and
-    consists of three operations, which you can think of as having the following
-    types:
-
-> -- 'push' retransmits every values
-> push  :: (Monad m)
->       =>  a -> Pipe a a m r
->
-> -- '>>~' transforms a 'Producer' by applying a 'Pipe' or 'Consumer' downstream
-> (>>~) :: (Monad m)              |  (>>~) :: (Monad m)
->       =>       Producer a m r   |        =>       Producer a m r
->       -> (a -> Pipe   a b m r)  |        -> (a -> Consumer a m r)
->       ->       Producer b m r   |        ->       Effect     m r
->
-> -- '>~>' connects 'Pipe's and 'Consumer's
-> (>~>) :: (Monad m)              |  (>~>) :: (Monad m)
->       => (a -> Pipe   a b m r)  |        => (a -> Pipe   a b m r)
->       => (b -> Pipe   b c m r)  |        -> (b -> Consumer b m r)
->       => (a -> Pipe   a c m r)  |        -> (a -> Consumer a m r)
+    The 'push' category closely corresponds to push-based Unix pipes.
 
     The 'push' category obeys the category laws, where 'push' is the identity
     and ('>~>') is composition:
@@ -472,9 +433,7 @@ fb' >\\ p0 = go p0
 > -- Associativity
 > (f >~> g) >~> h = f >~> (g >~> h)
 
-    In the fully general case, you can also send information upstream by
-    invoking 'request' with a non-@()@ argument.  The upstream 'Proxy' will
-    receive this argument through the return value of 'respond':
+    The following diagram shows the flow of information:
 
 > push  :: (Monad m)
 >       =>  a -> Proxy a' a a' a m r
@@ -560,25 +519,7 @@ p >>~ fb = case p of
 {-# INLINABLE (>>~) #-}
 
 {- $pull
-    The 'pull' category closely corresponds to pull-based Unix pipes and
-    consists of three operations, which you can think of as having the following
-    types:
-
-> -- 'pull' retransmits all values
-> pull  :: (Monad m)
->       =>  () -> Pipe a a m r
->
-> -- '+>>' transforms a 'Consumer' by applying a 'Pipe' or 'Producer' upstream
-> (+>>) :: (Monad m)               |  (+>>) :: (Monad m)
->       => (() -> Pipe   a b m r)  |        => (() -> Producer b m r)
->       ->        Consumer b m r   |        ->        Consumer b m r
->       ->        Consumer a m r   |        ->        Effect     m r
->
-> -- '>+>' connects two 'Pipe's or 'Producer's
-> (>+>) :: (Monad m)               |  (>+>) :: (Monad m)
->       => (() -> Pipe   a b m r)  |        -> (() -> Producer b m r)
->       -> (() -> Pipe   b c m r)  |        -> (() -> Pipe   b c m r)
->       -> (() -> Pipe   a c m r)  |        -> (() -> Producer c m r)
+    The 'pull' category closely corresponds to pull-based Unix pipes.
 
     The 'pull' category obeys the category laws, where 'pull' is the identity
     and ('>+>') is composition:
@@ -592,32 +533,7 @@ p >>~ fb = case p of
 > -- Associativity
 > (f >+> g) >+> h = f >+> (g >+> h)
 
-    For unidirectional Unix-like pipes, you can use the following simpler
-    operations, which you can think of as having the following types:
-
-> cat   :: (Monad m) => Pipe   a a m r
->
-> (>->) :: (Monad m) => Producer a m r -> Consumer a m r -> Effect     m r
-> (>->) :: (Monad m) => Producer a m r -> Pipe   a b m r -> Producer b m r
-> (>->) :: (Monad m) => Pipe   a b m r -> Consumer b m r -> Consumer a m r
-> (>->) :: (Monad m) => Pipe   a b m r -> Pipe   b c m r -> Pipe   a c m r
-
-    When you write the 'pull' category laws in terms of ('>->') and 'cat', you
-    get the category laws for Unix pipes:
-
-> -- Useless use of 'cat'
-> cat >-> f = f
->
-> -- Redirecting stdout to 'cat' does nothing
-> f >-> cat = f
->
-> -- The Unix pipe operator is associative
-> (f >-> g) >-> h = f >-> (g >-> h)
-
-    In the fully general case, you can also send information upstream by
-    invoking 'request' with a non-@()@ argument.  The upstream 'Proxy' will
-    receive the first value through its initial argument and bind each
-    subsequent value through the return value of 'respond':
+    The following diagrams show the flow of information:
 
 > pull  :: (Monad m)
 >       =>  a' -> Proxy a' a a' a m r
