@@ -109,8 +109,8 @@ f '~>' 'yield' = f
 {-| Produce a value
 
 @
- 'yield' :: 'Monad' m => b -> 'Producer' b m ()
- 'yield' :: 'Monad' m => b -> 'Pipe'   a b m ()
+ 'yield' :: 'Monad' m => a -> 'Producer' a m ()
+ 'yield' :: 'Monad' m => a -> 'Pipe'   x a m ()
 @
 -}
 yield :: (Monad m) => a -> Proxy x' x a' a m a'
@@ -122,10 +122,10 @@ yield = respond
 @
  'for' :: 'Monad' m => 'Producer' b m () -> (b -> 'Effect'       m ()) -> 'Effect'       m ()
  'for' :: 'Monad' m => 'Producer' b m () -> (b -> 'Producer'   c m ()) -> 'Producer'   c m ()
- 'for' :: 'Monad' m => 'Pipe'   a b m () -> (b -> 'Effect'       m ()) -> 'Consumer' a   m ()
- 'for' :: 'Monad' m => 'Pipe'   a b m () -> (b -> 'Producer'   c m ()) -> 'Pipe'     a c m ()
- 'for' :: 'Monad' m => 'Pipe'   a b m () -> (b -> 'Consumer' a   m ()) -> 'Consumer' a   m ()
- 'for' :: 'Monad' m => 'Pipe'   a b m () -> (b -> 'Pipe'     a c m ()) -> 'Pipe'     a c m ()
+ 'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Effect'       m ()) -> 'Consumer' x   m ()
+ 'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Producer'   c m ()) -> 'Pipe'     x c m ()
+ 'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Consumer' x   m ()) -> 'Consumer' x   m ()
+ 'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Pipe'     x c m ()) -> 'Pipe'     x c m ()
 @
 -}
 for :: (Monad m)
@@ -140,10 +140,10 @@ for = (//>)
 @
  ('~>') :: 'Monad' m => (a -> 'Producer' b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Effect'       m ())
  ('~>') :: 'Monad' m => (a -> 'Producer' b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Producer'   c m ())
- ('~>') :: 'Monad' m => (a -> 'Pipe'   a b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Consumer' a   m ())
- ('~>') :: 'Monad' m => (a -> 'Pipe'   a b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Pipe'     a c m ())
- ('~>') :: 'Monad' m => (a -> 'Pipe'   a b m ()) -> (b -> 'Consumer' a   m ()) -> (a -> 'Consumer' a   m ())
- ('~>') :: 'Monad' m => (a -> 'Pipe'   a b m ()) -> (b -> 'Pipe'     a c m ()) -> (a -> 'Pipe'     a c m ())
+ ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Consumer' x   m ())
+ ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Pipe'     x c m ())
+ ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Consumer' x   m ()) -> (a -> 'Consumer' x   m ())
+ ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Pipe'     x c m ()) -> (a -> 'Pipe'     x c m ())
 @
 -}
 (~>)
@@ -185,7 +185,7 @@ g <~ f = f ~> g
 
 @
  'await' :: 'Monad' m => 'Consumer' a   m a
- 'await' :: 'Monad' m => 'Pipe'     a b m a
+ 'await' :: 'Monad' m => 'Pipe'     a y m a
 @
 -}
 await :: (Monad m) => Proxy () a y' y m a
@@ -195,12 +195,12 @@ await = request ()
 {-| @(draw >~ p)@ loops over @p@ replacing each 'await' with @draw@
 
 @
- ('>~') :: 'Monad' m => 'Effect'       m b -> 'Consumer' b   m d -> 'Effect'       m d
- ('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Consumer' b   m d -> 'Consumer' a   m d
- ('>~') :: 'Monad' m => 'Effect'       m b -> 'Pipe'     b c m d -> 'Producer'   c m d
- ('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Pipe'     b c m d -> 'Pipe'     a c m d
- ('>~') :: 'Monad' m => 'Producer'   c m b -> 'Pipe'     b c m d -> 'Producer'   c m d
- ('>~') :: 'Monad' m => 'Pipe'     a c m b -> 'Pipe'     b c m d -> 'Pipe'     a c m d
+ ('>~') :: 'Monad' m => 'Effect'       m b -> 'Consumer' b   m c -> 'Effect'       m c
+ ('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Consumer' b   m c -> 'Consumer' a   m c
+ ('>~') :: 'Monad' m => 'Effect'       m b -> 'Pipe'     b y m c -> 'Producer'   y m c
+ ('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
+ ('>~') :: 'Monad' m => 'Producer'   y m b -> 'Pipe'     b y m c -> 'Producer'   y m c
+ ('>~') :: 'Monad' m => 'Pipe'     a y m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
 @
 -}
 (>~)
