@@ -107,16 +107,18 @@ import Pipes.Internal (Proxy(..))
 
     Diagrammatically:
 
-> Upstream | Downstream
->     +---------+
->     |         |
-> a' <==       <== b'
->     |         |
-> a  ==>       ==> b
->     |    |    |
->     +----|----+
->          v
->          r
+@
+Upstream | Downstream
+    +---------+
+    |         |
+a' <==       <== b'
+    |         |
+a  ==>       ==> b
+    |    |    |
+    +----|----+
+         v
+         r
+@
 -}
 
 -- | Run a self-contained 'Effect', converting it back to the base monad
@@ -134,21 +136,25 @@ run = go
    * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
 
-> lift . k >+> p
->
-> hoist f . k >+> p
+@
+'lift' . k '>+>' p
 
+'hoist' f . k '>+>' p
+@
    * Keep the priorities different so that users can mix composition operators
      like:
 
-> up \>\ p />/ dn
->
-> up >~> p >+> dn
+@
+up '\>\' p '/>/' dn
+up '>~>' p '>+>' dn
+@
 
    * Keep 'request' and 'respond' composition lower in precedence than 'pull'
      and 'push' composition, so that users can do:
 
-> read \>\ pull >+> writer
+@
+read '\>\' 'pull' '>+>' writer
+@
 
    * I arbitrarily choose a lower priority for downstream operators so that lazy
      pull-based computations need not evaluate upstream stages unless absolutely
@@ -173,14 +179,14 @@ infixr 8 >~>
     'Control.Category.id'.  The ('Control.Category..') and 'Control.Category.id'
     must satisfy the following three 'Control.Category.Category' laws:
 
-> -- Left identity 
-> id . f = f
->
-> -- Right identity
-> f . id = f
->
-> -- Associativity
-> (f . g) . h = f . (g . h)
+@
+\ \-\- Left identity
+'id' '.' f = f
+\ \-\- Right identity
+f '.' 'id' = f
+\ \-\- Associativity
+(f '.' g) '.' h = f '.' (g '.' h)
+@
 
     The 'Proxy' type sits at the intersection of five separate categories, four
     of which are named after their identity:
@@ -192,12 +198,12 @@ infixr 8 >~>
  request category |   'request'   |     '\>\'     |     '>\\'     |
     push category |   'push'      |     '>~>'     |     '>>~'     |
     pull category |   'pull'      |     '>+>'     |     '+>>'     |
- Kleisli category |   'return'    |     '>=>'     |     '>>='     |
+ Kleisli category |   'return'    |     'Control.Monad.>=>'     |     '>>='     |
                   +-------------+-------------+-------------+
 @
 
     Each composition operator has a \"point-ful\" version, analogous to how
-    ('>>=') is the point-ful version of ('>=>').  For example, ('//>') is the
+    ('>>=') is the point-ful version of ('Control.Monad.>=>').  For example, ('//>') is the
     point-ful version of ('\>\').
 -}
 
@@ -207,48 +213,47 @@ infixr 8 >~>
     The 'respond' category obeys the category laws, where 'respond' is the
     identity and ('/>/') is composition:
 
-> -- Left identity
-> respond />/ f = f
->
-> -- Right identity
-> f />/ respond = f
->
-> -- Associativity
-> (f />/ g) />/ h = f />/ (g />/ h)
+@
+\ \-\- Left identity
+'respond' '/>/' f = f
+\ \-\- Right identity
+f '/>/' 'respond' = f
+\ \-\- Associativity
+(f '/>/' g) '/>/' h = f '/>/' (g '/>/' h)
+@
 
     The following diagrams show the flow of information:
 
-> respond :: (Monad m)
->         =>  a -> Proxy x' x a' a m a'
->
->           a
->           |
->      +----|----+
->      |    |    |
->  x' <==   \ /==== a'
->      |     X   |
->  x  ==>   / \===> a
->      |    |    |
->      +----|----+
->           v 
->           a'
->
-> (/>/) :: (Monad m)
->       => (a -> Proxy x' x b' b m a')
->       -> (b -> Proxy x' x c' c m b')
->       -> (a -> Proxy x' x b' b m a')
->
->           a                 /=====> b                      a
->           |                //       |                      |
->      +----|----+          //   +----|----+            +----|----+
->      |    v    |         //    |    v    |            |    v    |
->  x' <==       <== b' <=\// x' <==       <== c'    x' <==       <== c'
->      |    f    |       \\      |    g    |     =      | f />/ g |
->  x  ==>       ==> b  ==/\\ x  ==>       ==> c     x  ==>       ==> c'
->      |    |    |         \\    |    |    |            |    |    |
->      +----|----+          \\   +----|----+            +----|----+
->           v                \\       v                      v
->           a'                \====== b'                     a'
+@
+'respond' :: ('Monad' m)
+        =>  a -> 'Proxy' x' x a' a m a'
+          a
+          |
+     +----|----+
+     |    |    |
+ x' <==   \\ /==== a'
+     |     X   |
+ x  ==>   / \\===> a
+     |    |    |
+     +----|----+
+          v 
+          a'
+('/>/') :: ('Monad' m)
+      => (a -> 'Proxy' x' x b' b m a')
+      -> (b -> 'Proxy' x' x c' c m b')
+      -> (a -> 'Proxy' x' x b' b m a')
+          a                   /===> b                      a
+          |                  /      |                      |
+     +----|----+            /  +----|----+            +----|----+
+     |    v    |           /   |    v    |            |    v    |
+ x' <==       <== b' <==\\ / x'<==       <== c'    x' <==       <== c'
+     |    f    |         X     |    g    |     =      | f '/>/' g |
+ x  ==>       ==> b  ===/ \\ x ==>       ==> c     x  ==>       ==> c'
+     |    |    |           \\   |    |    |            |    |    |
+     +----|----+            \\  +----|----+            +----|----+
+          v                  \\      v                      v
+          a'                  \\==== b'                     a'
+@
 
 -}
 
@@ -263,7 +268,9 @@ respond a = Respond a Pure
 
 {-| Compose two unfolds, creating a new unfold
 
-> (f />/ g) x = f x //> g
+@
+(f '/>/' g) x = f x '//>' g
+@
 
     ('/>/') is the composition operator of the respond category.
 -}
@@ -316,48 +323,47 @@ p0 //> fb = go p0
     The 'request' category obeys the category laws, where 'request' is the
     identity and ('\>\') is composition:
 
-> -- Left identity
-> request \>\ f = f
->
-> -- Right identity
-> f \>\ request = f
->
-> -- Associativity
-> (f \>\ g) \>\ h = f \>\ (g \>\ h)
+@
+-- Left identity
+'request' '\>\' f = f
+\ \-\- Right identity
+f '\>\' 'request' = f
+\ \-\- Associativity
+(f '\>\' g) '\>\' h = f '\>\' (g '\>\' h)
+@
 
     The following diagrams show the flow of information:
 
-> request :: (Monad m)
->         =>  a' -> Proxy a' a y' y m a
->
->           a'
->           |
->      +----|----+
->      |    |    |
->  a' <====/    <== y'
->      |         |
->  a  =====\    ==> y
->      |    |    |
->      +----|----+
->           v 
->           a 
->
-> (\>\) :: (Monad m)
->       => (b' -> Proxy a' a y' y m b)
->       -> (c' -> Proxy b' b y' y m c)
->       -> (c' -> Proxy a' a y' y m c)
->
->           b'<======\               c'                     c'
->           |        \\              |                      |
->      +----|----+    \\        +----|----+            +----|----+
->      |    v    |     \\       |    v    |            |    v    |
->  a' <==       <== y'  \== b' <==       <== y'    a' <==       <== y'
->      |    f    |              |    g    |     =      | f \>\ g |
->  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
->      |    |    |     //       |    |    |            |    |    |
->      +----|----+    //        +----|----+            +----|----+
->           v        //              v                      v
->           b =======/               c                      c
+@
+'request' :: ('Monad' m)
+        =>  a' -> 'Proxy' a' a y' y m a
+          a'
+          |
+     +----|----+
+     |    |    |
+ a' <=====/   <== y'
+     |         |
+ a  ======\\   ==> y
+     |    |    |
+     +----|----+
+          v
+          a
+('\>\') :: ('Monad' m)
+      => (b' -> 'Proxy' a' a y' y m b)
+      -> (c' -> 'Proxy' b' b y' y m c)
+      -> (c' -> 'Proxy' a' a y' y m c)
+          b'<=====\\                c'                     c'
+          |        \\               |                      |
+     +----|----+    \\         +----|----+            +----|----+
+     |    v    |     \\        |    v    |            |    v    |
+ a' <==       <== y'  \\== b' <==       <== y'    a' <==       <== y'
+     |    f    |              |    g    |     =      | f '\>\' g |
+ a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
+     |    |    |     /        |    |    |            |    |    |
+     +----|----+    /         +----|----+            +----|----+
+          v        /               v                      v
+          b ======/                c                      c
+@
 -}
 
 {-| Send a value of type @a'@ upstream and block waiting for a reply of type @a@
@@ -370,7 +376,9 @@ request a' = Request a' Pure
 
 {-| Compose two folds, creating a new fold
 
-> (f \>\ g) x = f >\\ g x
+@
+(f '\>\' g) x = f '>\\' g x
+@
 
     ('\>\') is the composition operator of the request category.
 -}
@@ -423,54 +431,58 @@ fb' >\\ p0 = go p0
     The 'push' category obeys the category laws, where 'push' is the identity
     and ('>~>') is composition:
 
-> -- Left identity
-> push >~> f = f
->
-> -- Right identity
-> f >~> push = f
->
-> -- Associativity
-> (f >~> g) >~> h = f >~> (g >~> h)
+@
+\ \-\- Left identity
+'push' '>~>' f = f
+\ \-\- Right identity
+f '>~>' 'push' = f
+\ \-\- Associativity
+(f '>~>' g) '>~>' h = f '>~>' (g '>~>' h)
+@
 
     The following diagram shows the flow of information:
 
-> push  :: (Monad m)
->       =>  a -> Proxy a' a a' a m r
->
->           a
->           |
->      +----|----+
->      |    v    |
->  a' <============ a'
->      |         |
->  a  ============> a
->      |    |    |
->      +----|----+
->           v
->           r
->
-> (>~>) :: (Monad m)
->       => (a -> Proxy a' a b' b m r)
->       -> (b -> Proxy b' b c' c m r)
->       -> (a -> Proxy a' a c' c m r)
->
->           a                b                      a
->           |                |                      |
->      +----|----+      +----|----+            +----|----+
->      |    v    |      |    v    |            |    v    |
->  a' <==       <== b' <==       <== c'    a' <==       <== c'
->      |    f    |      |    g    |     =      | f >~> g |
->  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
->      |    |    |      |    |    |            |    |    |
->      +----|----+      +----|----+            +----|----+
->           v                v                      v
->           r                r                      r
+@
+'push'  :: ('Monad' m)
+      =>  a -> 'Proxy' a' a a' a m r
+
+\          a
+          |
+     +----|----+
+     |    v    |
+ a' <============ a'
+     |         |
+ a  ============> a
+     |    |    |
+     +----|----+
+          v
+          r
+
+('>~>') :: ('Monad' m)
+      => (a -> 'Proxy' a' a b' b m r)
+      -> (b -> 'Proxy' b' b c' c m r)
+      -> (a -> 'Proxy' a' a c' c m r)
+
+\          a                b                      a
+          |                |                      |
+     +----|----+      +----|----+            +----|----+
+     |    v    |      |    v    |            |    v    |
+ a' <==       <== b' <==       <== c'    a' <==       <== c'
+     |    f    |      |    g    |     =      | f '>~>' g |
+ a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
+     |    |    |      |    |    |            |    |    |
+     +----|----+      +----|----+            +----|----+
+          v                v                      v
+          r                r                      r
+@
 
 -}
 
 {-| Forward responses followed by requests
 
-> push = respond >=> request >=> push
+@
+'push' = 'respond' 'Control.Monad.>=>' 'request' 'Control.Monad.>=>' 'push'
+@
 
     'push' is the identity of the push category.
 -}
@@ -483,7 +495,9 @@ push = go
 {-| Compose two proxies blocked while 'request'ing data, creating a new proxy
     blocked while 'request'ing data
 
-> (f >~> g) x = f x >>~ g
+@
+(f '>~>' g) x = f x '>>~' g
+@
 
     ('>~>') is the composition operator of the push category.
 -}
@@ -523,54 +537,60 @@ p >>~ fb = case p of
     The 'pull' category obeys the category laws, where 'pull' is the identity
     and ('>+>') is composition:
 
-> -- Left identity
-> pull >+> f = f
->
-> -- Right identity
-> f >+> pull = f
->
-> -- Associativity
-> (f >+> g) >+> h = f >+> (g >+> h)
+@
+\ \-\- Left identity
+'pull' '>+>' f = f
+
+\ \-\- Right identity
+f '>+>' 'pull' = f
+
+\ \-\- Associativity
+(f '>+>' g) '>+>' h = f '>+>' (g '>+>' h)
+@
 
     The following diagrams show the flow of information:
 
-> pull  :: (Monad m)
->       =>  a' -> Proxy a' a a' a m r
->
->           a'
->           |
->      +----|----+
->      |    v    |
->  a' <============ a'
->      |         |
->  a  ============> a
->      |    |    |
->      +----|----+
->           v
->           r
->
-> (>+>) :: (Monad m)
->       -> (b' -> Proxy a' a b' b m r)
->       -> (c' -> Proxy b' b c' c m r)
->       -> (c' -> Proxy a' a c' c m r)
->
->           b'               c'                     c'
->           |                |                      |
->      +----|----+      +----|----+            +----|----+
->      |    v    |      |    v    |            |    v    |
->  a' <==       <== b' <==       <== c'    a' <==       <== c'
->      |    f    |      |    g    |     =      | f >+> g |
->  a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
->      |    |    |      |    |    |            |    |    |
->      +----|----+      +----|----+            +----|----+
->           v                v                      v
->           r                r                      r
+@
+'pull'  :: ('Monad' m)
+      =>  a' -> 'Proxy' a' a a' a m r
+
+\          a'
+          |
+     +----|----+
+     |    v    |
+ a' <============ a'
+     |         |
+ a  ============> a
+     |    |    |
+     +----|----+
+          v
+          r
+
+('>+>') :: ('Monad' m)
+      -> (b' -> 'Proxy' a' a b' b m r)
+      -> (c' -> 'Proxy' b' b c' c m r)
+      -> (c' -> 'Proxy' a' a c' c m r)
+
+\          b'               c'                     c'
+          |                |                      |
+     +----|----+      +----|----+            +----|----+
+     |    v    |      |    v    |            |    v    |
+ a' <==       <== b' <==       <== c'    a' <==       <== c'
+     |    f    |      |    g    |     =      | f >+> g |
+ a  ==>       ==> b  ==>       ==> c     a  ==>       ==> c
+     |    |    |      |    |    |            |    |    |
+     +----|----+      +----|----+            +----|----+
+          v                v                      v
+          r                r                      r
+@
 
 -}
 
 {-| Forward requests followed by responses:
 
-> pull = request >=> respond >=> pull
+@
+'pull' = 'request' 'Control.Monad.>=>' 'respond' 'Control.Monad.>=>' 'pull'
+@
 
     'pull' is the identity of the pull category.
 -}
@@ -583,7 +603,9 @@ pull = go
 {-| Compose two proxies blocked in the middle of 'respond'ing, creating a new
     proxy blocked in the middle of 'respond'ing
 
-> (f >+> g) x = f +>> g x
+@
+(f '>+>' g) x = f '+>>' g x
+@
 
     ('>+>') is the composition operator of the pull category.
 -}
@@ -622,23 +644,24 @@ fb' +>> p = case p of
 
     * The request category is the dual of the respond category
 
-> reflect . respond = request
->
-> reflect . (f />/ g) = reflect . f /</ reflect . g
+@
+'reflect' '.' 'respond' = 'request'
+'reflect' '.' (f '/>/' g) = 'reflect' '.' f '/</' 'reflect' '.' g
+@
 
-> reflect . request = respond
->
-> reflect . (f \>\ g) = reflect . f \<\ reflect . g
+@
+'reflect' '.' 'request' = 'respond'
+'reflect' '.' (f '\>\' g) = 'reflect' '.' f '\<\' 'reflect' '.' g
+@
 
     * The pull category is the dual of the push category
 
-> reflect . push = pull
->
-> reflect . (f >~> g) = reflect . f <+< reflect . g
-
-> reflect . pull = push
->
-> reflect . (f >+> g) = reflect . f <~< reflect . g
+@
+'reflect' '.' 'push' = 'pull'
+'reflect' '.' (f '>~>' g) = 'reflect' '.' f '<+<' 'reflect' '.' g
+'reflect' '.' 'pull' = 'push'
+'reflect' '.' (f '>+>' g) = 'reflect' '.' f '<~<' 'reflect' '.' g
+@
 -}
 
 -- | Switch the upstream and downstream ends
