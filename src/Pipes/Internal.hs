@@ -5,11 +5,11 @@
     transformer laws.  These laws do not hold if you can pattern match on the
     constructors, as the following counter-example illustrates:
 
-> lift . return = M . return . Pure
->
-> return = Pure
->
-> lift . return /= return
+@
+'lift' '.' 'return' = 'M' '.' 'return' '.' 'Pure'
+'return' = 'Pure'
+'lift' '.' 'return' /= 'return'
+@
 
     You do not need to worry about this if you do not import this module, since
     the other modules in this library do not export the constructors or export
@@ -108,9 +108,10 @@ instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
 {-| The monad transformer laws are correct when viewed through the 'observe'
     function:
 
-> observe (lift (return r)) = observe (return r)
->
-> observe (lift (m >>= f)) = observe (lift m >>= lift . f)
+@
+'observe' ('lift' ('return' r)) = 'observe' ('return' r)
+'observe' ('lift' (m '>>=' f)) = 'observe' ('lift' m '>>=' 'lift' '.' f)
+@
 
     This correctness comes at a small cost to performance, so use this function
     sparingly.

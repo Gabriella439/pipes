@@ -56,44 +56,52 @@ import Prelude hiding ((.), id)
     from standard input and 'yield' them downstream, terminating when reaching
     the end of the input:
 
-> -- echo.hs
->
-> import Control.Monad (unless)
-> import Pipes
-> import qualified System.IO as IO
->
-> --       +--------+-- A 'Producer' of 'String's
-> --       |        |
-> --       |        |      +-- The base monad is 'IO'
-> --       |        |      |
-> --       |        |      |  +-- Returns '()' when finished
-> --       |        |      |  |
-> --       v        v      v  v
-> stdin :: Producer String IO ()
-> stdin = do
->     eof <- lift $ IO.hIsEOF IO.stdin  -- 'lift' actions from the base monad
->     unless eof $ do
->         str <- lift getLine           -- Read a line of input
->         yield str                     -- 'yield' the line of input
->         stdin                         -- Loop
+@
+\-\- echo.hs
+
+import Control.Monad (unless)
+import Pipes
+import qualified System.IO as IO
+
+\-\-       +--------+-- A 'Producer' of 'String's
+\-\-       |        |
+\-\-       |        |      +-- The base monad is 'IO'
+\-\-       |        |      |
+\-\-       |        |      |  +-- Returns '()' when finished
+\-\-       |        |      |  |
+\-\-       v        v      v  v
+stdin :: Producer String IO ()
+stdin = do
+    eof <- 'lift' $ IO.hIsEOF IO.stdin  -- 'lift' actions from the base monad
+    unless eof $ do
+        str <- 'lift' getLine           -- Read a line of input
+        'yield' str                     -- 'yield' the line of input
+        stdin                         -- Loop
+@
 
     'yield' emits a value, suspending the current 'Producer' until the value is
     consumed:
 
-> yield :: (Monad m) => a -> Producer a m ()
+@
+'yield' :: (Monad m) => a -> 'Producer' a m ()
+@
 
     The simplest way to consume a 'Producer' is a 'for' loop, which has the
     following type:
 
-> --                  +-- Producer      +-- The body of the      +-- Returns new
-> --                  |   to loop       |   loop                 |   Producer
-> --                  v   over          v                        v  
-> --                  --------------    ---------------------    --------------
-> for :: (Monad m) => Producer a m r -> (a -> Producer b m r) -> Producer b m r
+@
+\-\-                  +-- Producer      +-- The body of the      +-- Returns new
+\-\-                  |   to loop       |   loop                 |   Producer
+\-\-                  v   over          v                        v  
+\-\-                  --------------    ---------------------    --------------
+'for' :: (Monad m) => 'Producer' a m r -> (a -> 'Producer' b m r) -> 'Producer' b m r
+@
 
     Notice how this greatly resembles the type of @(flip concatMap)@:
 
-> flip concatMap :: [a] -> (a -> [b]) -> [b]
+@
+flip concatMap :: [a] -> (a -> [b]) -> [b]
+@
 
     That's because 'for' behaves the same way.  'for' applies the body of the
     loop to each element of the 'Producer' and then flattens the results back
@@ -101,63 +109,77 @@ import Prelude hiding ((.), id)
 
     Here's an example 'for' @loop@ in action:
 
-> -- echo.hs
->
-> --               +-- 'loop' doesn't emit any new values, so 'a' is polymorphic
-> --               |
-> --               v
-> loop :: Producer a IO ()
-> loop = for stdin $ \str -> do  -- Read this like: "for str in stdin"
->     lift $ putStrLn str        -- The body of the 'for' loop
->
-> -- even better: loop = for stdin (lift . putStrLn)
+@
+\-\- echo.hs
+
+\-\-               +-- 'loop' doesn't emit any new values, so 'a' is polymorphic
+\-\-               |
+\-\-               v
+loop :: 'Producer' a IO ()
+loop = 'for' stdin $ \str -> do  -- Read this like: \"for str in stdin\"
+    'lift' $ putStrLn str        -- The body of the 'for' loop
+
+\-\- even better: loop = 'for' stdin ('lift' . putStrLn)
+@
 
     Notice how 'loop' does not re-emit any values in the body of the 'for' loop.
     @pipes@ defines a type synonym for this special case:
 
-> data X  -- The uninhabited type
->
-> type Effect m r = Producer X m r
+@
+data 'X'  -- The uninhabited type
+
+type 'Effect' m r = 'Producer' 'X' m r
+@
 
     Since 'X' is uninhabited, a 'Producer' only type-checks as an 'Effect' if
     the 'Producer' never outputs any values.  @loop@ satisfies this criterion,
     so we can narrow the type signature of @loop@ even further to:
 
-> loop :: (Monad m) => Effect IO ()
+@
+loop :: (Monad m) => 'Effect' IO ()
+@
 
     'Effect's are special because we can 'run' any 'Effect' and convert it back
     to the base monad:
 
-> run :: (Monad m) => Effect m r -> m r
+@
+run :: (Monad m) => 'Effect' m r -> m r
+@
 
     'run' only accepts 'Effect's in order to avoid silently discarding unhandled
     output.  Our @loop@ has no unhandled output, so we are good to go:
 
-> -- echo.hs
->
-> main :: IO ()
-> main = run loop
->
-> -- or you could just inline the 'loop':
-> -- main = run $ for stdin (lift . putStrLn)
+@
+\-\- echo.hs
+
+main :: IO ()
+main = run loop
+
+\-\- or you could just inline the 'loop':
+\-\- main = run $ 'for' stdin ('lift' . putStrLn)
+@
 
     Our final program loops over standard input and echoes every line to
     standard output until we hit @Ctrl-D@ to end the input stream:
 
-> $ ghc -O2 echo.hs
-> $ ./echo
-> Test<Enter>
-> Test
-> ABC<Enter>
-> ABC
-> <Ctrl-D>
-> $
+@
+$ ghc -O2 echo.hs
+$ ./echo
+Test\<Enter\>
+Test
+ABC\<Enter\>
+ABC
+\<Ctrl-D\>
+$
+@
 
     You can also loop over lists, too.  To do so, convert the list to a
     'Producer' using 'each':
 
-> each :: (Monad m) => [a] -> Producer a m ()
-> each as = mapM_ yield as
+@
+'each' :: (Monad m) => [a] -> 'Producer' a m ()
+'each' as = mapM_ 'yield' as
+@
 
     Use this to iterate over lists using a \"foreach\" loop:
 
@@ -174,92 +196,108 @@ import Prelude hiding ((.), id)
     test out this feature by defining a new loop body that @duplicate@s every
     value:
 
-> -- nested.hs
->
-> import Pipes
-> import qualified Pipes.Prelude as P  -- Pipes.Prelude already has 'stdin'
->
-> duplicate :: (Monad m) => a -> Producer a m ()
-> duplicate x = do
->     yield x
->     yield x
->
-> loop :: Producer String IO ()
-> loop = for P.stdin duplicate
->
-> -- This is the exact same as:
-> --
-> -- loop = for P.stdin $ \x -> do
-> --     yield x
-> --     yield x
+@
+\-\- nested.hs
+
+import Pipes
+import qualified Pipes.Prelude as P  -- Pipes.Prelude already has stdin
+
+duplicate :: (Monad m) => a -> 'Producer' a m ()
+duplicate x = do
+    'yield' x
+    'yield' x
+
+loop :: 'Producer' String IO ()
+loop = 'for' P.stdin duplicate
+
+\-\- This is the exact same as:
+\-\-
+\-\- loop = 'for' P.stdin $ \x -> do
+\-\-     'yield' x
+\-\-     'yield' x
+@
 
     This time our @loop@ outputs 'String's, specifically two copies of every
     line that we read from standard input.
 
     Since @loop@ is itself a 'Producer', we can loop over our @loop@:
 
-> -- nested.hs
->
-> -- I heard you like loops
-> main = run $ for loop (lift . putStrLn)
+@
+\-\- nested.hs
+
+\-\- I heard you like loops
+main = run $ 'for' loop ('lift' . putStrLn)
+@
 
     This creates a program which echoes every line from standard input to
     standard output twice:
 
-> $ ./nested
-> Test<Enter>
-> Test
-> Test
-> ABC<Enter>
-> ABC
-> ABC
-> <Ctrl-D>
-> $
+@
+$ ./nested
+Test\<Enter\>
+Test
+Test
+ABC\<Enter\>
+ABC
+ABC
+\<Ctrl-D\>
+$
+@
 
     But is this feature really necessary?  Couldn't we have instead written this
     using a nested for loop?
 
-> main = run $
->     for P.stdin $ \str1 ->
->         for (duplicate str1) $ \str2 ->
->             lift $ putStrLn str
+@
+main = run $
+    for P.stdin $ \str1 ->
+        'for' (duplicate str1) $ \str2 ->
+            'lift' $ putStrLn str
+@
 
     Yes, we could have!  In fact, this is a special case of the following
     equality, which always holds no matter what:
 
-> -- m :: (Monad m) =>      Producer a m ()  -- i.e. 'P.stdin'
-> -- f :: (Monad m) => a -> Producer b m ()  -- i.e. 'duplicate'
-> -- g :: (Monad m) => b -> Producer c m ()  -- i.e. '(lift . putStrLn)'
->
-> for (for m f) g = for m (\x -> for (f x) g)
+@
+\-\- m :: (Monad m) =>      'Producer' a m ()  -- i.e. P.stdin
+\-\- f :: (Monad m) => a -> 'Producer' b m ()  -- i.e. 'duplicate'
+\-\- g :: (Monad m) => b -> 'Producer' c m ()  -- i.e. '('lift' . putStrLn)'
+
+'for' ('for' m f) g = 'for' m (\x -> 'for' (f x) g)
+@
 
     We can understand the rationale behind this equality if we define the
     following operator that is the point-free counterpart to 'for':
 
-> (~>) :: (Monad m)
->      => (a -> Producer b m r)
->      -> (b -> Producer c m r)
->      -> (a -> Producer c m r)
-> (f ~> g) x = for (f x) g
+@
+('~>') :: (Monad m)
+     => (a -> 'Producer' b m r)
+     -> (b -> 'Producer' c m r)
+     -> (a -> 'Producer' c m r)
+(f '~>' g) x = 'for' (f x) g
+@
 
     Using this operator we can transform our original equality into the
     following more symmetric form:
 
-> f :: (Monad m) => a -> Producer b m r
-> g :: (Monad m) => b -> Producer c m r
-> h :: (Monad m) => c -> Producer d m r
->
-> -- Associativity
-> (f ~> g) ~> h = f ~> (g ~> h)
+@
+f :: (Monad m) => a -> 'Producer' b m r
+g :: (Monad m) => b -> 'Producer' c m r
+h :: (Monad m) => c -> 'Producer' d m r
+
+\-\- Associativity
+(f '~>' g) '~>' h = f '~>' (g '~>' h)
+@
 
     This looks just like an associativity law.  In fact, ('~>') has another nice
     property, which is that 'yield' is its left and right identity:
 
-> -- Left Identity
-> yield ~> f = f
->
-> -- Right Identity
-> f ~> yield = f
+@
+\-\- Left Identity
+'yield' '~>' f = f
+
+\-\- Right Identity
+f '~>' 'yield' = f
+@
 
     In other words, 'yield' and ('~>') form a 'Control.Category.Category' where
     ('~>') plays the role of the composition operator and 'yield' is the
@@ -268,7 +306,9 @@ import Prelude hiding ((.), id)
     Notice that if we translate the left identity law to use 'for' instead of
     ('~>') we get:
 
-> for (yield x) f = f x
+@
+'for' ('yield' x) f = f x
+@
 
     This just says that if you iterate over a single-element 'Producer' with no
     side effects, then you can instead cut out the middle man and directly apply
@@ -277,8 +317,9 @@ import Prelude hiding ((.), id)
     If we translate the right identity law to use 'for' instead of ('~>') we
     get:
 
-> for m yield = m
-
+@
+'for' m 'yield' = m
+@
 
     This just says that if the only thing you do is re-'yield' every element of
     a stream, you get back your original stream.
@@ -286,17 +327,21 @@ import Prelude hiding ((.), id)
     These three \"for loop\" laws summarize our intuition for how 'for' loops
     should behave:
 
-> for (for m f) g = for m (\x -> for (f x) g)
->
-> for (yield x) f = f x
->
-> for m yield = m
+@
+'for' ('for' m f) g = 'for' m (\x -> 'for' (f x) g)
+
+'for' ('yield' x) f = f x
+
+'for' m 'yield' = m
+@
 
     In fact, we get more out of this than just a bunch of equations.  We also
     get a useful operator, too: ('~>').  We can use this operator to condense
     our original code into the following more succinct form:
 
-> main = run $ for P.stdin (duplicate ~> lift . putStrLn)
+@
+main = run $ 'for' P.stdin (duplicate '~>' 'lift' . putStrLn)
+@
 
     This means that we can also choose to program in a more functional style and
     think of stream processing in terms of composing transformations using
@@ -320,7 +365,9 @@ import Prelude hiding ((.), id)
     The most general solution is to externally iterate over the 'Producer' using
     the 'next' command:
 
-> next :: (Monad m) => Producer a m r -> m (Either r (a, Producer a m r))
+@
+next :: (Monad m) => 'Producer' a m r -> m ('Either' r (a, 'Producer' a m r))
+@
 
     Think of 'next' as pattern matching on the head of the 'Producer'.  This
     'Either' returns a 'Left' if the 'Producer' is done or it returns a 'Right'
@@ -333,33 +380,39 @@ import Prelude hiding ((.), id)
     The following @printN@ 'Consumer' shows how to 'print' out only the first
     @n@ elements received:
 
-> -- printn.hs
->
-> import Control.Monad (replicateM_)
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> --               +--------+-- A 'Consumer' of 'String's
-> --               |        |
-> --               v        v
-> printN :: Int -> Consumer String IO ()
-> printN n = replicateM_ n $ do  -- Repeat the following block 'n' times
->     str <- await               -- 'await' a new 'String'
->     lift $ putStrLn str        -- Print out the 'String'
+@
+\-\- printn.hs
+
+import Control.Monad (replicateM_)
+import Pipes
+import qualified Pipes.Prelude as P
+
+\-\-               +--------+-- A 'Consumer' of 'String's
+\-\-               |        |
+\-\-               v        v
+printN :: Int -> 'Consumer' String IO ()
+printN n = replicateM_ n $ do  -- Repeat the following block 'n' times
+    str <- 'await'               -- 'await' a new 'String'
+    'lift' $ putStrLn str        -- Print out the 'String'
+@
 
     'await' is the dual of 'yield': we suspend our 'Consumer' until we receive a
     new value:
 
-> await :: (Monad m) => Consumer a m a
+@
+'await' :: (Monad m) => 'Consumer' a m a
+@
 
     One way to feed a 'Consumer' is to repeatedly feed the same input using
     using ('>~'):
 
-> --                   +- Feed       +- Consumer to    +- Returns new
-> --                   |  action     |  feed           |  Effect
-> --                   v             v                 v  
-> --                   ----------    --------------    ----------
-> (>~) :: (Monad m) => Effect m b -> Consumer b m c -> Effect m c
+@
+\-\-                   +- Feed       +- Consumer to    +- Returns new
+\-\-                   |  action     |  feed           |  Effect
+\-\-                   v             v                 v  
+\-\-                   ----------    --------------    ----------
+('>~') :: (Monad m) => 'Effect' m b -> 'Consumer' b m c -> 'Effect' m c
+@
 
     This runs the given 'Effect' every time the 'Consumer' 'await's a value,
     using the return value of the 'Effect' to supply the input:
@@ -377,21 +430,25 @@ ABC
     base monad.  The reason why is that ('>~') actually permits the following
     more general type:
 
-> (>~) :: (Monad m) => Consumer a m b -> Consumer b m c -> Consumer a m c
+@
+(>~) :: (Monad m) => 'Consumer' a m b -> 'Consumer' b m c -> 'Consumer' a m c
+@
 
     We can feed a 'Consumer' with yet another 'Consumer' so that you can 'await'
     while you 'await'.  For example, we could define the following intermediate
     'Consumer' that requests two 'String's and returns them concatenated:
 
-> -- printn.hs
->
-> doubleUp :: (Monad m) => Consumer String m String
-> doubleUp = do
->     str1 <- await
->     str2 <- await
->     return (str1 ++ str2)
->
-> -- even better: doubleUp = (++) <$> await <*> await
+@
+\-\- printn.hs
+
+doubleUp :: (Monad m) => 'Consumer' String m String
+doubleUp = do
+    str1 <- 'await'
+    str2 <- 'await'
+    return (str1 ++ str2)
+
+\-\- even better: doubleUp = (++) <$> 'await' 'Control.Applicative.<*>' 'await'
+@
 
     We can now insert this in between @(lift getLine)@ and @printN@ and see what
     happens:
@@ -414,27 +471,33 @@ ABCDEF
 {- $pipes
     Use ('>->') to connect a 'Producer' to a 'Consumer':
 
-> (>->) :: (Monad m)
->      => Producer a m r
->      -> Consumer a m r
->      -> Effect     m r
+@
+('>->') :: (Monad m)
+     => 'Producer' a m r
+     -> 'Consumer' a m r
+     -> 'Effect'     m r
+@
 
     This returns an 'Effect' which we can 'run':
 
-> -- printn.hs
->
-> main = run $ P.stdin >-> printN 3
+@
+\-\- printn.hs
+
+main = run $ P.stdin '>->' printN 3
+@
 
     This will prompt the user for input three times, echoing each input:
 
-> $ ./printn
-> Test<Enter>
-> Test
-> ABC<Enter>
-> ABC
-> 42<Enter>
-> 42
-> $
+@
+$ ./printn
+Test\<Enter\>
+Test
+ABC\<Enter\>
+ABC
+42\<Enter\>
+42
+$
+@
 
     ('>->') pairs every 'await' in the 'Consumer' with a 'yield' in the
     'Producer'.  Since our 'Consumer' only calls 'await' three times, our
@@ -445,11 +508,13 @@ ABCDEF
     The opposite is true, too: if the 'Producer' terminates, then the whole
     'Effect' terminates.
 
-> $ ./printn
-> Test<Enter>
-> Test
-> <Ctrl-D>
-> $
+@
+$ ./printn
+Test\<Enter\>
+Test
+\<Ctrl-D\>
+$
+@
 
     This is why ('>->') requires that both the 'Producer' and 'Consumer' share
     the same type of return value: whichever one terminates first provides the
@@ -458,28 +523,32 @@ ABCDEF
     Let's test this by modifying our 'Producer' to return 'False' and our
     'Consumer' to return 'True':
 
-> -- printn.hs
->
-> import Control.Applicative ((<$))  -- (<$) modifies return values
->
-> main = do
->     finished <- run $ (False <$ P.stdin) >-> (True <$ printN 3)
->     putStrLn $ if finished then "Success!" else "You had one job..."
+@
+\-\- printn.hs
+
+import Control.Applicative ((<$))  -- (<$) modifies return values
+
+main = do
+    finished <- run $ (False <$ P.stdin) >-> (True <$ printN 3)
+    putStrLn $ if finished then \"Success!\" else \"You had one job...\"
+@
 
     This lets us diagnose whether the 'Producer' or 'Consumer' terminated first:
 
-> $ ./printn
-> Test<Enter>
-> Test
-> ABC<Enter>
-> ABC
-> 42<Enter>
-> 42
-> Success!
-> $ ./printn
-> <Ctrl-D>
-> You had one job...
-> $
+@
+$ ./printn
+Test\<Enter\>
+Test
+ABC\<Enter\>
+ABC
+42\<Enter\>
+42
+Success!
+$ ./printn
+\<Ctrl-D\>
+You had one job...
+$
+@
 
     You might wonder why ('>->') returns an 'Effect' that we have to 'run'
     instead of directly returning an action in the base monad.  This is because
@@ -533,40 +602,42 @@ ABCDEF
 
 {- $appendix
 
-> -- echo.hs
->
-> import Control.Monad (unless)
-> import Pipes
-> import qualified System.IO as IO
->
-> stdin :: Producer String IO ()
-> stdin = do
->     eof <- lift $ IO.hIsEOF IO.stdin
->     unless eof $ do
->         str <- lift getLine
->         yield str
->         stdin
->
-> loop :: Effect IO ()
-> loop = for stdin $ \str -> do
->     lift $ putStrLn str
->
-> main :: IO ()
-> main = run loop
+@
+\-\- echo.hs
 
-> -- nested.hs
->
-> import Pipes
-> import qualified Pipes.Prelude as P
->
-> duplicate :: (Monad m) => a -> Producer a m ()
-> duplicate x = do
->     yield x
->     yield x
->
-> loop :: Producer String IO ()
-> loop = for P.stdin duplicate
->
-> main  = run $ for loop (lift . putStrLn)
+import Control.Monad (unless)
+import Pipes
+import qualified System.IO as IO
+
+stdin :: Producer String IO ()
+stdin = do
+    eof <- lift $ IO.hIsEOF IO.stdin
+    unless eof $ do
+        str <- lift getLine
+        yield str
+        stdin
+
+loop :: Effect IO ()
+loop = for stdin $ \str -> do
+    lift $ putStrLn str
+
+main :: IO ()
+main = run loop
+
+\-\- nested.hs
+
+import Pipes
+import qualified Pipes.Prelude as P
+
+duplicate :: (Monad m) => a -> Producer a m ()
+duplicate x = do
+    yield x
+    yield x
+
+loop :: Producer String IO ()
+loop = for P.stdin duplicate
+
+main  = run $ for loop (lift . putStrLn)
+@
 
 -}
