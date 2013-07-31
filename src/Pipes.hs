@@ -80,28 +80,28 @@ infixr 7 <-<
     'yield' and ('~>') obey the 'Control.Category.Category' laws:
 
 @
-\ \-\- Left identity
+\-\- Left identity
 'yield' '~>' f
 
-\ \-\- Right identity
+\-\- Right identity
 f '~>' 'yield' = f
 
-\ \-\- Associativity
+\-\- Associativity
 (f '~>' g) '~>' h = f '~>' (g '~>' h)
 @
 
     These are equivalent to the following \"for loop laws\":
 
 @
-\ \-\- Looping over a single yield simplifies to function application
-\ 'for' ('yield' x) f = f x
+\-\- Looping over a single yield simplifies to function application
+'for' ('yield' x) f = f x
 
-\ \-\- Re-yielding every element of a stream returns the original stream
-\ 'for' m 'yield' = m
+\-\- Re-yielding every element of a stream returns the original stream
+'for' m 'yield' = m
 
-\ \-\- Nested for loops can become a sequential 'for' loops if the inner loop
-\ \-\- body ignores the outer loop variable
-\ 'for' m (\\a -\> 'for' (f a) g) = 'for' ('for' m f) g = 'for' m (f '~>' g)
+\-\- Nested for loops can become a sequential 'for' loops if the inner loop
+\-\- body ignores the outer loop variable
+'for' m (\\a -\> 'for' (f a) g) = 'for' ('for' m f) g = 'for' m (f '~>' g)
 @
 
 -}
@@ -109,8 +109,8 @@ f '~>' 'yield' = f
 {-| Produce a value
 
 @
- 'yield' :: 'Monad' m => a -> 'Producer' a m ()
- 'yield' :: 'Monad' m => a -> 'Pipe'   x a m ()
+'yield' :: 'Monad' m => a -> 'Producer' a m ()
+'yield' :: 'Monad' m => a -> 'Pipe'   x a m ()
 @
 -}
 yield :: (Monad m) => a -> Proxy x' x a' a m a'
@@ -120,12 +120,12 @@ yield = respond
 {-| @(for p body)@ loops over @p@ replacing each 'yield' with @body@.
 
 @
- 'for' :: 'Monad' m => 'Producer' b m () -> (b -> 'Effect'       m ()) -> 'Effect'       m ()
- 'for' :: 'Monad' m => 'Producer' b m () -> (b -> 'Producer'   c m ()) -> 'Producer'   c m ()
- 'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Effect'       m ()) -> 'Consumer' x   m ()
- 'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Producer'   c m ()) -> 'Pipe'     x c m ()
- 'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Consumer' x   m ()) -> 'Consumer' x   m ()
- 'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Pipe'     x c m ()) -> 'Pipe'     x c m ()
+'for' :: 'Monad' m => 'Producer' b m () -> (b -> 'Effect'       m ()) -> 'Effect'       m ()
+'for' :: 'Monad' m => 'Producer' b m () -> (b -> 'Producer'   c m ()) -> 'Producer'   c m ()
+'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Effect'       m ()) -> 'Consumer' x   m ()
+'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Producer'   c m ()) -> 'Pipe'     x c m ()
+'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Consumer' x   m ()) -> 'Consumer' x   m ()
+'for' :: 'Monad' m => 'Pipe'   x b m () -> (b -> 'Pipe'     x c m ()) -> 'Pipe'     x c m ()
 @
 -}
 for :: (Monad m)
@@ -138,12 +138,12 @@ for = (//>)
 {-| Compose loop bodies
 
 @
- ('~>') :: 'Monad' m => (a -> 'Producer' b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Effect'       m ())
- ('~>') :: 'Monad' m => (a -> 'Producer' b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Producer'   c m ())
- ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Consumer' x   m ())
- ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Pipe'     x c m ())
- ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Consumer' x   m ()) -> (a -> 'Consumer' x   m ())
- ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Pipe'     x c m ()) -> (a -> 'Pipe'     x c m ())
+('~>') :: 'Monad' m => (a -> 'Producer' b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Effect'       m ())
+('~>') :: 'Monad' m => (a -> 'Producer' b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Producer'   c m ())
+('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Effect'       m ()) -> (a -> 'Consumer' x   m ())
+('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Producer'   c m ()) -> (a -> 'Pipe'     x c m ())
+('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Consumer' x   m ()) -> (a -> 'Consumer' x   m ())
+('~>') :: 'Monad' m => (a -> 'Pipe'   x b m ()) -> (b -> 'Pipe'     x c m ()) -> (a -> 'Pipe'     x c m ())
 @
 -}
 (~>)
@@ -169,14 +169,14 @@ g <~ f = f ~> g
     'await' and ('>~') obey the 'Control.Category.Category' laws:
 
 @
-\ \-\- Feeding with an await is the same as not feeding at all
-\ 'await' '>~' f = f
+\-\- Feeding with an await is the same as not feeding at all
+'await' '>~' f = f
 
-\ \-\- Feeding an await just replaces the await
-\ f '>~' 'await' = f
+\-\- Feeding an await just replaces the await
+f '>~' 'await' = f
 
-\ \-\- (>~) is associative
-\ (f '>~' g) '>~' h = f '>~' (g '>~' h)
+\-\- (>~) is associative
+(f '>~' g) '>~' h = f '>~' (g '>~' h)
 @
 
 -}
@@ -184,8 +184,8 @@ g <~ f = f ~> g
 {-| Consume a value
 
 @
- 'await' :: 'Monad' m => 'Consumer' a   m a
- 'await' :: 'Monad' m => 'Pipe'     a y m a
+'await' :: 'Monad' m => 'Consumer' a   m a
+'await' :: 'Monad' m => 'Pipe'     a y m a
 @
 -}
 await :: (Monad m) => Proxy () a y' y m a
@@ -195,12 +195,12 @@ await = request ()
 {-| @(draw >~ p)@ loops over @p@ replacing each 'await' with @draw@
 
 @
- ('>~') :: 'Monad' m => 'Effect'       m b -> 'Consumer' b   m c -> 'Effect'       m c
- ('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Consumer' b   m c -> 'Consumer' a   m c
- ('>~') :: 'Monad' m => 'Effect'       m b -> 'Pipe'     b y m c -> 'Producer'   y m c
- ('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
- ('>~') :: 'Monad' m => 'Producer'   y m b -> 'Pipe'     b y m c -> 'Producer'   y m c
- ('>~') :: 'Monad' m => 'Pipe'     a y m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
+('>~') :: 'Monad' m => 'Effect'       m b -> 'Consumer' b   m c -> 'Effect'       m c
+('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Consumer' b   m c -> 'Consumer' a   m c
+('>~') :: 'Monad' m => 'Effect'       m b -> 'Pipe'     b y m c -> 'Producer'   y m c
+('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
+('>~') :: 'Monad' m => 'Producer'   y m b -> 'Pipe'     b y m c -> 'Producer'   y m c
+('>~') :: 'Monad' m => 'Pipe'     a y m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
 @
 -}
 (>~)
@@ -226,14 +226,14 @@ p2 ~< p1 = p1 >~ p2
     'cat' and ('>->') obey the 'Control.Category' laws:
 
 @
-\ \-\- Useless use of cat
-\ 'cat' '>->' f = f
+\-\- Useless use of cat
+'cat' '>->' f = f
 
-\ \-\- Redirecting output to cat does nothing
-\ f '>->' 'cat' = f
+\-\- Redirecting output to cat does nothing
+f '>->' 'cat' = f
 
-\ \-\- The pipe operator is associative
-\ (f '>->' g) '>->' h = f '>->' (g '>->' h)
+\-\- The pipe operator is associative
+(f '>->' g) '>->' h = f '>->' (g '>->' h)
 @
 
 -}
@@ -246,10 +246,10 @@ cat = pull ()
 {-| 'Pipe' composition, analogous to the Unix pipe operator
 
 @
- ('>->') :: 'Monad' m => 'Producer' b m r -> 'Consumer' b   m r -> 'Effect'       m r
- ('>->') :: 'Monad' m => 'Producer' b m r -> 'Pipe'     b c m r -> 'Producer'   c m r
- ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
- ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
+('>->') :: 'Monad' m => 'Producer' b m r -> 'Consumer' b   m r -> 'Effect'       m r
+('>->') :: 'Monad' m => 'Producer' b m r -> 'Pipe'     b c m r -> 'Producer'   c m r
+('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
+('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
 @
 -}
 (>->)
