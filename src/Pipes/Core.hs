@@ -108,16 +108,16 @@ import Pipes.Internal (Proxy(..))
     Diagrammatically:
 
 @
-Upstream | Downstream
-    +---------+
-    |         |
-a' <==       <== b'
-    |         |
-a  ==>       ==> b
-    |    |    |
-    +----|----+
-         v
-         r
+ Upstream | Downstream
+     +---------+
+     |         |
+ a' <==       <== b'
+     |         |
+ a  ==>       ==> b
+     |    |    |
+     +----|----+
+          v
+          r
 @
 -}
 
@@ -136,25 +136,22 @@ run = go
    * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
 
-@
-'lift' . k '>+>' p
 
-'hoist' f . k '>+>' p
-@
+> lift . k >+> p
+>
+> hoist f . k >+> p
+
    * Keep the priorities different so that users can mix composition operators
      like:
 
-@
-up '\>\' p '/>/' dn
-up '>~>' p '>+>' dn
-@
+> up \>\ p />/ dn
+>
+> up >~> p >+> dn
 
    * Keep 'request' and 'respond' composition lower in precedence than 'pull'
      and 'push' composition, so that users can do:
 
-@
-read '\>\' 'pull' '>+>' writer
-@
+> read \>\ pull >+> writer
 
    * I arbitrarily choose a lower priority for downstream operators so that lazy
      pull-based computations need not evaluate upstream stages unless absolutely
@@ -180,12 +177,14 @@ infixr 8 >~>
     must satisfy the following three 'Control.Category.Category' laws:
 
 @
-\ \-\- Left identity
-'id' '.' f = f
-\ \-\- Right identity
-f '.' 'id' = f
-\ \-\- Associativity
-(f '.' g) '.' h = f '.' (g '.' h)
+\-\- Left identity
+'Control.Category.id' 'Control.Category..' f = f
+
+\-\- Right identity
+f 'Control.Category..' 'Control.Category.id' = f
+
+\-\- Associativity
+(f 'Control.Category..' g) 'Control.Category..' h = f 'Control.Category..' (g 'Control.Category..' h)
 @
 
     The 'Proxy' type sits at the intersection of five separate categories, four
@@ -203,8 +202,8 @@ f '.' 'id' = f
 @
 
     Each composition operator has a \"point-ful\" version, analogous to how
-    ('>>=') is the point-ful version of ('Control.Monad.>=>').  For example, ('//>') is the
-    point-ful version of ('\>\').
+    ('>>=') is the point-ful version of ('Control.Monad.>=>').  For example,
+    ('//>') is the point-ful version of ('\>\').
 -}
 
 {- $respond
@@ -214,11 +213,13 @@ f '.' 'id' = f
     identity and ('/>/') is composition:
 
 @
-\ \-\- Left identity
+\-\- Left identity
 'respond' '/>/' f = f
-\ \-\- Right identity
+
+\-\- Right identity
 f '/>/' 'respond' = f
-\ \-\- Associativity
+
+\-\- Associativity
 (f '/>/' g) '/>/' h = f '/>/' (g '/>/' h)
 @
 
@@ -226,8 +227,9 @@ f '/>/' 'respond' = f
 
 @
 'respond' :: ('Monad' m)
-        =>  a -> 'Proxy' x' x a' a m a'
-          a
+       =>  a -> 'Proxy' x' x a' a m a'
+
+\          a
           |
      +----|----+
      |    |    |
@@ -238,11 +240,13 @@ f '/>/' 'respond' = f
      +----|----+
           v 
           a'
+
 ('/>/') :: ('Monad' m)
       => (a -> 'Proxy' x' x b' b m a')
       -> (b -> 'Proxy' x' x c' c m b')
       -> (a -> 'Proxy' x' x b' b m a')
-          a                   /===> b                      a
+
+\          a                   /===> b                      a
           |                  /      |                      |
      +----|----+            /  +----|----+            +----|----+
      |    v    |           /   |    v    |            |    v    |
@@ -326,9 +330,11 @@ p0 //> fb = go p0
 @
 -- Left identity
 'request' '\>\' f = f
-\ \-\- Right identity
+
+\-\- Right identity
 f '\>\' 'request' = f
-\ \-\- Associativity
+
+\-\- Associativity
 (f '\>\' g) '\>\' h = f '\>\' (g '\>\' h)
 @
 
@@ -337,7 +343,8 @@ f '\>\' 'request' = f
 @
 'request' :: ('Monad' m)
         =>  a' -> 'Proxy' a' a y' y m a
-          a'
+
+\          a'
           |
      +----|----+
      |    |    |
@@ -348,11 +355,13 @@ f '\>\' 'request' = f
      +----|----+
           v
           a
+
 ('\>\') :: ('Monad' m)
       => (b' -> 'Proxy' a' a y' y m b)
       -> (c' -> 'Proxy' b' b y' y m c)
       -> (c' -> 'Proxy' a' a y' y m c)
-          b'<=====\\                c'                     c'
+
+\          b'<=====\\                c'                     c'
           |        \\               |                      |
      +----|----+    \\         +----|----+            +----|----+
      |    v    |     \\        |    v    |            |    v    |
@@ -432,11 +441,13 @@ fb' >\\ p0 = go p0
     and ('>~>') is composition:
 
 @
-\ \-\- Left identity
+\-\- Left identity
 'push' '>~>' f = f
-\ \-\- Right identity
+
+\-\- Right identity
 f '>~>' 'push' = f
-\ \-\- Associativity
+
+\-\- Associativity
 (f '>~>' g) '>~>' h = f '>~>' (g '>~>' h)
 @
 
@@ -538,13 +549,13 @@ p >>~ fb = case p of
     and ('>+>') is composition:
 
 @
-\ \-\- Left identity
+\-\- Left identity
 'pull' '>+>' f = f
 
-\ \-\- Right identity
+\-\- Right identity
 f '>+>' 'pull' = f
 
-\ \-\- Associativity
+\-\- Associativity
 (f '>+>' g) '>+>' h = f '>+>' (g '>+>' h)
 @
 
@@ -646,11 +657,13 @@ fb' +>> p = case p of
 
 @
 'reflect' '.' 'respond' = 'request'
+
 'reflect' '.' (f '/>/' g) = 'reflect' '.' f '/</' 'reflect' '.' g
 @
 
 @
 'reflect' '.' 'request' = 'respond'
+
 'reflect' '.' (f '\>\' g) = 'reflect' '.' f '\<\' 'reflect' '.' g
 @
 
@@ -658,8 +671,13 @@ fb' +>> p = case p of
 
 @
 'reflect' '.' 'push' = 'pull'
+
 'reflect' '.' (f '>~>' g) = 'reflect' '.' f '<+<' 'reflect' '.' g
+@
+
+@
 'reflect' '.' 'pull' = 'push'
+
 'reflect' '.' (f '>+>' g) = 'reflect' '.' f '<~<' 'reflect' '.' g
 @
 -}

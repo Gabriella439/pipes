@@ -7,7 +7,9 @@
 
 @
 'lift' '.' 'return' = 'M' '.' 'return' '.' 'Pure'
+
 'return' = 'Pure'
+
 'lift' '.' 'return' /= 'return'
 @
 
@@ -110,6 +112,7 @@ instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
 
 @
 'observe' ('lift' ('return' r)) = 'observe' ('return' r)
+
 'observe' ('lift' (m '>>=' f)) = 'observe' ('lift' m '>>=' 'lift' '.' f)
 @
 
