@@ -143,7 +143,7 @@ loop :: (Monad m) => 'Effect' IO ()
     to the base monad:
 
 @
-run :: (Monad m) => 'Effect' m r -> m r
+'run' :: (Monad m) => 'Effect' m r -> m r
 @
 
     'run' only accepts 'Effect's in order to avoid silently discarding unhandled
@@ -153,10 +153,10 @@ run :: (Monad m) => 'Effect' m r -> m r
 \-\- echo.hs
 
 main :: IO ()
-main = run loop
+main = 'run' loop
 
 \-\- or you could just inline the 'loop':
-\-\- main = run $ 'for' stdin ('lift' . putStrLn)
+\-\- main = 'run' $ 'for' stdin ('lift' . putStrLn)
 @
 
     Our final program loops over standard input and echoes every line to
@@ -226,7 +226,7 @@ loop = 'for' P.stdin duplicate
 \-\- nested.hs
 
 \-\- I heard you like loops
-main = run $ 'for' loop ('lift' . putStrLn)
+main = 'run' $ 'for' loop ('lift' . putStrLn)
 @
 
     This creates a program which echoes every line from standard input to
@@ -248,7 +248,7 @@ $
     using a nested for loop?
 
 @
-main = run $
+main = 'run' $
     for P.stdin $ \str1 ->
         'for' (duplicate str1) $ \str2 ->
             'lift' $ putStrLn str
@@ -340,7 +340,7 @@ f '~>' 'yield' = f
     our original code into the following more succinct form:
 
 @
-main = run $ 'for' P.stdin (duplicate '~>' 'lift' . putStrLn)
+main = 'run' $ 'for' P.stdin (duplicate '~>' 'lift' . putStrLn)
 @
 
     This means that we can also choose to program in a more functional style and
@@ -483,7 +483,7 @@ ABCDEF
 @
 \-\- printn.hs
 
-main = run $ P.stdin '>->' printN 3
+main = 'run' $ P.stdin '>->' printN 3
 @
 
     This will prompt the user for input three times, echoing each input:
@@ -529,7 +529,7 @@ $
 import Control.Applicative ((<$))  -- (<$) modifies return values
 
 main = do
-    finished <- run $ (False <$ P.stdin) >-> (True <$ printN 3)
+    finished <- 'run' $ (False <$ P.stdin) >-> (True <$ printN 3)
     putStrLn $ if finished then \"Success!\" else \"You had one job...\"
 @
 
