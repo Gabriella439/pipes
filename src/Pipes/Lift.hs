@@ -158,6 +158,12 @@ execStateP s = fmap snd . runStateP s
 {- $writert
     Note that 'runWriterP' and 'execWriterP' will keep the accumulator in
     weak-head-normal form so that folds run in constant space when possible.
+
+    This means that until @transformers@ adds a truly strict 'W.WriterT', you
+    should consider unwrapping 'W.WriterT' first using 'runWriterP' or
+    'execWriterP' before 'Pipes.run'ning your 'Proxy'.  You will get better
+    performance this way and eliminate space leaks if your accumulator doesn't
+    have any lazy fields.
 -}
 
 -- | Run 'W.WriterT' in the base monad

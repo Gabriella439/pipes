@@ -93,19 +93,7 @@ module Pipes.Core (
 import Pipes.Internal (Proxy(..))
 
 {- $proxy
-    You can connect proxies together in five different ways:
-
-    * ('Pipes.>->'): connect pull-based streams
-
-    * ('Pipes.>~>'): connect push-based streams
-
-    * ('Pipes.\>\'): chain folds
-
-    * ('Pipes./>/'): chain unfolds
-
-    * ('Control.Monad.>=>'): sequence proxies
-
-    Diagrammatically:
+    Diagrammatically, you can think of a 'Proxy' as having the following shape:
 
 @
  Upstream | Downstream
@@ -119,6 +107,19 @@ import Pipes.Internal (Proxy(..))
           v
           r
 @
+
+    You can connect proxies together in five different ways:
+
+    * ('Pipes.>->'): connect pull-based streams
+
+    * ('Pipes.>~>'): connect push-based streams
+
+    * ('Pipes.\>\'): chain folds
+
+    * ('Pipes./>/'): chain unfolds
+
+    * ('Control.Monad.>=>'): sequence proxies
+
 -}
 
 -- | Run a self-contained 'Effect', converting it back to the base monad
@@ -203,7 +204,8 @@ f 'Control.Category..' 'Control.Category.id' = f
 
     Each composition operator has a \"point-ful\" version, analogous to how
     ('>>=') is the point-ful version of ('Control.Monad.>=>').  For example,
-    ('//>') is the point-ful version of ('\>\').
+    ('//>') is the point-ful version of ('/>/').  The convention is that the
+    odd character out faces the argument that is a function.
 -}
 
 {- $respond

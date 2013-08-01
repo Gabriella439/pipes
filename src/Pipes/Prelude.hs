@@ -4,7 +4,7 @@
     recommend the following import scheme:
 
 > import Pipes
-> import qualified Pipes.Prelude as P
+> import qualified Pipes.Prelude as P  -- or use any other qualifier you prefer
 -}
 
 {-# LANGUAGE RankNTypes #-}
@@ -131,7 +131,7 @@ fromHandle h = go
 {-# INLINABLE fromHandle #-}
 
 {- $unfolds
-    An unfold is a 'Producer' which can double as a stream transformer.
+    An unfold is a 'Producer' which doubles as a stream transformer.
 
     You use 'for' to apply an unfold to a stream.  This behaves like a
     'concatMap', generating a new 'Producer':
@@ -163,8 +163,7 @@ ABC
 ABC
 ...
 
-    All of these must behave identically, because of the associativity law for
-    the yield category.
+    All three of the above idioms always behave identically.
 
     Note that 'each' is also an unfold and can be used to flatten streams of
     'Foldable' elements:
@@ -199,7 +198,12 @@ replicateM n m = replicateM_ n $ do
     yield a
 {-# INLINABLE replicateM #-}
 
--- | @(yieldIf pred a)@ only re-'yield's @a@ if it satisfies the predicate @p@
+{-| @(yieldIf pred a)@ only re-'yield's @a@ if it satisfies the predicate @p@
+
+    Use 'yieldIf' to filter a stream:
+
+>>> run $ (each ~> yieldIf even ~> lift . print) [1..4]
+-}
 yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
 yieldIf predicate a =
     if (predicate a)
@@ -249,6 +253,9 @@ quit<Enter>
 
 >>> run $ for (P.stdin >-> P.drop 2 >-> P.take 2) (lift . putStrLn)
 
+    You can also connect 'Consumer's this way, too, but most useful 'Consumer's
+    are non-trivial and you will find them all in derived @pipes@ libraries
+    instead of here.
 -}
 
 -- | @(take n)@ only allows @n@ values to pass through
