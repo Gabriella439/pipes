@@ -45,6 +45,7 @@ module Pipes.Prelude (
     index,
     last,
     null,
+    toList,
 
     -- * Zips
     zip,
@@ -57,11 +58,12 @@ module Pipes.Prelude (
 
 import Control.Monad (liftM, replicateM_, when, unless)
 import Control.Monad.Trans.State.Strict (get, put)
-import qualified System.IO   as IO
+import Data.Functor.Identity (Identity, runIdentity)
 import Pipes
 import Pipes.Core
 import Pipes.Internal
 import Pipes.Lift (evalStateP)
+import qualified System.IO as IO
 import Prelude hiding (
     all,
     any,
@@ -471,6 +473,17 @@ null p = do
         Left  _ -> True
         Right _ -> False
 {-# INLINABLE null #-}
+
+-- | Convert a pure 'Producer' into a list
+toList :: Producer a Identity r -> [a]
+toList = loop
+  where
+    loop p = case p of
+        Request _ fu -> loop (fu ())
+        Respond a fu -> a:loop (fu ())
+        M         m  -> loop (runIdentity m)
+        Pure    _    -> []
+{-# INLINABLE toList #-}
 
 -- | Zip two 'Producer's
 zip :: (Monad m)
