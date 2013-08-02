@@ -1,7 +1,29 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-{-| @pipes@ is a lightweight and powerful library for processing effectful
-    streams in constant memory.
+{-| Conventional Haskell stream programming forces you to pick only two of the
+    following three features:
+
+    * Effects
+
+    * Streaming
+
+    * Composability
+
+    If you sacrifice effects you get Haskell's pure and lazy lists, which you
+    can transform using composable functions in constant space, but do not
+    permit effects.
+
+    If you sacrifice streaming you get 'mapM' and 'forM' and \"ListT done
+    wrong\" (from @transformers@), which are composable and effectful, but do
+    not return a single result until the whole list has first been processed and
+    loaded into memory.
+
+    If you sacrifice composability you write a tightly coupled read, transform,
+    and write loops in 'IO', which is efficient and effectful, but is not
+    modular or separable.
+
+    @pipes@ gives you all three features: effectful, streaming, and composable
+    programming. 
 
     @pipes@ supports a wide variety of stream programming abstractions, such as:
 
@@ -12,6 +34,8 @@
     * effectful 'Pipe's (like Unix pipes), and:
 
     * 'ListT' done right.
+
+    ... all of which are highly composable.
 
     If you want a Quick Start guide, read the documentation in "Pipes.Prelude"
     from top to bottom.
@@ -40,6 +64,7 @@ module Pipes.Tutorial (
     ) where
 
 import Control.Category
+import Control.Monad
 import Control.Monad.Trans.Error
 import Control.Monad.Trans.Writer.Strict
 import Pipes
@@ -63,16 +88,16 @@ import Control.Monad (unless)
 import Pipes
 import qualified System.IO as IO
 
-\-\-       +--------+-- A 'Producer' of 'String's
+\-\-       +--------+-- A \'Producer\' of \'String\'s
 \-\-       |        |
-\-\-       |        |      +-- The base monad is 'IO'
+\-\-       |        |      +-- The base monad is \'IO\'
 \-\-       |        |      |
 \-\-       |        |      |  +-- Returns '()' when finished
 \-\-       |        |      |  |
 \-\-       v        v      v  v
 stdin :: Producer String IO ()
 stdin = do
-    eof <- 'lift' $ IO.hIsEOF IO.stdin  -- 'lift' actions from the base monad
+    eof <- 'lift' $ IO.hIsEOF IO.stdin  -- \'lift\' actions from the base monad
     unless eof $ do
         str <- 'lift' getLine           -- Read a line of input
         'yield' str                     -- 'yield' the line of input
