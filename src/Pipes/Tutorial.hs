@@ -50,8 +50,8 @@ module Pipes.Tutorial (
     -- * Producers
     -- $producers
 
-    -- * Theory
-    -- $theory
+    -- * Composability
+    -- $composability
 
     -- * Consumers
     -- $consumers
@@ -208,7 +208,7 @@ import Prelude hiding ((.), id)
 
 -}
 
-{- $theory
+{- $composability
     You might wonder why the body of a 'for' loop can be a 'Producer'.  Let's
     test out this feature by defining a new loop body that @duplicate@s every
     value:
@@ -306,9 +306,8 @@ import Prelude hiding ((.), id)
 > -- Right Identity
 > f ~> yield = f
 
-    In other words, 'yield' and ('~>') form a 'Control.Category.Category' where
-    ('~>') plays the role of the composition operator and 'yield' is the
-    identity.
+    In other words, 'yield' and ('~>') form a 'Category' where ('~>') plays the
+    role of the composition operator and 'yield' is the identity.
 
     Notice that if we translate the left identity law to use 'for' instead of
     ('~>') we get:
@@ -335,6 +334,9 @@ import Prelude hiding ((.), id)
 > for (yield x) f = f x
 >
 > for m yield = m
+
+    ... and because these are just 'Category' laws in disguise that means that
+    'Producer's in @pipes@ are composable in a theoretically rigorous sense.
 
     In fact, we get more out of this than just a bunch of equations.  We also
     get a useful operator, too: ('~>').  We can use this operator to condense
@@ -365,7 +367,7 @@ import Prelude hiding ((.), id)
     the 'next' command:
 
 @
- next :: (Monad m) => 'Producer' a m r -> m (Either r (a, 'Producer' a m r))
+ 'next' :: (Monad m) => 'Producer' a m r -> m (Either r (a, 'Producer' a m r))
 @
 
     Think of 'next' as pattern matching on the head of the 'Producer'.  This
@@ -461,10 +463,33 @@ ABCDEF
 
     'doubleUp' splits every request from 'printN' into two separate requests and
     returns back the concatenated result.
+
+    We didn't need to parenthesize the above chain of ('>~') operators, because
+    ('>~') is associative:
+
+> -- Associativity
+> (f >~ g) >~ h = f >~ (g >~ h)
+
+    ... so we can always omit the parentheses since the meaning is unambiguous:
+
+> f >~ g >~ h
+
+    Also, ('>~') has an identity, which is 'await'!
+
+> -- Left identity
+> await >~ f = f
+>
+> -- Right Identity
+> f >~ await = f
+
+    In other words, ('>~') and 'await' form a 'Category', too, and 'Consumer's
+    are also composable.
 -}
 
 {- $pipes
-    Use ('>->') to connect a 'Producer' to a 'Consumer':
+    We don't need to restrict ourselves to using 'Producer's exclusively or
+    'Consumer's exclusively.  We can connect 'Producer's and 'Consumer's
+    together using ('>->'):
 
 @
 ('>->') :: (Monad m)
@@ -496,8 +521,8 @@ ABCDEF
     for input three times.  Once the 'Consumer' terminates the whole 'Effect'
     terminates.
 
-    The opposite is true, too: if the 'Producer' terminates, then the whole
-    'Effect' terminates.
+    The opposite is true, too: if the 'Producer' terminates early, then the
+    whole 'Effect' terminates.
 
 > $ ./printn
 > Test<Enter>
@@ -537,10 +562,24 @@ ABCDEF
 
     You might wonder why ('>->') returns an 'Effect' that we have to 'run'
     instead of directly returning an action in the base monad.  This is because
-    you can connect things other than 'Producer's and 'Consumer's, like 'Pipe's.
+    you can connect things other than 'Producer's and 'Consumer's, like 'Pipe's,
+    which are effectful stream transformations.
+
     A 'Pipe' is a monad transformer that is a mix between a 'Producer' and
     'Consumer', because a 'Pipe' can both 'await' and 'yield'.  The following
-    @take@ 'Pipe' only allows a fixed number of values to pass through:
+    example 'Pipe' behaves like @take@, only allowing a fixed number of values
+    to pass through:
+
+> -- take.hs
+>
+> import Control.Monad (replicateM_)
+> import Pipes
+> import Prelude hiding (take)
+>
+> take :: (Monad m) => Int -> Pipe a a m ()
+> take n = replicateM_ n $ do
+>     a <- await
+>     yield a
 -}
 
 {- $conclusion
