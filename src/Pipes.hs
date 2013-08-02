@@ -345,6 +345,7 @@ next = go
         Respond a fu -> return (Right (a, fu ()))
         M         m  -> m >>= go
         Pure    r    -> return (Left r)
+{-# INLINABLE next #-}
 
 -- | Convert a 'F.Foldable' to a 'Producer'
 each :: (Monad m, F.Foldable f) => f a -> Producer' a m ()
