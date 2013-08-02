@@ -23,6 +23,7 @@ module Pipes.Prelude (
     yieldIf,
     yieldAfter,
     read,
+    debug,
 
     -- * Pipes
     -- $pipes
@@ -232,6 +233,11 @@ read str = case (reads str) of
         return ()
     _         -> return ()
 {-# INLINABLE read #-}
+
+-- | 'print' values flowing through for debugging purposes
+debug :: (Show a) => a -> Producer' a IO ()
+debug = yieldAfter print
+{-# INLINABLE debug #-}
 
 {- $pipes
     Use ('>->') to transform a 'Producer' using a 'Pipe':
