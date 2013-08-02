@@ -21,8 +21,8 @@ module Pipes.Prelude (
     replicate,
     replicateM,
     yieldIf,
+    yieldAfter,
     read,
-    debug,
 
     -- * Pipes
     -- $pipes
@@ -216,6 +216,14 @@ yieldIf predicate a =
     else return ()
 {-# INLINABLE yieldIf #-}
 
+-- | Re-'yield' the value after first applying the given action
+yieldAfter :: (Monad m) => (a -> m b) -> a -> Producer' a m ()
+yieldAfter f a = do
+    _ <- lift (f a)
+    _ <- yield a
+    return ()
+{-# INLINABLE yieldAfter #-}
+
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
 read :: (Monad m, Read a) => String -> Producer' a m ()
 read str = case (reads str) of
@@ -224,14 +232,6 @@ read str = case (reads str) of
         return ()
     _         -> return ()
 {-# INLINABLE read #-}
-
--- | 'print' values flowing through for debugging purposes
-debug :: (Show a) => a -> Producer' a IO ()
-debug a = do
-    lift (print a)
-    _ <- yield a
-    return ()
-{-# INLINABLE debug #-}
 
 {- $pipes
     Use ('>->') to transform a 'Producer' using a 'Pipe':
