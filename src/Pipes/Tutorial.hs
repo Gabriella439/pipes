@@ -7,7 +7,7 @@
 
     * effectful 'Producer's (like generators),
 
-    * effectful 'Consumer's (like iteratees)
+    * effectful 'Consumer's (like iteratees),
 
     * effectful 'Pipe's (like Unix pipes), and:
 
