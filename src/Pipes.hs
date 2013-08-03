@@ -75,18 +75,18 @@ infixl 7 >->
 infixr 7 <-<
 
 {- $producers
-    Use 'yield' to build 'Producer's and ('~>') \/ 'for' to consume 'Producer's.
+    Use 'yield' to produce output and ('~>') \/ 'for' to substitute 'yield's.
 
     'yield' and ('~>') obey the 'Control.Category.Category' laws:
 
 @
-\-\- Left identity
+\-\- Substituting \'yield\' with \'f\' gives \'f\'
 'yield' '~>' f
 
-\-\- Right identity
+\-\- Substituting every \'yield\' with another \'yield\' does nothing
 f '~>' 'yield' = f
 
-\-\- Associativity
+\-\- \'yield\' substitution is associative
 (f '~>' g) '~>' h = f '~>' (g '~>' h)
 @
 
@@ -164,18 +164,18 @@ g <~ f = f ~> g
 {-# INLINABLE (<~) #-}
 
 {- $consumers
-    Use 'await' to build 'Consumer's and ('>~') to feed 'Consumer's.
+    Use 'await' to request input and ('>~') to substitute 'await's.
 
     'await' and ('>~') obey the 'Control.Category.Category' laws:
 
 @
-\-\- Feeding with an await is the same as not feeding at all
+\-\- Substituting every \'await\' with another \'await\' does nothing
 'await' '>~' f = f
 
-\-\- Feeding an await just replaces the await
+\-\- Substituting \'await\' with \'f\' gives \'f\'
 f '>~' 'await' = f
 
-\-\- (>~) is associative
+\-\- \'await\' substitution is associative
 (f '>~' g) '>~' h = f '>~' (g '>~' h)
 @
 
