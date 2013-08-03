@@ -206,7 +206,7 @@ replicateM n m = replicateM_ n $ do
 
     Use 'yieldIf' to filter a stream:
 
->>> run $ (each ~> yieldIf even ~> lift . print) [1..4]
+>>> run $ for (each [1..4]) (yieldIf even ~> lift . print)
 -}
 yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
 yieldIf predicate a =
