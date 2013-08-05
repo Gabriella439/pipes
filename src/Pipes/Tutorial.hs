@@ -19,13 +19,12 @@
     into memory.
 
     If you sacrifice /Composability/ you write a tightly coupled read,
-    transform, and write loop in 'IO', which is efficient and effectful, but is
+    transform, and write loop in 'IO', which is streaming and effectful, but is
     not modular or separable.
 
     @pipes@ gives you all three features: effectful, streaming, and composable
-    programming. 
-
-    @pipes@ supports a wide variety of stream programming abstractions, such as:
+    programming.  @pipes@ also provides a wide variety of stream programming
+    abstractions which are all subsets of a single unified machinery:
 
     * effectful 'Producer's (like generators),
 
@@ -35,7 +34,15 @@
 
     * 'ListT' done right.
 
-    ... all of which are composable.
+    All of these are connectable and you can combine them together in clever and
+    unexpected ways because they all share the same underlying type.
+
+    @pipes@ requires a basic understanding of monad transformers, which you can
+    learn about by searching for \"Monad Transformers - Step by Step\".  This is
+    a beginner-friendly and accessible paper that teaches basic monad
+    transformer usage.  Pay careful attention to section 2.5, describing the
+    use of 'lift'.  After that, study the documentation for the
+    @Control.Monad.Trans.Class@ module from the @transformers@ library.
 
     If you want a Quick Start guide, read the documentation in "Pipes.Prelude"
     from top to bottom.
@@ -47,6 +54,9 @@
 -}
 
 module Pipes.Tutorial (
+    -- * Introduction
+    -- $introduction
+
     -- * Producers
     -- $producers
 
@@ -72,10 +82,56 @@ import Pipes.Lift
 import qualified Pipes.Prelude as P
 import Prelude hiding ((.), id)
 
+{- $introduction
+    The @pipes@ library decouples stream processing stages from each other so
+    that you can mix and match diverse stages to produce useful streaming
+    programs.  If you are a library writer, @pipes@ lets you package up
+    streaming components into a reusable interface.  If you are an application
+    writer, @pipes@ lets you connect pre-made streaming components with minimal
+    effort to produce a working program that streams data highly efficiently in
+    constant memory.
+
+    To enforce loose coupling, components can only communicate with each other
+    using two commands:
+
+    * 'yield': Produce values
+
+    * 'await': Consume values
+
+    There are four central types corresponding to the four permutations in which
+    you can enable or disable these two commands:
+
+    * 'Producer's can only 'yield' values and model streaming sources
+
+    * 'Consumer's can only 'await' values and model streaming sinks
+
+    * 'Pipe's can both 'await' and 'yield' values and model stream
+      transformations
+
+    * 'Effect's can neither 'yield' nor 'await' and model non-streaming
+      components
+
+    You can connect these components together in four separate ways which
+    closely parallel the four types:
+
+    * 'for' connects 'Producer's
+
+    * '>~' connects 'Consumer's
+
+    * '>->' connects 'Pipe's
+
+    * ('>>=') connects 'Effect's
+
+    However, as you progress through this tutorial you will learn that all four
+    of these operators actually work on mixtures of all four types, producing
+    surprising and emergent behavior.
+-}
+
 {- $producers
-    @pipes@ represents an effectful stream of input using the 'Producer' type.
-    A 'Producer' is a monad transformer that extends the base monad with the
-    ability to incrementally 'yield' output to an anonymous downstream handler.
+    @pipes@ represents an effectful stream of input using the 'Producer' type,
+    which is a monad transformer that extends a base monad with the ability to
+    incrementally 'yield' output to an anonymous downstream handler.  This lets
+    us decouple how we generate values from how we consume them.
 
     The following @stdin@ 'Producer' shows how to incrementally read in lines
     from standard input and 'yield' them downstream, terminating when reaching
@@ -89,18 +145,27 @@ import Prelude hiding ((.), id)
 >
 > --       +--------+-- A 'Producer' of 'String's
 > --       |        |
-> --       |        |      +-- The base monad is 'IO'
-> --       |        |      |
-> --       |        |      |  +-- Returns '()' when finished
-> --       |        |      |  |
+> --       |        |      +-- Every monad transformer has a base monad.
+> --       |        |      |   This time the base monad is 'IO'.
+> --       |        |      |  
+> --       |        |      |  +-- Every monadic action has a return value.
+> --       |        |      |  |   This action returns '()' when finished
 > --       v        v      v  v
 > stdin :: Producer String IO ()
 > stdin = do
->     eof <- lift $ IO.hIsEOF IO.stdin  -- 'lift' actions from the base monad
+>     eof <- lift $ IO.hIsEOF IO.stdin  -- 'lift' an 'IO' action from the base
+>                                       -- monad
 >     unless eof $ do
 >         str <- lift getLine           -- Read a line of input
 >         yield str                     -- 'yield' the line of input
 >         stdin                         -- Loop
+
+    Whenever you see a type of the form:
+
+> Producer a m r
+
+    ... you should think: \"This outputs a stream of zero or more value of type
+    @a@ and finishes off with a single return value of type @r@.
 
     'yield' emits a value, suspending the current 'Producer' until the value is
     consumed.  You can think of 'yield' as having the following type:
@@ -108,6 +173,13 @@ import Prelude hiding ((.), id)
 @
  'yield' :: (Monad m) => a -> 'Producer' a m ()
 @
+
+    The true type of 'yield' is actually more general and powerful.  Throughout
+    the tutorial I will present type signatures like this that are simplified at
+    first and then later I will show you neat ways that you can generalize them.
+    So read the above type signature as simply saying: \"You can use 'yield' in
+    a 'Producer' context, but you may be able to use 'yield' in other contexts,
+    too.\"
 
     The simplest way to consume a 'Producer' is a 'for' loop, which has the
     following type:
@@ -120,6 +192,17 @@ import Prelude hiding ((.), id)
  'for' :: (Monad m) => 'Producer' a m r -> (a -> 'Producer' b m r) -> 'Producer' b m r
 @
 
+    @(for producer f)@ loops over @(producer)@, substituting each 'yield' in
+    @(producer)@ with @(f)@.  If @(f)@ 'yield's any values of its own, then
+    these become the new output type of the final result.
+
+    Again, the above type signature is not the true type of 'for', which is
+    more general.  Think of the above type signature as saying: \"If the first
+    argument of 'for' is a 'Producer' and the second argument returns a
+    'Producer', then the final result must be a 'Producer'.\"  If we provide
+    arguments other than 'Producer's then the type of the result will also
+    change to something other than a 'Producer'.
+
     Here's an example 'for' @loop@ in action:
 
 > -- echo.hs
@@ -130,10 +213,9 @@ import Prelude hiding ((.), id)
 >
 > -- even better: loop = for stdin (lift . putStrLn)
 
-    'for' loops over a 'Producer' and replaces every 'yield' in the original
-    'Producer' with the body of the loop.  So the above code behaves as if we
-    had manually gone in and replaced every 'yield' in our @stdin@ with
-    @(lift . putStrLn)@ instead:
+    In this example, 'for' loops over @stdin@ and replaces every 'yield' in
+    @stdin@ with the body of the loop.  This is exactly equivalent to the
+    following code:
 
 > -- This definition of 'loop' is exactly equivalent to the previous one:
 > loop = do
@@ -143,19 +225,24 @@ import Prelude hiding ((.), id)
 >         (lift . putStrLn) str  -- Here we've replaced the original 'yield'
 >         loop
 
-    After this substitution, 'loop' no longer emits any values, so even though
+    You can think of 'yield' as creating a hole and a 'for' loop is one way to
+    fill that hole.
+
+    After this substitution, 'loop' consumed all of the values generated by
+    @stdin@ and did not re-'yield' any new values
+    , so even though
     @loop@ /technically/ qualifies a 'Producer', it does not use any
     'Producer'-specific features like 'yield':
-    completely polymorphic output type:
 
 > --               +-- 'loop' doesn't 'yield' any values, so 'a' is polymorphic,
 > --               |   meaning that 'a' could in principle be any type.
 > --               v
 > loop :: Producer a IO ()
 
-    In fact, every single action in @loop@ is 'lift'ed from the base monad and
-    we don't use any 'Producer'-specific features.  @pipes@ defines a type
-    synonym for this special case:
+    In fact, every single action in the body of our 'for' @loop@ is just
+    trivially 'lift'ed from the base monad and we never 'yield'.  @pipes@
+    defines a type synonym for this special case where we only 'lift' and never
+    'yield:
 
 @
  data 'X'  -- The uninhabited type
