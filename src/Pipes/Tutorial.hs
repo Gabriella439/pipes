@@ -9,18 +9,18 @@
 
     * Composability
 
-    If you sacrifice effects you get Haskell's pure and lazy lists, which you
-    can transform using composable functions in constant space, but do not
-    permit effects.
+    If you sacrifice /Effects/ you get Haskell's pure and lazy lists, which you
+    can transform using composable functions in constant space, but without
+    interleaving effects.
 
-    If you sacrifice streaming you get 'mapM' and 'forM' and \"ListT done
-    wrong\" (from @transformers@), which are composable and effectful, but do
-    not return a single result until the whole list has first been processed and
-    loaded into memory.
+    If you sacrifice /Streaming/ you get 'mapM', 'forM' and \"ListT done wrong\"
+    (from @transformers@), which are composable and effectful, but do not return
+    a single result until the whole list has first been processed and loaded
+    into memory.
 
-    If you sacrifice composability you write a tightly coupled read, transform,
-    and write loops in 'IO', which is efficient and effectful, but is not
-    modular or separable.
+    If you sacrifice /Composability/ you write a tightly coupled read,
+    transform, and write loop in 'IO', which is efficient and effectful, but is
+    not modular or separable.
 
     @pipes@ gives you all three features: effectful, streaming, and composable
     programming. 
@@ -35,7 +35,7 @@
 
     * 'ListT' done right.
 
-    ... all of which are highly composable.
+    ... all of which are composable.
 
     If you want a Quick Start guide, read the documentation in "Pipes.Prelude"
     from top to bottom.
@@ -96,14 +96,14 @@ import Prelude hiding ((.), id)
 > --       v        v      v  v
 > stdin :: Producer String IO ()
 > stdin = do
->    eof <- lift $ IO.hIsEOF IO.stdin  -- 'lift' actions from the base monad
->    unless eof $ do
->        str <- lift getLine           -- Read a line of input
->        yield str                     -- 'yield' the line of input
->        stdin                         -- Loop
+>     eof <- lift $ IO.hIsEOF IO.stdin  -- 'lift' actions from the base monad
+>     unless eof $ do
+>         str <- lift getLine           -- Read a line of input
+>         yield str                     -- 'yield' the line of input
+>         stdin                         -- Loop
 
     'yield' emits a value, suspending the current 'Producer' until the value is
-    consumed:
+    consumed.  You can think of 'yield' as having the following type:
 
 @
  'yield' :: (Monad m) => a -> 'Producer' a m ()
@@ -113,38 +113,49 @@ import Prelude hiding ((.), id)
     following type:
 
 @
- \-\-                  +-- Producer      +-- The body of the      +-- Returns new
- \-\-                  |   to loop       |   loop                 |   Producer
+ \-\-                  +-- Producer      +-- The body of the      +-- Result
+ \-\-                  |   to loop       |   loop                 |   
  \-\-                  v   over          v                        v  
  \-\-                  --------------    ---------------------    --------------
  'for' :: (Monad m) => 'Producer' a m r -> (a -> 'Producer' b m r) -> 'Producer' b m r
 @
 
-    Notice how this greatly resembles the type of @(flip concatMap)@:
-
-@
- 'flip' 'concatMap' :: [a] -> (a -> [b]) -> [b]
-@
-
-    That's because 'for' behaves the same way.  'for' applies the body of the
-    loop to each element of the 'Producer' and then flattens the results back
-    into a new 'Producer'.
-
     Here's an example 'for' @loop@ in action:
 
 > -- echo.hs
 >
-> --               +-- 'loop' doesn't emit any new values, so 'a' is polymorphic
-> --               |
-> --               v
 > loop :: Producer a IO ()
 > loop = for stdin $ \str -> do  -- Read this like: "for str in stdin"
 >     lift $ putStrLn str        -- The body of the 'for' loop
 >
 > -- even better: loop = for stdin (lift . putStrLn)
 
-    Notice how 'loop' does not re-emit any values in the body of the 'for' loop.
-    @pipes@ defines a type synonym for this special case:
+    'for' loops over a 'Producer' and replaces every 'yield' in the original
+    'Producer' with the body of the loop.  So the above code behaves as if we
+    had manually gone in and replaced every 'yield' in our @stdin@ with
+    @(lift . putStrLn)@ instead:
+
+> -- This definition of 'loop' is exactly equivalent to the previous one:
+> loop = do
+>     eof <- lift $ IO.hIsEOF IO.stdin
+>     unless eof $ do
+>         str <- lift getLine
+>         (lift . putStrLn) str  -- Here we've replaced the original 'yield'
+>         loop
+
+    After this substitution, 'loop' no longer emits any values, so even though
+    @loop@ /technically/ qualifies a 'Producer', it does not use any
+    'Producer'-specific features like 'yield':
+    completely polymorphic output type:
+
+> --               +-- 'loop' doesn't 'yield' any values, so 'a' is polymorphic,
+> --               |   meaning that 'a' could in principle be any type.
+> --               v
+> loop :: Producer a IO ()
+
+    In fact, every single action in @loop@ is 'lift'ed from the base monad and
+    we don't use any 'Producer'-specific features.  @pipes@ defines a type
+    synonym for this special case:
 
 @
  data 'X'  -- The uninhabited type
@@ -153,22 +164,22 @@ import Prelude hiding ((.), id)
 @
 
     Since 'X' is uninhabited, a 'Producer' only type-checks as an 'Effect' if
-    the 'Producer' never outputs any values.  @loop@ satisfies this criterion,
-    so we can narrow the type signature of @loop@ even further to:
+    the 'Producer' never outputs any values and therefore never uses any
+    'Producer'-specific features.  @loop@ satisfies this criterion, so we can
+    narrow the type signature of @loop@ even further to:
 
 @
  loop :: (Monad m) => 'Effect' 'IO' ()
 @
 
-    'Effect's are special because we can 'run' any 'Effect' and convert it back
-    to the base monad:
+    An 'Effect' always exactly corresponds to an action in the base monad, so we
+    can always 'run' these 'Effect's to lower them back down to the base monad:
 
 @
  'run' :: (Monad m) => 'Effect' m r -> m r
 @
 
-    'run' only accepts 'Effect's in order to avoid silently discarding unhandled
-    output.  Our @loop@ has no unhandled output, so we are good to go:
+    'run' is the last piece of the puzzle we need to complete our program:
 
 > -- echo.hs
 >
@@ -285,7 +296,7 @@ import Prelude hiding ((.), id)
  (f ~> g) x = for (f x) g
 @
 
-    Using this operator we can transform our original equality into the
+    Using the ('~>') operator, we can transform our original equality into the
     following more symmetric form:
 
 @
@@ -336,13 +347,15 @@ import Prelude hiding ((.), id)
 > for m yield = m
 
     ... and because these are just 'Category' laws in disguise that means that
-    'Producer's in @pipes@ are composable in a theoretically rigorous sense.
+    'Producer's are composable in a theoretically rigorous sense.
 
     In fact, we get more out of this than just a bunch of equations.  We also
     get a useful operator, too: ('~>').  We can use this operator to condense
     our original code into the following more succinct form:
 
 > main = run $ for P.stdin (duplicate ~> lift . putStrLn)
+>
+> -- Read as: "for each line in stdin, duplicate and putStrLn it"
 
     This means that we can also choose to program in a more functional style and
     think of stream processing in terms of composing transformations using
@@ -567,8 +580,8 @@ ABCDEF
 
     A 'Pipe' is a monad transformer that is a mix between a 'Producer' and
     'Consumer', because a 'Pipe' can both 'await' and 'yield'.  The following
-    example 'Pipe' behaves like @take@, only allowing a fixed number of values
-    to pass through:
+    example 'Pipe' behaves like the Prelude's 'take', only allowing a fixed
+    number of values to flow through:
 
 > -- take.hs
 >
