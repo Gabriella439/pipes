@@ -35,6 +35,10 @@ module Pipes.Prelude (
     scanl,
     scanM,
 
+    -- * Consumers
+    stdout,
+    toHandle,
+
     -- * Folds
     -- $folds
     foldl,
@@ -58,9 +62,11 @@ module Pipes.Prelude (
     generalize
     ) where
 
+import Control.Exception (throwIO, try)
 import Control.Monad (liftM, replicateM_, when, unless)
 import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
+import qualified GHC.IO.Exception as G
 import Pipes
 import Pipes.Core
 import Pipes.Internal
@@ -358,6 +364,25 @@ scanM step = loop
         b' <- lift (step b a)
         loop $! b'
 {-# INLINABLE scanM #-}
+
+-- | Write 'String's to 'IO.stdout' using 'putStrLn'
+stdout :: Consumer String IO ()
+stdout = toHandle IO.stdout
+{-# INLINABLE stdout #-}
+
+-- | Write 'String's to a 'IO.Handle' using 'hPutStrLn'
+toHandle :: IO.Handle -> Consumer String IO ()
+toHandle handle = do
+    loop
+  where
+    loop = do
+        str <- await
+        x   <- lift $ try $ IO.hPutStrLn handle str
+        case x of
+            Left e@(G.IOError { G.ioe_type = t}) ->
+                lift $ unless (t == G.ResourceVanished) $ throwIO e
+            Right () -> loop
+{-# INLINABLE toHandle #-}
 
 {- $folds
     Use these to fold the output of a 'Producer'.  Certain folds will stop
