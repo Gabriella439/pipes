@@ -370,24 +370,6 @@ ABC<Enter>
 True
 >>>
 
-    To run multiple folds at a time, instead use multiple 'WriterT' layers in
-    the base monad:
-
-> import Control.Monad.Trans.Class
-> import Control.Monad.Trans.Writer.Strict
-> import Data.Monoid
-> import Pipes
->
-> fold :: Effect (WriterT (Sum Int) (Writer Any)) ()
-> fold = for (each [1..10]) $ \i -> do
->     lift $ tell $ Sum i
->     lift $ lift $ tell $ Any (i > 5)
-
-    These types of folds will consume the entire 'Producer':
-
->>> print $ runWriter $ execWriterT $ run fold
-(Sum {getSum = 55},Any {getAny = True})
-
 -}
 
 -- | Strict fold of the elements of a 'Producer'
