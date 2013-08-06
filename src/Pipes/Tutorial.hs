@@ -13,8 +13,8 @@
     can transform using composable functions in constant space, but without
     interleaving effects.
 
-    If you sacrifice /Streaming/ you get 'mapM', 'forM' and \"ListT done wrong\"
-    (from @transformers@), which are composable and effectful, but do not return
+    If you sacrifice /Streaming/ you get 'mapM', 'forM' and
+    \"ListT done wrong\", which are composable and effectful, but do not return
     a single result until the whole list has first been processed and loaded
     into memory.
 
@@ -91,59 +91,64 @@ import Prelude hiding ((.), id)
     effort to produce a working program that streams data highly efficiently in
     constant memory.
 
-    To enforce loose coupling, components can only communicate with each other
-    using two commands:
+    To enforce loose coupling, components can only send or receive data in one
+    of four ways:
 
-    * 'yield': Produce values
-
-    * 'await': Consume values
+@
+              | Zero or more times | Exactly once |
+              +--------------------+--------------+
+ Produce Data |       'yield'        | Return value |
+              +--------------------+--------------+
+ Consume Data |       'await'        |   Argument   |
+              +--------------------+--------------+
+@
 
     The four central types correspond to the four permutations in which you can
-    enable or disable these two commands:
+    enable or disable 'yield' or 'await':
 
-    * 'Producer's can only 'yield' values and model streaming sources
+    * 'Producer's can only 'yield' values and they model streaming sources
 
-    * 'Consumer's can only 'await' values and model streaming sinks
+    * 'Consumer's can only 'await' values and they model streaming sinks
 
-    * 'Pipe's can both 'await' and 'yield' values and model stream
+    * 'Pipe's can both 'yield' and 'await' values and they model stream
       transformations
 
-    * 'Effect's can neither 'yield' nor 'await' and model non-streaming
-      components
+    * 'Effect's can neither 'yield' nor 'await' and they model non-streaming
+      components that only 'lift' effects from the base monad
 
     You can connect these components together in four separate ways which
-    closely parallel the four types:
+    closely parallel the four central types:
 
-    * 'for' connects 'Producer's
+    * 'for' handles 'yield's
 
-    * '>~' connects 'Consumer's
+    * '>~' handles 'await's
 
-    * '>->' connects 'Pipe's
+    * '>->' handles both 'yield's and 'await's
 
-    * ('>>=') connects 'Effect's
+    * ('>>=') handles return values
 
-    However, as you progress through this tutorial you will learn that all four
-    of these operators actually work on mixtures of all four types, producing
-    surprising and emergent behavior.
+    You know that you're done connecting things when you get an 'Effect',
+    meaning that all inputs and outputs have been handled.  You 'run' the
+    final 'Effect' to begin streaming.
 -}
 
 {- $producers
-    @pipes@ represents an effectful stream of input using the 'Producer' type,
-    which is a monad transformer that extends a base monad with the ability to
-    incrementally 'yield' output to an anonymous downstream handler.  This lets
-    us decouple how we generate values from how we consume them.
+    'Producer's are effectful streams of input.  Specifically, 'Producer' is a
+    monad transformer that extends any base monad with a new 'yield' command.
+    This 'yield' command lets you send output downstream to an anonymous
+    handler, decoupling how you generate values from how you consume them.
 
     The following @stdin@ 'Producer' shows how to incrementally read in lines
     from standard input and 'yield' them downstream, terminating when reaching
     the end of the input:
 
-> -- echo.hs
+> -- echo.hs (Remember that the full 'echo.hs' file is at the
 >
 > import Control.Monad (unless)
 > import Pipes
-> import qualified System.IO as IO
+> import System.IO (isEOF)
 >
-> --       +--------+-- A 'Producer' of 'String's
+> --       +--------+-- A 'Producer' that yields 'String's
 > --       |        |
 > --       |        |      +-- Every monad transformer has a base monad.
 > --       |        |      |   This time the base monad is 'IO'.
@@ -153,61 +158,107 @@ import Prelude hiding ((.), id)
 > --       v        v      v  v
 > stdin :: Producer String IO ()
 > stdin = do
->     eof <- lift $ IO.hIsEOF IO.stdin  -- 'lift' an 'IO' action from the base
->                                       -- monad
+>     eof <- lift isEOF        -- 'lift' an 'IO' action from the base monad
 >     unless eof $ do
->         str <- lift getLine           -- Read a line of input
->         yield str                     -- 'yield' the line of input
->         stdin                         -- Loop
-
-    Whenever you see a type of the form:
-
-> Producer a m r
-
-    ... you should think: \"This outputs a stream of zero or more value of type
-    @a@ and finishes off with a single return value of type @r@.
+>         str <- lift getLine  -- Read a line of input
+>         yield str            -- 'yield' the line of input
+>         stdin                -- Loop
 
     'yield' emits a value, suspending the current 'Producer' until the value is
-    consumed.  You can think of 'yield' as having the following type:
+    consumed.  If nobody consumes the value (which is possible) then 'yield'
+    never returns.  You can think of 'yield' as having the following type:
 
 @
- 'yield' :: (Monad m) => a -> 'Producer' a m ()
+ 'yield' :: Monad m => a -> 'Producer' a m ()
 @
 
     The true type of 'yield' is actually more general and powerful.  Throughout
     the tutorial I will present type signatures like this that are simplified at
     first and then later I will show you neat ways that you can generalize them.
-    So read the above type signature as simply saying: \"You can use 'yield' in
-    a 'Producer' context, but you may be able to use 'yield' in other contexts,
+    So read the above type signature as simply saying: \"You can use 'yield'
+    within a 'Producer', but you may be able to use 'yield' in other contexts,
     too.\"
 
-    The simplest way to consume a 'Producer' is a 'for' loop, which has the
-    following type:
+    Click the link to 'yield' to navigate to its documentation.  There you will
+    see the fully general type and underneath you will see equivalent simpler
+    types.  One of these says that 'yield' can also be used within a 'Pipe':
 
 @
- \-\-                  +-- Producer      +-- The body of the      +-- Result
- \-\-                  |   to loop       |   loop                 |   
- \-\-                  v   over          v                        v  
- \-\-                  --------------    ---------------------    --------------
- 'for' :: (Monad m) => 'Producer' a m r -> (a -> 'Producer' b m r) -> 'Producer' b m r
+ 'yield' :: Monad m => a -> 'Pipe' x a m ()
 @
 
-    @(for producer f)@ loops over @(producer)@, substituting each 'yield' in
-    @(producer)@ with @(f)@.  If @(f)@ 'yield's any values of its own, then
-    these become the new output type of the final result.
+    Use simpler types like these to guide you until you understand the fully
+    general type.
+
+    'for' loops are the simplest way to consume a 'Producer' like @stdin@.
+    'for' has the following type:
+
+@
+ \-\-                +-- Producer      +-- The body of the       +-- Result
+ \-\-                |   to loop       |   loop                  |   
+ \-\-                v   over          v                         v  
+ \-\-                --------------    ----------------------    --------------
+ 'for' :: Monad m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
+@
+
+    @(for producer body)@ loops over @(producer)@, substituting each 'yield' in
+    @(producer)@ with @(body)@.  @(body)@ may 'yield' values, too, and 'for'
+    will preserve these 'yield's, which become the new output type.
+
+    You can also deduce this from looking at the type signature:
+
+    * The body of the loop takes exactly one argument of type @(a)@, which is
+      the same type as as the output of the input 'Producer'.  Therefore, the
+      body of the loop must get its input from that 'Producer' and nowhere else.
+
+    * The output type of the body of the loop has type @(b)@, which is the exact
+      same output type as the final result, therefore we conclude that the final
+      result must reuse output from the body of the loop.
+
+    * The return value of the input 'Producer' matches the return value of the
+      result, therefore 'for' must loop over the entire 'Producer' and not skip
+      any elements or leave them unhandled.
 
     Again, the above type signature is not the true type of 'for', which is
     more general.  Think of the above type signature as saying: \"If the first
     argument of 'for' is a 'Producer' and the second argument returns a
-    'Producer', then the final result must be a 'Producer'.\"  If we provide
-    arguments other than 'Producer's then the type of the result will also
-    change to something other than a 'Producer'.
+    'Producer', then the final result must be a 'Producer'.\"
+
+    Click the link to 'for' to navigate to its documentation.  There you will
+    see the fully general type and underneath you will see equivalent simpler
+    types.  One of these says that the body of the loop can be an 'Effect', too:
+
+@
+ for :: Monad m => 'Producer' b m r -> (b -> 'Effect' m ()) -> 'Effect' m r
+@
+
+    An 'Effect' is just a 'Producer' that never 'yield's (i.e. it only 'lift's):
+
+@
+ data 'X'  -- The uninhabited type
+
+\ type 'Effect' m r = 'Producer' 'X' m r
+@
+
+    If a 'Producer' never 'yield's, its output will type check as anything,
+    including the uninhabited type 'X'.
+
+    This is why 'for' type-checks as both type signatures.  The second type
+    signature is just a special case of the first one:
+
+@
+ 'for' :: Monad m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
+ -- Specialize \'b\' to \'X\'
+ 'for' :: Monad m => 'Producer' a m r -> (a -> 'Producer' X m ()) -> 'Producer' X m r
+ -- Producer X = Effect
+ 'for' :: Monad m => 'Producer' a m r -> (a -> 'Effect'     m ()) -> 'Effect'     m r
+@
 
     Here's an example 'for' @loop@ in action:
 
 > -- echo.hs
 >
-> loop :: Producer a IO ()
+> loop :: Effect IO ()
 > loop = for stdin $ \str -> do  -- Read this like: "for str in stdin"
 >     lift $ putStrLn str        -- The body of the 'for' loop
 >
@@ -219,7 +270,7 @@ import Prelude hiding ((.), id)
 
 > -- This definition of 'loop' is exactly equivalent to the previous one:
 > loop = do
->     eof <- lift $ IO.hIsEOF IO.stdin
+>     eof <- lift isEOF
 >     unless eof $ do
 >         str <- lift getLine
 >         (lift . putStrLn) str  -- Here we've replaced the original 'yield'
@@ -228,45 +279,23 @@ import Prelude hiding ((.), id)
     You can think of 'yield' as creating a hole and a 'for' loop is one way to
     fill that hole.
 
-    After this substitution, 'loop' consumed all of the values generated by
-    @stdin@ and did not re-'yield' any new values
-    , so even though
-    @loop@ /technically/ qualifies a 'Producer', it does not use any
-    'Producer'-specific features like 'yield':
+    The body of the loop has no 'yield's, so after substitution the final result
+    has no 'yield's either.  In other words, if the body of the loop is an
+    'Effect', then the final result is an 'Effect', matching what we learned
+    from the type signature of 'for'.
 
-> --               +-- 'loop' doesn't 'yield' any values, so 'a' is polymorphic,
-> --               |   meaning that 'a' could in principle be any type.
-> --               v
-> loop :: Producer a IO ()
-
-    In fact, every single action in the body of our 'for' @loop@ is just
-    trivially 'lift'ed from the base monad and we never 'yield'.  @pipes@
-    defines a type synonym for this special case where we only 'lift' and never
-    'yield:
-
-@
- data 'X'  -- The uninhabited type
-
-\ type 'Effect' m r = 'Producer' 'X' m r
-@
-
-    Since 'X' is uninhabited, a 'Producer' only type-checks as an 'Effect' if
-    the 'Producer' never outputs any values and therefore never uses any
-    'Producer'-specific features.  @loop@ satisfies this criterion, so we can
-    narrow the type signature of @loop@ even further to:
-
-@
- loop :: (Monad m) => 'Effect' 'IO' ()
-@
-
-    An 'Effect' always exactly corresponds to an action in the base monad, so we
-    can always 'run' these 'Effect's to lower them back down to the base monad:
+    The final @loop@ only 'lift's actions from the base monad and this is true
+    for all 'Effect's.  An 'Effect' always exactly corresponds to an action in
+    the base monad, so we can always 'run' these 'Effect's to lower them back
+    down to the base monad and get rid of the 'lift's:
 
 @
  'run' :: (Monad m) => 'Effect' m r -> m r
 @
 
-    'run' is the last piece of the puzzle we need to complete our program:
+    This is the true type signature of 'run', which refuses to accept anything
+    other than an 'Effect'.  This ensures that we handle all inputs and outputs
+    before streaming data:
 
 > -- echo.hs
 >
@@ -288,15 +317,30 @@ import Prelude hiding ((.), id)
 > <Ctrl-D>
 > $
 
-    You can also loop over lists, too.  To do so, convert the list to a
-    'Producer' using 'each':
+    The final behavior is indistinguishable from just removing all the 'lift's
+    from @loop@:
+
+> main = do
+>     eof <- isEof
+>     unless eof $ do
+>         str <- lift getLine
+>         putStrLn str
+>         main
+
+    This is what we might have written by hand if we were not using @pipes@, but
+    with @pipes@ we can decouple the input and output logic from each other.
+    When we connect them back together, we still produce performant and
+    streaming code equivalent to what an expert would write.
+
+    You can also use 'for' to loop over lists, too.  To do so, convert the list
+    to a 'Producer' using 'each':
 
 @
  'each' :: (Monad m) => [a] -> 'Producer' a m ()
  each as = mapM_ yield as
 @
 
-    Use this to iterate over lists using a \"foreach\" loop:
+    Combine 'for' and 'each' to iterate over lists using a \"foreach\" loop:
 
 >>> run $ for (each [1..4]) (lift . print)
 1
