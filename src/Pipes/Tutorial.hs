@@ -98,8 +98,8 @@ import Prelude hiding ((.), id)
 
     * 'await': Consume values
 
-    There are four central types corresponding to the four permutations in which
-    you can enable or disable these two commands:
+    The four central types correspond to the four permutations in which you can
+    enable or disable these two commands:
 
     * 'Producer's can only 'yield' values and model streaming sources
 
