@@ -133,7 +133,7 @@ import Prelude hiding ((.), id)
 -}
 
 {- $producers
-    'Producer's are effectful streams of input.  Specifically, 'Producer' is a
+    'Producer's are effectful streams of input.  Specifically, a 'Producer' is a
     monad transformer that extends any base monad with a new 'yield' command.
     This 'yield' command lets you send output downstream to an anonymous
     handler, decoupling how you generate values from how you consume them.
@@ -174,10 +174,9 @@ import Prelude hiding ((.), id)
 
     The true type of 'yield' is actually more general and powerful.  Throughout
     the tutorial I will present type signatures like this that are simplified at
-    first and then later I will show you neat ways that you can generalize them.
-    So read the above type signature as simply saying: \"You can use 'yield'
-    within a 'Producer', but you may be able to use 'yield' in other contexts,
-    too.\"
+    first and then later reveal more general versions.  So read the above type
+    signature as simply saying: \"You can use 'yield' within a 'Producer', but
+    you may be able to use 'yield' in other contexts, too.\"
 
     Click the link to 'yield' to navigate to its documentation.  There you will
     see the fully general type and underneath you will see equivalent simpler
@@ -202,17 +201,17 @@ import Prelude hiding ((.), id)
 @
 
     @(for producer body)@ loops over @(producer)@, substituting each 'yield' in
-    @(producer)@ with @(body)@.  @(body)@ may 'yield' values, too, and 'for'
+    @(producer)@ with @(body)@.  The @(body)@ may 'yield' values, too, and 'for'
     will preserve these 'yield's, which become the new output type.
 
     You can also deduce this from looking at the type signature:
 
     * The body of the loop takes exactly one argument of type @(a)@, which is
-      the same type as as the output of the input 'Producer'.  Therefore, the
+      the same type as the output type of the first 'Producer'.  Therefore, the
       body of the loop must get its input from that 'Producer' and nowhere else.
 
-    * The output type of the body of the loop has type @(b)@, which is the exact
-      same output type as the final result, therefore we conclude that the final
+    * The output of the body of the loop has type @(b)@, which is the exact same
+      output type as the final result, therefore we conclude that the final
       result must reuse output from the body of the loop.
 
     * The return value of the input 'Producer' matches the return value of the
@@ -240,21 +239,28 @@ import Prelude hiding ((.), id)
 \ type 'Effect' m r = 'Producer' 'X' m r
 @
 
-    If a 'Producer' never 'yield's, its output will type check as anything,
-    including the uninhabited type 'X'.
+    If a 'Producer' never 'yield's, it will type check as an 'Effect'.
 
-    This is why 'for' type-checks as both type signatures.  The second type
+    This is why 'for' permits two different type signatures.  The second type
     signature is just a special case of the first one:
 
 @
  'for' :: Monad m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
- -- Specialize \'b\' to \'X\'
+
+\ -- Specialize \'b\' to \'X\'
  'for' :: Monad m => 'Producer' a m r -> (a -> 'Producer' X m ()) -> 'Producer' X m r
- -- Producer X = Effect
+
+\ -- Producer X = Effect
  'for' :: Monad m => 'Producer' a m r -> (a -> 'Effect'     m ()) -> 'Effect'     m r
 @
 
-    Here's an example 'for' @loop@ in action:
+    This is the same trick that all @pipes@ functions use to work with various
+    combinations of 'Producer's, 'Consumer's, 'Pipe's, and 'Effect's.  Each
+    function really has just one general type, which you can then simplify down
+    to multiple useful types.
+
+    Here's an example use of a 'for' @loop@, where the second argument (the
+    loop body) is an 'Effect':
 
 > -- echo.hs
 >
@@ -262,7 +268,7 @@ import Prelude hiding ((.), id)
 > loop = for stdin $ \str -> do  -- Read this like: "for str in stdin"
 >     lift $ putStrLn str        -- The body of the 'for' loop
 >
-> -- even better: loop = for stdin (lift . putStrLn)
+> -- more concise: loop = for stdin (lift . putStrLn)
 
     In this example, 'for' loops over @stdin@ and replaces every 'yield' in
     @stdin@ with the body of the loop.  This is exactly equivalent to the
@@ -284,16 +290,16 @@ import Prelude hiding ((.), id)
     'Effect', then the final result is an 'Effect', matching what we learned
     from the type signature of 'for'.
 
-    The final @loop@ only 'lift's actions from the base monad and this is true
-    for all 'Effect's.  An 'Effect' always exactly corresponds to an action in
-    the base monad, so we can always 'run' these 'Effect's to lower them back
-    down to the base monad and get rid of the 'lift's:
+    The final @loop@ only 'lift's actions from the base monad (which is true for
+    all 'Effect's).  An 'Effect' always exactly corresponds to an action in the
+    base monad, so we can always 'run' these 'Effect's to lower them back down
+    to the base monad and get rid of the 'lift's:
 
 @
  'run' :: (Monad m) => 'Effect' m r -> m r
 @
 
-    This is the true type signature of 'run', which refuses to accept anything
+    This is the real type signature of 'run', which refuses to accept anything
     other than an 'Effect'.  This ensures that we handle all inputs and outputs
     before streaming data:
 
@@ -302,7 +308,7 @@ import Prelude hiding ((.), id)
 > main :: IO ()
 > main = run loop
 > 
-> -- or you could just inline the 'loop':
+> -- or you can inline the 'loop', giving the following one-liner:
 > -- main = run $ for stdin (lift . putStrLn)
 
     Our final program loops over standard input and echoes every line to
@@ -323,7 +329,7 @@ import Prelude hiding ((.), id)
 > main = do
 >     eof <- isEof
 >     unless eof $ do
->         str <- lift getLine
+>         str <- getLine
 >         putStrLn str
 >         main
 
@@ -358,7 +364,7 @@ import Prelude hiding ((.), id)
 > -- nested.hs
 >
 > import Pipes
-> import qualified Pipes.Prelude as P  -- Pipes.Prelude already has stdin
+> import qualified Pipes.Prelude as P  -- Pipes.Prelude already has 'stdin'
 > 
 > duplicate :: (Monad m) => a -> Producer a m ()
 > duplicate x = do
@@ -449,7 +455,10 @@ import Prelude hiding ((.), id)
 > f ~> yield = f
 
     In other words, 'yield' and ('~>') form a 'Category' where ('~>') plays the
-    role of the composition operator and 'yield' is the identity.
+    role of the composition operator and 'yield' is the identity.  If you don't
+    know what a 'Category' is, that's okay, and category theory is not a
+    prerequisite for using @pipes@.  All you really need to know is that @pipes@
+    uses some simple category theory to keep the API intuitive and easy to use.
 
     Notice that if we translate the left identity law to use 'for' instead of
     ('~>') we get:
@@ -478,7 +487,7 @@ import Prelude hiding ((.), id)
 > for m yield = m
 
     ... and because these are just 'Category' laws in disguise that means that
-    'Producer's are composable in a theoretically rigorous sense.
+    'Producer's are composable in a rigorous sense of the word.
 
     In fact, we get more out of this than just a bunch of equations.  We also
     get a useful operator, too: ('~>').  We can use this operator to condense
@@ -486,7 +495,7 @@ import Prelude hiding ((.), id)
 
 > main = run $ for P.stdin (duplicate ~> lift . putStrLn)
 >
-> -- Read as: "for each line in stdin, duplicate and putStrLn it"
+> -- Read as: "for each line in stdin, duplicate it and then putStrLn it"
 
     This means that we can also choose to program in a more functional style and
     think of stream processing in terms of composing transformations using
@@ -589,7 +598,7 @@ ABC
 >     str2 <- await
 >     return (str1 ++ str2)
 >
-> -- even better: doubleUp = (++) <$> await <*> await
+> -- more concise: doubleUp = (++) <$> await <*> await
 
     We can now insert this in between @(lift getLine)@ and @printN@ and see what
     happens:
