@@ -370,7 +370,7 @@ stdout :: Consumer String IO ()
 stdout = toHandle IO.stdout
 {-# INLINABLE stdout #-}
 
--- | Write 'String's to a 'IO.Handle' using 'hPutStrLn'
+-- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: IO.Handle -> Consumer String IO ()
 toHandle handle = do
     loop
