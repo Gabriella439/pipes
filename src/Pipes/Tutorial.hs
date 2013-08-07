@@ -74,6 +74,9 @@ module Pipes.Tutorial (
     -- * Unfolds
     -- $unfolds
 
+    -- * ListT
+    -- $listT
+
     -- * Conclusion
     -- $conclusion
 
@@ -989,7 +992,7 @@ ABC
 4
 
     ... while this code lenses into a 'String', only printing values that parse
-    correctly:
+    successfully:
 
 >>> :set -XNoMonomorphismRestriction
 >>> let readList = P.read :: (Monad m) => String -> Producer [String] m ()
@@ -998,6 +1001,82 @@ ABC
 1
 2
 
+-}
+
+{- $listT
+    @pipes@ also provides a \"ListT done right\" implementation.
+
+    To bind a list within a 'ListT' computation, combine 'Select' and 'each':
+
+> import Pipes
+> 
+> pairs :: ListT IO (Int, Int)
+> pairs = do
+>     x <- Select $ each [1, 2]
+>     lift $ putStrLn $ "x = " ++ show x
+>     y <- Select $ each [3, 4]
+>     lift $ putStrLn $ "y = " ++ show y
+>     return (x, y)
+
+    You can then over a 'ListT' by combining 'every':
+
+@
+ 'every' :: 'Monad' m => 'ListT' m a -> 'Producer' a m ()
+@
+
+>>> run $ for (every pairs) (lift . print)
+x = 1
+y = 3
+(1,3)
+y = 4
+(1,4)
+x = 2
+y = 3
+(2,3)
+y = 4
+(2,4)
+
+    You can also go the other way, too, binding 'Producer's directly within a
+    'ListT'.  In fact, this is actually what 'Select' was already doing:
+
+> Select :: Producer a m () -> ListT m a
+
+    This lets you write crazy code like:
+
+> import Pipes
+> import qualified Pipes.Prelude as P
+> 
+> quitter :: Producer String IO ()
+> quitter = P.stdin >-> P.takeWhile (/= "quit")
+> 
+> pairs :: ListT IO String
+> pairs = do
+>     str1 <- Select quitter
+>     str2 <- Select quitter
+>     return (str1 ++ " " ++ str2)
+
+    Here we're binding standard input non-deterministically as if it were an
+    effectful list:
+
+>>> run $ every pairs >-> P.stdout
+Daniel<Enter>
+Fischer<Enter>
+Daniel Fischer
+Wagner<Enter>
+Daniel Wagner
+quit<Enter>
+Donald<Enter>
+Stewart<Enter>
+Donald Stewart
+Duck<Enter>
+Donald Duck
+quit<Enter>
+quit<Enter>
+>>>
+
+    Notice how this streams out values immediately as they are generated, rather
+    than building up a large intermediate result and then printing all the
+    values in one batch at the end.
 -}
 
 {- $conclusion
@@ -1027,9 +1106,10 @@ ABC
     * @pipes-attoparsec@: High-performance parsing
 
     Even these derived packages still do not explore the full potential of
-    @pipes@ functionality.  Advanced @pipes@ users can explore this library in
-    greater detail by studying the documentation in the "Pipes.Core" module to
-    learn about the symmetry of the underlying 'Proxy' type and operators.
+    @pipes@ functionality, which actually permits bidirectional communication.
+    Advanced @pipes@ users can explore this library in greater detail by
+    studying the documentation in the "Pipes.Core" module to learn about the
+    symmetry of the underlying 'Proxy' type and operators.
 
     To learn more about @pipes@, ask questions, or follow @pipes@ development,
     you can subscribe to the @haskell-pipes@ mailing list at:
