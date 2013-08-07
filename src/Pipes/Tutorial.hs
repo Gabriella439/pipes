@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-{-| Conventional Haskell stream programming forces you to pick only two of the
+{-| Conventional Haskell stream programming forces you to choose only two of the
     following three features:
 
     * Effects
@@ -38,14 +38,16 @@
     unexpected ways because they all share the same underlying type.
 
     @pipes@ requires a basic understanding of monad transformers, which you can
-    learn about by searching for \"Monad Transformers - Step by Step\".  This is
-    a beginner-friendly and accessible paper that teaches basic monad
-    transformer usage.  Pay careful attention to section 2.5, describing the
-    use of 'lift'.  After that, study the documentation for the
-    @Control.Monad.Trans.Class@ module from the @transformers@ library.
+    learn about by reading either:
 
-    If you want a Quick Start guide, read the documentation in "Pipes.Prelude"
-    from top to bottom.
+    * The paper \"Monad Transformers - Step by Step\"
+
+    * Chapter 18 of \"Real World Haskell\" on monad transformers
+
+    * The documentation of the @transformers@ library
+
+    If you want a Quick Start guide to @pipes@, read the documentation in
+    "Pipes.Prelude" from top to bottom.
 
     This tutorial is more extensive and explains the @pipes@ API in greater
     detail and illustrates several idioms.  You can follow along by using the
@@ -88,8 +90,8 @@ import Prelude hiding ((.), id)
     programs.  If you are a library writer, @pipes@ lets you package up
     streaming components into a reusable interface.  If you are an application
     writer, @pipes@ lets you connect pre-made streaming components with minimal
-    effort to produce a working program that streams data highly efficiently in
-    constant memory.
+    effort to produce a highly-efficient program that streams data in constant
+    memory.
 
     To enforce loose coupling, components can only send or receive data in one
     of four ways:
@@ -121,9 +123,9 @@ import Prelude hiding ((.), id)
 
     * 'for' handles 'yield's
 
-    * '>~' handles 'await's
+    * ('>~') handles 'await's
 
-    * '>->' handles both 'yield's and 'await's
+    * ('>->') handles both 'yield's and 'await's
 
     * ('>>=') handles return values
 
@@ -142,7 +144,7 @@ import Prelude hiding ((.), id)
     from standard input and 'yield' them downstream, terminating when reaching
     the end of the input:
 
-> -- echo.hs (Remember that the full 'echo.hs' file is at the
+> -- echo.hs
 >
 > import Control.Monad (unless)
 > import Pipes
@@ -221,7 +223,7 @@ import Prelude hiding ((.), id)
     Again, the above type signature is not the true type of 'for', which is
     more general.  Think of the above type signature as saying: \"If the first
     argument of 'for' is a 'Producer' and the second argument returns a
-    'Producer', then the final result must be a 'Producer'.\"
+    'Producer', then the final result must also be a 'Producer'.\"
 
     Click the link to 'for' to navigate to its documentation.  There you will
     see the fully general type and underneath you will see equivalent simpler
@@ -248,7 +250,7 @@ import Prelude hiding ((.), id)
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
 
 \ -- Specialize \'b\' to \'X\'
- 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' X m ()) -> 'Producer' X m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' 'X' m ()) -> 'Producer' 'X' m r
 
 \ -- Producer X = Effect
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Effect'     m ()) -> 'Effect'     m r
