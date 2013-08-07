@@ -1,6 +1,6 @@
 Name: pipes
 Version: 4.0.0
-Cabal-Version: >= 1.16
+Cabal-Version: >= 1.14
 Build-Type: Simple
 License: BSD3
 License-File: LICENSE
