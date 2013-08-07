@@ -71,6 +71,9 @@ module Pipes.Tutorial (
     -- * Pipes
     -- $pipes
 
+    -- * Unfolds
+    -- $unfolds
+
     -- * Appendix
     -- $appendix
     ) where
@@ -463,11 +466,12 @@ import Prelude hiding ((.), id)
 > -- Right Identity
 > f ~> yield = f
 
-    In other words, 'yield' and ('~>') form a 'Category' where ('~>') plays the
-    role of the composition operator and 'yield' is the identity.  If you don't
-    know what a 'Category' is, that's okay, and category theory is not a
-    prerequisite for using @pipes@.  All you really need to know is that @pipes@
-    uses some simple category theory to keep the API intuitive and easy to use.
+    In other words, 'yield' and ('~>') form a 'Category', specifically the
+    generator category, where ('~>') plays the role of the composition operator
+    and 'yield' is the identity.  If you don't know what a 'Category' is, that's
+    okay, and category theory is not a prerequisite for using @pipes@.  All you
+    really need to know is that @pipes@ uses some simple category theory to keep
+    the API intuitive and easy to use.
 
     Notice that if we translate the left identity law to use 'for' instead of
     ('~>') we get:
@@ -653,8 +657,8 @@ ABCDEF
 > -- Right Identity
 > f >~ await = f
 
-    In other words, ('>~') and 'await' form a 'Category', too, and 'Consumer's
-    are also composable.
+    In other words, ('>~') and 'await' form a 'Category', too, specifically the
+    iteratee category, and 'Consumer's are also composable.
 -}
 
 {- $pipes
@@ -666,13 +670,10 @@ ABCDEF
 
     However, we don't need to restrict ourselves to using 'Producer's
     exclusively or 'Consumer's exclusively.  We can connect 'Producer's and
-    'Consumer's directly together using ('>->'):
+    'Consumer's directly together using ('>->') (pronounced \"pipe\"):
 
 @
-('>->') :: (Monad m)
-     => 'Producer' a m r
-     -> 'Consumer' a m r
-     -> 'Effect'     m r
+ ('>->') :: 'Monad' m => 'Producer' a m r -> 'Consumer' a m r -> 'Effect' m r
 @
 
     This returns an 'Effect' which we can 'run':
@@ -762,6 +763,236 @@ ABCDEF
 > take n = replicateM_ n $ do  -- Repeat the following block 'n' times
 >     x <- await               -- 'await' a value of type 'a'
 >     yield x                  -- 'yield' a value of type 'a'
+
+    You can use 'Pipe's to transform 'Producer's, 'Consumer's, or even other
+    'Pipe's using the same ('>->') operator:
+
+@
+ ('>->') :: 'Monad' m => 'Producer' a m r -> 'Pipe'   a b m r -> 'Producer' b m r
+ ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Consumer' b m r -> 'Consumer' a m r
+ ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Pipe'   b c m r -> 'Pipe'   a c m r
+@
+
+    For example, you can compose 'P.take' after 'P.stdin' to limit the number of
+    lines drawn from standard input:
+
+> maxInput :: Int -> Producer String IO ()
+> maxInput n = P.stdin >-> take n
+
+>>> run $ maxInput 3 >-> P.stdout
+Test<Enter>
+Test
+ABC<Enter>
+ABC
+42<Enter>
+42
+>>>
+
+    ... or you can pre-compose 'P.take' before 'P.stdout' to limit the number of
+    lines written to standard output:
+
+> maxOutput :: Int -> Consumer String IO ()
+> maxOutput n = take n >-> P.stdout
+
+>>> run $ P.stdin >-> maxOutput 3
+<Exact same behavior>
+
+    Those both gave the same behavior because ('>->') is associative:
+
+> (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
+
+    Therefore we could have left out the parentheses and there was also no need
+    to pre-group components:
+
+>>> run $ P.stdin >-> take 3 >-> P.stdout
+<Exact same behavior>
+
+    ('>->') is designed to behave like the Unix pipe operator, @|@, except
+    with less quirks.
+
+    ('>->') also has an identity named 'cat' (named after the Unix @cat@
+    utility), which reforwards elements endlessly:
+
+> cat :: (Monad m) => Pipe a a m r
+> cat = forever $ do
+>     x <- await
+>     yield x
+
+    Therefore, ('>->') and 'cat' form a 'Category', specifically the category of
+    Unix pipes:
+
+> -- Useless use of 'cat'
+> cat >-> p = p
+>
+> -- Forwarding output to 'cat' does nothing
+> p >-> cat = p
+
+    A lot of Unix tools have very simple definitions when written using @pipes@:
+
+> -- unix.hs
+>
+> import Control.Monad (forever)
+> import Pipes
+> import qualified Pipes.Prelude as P  -- Pipes.Prelude provides 'take', too
+> import Prelude hiding (head)
+>
+> head :: (Monad m) => Pipe a a m ()
+> head = P.take 10
+>
+> yes :: (Monad m) => Producer String m r
+> yes = forever $ yield "y"
+>
+> main = run $ yes >-> head >-> P.stdout
+
+    This prints out 10 \'@y@\'s, just like the equivalent Unix pipeline:
+
+> $ ./unix
+> y
+> y
+> y
+> y
+> y
+> y
+> y
+> y
+> y
+> y
+> $
+
+    This lets us write \"Haskell pipes\" instead of Unix pipes.  These are much
+    easier to build than Unix pipes and we can connect them directly within
+    Haskell for type safety.
+-}
+
+{- $unfolds
+    How would we write a really simple @grep@ pipe that only does exact string
+    matching?  Our first attempt might look like this:
+
+> import Control.Monad (when)
+> import Pipes
+>
+> grep :: String -> Pipe String String m r
+> grep str = forever $ do
+>     line <- await
+>     when (str `isInfixOf` line) (yield line)
+
+    The above code grabs a single line at a time and only forwards the lines
+    that match the given 'String'.  However, while the above code is okay it is
+    not completely idiomatic @pipes@ code.
+
+    The first problem is that we are explicitly integrating the looping scheme
+    ('forever', in this case) with the string matching and filtering logic.
+    Fortunately, we can easily decouple the two by rewriting @grep@ like this:
+    
+> grep :: String -> Pipe String String m r
+> grep str = for cat $ \line ->
+>     when (str `isInfixOf line) (yield line)
+
+    Wait, what?  You can write a 'for' loop over 'cat'?
+
+    If we go back to the documentation for the 'for' function, we will see this
+    simplified type signature immediately below:
+
+@
+ for :: 'Monad' m => 'Pipe' x b m r -> (b -> 'Producer' c m ()) -> 'Pipe' x c m r
+@
+
+    This is an example of how @pipes@ is clever and will let you mix familiar
+    types and operations in unexpected ways.  'for' can loop over 'Pipe's the
+    same way we loop over 'Producer's.  'cat' is the empty 'Pipe' that
+    auto-forwards everything, so we just loop over 'cat' and replace every
+    'yield' with the body of the loop.
+
+    "Pipes.Prelude" also provides a convenience function that we can reuse here
+    called 'P.yieldIf':
+
+> yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer a m ()
+> yieldIf predicate a = when (predicate a) (yield a)
+
+    Using 'P.yieldIf' we can simplify @grep@ even further:
+
+> grep str = for cat (P.yieldIf (str `isInfixOf`))
+
+    This formulation is more declarative of our intent.  You would read this in
+    English as \"for each value flowing downstreaming, only yield the value if
+    @str@ is an infix of it\".
+
+    However, this version is still not completely idiomatic!  The truly
+    idiomatic version would leave out the @(for cat)@ part completely, leaving
+    behind just the body of the loop:
+
+> -- Rename this since it's simpler than @grep@
+> match :: (Monad m) => String -> String -> Producer String m ()
+> match str = P.yieldIf (str `isInfixOf`)
+
+    Then we can just use `match` directly to loop over any 'Producer' we want to
+    filter:
+
+> main = run $ for P.stdin (match "Test") >-> P.stdout
+
+    @match@ is an \"unfold\", a term referring to any component that can be used
+    as the body of a @for@ loop.  All unfolds have this shape:
+
+@
+ A -> 'Producer' B m ()
+@
+
+    ... and 'yield' is the trivial unfold.
+
+    So when you look at the type of @match@ you can mentally group the type like
+    this:
+
+> --                    +----------+-- 'match' takes a 'String' and returns an
+> --                    |          |   unfold
+> --                    v          v
+> match :: (Monad m) => String -> (String -> Producer String m ())
+
+    Unfolds are more idiomatic than the equivalent 'Pipe's for two reasons:
+
+    * They are simpler to write (no recursion necessary)
+
+    * You can upgrade an unfold to a 'Pipe' using @(for cat@), but you can't
+      downgrade a 'Pipe' to an unfold
+
+    However, you should never actually need to explicitly upgrade an unfold to
+    a 'Pipe'.  Any time you see yourself writing this:
+
+> -- Useless use of 'cat'
+> p >-> for cat unfold
+
+    ... you should instead be writing:
+
+> for p unfold
+
+    This is why "Pipes.Prelude" does not provide @filter@ or @map@ since you
+    get equivalent functionality by combining 'for' with 'P.yieldIf' or 'yield':
+
+> -- Filter out empty lines from standard input
+> for P.stdin (P.yieldIf (not . null)) :: Producer String IO ()
+
+> -- Map 'show' over all elements
+> for (each [1..10]) (yield . show) :: (Monad m) => Producer String m ()
+
+    Once you gain practice judiciously using unfolds you will see lots of
+    simple and elegant patterns emerge.  For example, this purely unfold-based
+    code prints out every element of a nested list:
+
+>>> import Pipes
+>>> import qualified Pipes.Prelude as P
+>>> run $ (each ~> each ~> lift . print) [[1, 2], [3, 4]]
+1
+2
+3
+4
+
+    ... while this code lenses into a 'String':
+
+>>> let readList = P.read :: (Monad m) => String -> Producer [String] m ()
+>>> let readInt  = P.read :: (Monad m) => String -> Producer  Int     m ()
+>>> run $ (readList ~> each ~> readInt ~> lift . print) "[\"1\", \"2\"]"
+1
+2
+
 -}
 
 {- $conclusion
