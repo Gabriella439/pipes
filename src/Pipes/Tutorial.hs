@@ -169,7 +169,7 @@ import Prelude hiding ((.), id)
     never returns.  You can think of 'yield' as having the following type:
 
 @
- 'yield' :: Monad m => a -> 'Producer' a m ()
+ 'yield' :: 'Monad' m => a -> 'Producer' a m ()
 @
 
     The true type of 'yield' is actually more general and powerful.  Throughout
@@ -183,7 +183,7 @@ import Prelude hiding ((.), id)
     types.  One of these says that 'yield' can also be used within a 'Pipe':
 
 @
- 'yield' :: Monad m => a -> 'Pipe' x a m ()
+ 'yield' :: 'Monad' m => a -> 'Pipe' x a m ()
 @
 
     Use simpler types like these to guide you until you understand the fully
@@ -197,7 +197,7 @@ import Prelude hiding ((.), id)
  \-\-                |   to loop       |   loop                  |   
  \-\-                v   over          v                         v  
  \-\-                --------------    ----------------------    --------------
- 'for' :: Monad m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
 @
 
     @(for producer body)@ loops over @(producer)@, substituting each 'yield' in
@@ -228,7 +228,7 @@ import Prelude hiding ((.), id)
     types.  One of these says that the body of the loop can be an 'Effect', too:
 
 @
- for :: Monad m => 'Producer' b m r -> (b -> 'Effect' m ()) -> 'Effect' m r
+ 'for' :: 'Monad' m => 'Producer' b m r -> (b -> 'Effect' m ()) -> 'Effect' m r
 @
 
     An 'Effect' is just a 'Producer' that never 'yield's (i.e. it only 'lift's):
@@ -245,19 +245,19 @@ import Prelude hiding ((.), id)
     signature is just a special case of the first one:
 
 @
- 'for' :: Monad m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
 
 \ -- Specialize \'b\' to \'X\'
- 'for' :: Monad m => 'Producer' a m r -> (a -> 'Producer' X m ()) -> 'Producer' X m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' X m ()) -> 'Producer' X m r
 
 \ -- Producer X = Effect
- 'for' :: Monad m => 'Producer' a m r -> (a -> 'Effect'     m ()) -> 'Effect'     m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Effect'     m ()) -> 'Effect'     m r
 @
 
     This is the same trick that all @pipes@ functions use to work with various
     combinations of 'Producer's, 'Consumer's, 'Pipe's, and 'Effect's.  Each
     function really has just one general type, which you can then simplify down
-    to multiple useful types.
+    to multiple useful alternative types.
 
     Here's an example use of a 'for' @loop@, where the second argument (the
     loop body) is an 'Effect':
@@ -271,10 +271,9 @@ import Prelude hiding ((.), id)
 > -- more concise: loop = for stdin (lift . putStrLn)
 
     In this example, 'for' loops over @stdin@ and replaces every 'yield' in
-    @stdin@ with the body of the loop.  This is exactly equivalent to the
-    following code:
+    @stdin@ with the body of the loop, printing each line.  This is exactly
+    equivalent to the following code:
 
-> -- This definition of 'loop' is exactly equivalent to the previous one:
 > loop = do
 >     eof <- lift isEOF
 >     unless eof $ do
@@ -290,13 +289,13 @@ import Prelude hiding ((.), id)
     'Effect', then the final result is an 'Effect', matching what we learned
     from the type signature of 'for'.
 
-    The final @loop@ only 'lift's actions from the base monad (which is true for
-    all 'Effect's).  An 'Effect' always exactly corresponds to an action in the
-    base monad, so we can always 'run' these 'Effect's to lower them back down
-    to the base monad and get rid of the 'lift's:
+    Notice how the final @loop@ only 'lift's actions from the base monad.  This
+    property is true for all 'Effect's, which exactly correspond to actions in
+    the base monad.  This correspondence means we can 'run' these 'Effect's to
+    get rid of all the 'lift's and lower them back down to the base monad:
 
 @
- 'run' :: (Monad m) => 'Effect' m r -> m r
+ 'run' :: 'Monad' m => 'Effect' m r -> m r
 @
 
     This is the real type signature of 'run', which refuses to accept anything
@@ -308,7 +307,7 @@ import Prelude hiding ((.), id)
 > main :: IO ()
 > main = run loop
 > 
-> -- or you can inline the 'loop', giving the following one-liner:
+> -- or you can inline the entire 'loop', giving the following one-liner:
 > -- main = run $ for stdin (lift . putStrLn)
 
     Our final program loops over standard input and echoes every line to
@@ -335,14 +334,14 @@ import Prelude hiding ((.), id)
 
     This is what we might have written by hand if we were not using @pipes@, but
     with @pipes@ we can decouple the input and output logic from each other.
-    When we connect them back together, we still produce performant and
-    streaming code equivalent to what an expert would write.
+    When we connect them back together, we still produce streaming code
+    equivalent to what a sufficiently careful Haskell expert would write.
 
     You can also use 'for' to loop over lists, too.  To do so, convert the list
     to a 'Producer' using 'each':
 
 @
- 'each' :: (Monad m) => [a] -> 'Producer' a m ()
+ 'each' :: 'Monad' m => [a] -> 'Producer' a m ()
  each as = mapM_ yield as
 @
 
@@ -353,6 +352,17 @@ import Prelude hiding ((.), id)
 2
 3
 4
+
+    'each' is actually more general and works for any 'Foldable':
+
+@
+ 'each' :: ('Monad' m, 'Foldable' f) => f a -> 'Producer' a m ()
+@
+
+     So you can loop over any 'Foldable' container or even a 'Maybe':
+
+>>> run $ for (each (Just 1)) (lift . print)
+1
 
 -}
 
