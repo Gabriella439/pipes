@@ -25,7 +25,12 @@ module Pipes.Lift (
     -- * WriterT
     -- $writert
     runWriterP,
-    execWriterP
+    execWriterP,
+    
+    -- * RWST
+    runRWSP,
+    evalRWSP,
+    execRWSP
     ) where
 
 import qualified Control.Monad.Trans.Error as E
@@ -33,6 +38,7 @@ import qualified Control.Monad.Trans.Maybe as M
 import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
+import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
 
@@ -188,3 +194,41 @@ execWriterP
     => Proxy a' a b' b (W.WriterT w m) r -> Proxy a' a b' b m w
 execWriterP = fmap snd . runWriterP
 {-# INLINABLE execWriterP #-}
+
+-- | Run 'RWST' in the base monad
+runRWSP :: (Monad m, Monoid w)
+        => i
+        -> s
+        -> Proxy a' a b' b (RWS.RWST i w s m) r
+        -> Proxy a' a b' b m (r, s, w)
+runRWSP i = go mempty
+  where
+    go w s p = case p of
+        Request a' fa  -> Request a' (\a  -> go w s (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go w s (fb' b'))
+        Pure    r      -> Pure (r, s, w)
+        M          m   -> M (do
+            (p', s', w') <- RWS.runRWST m i s
+            let wt = mappend w w'
+            wt `seq` return (go w' s' p') )
+{-# INLINABLE runRWSP #-}
+
+-- | Evaluate 'RWST' in the base monad
+evalRWSP :: (Monad m, Monoid w)
+         => i
+         -> s
+         -> Proxy a' a b' b (RWS.RWST i w s m) r
+         -> Proxy a' a b' b m (r, w)
+evalRWSP i s = fmap go . runRWSP i s
+    where go (r, _, w) = (r, w)
+{-# INLINABLE evalRWSP #-}
+
+-- | Execute 'RWST' in the base monad
+execRWSP :: (Monad m, Monoid w)
+         => i
+         -> s
+         -> Proxy a' a b' b (RWS.RWST i w s m) r
+         -> Proxy a' a b' b m (s, w)
+execRWSP i s = fmap go . runRWSP i s
+    where go (_, s', w) = (s', w)
+{-# INLINABLE execRWSP #-}
