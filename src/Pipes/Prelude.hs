@@ -21,7 +21,7 @@ module Pipes.Prelude (
     replicate,
     replicateM,
     yieldIf,
-    yieldAfter,
+    chain,
     debug,
     read,
 
@@ -224,19 +224,19 @@ yieldIf predicate a =
 {-# INLINABLE yieldIf #-}
 
 -- | Re-'yield' the value after first applying the given action
-yieldAfter :: (Monad m) => (a -> m b) -> a -> Producer' a m ()
-yieldAfter f a = do
+chain :: (Monad m) => (a -> m b) -> a -> Producer' a m ()
+chain f a = do
     _ <- lift (f a)
     _ <- yield a
     return ()
-{-# INLINABLE yieldAfter #-}
+{-# INLINABLE chain #-}
 
 {-| 'print' values flowing through for debugging purposes
 
-> debug = yieldAfter print
+> debug = chain print
 -}
 debug :: (Show a) => a -> Producer' a IO ()
-debug = yieldAfter print
+debug = chain print
 {-# INLINABLE debug #-}
 
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds

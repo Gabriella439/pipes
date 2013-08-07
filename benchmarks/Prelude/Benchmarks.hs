@@ -52,7 +52,7 @@ preludeBenchmarks vmax benchEnum_p =
             let repM = runIdentity . run . (discard <\\) . flip P.replicateM (return ())
             in whnf repM vmax
       , bench "yieldIf"    $ whnf (run . (P.yieldIf even ~> discard) <\\ ) benchEnum_p
-      , bench "yieldAfter" $ whnf (run . (P.yieldAfter return ~> discard) <\\ ) benchEnum_p
+      , bench "chain" $ whnf (run . (P.chain return ~> discard) <\\ ) benchEnum_p
       ]
     , bgroup "Zips" $ map (\b -> b benchEnum_p) [
         bench "zip"     . whnf (run . (discard <\\) . P.zip benchEnum_p)
