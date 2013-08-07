@@ -26,7 +26,7 @@ module Pipes.Lift (
     -- $writert
     runWriterP,
     execWriterP,
-    
+
     -- * RWST
     runRWSP,
     evalRWSP,
