@@ -74,6 +74,9 @@ module Pipes.Tutorial (
     -- * Unfolds
     -- $unfolds
 
+    -- * Conclusion
+    -- $conclusion
+
     -- * Appendix
     -- $appendix
     ) where
@@ -985,11 +988,13 @@ ABC
 3
 4
 
-    ... while this code lenses into a 'String':
+    ... while this code lenses into a 'String', only printing values that parse
+    correctly:
 
+>>> :set -XNoMonomorphismRestriction
 >>> let readList = P.read :: (Monad m) => String -> Producer [String] m ()
 >>> let readInt  = P.read :: (Monad m) => String -> Producer  Int     m ()
->>> run $ (readList ~> each ~> readInt ~> lift . print) "[\"1\", \"2\"]"
+>>> run $ (readList ~> each ~> readInt ~> lift . print) "[\"1\", \"X\", \"2\"]"
 1
 2
 
@@ -1001,13 +1006,11 @@ ABC
     ecosystem of streaming components.  More powerful libraries that build upon
     @pipes@ include:
 
-    * @pipes-safe@: Resource management and exception safety for @pipes@
-
     * @pipes-concurrency@: Concurrent reactive programming and message passing
 
-    * @pipes-parse@: Central idioms for stream parsing
+    * @pipes-parse@: Minimal utilities for stream parsing
 
-    * @pipes-arrow@: Push-based directed acyclic graphs for @pipes@
+    * @pipes-safe@: Resource management and exception safety for @pipes@
 
     These libraries provide functionality specialized to common streaming
     domains.  Additionally, there are several derived libraries on Hackage that
@@ -1025,8 +1028,8 @@ ABC
 
     Even these derived packages still do not explore the full potential of
     @pipes@ functionality.  Advanced @pipes@ users can explore this library in
-    greater detail by studying the documentation in the "Pipes" module to learn
-    about the symmetry behind the underlying 'Proxy' type and operators.
+    greater detail by studying the documentation in the "Pipes.Core" module to
+    learn about the symmetry of the underlying 'Proxy' type and operators.
 
     To learn more about @pipes@, ask questions, or follow @pipes@ development,
     you can subscribe to the @haskell-pipes@ mailing list at:
