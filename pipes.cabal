@@ -1,6 +1,6 @@
 Name: pipes
 Version: 4.0.0
-Cabal-Version: >= 1.14
+Cabal-Version: >= 1.10
 Build-Type: Simple
 License: BSD3
 License-File: LICENSE
@@ -57,14 +57,12 @@ Library
 Benchmark prelude-benchmarks
     Default-Language: Haskell2010
     Type:             exitcode-stdio-1.0
-    HS-Source-Dirs:
-        benchmarks,
-        benchmarks/Prelude          
-    Main-Is:      Main.hs
-    GHC-Options: -O2 -Wall -rtsopts -fno-warn-unused-do-bind
+    HS-Source-Dirs:   benchmarks
+    Main-Is:          PreludeBench.hs
+    GHC-Options:     -O2 -Wall -rtsopts -fno-warn-unused-do-bind
 
     Build-Depends:
         base      >= 4 && < 5,
-        pipes,
+        criterion >= 0.8     ,
         mtl,
-        criterion >= 0.8
+        pipes     >= 4.0.0
