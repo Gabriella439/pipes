@@ -18,8 +18,11 @@
     any functions which can violate the monad transformer laws.
 -}
 
+{-# LANGUAGE RankNTypes #-}
+
 module Pipes.Internal (
     Proxy(..),
+    unsafeHoist,
     observe
     ) where
 
@@ -96,13 +99,25 @@ p0 `_bind` f = go p0 where
 instance MonadTrans (Proxy a' a b' b) where
     lift m = M (m >>= \r -> return (Pure r))
 
+{-| 'unsafeHoist' is like 'hoist', but faster.
+
+    This is labeled as unsafe because you will break the monad transformer laws
+    if you do not pass a monad morphism as the first argument.  This function is
+    safe if you pass a monad morphism as the first argument.
+-}
+unsafeHoist
+    :: (Monad m)
+    => (forall x . m x -> n x) -> Proxy a' a b' b m r -> Proxy a' a b' b n r
+unsafeHoist nat = go
+  where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        M          m   -> M (nat (m >>= \p' -> return (go p')))
+        Pure       r   -> Pure r
+
 instance MFunctor (Proxy a' a b' b) where
-    hoist nat p0 = go (observe p0) where
-        go p = case p of
-            Request a' fa  -> Request a' (\a  -> go (fa  a ))
-            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (nat (m >>= \p' -> return (go p')))
-            Pure       r   -> Pure r
+    hoist nat p0 = unsafeHoist nat (observe p0)
 
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
