@@ -40,11 +40,11 @@
     @pipes@ requires a basic understanding of monad transformers, which you can
     learn about by reading either:
 
-    * The paper \"Monad Transformers - Step by Step\"
+    * the paper \"Monad Transformers - Step by Step\",
 
-    * Chapter 18 of \"Real World Haskell\" on monad transformers
+    * chapter 18 of \"Real World Haskell\" on monad transformers, or:
 
-    * The documentation of the @transformers@ library
+    * the documentation of the @transformers@ library.
 
     If you want a Quick Start guide to @pipes@, read the documentation in
     "Pipes.Prelude" from top to bottom.
@@ -70,6 +70,15 @@ module Pipes.Tutorial (
 
     -- * Pipes
     -- $pipes
+
+    -- * Unfolds
+    -- $unfolds
+
+    -- * ListT
+    -- $listT
+
+    -- * Conclusion
+    -- $conclusion
 
     -- * Appendix
     -- $appendix
@@ -98,11 +107,11 @@ import Prelude hiding ((.), id)
 
 @
               | Zero or more times | Exactly once |
-              +--------------------+--------------+
+ -------------+--------------------+--------------+
  Produce Data |       'yield'        | Return value |
-              +--------------------+--------------+
+ -------------+--------------------+--------------+
  Consume Data |       'await'        |   Argument   |
-              +--------------------+--------------+
+ -------------+--------------------+--------------+
 @
 
     The four central types correspond to the four permutations in which you can
@@ -140,9 +149,9 @@ import Prelude hiding ((.), id)
     This 'yield' command lets you send output downstream to an anonymous
     handler, decoupling how you generate values from how you consume them.
 
-    The following @stdin@ 'Producer' shows how to incrementally read in lines
-    from standard input and 'yield' them downstream, terminating when reaching
-    the end of the input:
+    The following @stdin@ 'Producer' shows how to incrementally read in
+    'String's from standard input and 'yield' them downstream, terminating
+    gracefully when reaching the end of the input:
 
 > -- echo.hs
 >
@@ -163,7 +172,7 @@ import Prelude hiding ((.), id)
 >     eof <- lift isEOF        -- 'lift' an 'IO' action from the base monad
 >     unless eof $ do
 >         str <- lift getLine  -- Read a line of input
->         yield str            -- 'yield' the line of input
+>         yield str            -- 'yield' the 'String'
 >         stdin                -- Loop
 
     'yield' emits a value, suspending the current 'Producer' until the value is
@@ -203,14 +212,15 @@ import Prelude hiding ((.), id)
 @
 
     @(for producer body)@ loops over @(producer)@, substituting each 'yield' in
-    @(producer)@ with @(body)@.  The @(body)@ may 'yield' values, too, and 'for'
-    will preserve these 'yield's, which become the new output type.
+    @(producer)@ with @(body)@.  The @(body)@ may 'yield' values of its own,
+    too, and 'for' will preserve these 'yield's, which become the new output
+    type.
 
-    You can also deduce this from looking at the type signature:
+    You can also deduce a lot of that behavior purely from the type signature:
 
     * The body of the loop takes exactly one argument of type @(a)@, which is
-      the same type as the output type of the first 'Producer'.  Therefore, the
-      body of the loop must get its input from that 'Producer' and nowhere else.
+      the same as the output type of the first 'Producer'.  Therefore, the body
+      of the loop must get its input from that 'Producer' and nowhere else.
 
     * The output of the body of the loop has type @(b)@, which is the exact same
       output type as the final result, therefore we conclude that the final
@@ -218,12 +228,12 @@ import Prelude hiding ((.), id)
 
     * The return value of the input 'Producer' matches the return value of the
       result, therefore 'for' must loop over the entire 'Producer' and not skip
-      any elements or leave them unhandled.
+      anything.
 
     Again, the above type signature is not the true type of 'for', which is
     more general.  Think of the above type signature as saying: \"If the first
     argument of 'for' is a 'Producer' and the second argument returns a
-    'Producer', then the final result must also be a 'Producer'.\"
+    'Producer', then the final result must be a 'Producer'.\"
 
     Click the link to 'for' to navigate to its documentation.  There you will
     see the fully general type and underneath you will see equivalent simpler
@@ -274,27 +284,24 @@ import Prelude hiding ((.), id)
 
     In this example, 'for' loops over @stdin@ and replaces every 'yield' in
     @stdin@ with the body of the loop, printing each line.  This is exactly
-    equivalent to the following code:
+    equivalent to the following code, which I've placed side-by-side with the
+    original definition of @stdin@ for comparison:
 
-> loop = do
->     eof <- lift isEOF
->     unless eof $ do
->         str <- lift getLine
->         (lift . putStrLn) str  -- Here we've replaced the original 'yield'
->         loop
+> loop = do                      |  stdin = do
+>     eof <- lift isEOF          |      eof <- lift isEOF
+>     unless eof $ do            |      unless eof $ do
+>         str <- lift getLine    |          str <- lift getLine
+>         (lift . putStrLn) str  |          yield str
+>         loop                   |          stdin
 
     You can think of 'yield' as creating a hole and a 'for' loop is one way to
     fill that hole.
 
-    The body of the loop has no 'yield's, so after substitution the final result
-    has no 'yield's either.  In other words, if the body of the loop is an
-    'Effect', then the final result is an 'Effect', matching what we learned
-    from the type signature of 'for'.
-
-    Notice how the final @loop@ only 'lift's actions from the base monad.  This
-    property is true for all 'Effect's, which exactly correspond to actions in
-    the base monad.  This correspondence means we can 'run' these 'Effect's to
-    get rid of all the 'lift's and lower them back down to the base monad:
+    Notice how the final @loop@ only 'lift's actions and does nothing else.
+    This property is true for all 'Effect's, which are just glorified wrappers
+    around actions the base monad.  This means we can 'run' these 'Effect's to
+    remove their 'lift's and lower them back down to the equivalent action in
+    the base monad:
 
 @
  'run' :: 'Monad' m => 'Effect' m r -> m r
@@ -308,9 +315,10 @@ import Prelude hiding ((.), id)
 >
 > main :: IO ()
 > main = run loop
-> 
-> -- or you can inline the entire 'loop', giving the following one-liner:
-> -- main = run $ for stdin (lift . putStrLn)
+
+    ... or you could inline the entire @loop@ into the following one-liner:
+
+> main = run $ for stdin (lift . putStrLn)
 
     Our final program loops over standard input and echoes every line to
     standard output until we hit @Ctrl-D@ to end the input stream:
@@ -327,25 +335,24 @@ import Prelude hiding ((.), id)
     The final behavior is indistinguishable from just removing all the 'lift's
     from @loop@:
 
-> main = do
->     eof <- isEof
->     unless eof $ do
->         str <- getLine
->         putStrLn str
->         main
+> main = do               |  loop = do
+>     eof <- isEof        |      eof <- lift isEof
+>     unless eof $ do     |      unless eof $ do
+>         str <- getLine  |          str <- lift getLine
+>         putStrLn str    |          (lift . putStrLn) str
+>         main            |          loop
 
-    This is what we might have written by hand if we were not using @pipes@, but
-    with @pipes@ we can decouple the input and output logic from each other.
-    When we connect them back together, we still produce streaming code
-    equivalent to what a sufficiently careful Haskell expert would write.
+    This @main@ is what we might have written by hand if we were not using
+    @pipes@, but with @pipes@ we can decouple the input and output logic from
+    each other.  When we connect them back together, we still produce streaming
+    code equivalent to what a sufficiently careful Haskell programmer would
+    write.
 
     You can also use 'for' to loop over lists, too.  To do so, convert the list
-    to a 'Producer' using 'each':
+    to a 'Producer' using 'each', which is exported by default from "Pipes":
 
-@
- 'each' :: 'Monad' m => [a] -> 'Producer' a m ()
- each as = mapM_ yield as
-@
+> each :: (Monad m) => [a] -> Producer a m ()
+> each as = mapM_ yield as
 
     Combine 'for' and 'each' to iterate over lists using a \"foreach\" loop:
 
@@ -399,7 +406,6 @@ import Prelude hiding ((.), id)
 
 > -- nested.hs
 >
-> -- I heard you like loops
 > main = run $ for loop (lift . putStrLn)
 
     This creates a program which echoes every line from standard input to
@@ -466,20 +472,21 @@ import Prelude hiding ((.), id)
 > -- Right Identity
 > f ~> yield = f
 
-    In other words, 'yield' and ('~>') form a 'Category' where ('~>') plays the
-    role of the composition operator and 'yield' is the identity.  If you don't
-    know what a 'Category' is, that's okay, and category theory is not a
-    prerequisite for using @pipes@.  All you really need to know is that @pipes@
-    uses some simple category theory to keep the API intuitive and easy to use.
+    In other words, 'yield' and ('~>') form a 'Category', specifically the
+    generator category, where ('~>') plays the role of the composition operator
+    and 'yield' is the identity.  If you don't know what a 'Category' is, that's
+    okay, and category theory is not a prerequisite for using @pipes@.  All you
+    really need to know is that @pipes@ uses some simple category theory to keep
+    the API intuitive and easy to use.
 
     Notice that if we translate the left identity law to use 'for' instead of
     ('~>') we get:
 
 > for (yield x) f = f x
 
-    This just says that if you iterate over a single-element 'Producer' with no
-    side effects, then you can instead cut out the middle man and directly apply
-    the body of the loop to that single element.
+    This just says that if you iterate over a pure single-element 'Producer',
+    then you could instead cut out the middle man and directly apply the body of
+    the loop to that single element.
 
     If we translate the right identity law to use 'for' instead of ('~>') we
     get:
@@ -506,8 +513,6 @@ import Prelude hiding ((.), id)
     our original code into the following more succinct form:
 
 > main = run $ for P.stdin (duplicate ~> lift . putStrLn)
->
-> -- Read as: "for each line in stdin, duplicate it and then putStrLn it"
 
     This means that we can also choose to program in a more functional style and
     think of stream processing in terms of composing transformations using
@@ -516,7 +521,7 @@ import Prelude hiding ((.), id)
     The above example is a microcosm of the design philosophy behind the @pipes@
     library:
 
-    * Define primitives in terms of categories
+    * Define the API in terms of categories
 
     * Specify expected behavior in terms of category laws
 
@@ -539,36 +544,44 @@ import Prelude hiding ((.), id)
     'Either' returns a 'Left' if the 'Producer' is done or it returns a 'Right'
     containing the next value, @a@, along with the remainder of the 'Producer'.
 
-    However, sometimes we can get away with something a little more elegant,
-    like a 'Consumer', which represents an effectful sink of values.  A
-    'Consumer' is a monad transformer that extends the base monad with the
-    ability to incrementally 'await' input from an anonymous upstream source.
-    The following @printN@ 'Consumer' shows how to 'print' out only the first
-    @n@ elements received:
+    However, sometimes we can get away with something a little more simple and
+    elegant, like a 'Consumer', which represents an effectful sink of values.  A
+    'Consumer' is a monad transformer that extends the base monad with a new
+    'await' command. This 'await' command lets you receive input from an
+    anonymous upstream source.
 
-> -- printn.hs
->
-> import Control.Monad (replicateM_)
+    The following @stdout@ 'Consumer' shows how to incrementally 'await'
+    'String's and print them to standard output, terminating gracefully when
+    receiving a broken pipe error:
+
+> import Control.Monad (unless)
+> import Control.Exception (try, throwIO)
+> import qualified GHC.IO.Exception as G
 > import Pipes
-> import qualified Pipes.Prelude as P
 >
-> --               +--------+-- A 'Consumer' of 'String's
-> --               |        |
-> --               v        v
-> printN :: Int -> Consumer String IO ()
-> printN n = replicateM_ n $ do  -- Repeat the following block 'n' times
->     str <- await               -- 'await' a new 'String'
->     lift $ putStrLn str        -- Print out the 'String'
+> --        +--------+-- A 'Consumer' that awaits 'String's
+> --        |        |
+> --        v        v
+> stdout :: Consumer String IO ()
+> stdout = do
+>     str <- await  -- 'await' a 'String'
+>     x   <- lift $ try $ putStrLn str
+>     case x of
+>         -- Gracefully terminate if we got a broken pipe error
+>         Left e@(G.IOError { G.ioe_type = t}) ->
+>             lift $ unless (t == G.ResourceVanished) $ throwIO e
+>         Right () -> stdout  -- Loop
 
     'await' is the dual of 'yield': we suspend our 'Consumer' until we receive a
-    new value:
+    new value.  If nobody provides a value (which is possible) then 'await'
+    never returns.  You can think of 'await' as having the following type:
 
 @
  'await' :: (Monad m) => 'Consumer' a m a
 @
 
     One way to feed a 'Consumer' is to repeatedly feed the same input using
-    using ('>~'):
+    using ('>~') (pronounced \"feed\"):
 
 @
  \-\-                   +- Feed       +- Consumer to    +- Returns new
@@ -581,14 +594,14 @@ import Prelude hiding ((.), id)
     This runs the given 'Effect' every time the 'Consumer' 'await's a value,
     using the return value of the 'Effect' to supply the input:
 
->>> run $ lift getLine >~ printN 3
+>>> run $ lift getLine >~ stdout
 Test<Enter>
 Test
 ABC<Enter>
 ABC
 42<Enter>
 42
->>>
+...
 
     You might wonder why ('>~') uses an 'Effect' instead of a raw action in the
     base monad.  The reason why is that ('>~') actually permits the following
@@ -598,9 +611,12 @@ ABC
  ('>~') :: (Monad m) => 'Consumer' a m b -> 'Consumer' b m c -> 'Consumer' a m c
 @
 
-    We can feed a 'Consumer' with yet another 'Consumer' so that you can 'await'
-    while you 'await'.  For example, we could define the following intermediate
-    'Consumer' that requests two 'String's and returns them concatenated:
+    ('>~') is the dual of ('~>'), composing 'Consumer's instead of 'Producer's.
+
+    This means that you can feed a 'Consumer' with yet another 'Consumer' so
+    that you can 'await' while you 'await'.  For example, we could define the
+    following intermediate 'Consumer' that requests two 'String's and returns
+    them concatenated:
 
 > -- printn.hs
 >
@@ -647,82 +663,85 @@ ABCDEF
 > -- Right Identity
 > f >~ await = f
 
-    In other words, ('>~') and 'await' form a 'Category', too, and 'Consumer's
-    are also composable.
+    In other words, ('>~') and 'await' form a 'Category', too, specifically the
+    iteratee category, and 'Consumer's are also composable.
 -}
 
 {- $pipes
-    We don't need to restrict ourselves to using 'Producer's exclusively or
-    'Consumer's exclusively.  We can connect 'Producer's and 'Consumer's
-    together using ('>->'):
+    Our previous programs were unsatisfactory because they were biased either
+    towards the 'Producer' end or the 'Consumer' end.  As a result, we had to
+    choose between gracefully handling end of input (using 'P.stdin') or
+    gracefully handling broken pipes (using 'P.stdout'), but not both at the
+    same time.
+
+    However, we don't need to restrict ourselves to using 'Producer's
+    exclusively or 'Consumer's exclusively.  We can connect 'Producer's and
+    'Consumer's directly together using ('>->') (pronounced \"pipe\"):
 
 @
-('>->') :: (Monad m)
-     => 'Producer' a m r
-     -> 'Consumer' a m r
-     -> 'Effect'     m r
+ ('>->') :: 'Monad' m => 'Producer' a m r -> 'Consumer' a m r -> 'Effect' m r
 @
 
     This returns an 'Effect' which we can 'run':
 
-> -- printn.hs
+> -- echo2.hs
 >
-> main = run $ P.stdin >-> printN 3
+> import Pipes
+> import qualified Pipes.Prelude as P  -- Pipes.Prelude also provides 'stdout'
+>
+> main = run $ P.stdin >-> P.stdout
 
-    This will prompt the user for input three times, echoing each input:
+    This program is more declarative of our intent: we want to stream values
+    from 'P.stdin' to 'P.stdout'.  The above \"pipeline\" not only echoes
+    standard input to standard output, but also handles both end of input and
+    broken pipe errors:
 
-> $ ./printn
+> $ ./echo2
 > Test<Enter>
 > Test
 > ABC<Enter>
 > ABC
 > 42<Enter>
 > 42
-> $
-
-    ('>->') pairs every 'await' in the 'Consumer' with a 'yield' in the
-    'Producer'.  Since our 'Consumer' only calls 'await' three times, our
-    'Producer' only 'yield's three times and therefore only prompts the user
-    for input three times.  Once the 'Consumer' terminates the whole 'Effect'
-    terminates.
-
-    The opposite is true, too: if the 'Producer' terminates early, then the
-    whole 'Effect' terminates.
-
-> $ ./printn
-> Test<Enter>
-> Test
 > <Ctrl-D>
 > $
 
-    This is why ('>->') requires that both the 'Producer' and 'Consumer' share
-    the same type of return value: whichever one terminates first provides the
-    return value for the entire 'Effect'.
+    ('>->') matches every 'await' in the 'Consumer' with a 'yield' in the
+    'Producer'.  Every time 'P.stdout' awaits a 'String' it transfers control
+    to 'P.stdin' and every time 'P.stdin' yields a 'String' it transfers control
+    back to 'P.stdout'.
 
-    Let's test this by modifying our 'Producer' to return 'False' and our
-    'Consumer' to return 'True':
+    Streaming stops when either 'P.stdin' terminates (i.e. end of input) or
+    'P.stdout' terminates (i.e. broken pipe).  This is why ('>->') requires that
+    both the 'Producer' and 'Consumer' share the same type of return value:
+    whichever one terminates first provides the return value for the entire
+    'Effect'.
 
-> -- printn.hs
+    Let's test this by modifying our 'Producer' and 'Consumer' to each return a
+    diagnostic 'String':
+
+> -- echo3.hs
 >
 > import Control.Applicative ((<$))  -- (<$) modifies return values
+> import Pipes
+> import qualified Pipes.Prelude as P
+> import System.IO
 >
 > main = do
->     finished <- run $ (False <$ P.stdin) >-> (True <$ printN 3)
->     putStrLn $ if finished then "Success!" else "You had one job..."
+>     hSetBuffering stdout NoBuffering
+>     str <- run $ ("End of input!" <$ P.stdin) >-> ("Broken pipe!" <$ P.stdout)
+>     hPutStrLn stderr str
 
     This lets us diagnose whether the 'Producer' or 'Consumer' terminated first:
 
-> $ ./printn
+> $ ./echo3
 > Test<Enter>
 > Test
-> ABC<Enter>
-> ABC
-> 42<Enter>
-> 42
-> Success!
-> $ ./printn
 > <Ctrl-D>
-> You had one job...
+> End of input!
+> $ ./echo3 | perl -e 'close STDIN'
+> Test<Enter>
+> Broken pipe!
 > $
 
     You might wonder why ('>->') returns an 'Effect' that we have to 'run'
@@ -741,10 +760,323 @@ ABCDEF
 > import Pipes
 > import Prelude hiding (take)
 >
+> --                          +--------- A 'Pipe' that
+> --                          |    +---- 'await's 'a's and
+> --                          |    | +-- 'yield's 'a's
+> --                          |    | |
+> --                          v    v v
 > take :: (Monad m) => Int -> Pipe a a m ()
-> take n = replicateM_ n $ do
->     a <- await
->     yield a
+> take n = replicateM_ n $ do  -- Repeat the following block 'n' times
+>     x <- await               -- 'await' a value of type 'a'
+>     yield x                  -- 'yield' a value of type 'a'
+
+    You can use 'Pipe's to transform 'Producer's, 'Consumer's, or even other
+    'Pipe's using the same ('>->') operator:
+
+@
+ ('>->') :: 'Monad' m => 'Producer' a m r -> 'Pipe'   a b m r -> 'Producer' b m r
+ ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Consumer' b m r -> 'Consumer' a m r
+ ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Pipe'   b c m r -> 'Pipe'   a c m r
+@
+
+    For example, you can compose 'P.take' after 'P.stdin' to limit the number of
+    lines drawn from standard input:
+
+> maxInput :: Int -> Producer String IO ()
+> maxInput n = P.stdin >-> take n
+
+>>> run $ maxInput 3 >-> P.stdout
+Test<Enter>
+Test
+ABC<Enter>
+ABC
+42<Enter>
+42
+>>>
+
+    ... or you can pre-compose 'P.take' before 'P.stdout' to limit the number of
+    lines written to standard output:
+
+> maxOutput :: Int -> Consumer String IO ()
+> maxOutput n = take n >-> P.stdout
+
+>>> run $ P.stdin >-> maxOutput 3
+<Exact same behavior>
+
+    Those both gave the same behavior because ('>->') is associative:
+
+> (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
+
+    Therefore we could have left out the parentheses and there was also no need
+    to pre-group components:
+
+>>> run $ P.stdin >-> take 3 >-> P.stdout
+<Exact same behavior>
+
+    ('>->') is designed to behave like the Unix pipe operator, @|@, except
+    with less quirks.
+
+    ('>->') also has an identity named 'cat' (named after the Unix @cat@
+    utility), which reforwards elements endlessly:
+
+> cat :: (Monad m) => Pipe a a m r
+> cat = forever $ do
+>     x <- await
+>     yield x
+
+    Therefore, ('>->') and 'cat' form a 'Category', specifically the category of
+    Unix pipes:
+
+> -- Useless use of 'cat'
+> cat >-> p = p
+>
+> -- Forwarding output to 'cat' does nothing
+> p >-> cat = p
+
+    A lot of Unix tools have very simple definitions when written using @pipes@:
+
+> -- unix.hs
+>
+> import Control.Monad (forever)
+> import Pipes
+> import qualified Pipes.Prelude as P  -- Pipes.Prelude provides 'take', too
+> import Prelude hiding (head)
+>
+> head :: (Monad m) => Pipe a a m ()
+> head = P.take 10
+>
+> yes :: (Monad m) => Producer String m r
+> yes = forever $ yield "y"
+>
+> main = run $ yes >-> head >-> P.stdout
+
+    This prints out 10 \'@y@\'s, just like the equivalent Unix pipeline:
+
+> $ ./unix
+> y
+> y
+> y
+> y
+> y
+> y
+> y
+> y
+> y
+> y
+> $
+
+    This lets us write \"Haskell pipes\" instead of Unix pipes.  These are much
+    easier to build than Unix pipes and we can connect them directly within
+    Haskell for type safety.
+-}
+
+{- $unfolds
+    How would we write a really simple @grep@ pipe that only does exact string
+    matching?  Our first attempt might look like this:
+
+> import Control.Monad (when)
+> import Pipes
+>
+> grep :: String -> Pipe String String m r
+> grep str = forever $ do
+>     line <- await
+>     when (str `isInfixOf` line) (yield line)
+
+    The above code grabs a single line at a time and only forwards the lines
+    that match the given 'String'.  However, while the above code is okay it is
+    not completely idiomatic @pipes@ code.
+
+    The first problem is that we are explicitly integrating the looping scheme
+    ('forever', in this case) with the string matching and filtering logic.
+    Fortunately, we can easily decouple the two by rewriting @grep@ like this:
+    
+> grep :: String -> Pipe String String m r
+> grep str = for cat $ \line ->
+>     when (str `isInfixOf line) (yield line)
+
+    Wait, what?  You can write a 'for' loop over 'cat'?
+
+    If we go back to the documentation for the 'for' function, we will see this
+    simplified type signature immediately below:
+
+@
+ for :: 'Monad' m => 'Pipe' x b m r -> (b -> 'Producer' c m ()) -> 'Pipe' x c m r
+@
+
+    This is an example of how @pipes@ is clever and will let you mix familiar
+    types and operations in unexpected ways.  'for' can loop over 'Pipe's the
+    same way we loop over 'Producer's.  'cat' is the empty 'Pipe' that
+    auto-forwards everything, so we just loop over 'cat' and replace every
+    'yield' with the body of the loop.
+
+    "Pipes.Prelude" also provides a convenience function that we can reuse here
+    called 'P.yieldIf':
+
+> yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer a m ()
+> yieldIf predicate a = when (predicate a) (yield a)
+
+    Using 'P.yieldIf' we can simplify @grep@ even further:
+
+> grep str = for cat (P.yieldIf (str `isInfixOf`))
+
+    This formulation is more declarative of our intent.  You would read this in
+    English as \"for each value flowing downstreaming, only yield the value if
+    @str@ is an infix of it\".
+
+    However, this version is still not completely idiomatic!  The truly
+    idiomatic version would leave out the @(for cat)@ part completely, leaving
+    behind just the body of the loop:
+
+> -- Rename this since it's simpler than @grep@
+> match :: (Monad m) => String -> String -> Producer String m ()
+> match str = P.yieldIf (str `isInfixOf`)
+
+    Then we can just use `match` directly to loop over any 'Producer' we want to
+    filter:
+
+> main = run $ for P.stdin (match "Test") >-> P.stdout
+
+    @match@ is an \"unfold\", a term referring to any component that can be used
+    as the body of a @for@ loop.  All unfolds have this shape:
+
+@
+ A -> 'Producer' B m ()
+@
+
+    ... and 'yield' is the trivial unfold.
+
+    So when you look at the type of @match@ you can mentally group the type like
+    this:
+
+> --                    +----------+-- 'match' takes a 'String' and returns an
+> --                    |          |   unfold
+> --                    v          v
+> match :: (Monad m) => String -> (String -> Producer String m ())
+
+    Unfolds are more idiomatic than the equivalent 'Pipe's for two reasons:
+
+    * They are simpler to write (no recursion necessary)
+
+    * You can upgrade an unfold to a 'Pipe' using @(for cat@), but you can't
+      downgrade a 'Pipe' to an unfold
+
+    However, you should never actually need to explicitly upgrade an unfold to
+    a 'Pipe'.  Any time you see yourself writing this:
+
+> -- Useless use of 'cat'
+> p >-> for cat unfold
+
+    ... you should instead be writing:
+
+> for p unfold
+
+    This is why "Pipes.Prelude" does not provide @filter@ or @map@ since you
+    get equivalent functionality by combining 'for' with 'P.yieldIf' or 'yield':
+
+> -- Filter out empty lines from standard input
+> for P.stdin (P.yieldIf (not . null)) :: Producer String IO ()
+
+> -- Map 'show' over all elements
+> for (each [1..10]) (yield . show) :: (Monad m) => Producer String m ()
+
+    Once you gain practice judiciously using unfolds you will see lots of
+    simple and elegant patterns emerge.  For example, this purely unfold-based
+    code prints out every element of a nested list:
+
+>>> import Pipes
+>>> import qualified Pipes.Prelude as P
+>>> run $ (each ~> each ~> lift . print) [[1, 2], [3, 4]]
+1
+2
+3
+4
+
+    ... while this code lenses into a 'String', only printing values that parse
+    successfully:
+
+>>> :set -XNoMonomorphismRestriction
+>>> let readList = P.read :: (Monad m) => String -> Producer [String] m ()
+>>> let readInt  = P.read :: (Monad m) => String -> Producer  Int     m ()
+>>> run $ (readList ~> each ~> readInt ~> lift . print) "[\"1\", \"X\", \"2\"]"
+1
+2
+
+-}
+
+{- $listT
+    @pipes@ also provides a \"ListT done right\" implementation.
+
+    To bind a list within a 'ListT' computation, combine 'Select' and 'each':
+
+> import Pipes
+> 
+> pairs :: ListT IO (Int, Int)
+> pairs = do
+>     x <- Select $ each [1, 2]
+>     lift $ putStrLn $ "x = " ++ show x
+>     y <- Select $ each [3, 4]
+>     lift $ putStrLn $ "y = " ++ show y
+>     return (x, y)
+
+    You can then over a 'ListT' by combining 'every':
+
+@
+ 'every' :: 'Monad' m => 'ListT' m a -> 'Producer' a m ()
+@
+
+>>> run $ for (every pairs) (lift . print)
+x = 1
+y = 3
+(1,3)
+y = 4
+(1,4)
+x = 2
+y = 3
+(2,3)
+y = 4
+(2,4)
+
+    You can also go the other way, too, binding 'Producer's directly within a
+    'ListT'.  In fact, this is actually what 'Select' was already doing:
+
+> Select :: Producer a m () -> ListT m a
+
+    This lets you write crazy code like:
+
+> import Pipes
+> import qualified Pipes.Prelude as P
+> 
+> quitter :: Producer String IO ()
+> quitter = P.stdin >-> P.takeWhile (/= "quit")
+> 
+> pairs :: ListT IO String
+> pairs = do
+>     str1 <- Select quitter
+>     str2 <- Select quitter
+>     return (str1 ++ " " ++ str2)
+
+    Here we're binding standard input non-deterministically as if it were an
+    effectful list:
+
+>>> run $ every pairs >-> P.stdout
+Daniel<Enter>
+Fischer<Enter>
+Daniel Fischer
+Wagner<Enter>
+Daniel Wagner
+quit<Enter>
+Donald<Enter>
+Stewart<Enter>
+Donald Stewart
+Duck<Enter>
+Donald Duck
+quit<Enter>
+quit<Enter>
+>>>
+
+    Notice how this streams out values immediately as they are generated, rather
+    than building up a large intermediate result and then printing all the
+    values in one batch at the end.
 -}
 
 {- $conclusion
@@ -753,13 +1085,11 @@ ABCDEF
     ecosystem of streaming components.  More powerful libraries that build upon
     @pipes@ include:
 
-    * @pipes-safe@: Resource management and exception safety for @pipes@
-
     * @pipes-concurrency@: Concurrent reactive programming and message passing
 
-    * @pipes-parse@: Central idioms for stream parsing
+    * @pipes-parse@: Minimal utilities for stream parsing
 
-    * @pipes-arrow@: Push-based directed acyclic graphs for @pipes@
+    * @pipes-safe@: Resource management and exception safety for @pipes@
 
     These libraries provide functionality specialized to common streaming
     domains.  Additionally, there are several derived libraries on Hackage that
@@ -776,9 +1106,10 @@ ABCDEF
     * @pipes-attoparsec@: High-performance parsing
 
     Even these derived packages still do not explore the full potential of
-    @pipes@ functionality.  Advanced @pipes@ users can explore this library in
-    greater detail by studying the documentation in the "Pipes" module to learn
-    about the symmetry behind the underlying 'Proxy' type and operators.
+    @pipes@ functionality, which actually permits bidirectional communication.
+    Advanced @pipes@ users can explore this library in greater detail by
+    studying the documentation in the "Pipes.Core" module to learn about the
+    symmetry of the underlying 'Proxy' type and operators.
 
     To learn more about @pipes@, ask questions, or follow @pipes@ development,
     you can subscribe to the @haskell-pipes@ mailing list at:

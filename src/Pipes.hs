@@ -37,7 +37,7 @@ module Pipes (
 
     -- * ListT
     ListT(..),
-    Iterable(..),
+    Enumerable(..),
 
     -- * Utilities
     next,
@@ -304,28 +304,28 @@ instance (Monad m) => MonadPlus (ListT m) where
 instance MFunctor ListT where
     hoist morph = Select . hoist morph . list
 
-{-| 'Iterable' generalizes 'Data.Foldable.Foldable', converting effectful
+{-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
 -}
-class Iterable t where
+class Enumerable t where
     toListT :: (Monad m) => t m a -> ListT m a
 
-instance Iterable ListT where
+instance Enumerable ListT where
     toListT = id
 
-instance Iterable IdentityT where
+instance Enumerable IdentityT where
     toListT m = Select $ do
         a <- lift $ runIdentityT m
         yield a
 
-instance Iterable MaybeT where
+instance Enumerable MaybeT where
     toListT m = Select $ do
         x <- lift $ runMaybeT m
         case x of
             Nothing -> return ()
             Just a  -> yield a
 
-instance Iterable (ErrorT e) where
+instance Enumerable (ErrorT e) where
     toListT m = Select $ do
         x <- lift $ runErrorT m
         case x of
@@ -352,8 +352,8 @@ each :: (Monad m, F.Foldable f) => f a -> Producer' a m ()
 each = F.mapM_ yield
 {-# INLINABLE each #-}
 
--- | Convert an 'Iterable' to a 'Producer'
-every :: (Monad m, Iterable t) => t m a -> Producer' a m ()
+-- | Convert an 'Enumerable' to a 'Producer'
+every :: (Monad m, Enumerable t) => t m a -> Producer' a m ()
 every it = discard >\\ list (toListT it) //> \a -> do
     _ <- yield a
     return ()

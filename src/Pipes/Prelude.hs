@@ -21,7 +21,7 @@ module Pipes.Prelude (
     replicate,
     replicateM,
     yieldIf,
-    yieldAfter,
+    chain,
     debug,
     read,
 
@@ -228,19 +228,19 @@ yieldIf predicate a =
 {-# INLINABLE yieldIf #-}
 
 -- | Re-'yield' the value after first applying the given action
-yieldAfter :: (Monad m) => (a -> m b) -> a -> Producer' a m ()
-yieldAfter f a = do
+chain :: (Monad m) => (a -> m b) -> a -> Producer' a m ()
+chain f a = do
     _ <- lift (f a)
     _ <- yield a
     return ()
-{-# INLINABLE yieldAfter #-}
+{-# INLINABLE chain #-}
 
 {-| 'print' values flowing through for debugging purposes
 
-> debug = yieldAfter print
+> debug = chain print
 -}
 debug :: (Show a) => a -> Producer' a IO ()
-debug = yieldAfter print
+debug = chain print
 {-# INLINABLE debug #-}
 
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
@@ -380,12 +380,12 @@ scanM step = loop
 {-# INLINABLE scanM #-}
 
 -- | Write 'String's to 'IO.stdout' using 'putStrLn'
-stdout :: Consumer String IO ()
+stdout :: Consumer' String IO ()
 stdout = toHandle IO.stdout
 {-# INLINABLE stdout #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
-toHandle :: IO.Handle -> Consumer String IO ()
+toHandle :: IO.Handle -> Consumer' String IO ()
 toHandle handle = do
     loop
   where
@@ -412,14 +412,14 @@ True
 -}
 
 -- | Strict fold of the elements of a 'Producer'
-foldl :: (Monad m) => (b -> a -> b) -> b -> Producer a m r -> m b
-foldl step b0 p0 = loop p0 b0
+foldl :: (Monad m) => (x -> a -> x) -> x -> (x -> b) -> Producer a m r -> m b
+foldl step x0 done p0 = loop p0 x0
   where
-    loop p b = case p of
-        Request _  fu -> loop (fu ()) b
-        Respond a  fu -> loop (fu ()) $! step b a
-        M          m  -> m >>= \p' -> loop p' b
-        Pure    _     -> return b
+    loop p x = case p of
+        Request _  fu -> loop (fu ()) x
+        Respond a  fu -> loop (fu ()) $! step x a
+        M          m  -> m >>= \p' -> loop p' x
+        Pure    _     -> return (done x)
 {-
     loop p b = do
         x <- next p
@@ -430,16 +430,16 @@ foldl step b0 p0 = loop p0 b0
 {-# INLINABLE foldl #-}
 
 -- | Strict, monadic fold of the elements of a 'Producer'
-foldM :: (Monad m) => (b -> a -> m b) -> b -> Producer a m r -> m b
-foldM step b0 p0 = loop p0 b0
+foldM :: (Monad m) => (x -> a -> m x) -> x -> (x -> b) -> Producer a m r -> m b
+foldM step x0 done p0 = loop p0 x0
   where
-    loop p b = case p of
-        Request _  fu -> loop (fu ()) b
+    loop p x = case p of
+        Request _  fu -> loop (fu ()) x
         Respond a  fu -> do
-            b' <- step b a
-            loop (fu ()) $! b'
-        M          m  -> m >>= \p' -> loop p' b
-        Pure    _     -> return b
+            x' <- step x a
+            loop (fu ()) $! x'
+        M          m  -> m >>= \p' -> loop p' x
+        Pure    _     -> return (done x)
 {-
     loop p b = do
         x <- next p
