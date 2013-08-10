@@ -23,6 +23,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Pipes.Internal (
     Proxy(..),
+    liftCatchError,
     observe
     ) where
 
@@ -32,10 +33,11 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 
+import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
-import Data.Monoid (mempty)
+import Data.Monoid (mempty,mappend)
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
     an upstream and downstream interface.
@@ -135,37 +137,48 @@ instance (MonadState s m) => MonadState s (Proxy a' a b' b m) where
 instance (MonadWriter w m) => MonadWriter w (Proxy a' a b' b m) where
     writer = lift . writer
     tell = lift . tell
-    listen = go mempty
+    listen proxy = go proxy mempty
         where
-          go w p = case p of
-              Request a' fa  -> Request a' (\a  -> go w (fa  a ))
-              Respond b  fb' -> Respond b  (\b' -> go w (fb' b'))
+          go p w = case p of
+              Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
+              Respond b  fb' -> Respond b  (\b' -> go (fb' b') w)
               Pure    r      -> Pure (r, w)
-              M       m      -> M ((\(p', w') -> go w' p') `liftM` listen m)
+              M       m      -> M (
+                (\(p', w') -> go p' $! mappend w w') `liftM` listen m)
 
     pass = go
         where
-          -- Pass needs to happen in the underlying MonadWriter, so we
-          -- can only sensibly do something if the 'w -> w' function is
-          -- produced inside M.
-          --
-          -- If we encounter an M, we first extract the 'w -> w' function
-          -- using extract, then "pass" that in the underlying monad.
           go p = case p of
               Request a' fa  -> Request a' (\a  -> go (fa  a ))
               Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-              Pure    (r, _) -> Pure r
-              M       m      -> M (pass (extract `liftM` m))
-          -- Extract can only do something sensibly if there is a Pure
-          -- embedded inside the M we're called on. So if we encounter
-          -- a Pure, we lift the modification function out for 'go' to
-          -- 'pass'. If there is no pure, the only sensibly thing is to
-          -- not modify the writer state and recurse.
-          extract p = case p of
-              Request a' fa  -> (Request a' (\a  -> go (fa  a )), id)
-              Respond b  fb' -> (Respond b  (\b' -> go (fb' b')), id)
-              Pure    (r, f) -> (Pure r, f)
-              M       m      -> (go (M m), id)
+              M       m      -> M (go `liftM` m)
+              Pure    (r, f) -> M (pass (return (Pure r, f)))
+
+-- | Catch an error using a catch function for the base monad
+liftCatchError
+    :: (Monad m)
+    => (   m (Proxy a' a b' b m r)
+        -> (e -> m (Proxy a' a b' b m r))
+        -> m (Proxy a' a b' b m r) )
+    -- ^
+    ->    (Proxy a' a b' b m r
+        -> (e -> Proxy a' a b' b m r)
+        -> Proxy a' a b' b m r)
+    -- ^
+liftCatchError c p0 f = go p0
+  where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        Pure    r      -> Pure r
+        M          m   -> M ((do
+            p' <- m
+            return (go p') ) `c` (\e -> return (f e)) )
+{-# INLINABLE liftCatchError #-}
+
+instance (MonadError e m) => MonadError e (Proxy a' a b' b m) where
+    throwError = lift . throwError
+    catchError = liftCatchError catchError
 
 {-| The monad transformer laws are correct when viewed through the 'observe'
     function:
