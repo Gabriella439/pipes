@@ -27,6 +27,8 @@ module Pipes.Prelude (
 
     -- * Pipes
     -- $pipes
+    map,
+    filter,
     take,
     takeWhile,
     drop,
@@ -77,11 +79,13 @@ import Prelude hiding (
     any,
     drop,
     dropWhile,
+    filter,
     foldl,
-    read,
     head,
     last,
+    map,
     null,
+    read,
     replicate,
     scanl,
     take,
@@ -283,6 +287,16 @@ quit<Enter>
     are non-trivial and you will find them all in derived @pipes@ libraries
     instead of here.
 -}
+
+-- | Apply a function to all values flowing downstream
+map :: (Monad m) => (a -> b) -> Pipe a b m r
+map f = for cat (yield . f)
+{-# INLINABLE map #-}
+
+-- | @(filter predicate)@ only forwards values that satisfy the predicate.
+filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
+filter predicate = for cat (yieldIf predicate)
+{-# INLINABLE filter #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> Pipe a a m ()
