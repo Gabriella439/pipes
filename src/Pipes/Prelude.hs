@@ -34,14 +34,14 @@ module Pipes.Prelude (
     drop,
     dropWhile,
     findIndices,
-    scanl,
+    scan,
     scanM,
     chain,
     read,
 
     -- * Folds
     -- $folds
-    foldl,
+    fold,
     foldM,
     all,
     any,
@@ -80,14 +80,12 @@ import Prelude hiding (
     drop,
     dropWhile,
     filter,
-    foldl,
     head,
     last,
     length,
     map,
     null,
     read,
-    scanl,
     take,
     takeWhile,
     zip,
@@ -272,15 +270,15 @@ findIndices predicate = loop 0
 {-# INLINABLE findIndices #-}
 
 -- | Strict left scan
-scanl :: (Monad m) => L.Fold a b -> Pipe a b m r
-scanl (L.Fold step begin done) = loop begin
+scan :: (Monad m) => L.Fold a b -> Pipe a b m r
+scan (L.Fold step begin done) = loop begin
   where
     loop x = do
         yield (done x)
         a <- await
         let x' = step x a
         loop $! x'
-{-# INLINABLE scanl #-}
+{-# INLINABLE scan #-}
 
 -- | Strict, monadic left scan
 scanM :: (Monad m) => L.FoldM m a b -> Pipe a b m r
@@ -324,8 +322,8 @@ True
 -}
 
 -- | Strict fold of the elements of a 'Producer'
-foldl :: (Monad m) => L.Fold a b -> Producer a m r -> m b
-foldl (L.Fold step begin done) p0 = loop p0 begin
+fold :: (Monad m) => L.Fold a b -> Producer a m r -> m b
+fold (L.Fold step begin done) p0 = loop p0 begin
   where
     loop p x = case p of
         Request _  fu -> loop (fu ()) x
@@ -339,7 +337,7 @@ foldl (L.Fold step begin done) p0 = loop p0 begin
             Left   _      -> return b
             Right (a, p') -> loop p' $! step b a
 -}
-{-# INLINABLE foldl #-}
+{-# INLINABLE fold #-}
 
 -- | Strict, monadic fold of the elements of a 'Producer'
 foldM
@@ -413,7 +411,7 @@ last p0 = do
 
 -- | Count the number of elements in a 'Producer'
 length :: (Monad m) => Producer a m r -> m Int
-length = foldl L.length
+length = fold L.length
 {-# INLINABLE length #-}
 
 -- | Determine if a 'Producer' is empty
