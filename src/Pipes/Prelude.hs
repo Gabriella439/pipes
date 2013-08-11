@@ -26,7 +26,6 @@ module Pipes.Prelude (
     replicateM,
     yieldIf,
     chain,
-    debug,
     read,
 
     -- * Pipes
@@ -40,6 +39,7 @@ module Pipes.Prelude (
     findIndices,
     scanl,
     scanM,
+    debug,
 
     -- * Consumers
     -- $consumers
@@ -188,12 +188,7 @@ replicateM n m = replicateM_ n $ do
     yield a
 {-# INLINABLE replicateM #-}
 
-{-| @(yieldIf pred a)@ only re-'yield's @a@ if it satisfies the predicate @p@
-
-    Use 'yieldIf' to filter a stream:
-
->>> run $ for (each [1..4]) (yieldIf even ~> lift . print)
--}
+-- | @(yieldIf pred a)@ only re-'yield's @a@ if it satisfies the predicate @p@
 yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
 yieldIf predicate a =
     if (predicate a)
@@ -210,14 +205,6 @@ chain f a = do
     _ <- yield a
     return ()
 {-# INLINABLE chain #-}
-
-{-| 'print' values flowing through for debugging purposes
-
-> debug = chain print
--}
-debug :: (Show a) => a -> Producer' a IO ()
-debug = chain print
-{-# INLINABLE debug #-}
 
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
 read :: (Monad m, Read a) => String -> Producer' a m ()
@@ -337,6 +324,14 @@ scanM step = loop
         b' <- lift (step b a)
         loop $! b'
 {-# INLINABLE scanM #-}
+
+{-| 'print' values flowing through for debugging purposes
+
+> p >-> debug = for p (chain print)
+-}
+debug :: (Show a) => Pipe a a IO r
+debug = for cat (chain print)
+{-# INLINABLE debug #-}
 
 {- $consumers
     Feed a 'Consumer' the same value repeatedly using ('>~'):
