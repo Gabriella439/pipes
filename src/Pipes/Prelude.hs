@@ -296,16 +296,13 @@ scanM step = loop
 chain :: (Monad m) => (a -> m b) -> Pipe a a m r
 chain f = for cat $ \a -> do
     _ <- lift (f a)
-    _ <- yield a
-    return ()
+    yield a
 {-# INLINABLE chain #-}
 
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
 read :: (Monad m, Read a) => Pipe String a m r
 read = for cat $ \str -> case (reads str) of
-    [(a, "")] -> do
-        _ <- yield a
-        return ()
+    [(a, "")] -> yield a
     _         -> return ()
 {-# INLINABLE read #-}
 

@@ -354,9 +354,7 @@ each = F.mapM_ yield
 
 -- | Convert an 'Enumerable' to a 'Producer'
 every :: (Monad m, Enumerable t) => t m a -> Producer' a m ()
-every it = discard >\\ list (toListT it) //> \a -> do
-    _ <- yield a
-    return ()
+every it = discard >\\ list (toListT it)
 {-# INLINABLE every #-}
 
 -- | Discards all values
