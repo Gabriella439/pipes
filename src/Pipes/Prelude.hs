@@ -64,6 +64,7 @@ module Pipes.Prelude (
     ) where
 
 import Control.Exception (throwIO, try)
+import qualified Control.Foldl as L
 import Control.Monad (liftM, replicateM_, when, unless)
 import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
@@ -271,25 +272,28 @@ findIndices predicate = loop 0
 {-# INLINABLE findIndices #-}
 
 -- | Strict left scan
-scanl :: (Monad m) => (b -> a -> b) -> b -> Pipe a b m r
-scanl step = loop
+scanl :: (Monad m) => L.Fold a b -> Pipe a b m r
+scanl (L.Fold step begin done) = loop begin
   where
-    loop b = do
-        yield b
+    loop x = do
+        yield (done x)
         a <- await
-        let b' = step b a
-        loop $! b'
+        let x' = step x a
+        loop $! x'
 {-# INLINABLE scanl #-}
 
 -- | Strict, monadic left scan
-scanM :: (Monad m) => (b -> a -> m b) -> b -> Pipe a b m r
-scanM step = loop
+scanM :: (Monad m) => L.FoldM m a b -> Pipe a b m r
+scanM (L.FoldM step begin done) = do
+    x <- lift begin
+    loop x
   where
-    loop b = do
+    loop x = do
+        b <- lift (done x)
         yield b
         a  <- await
-        b' <- lift (step b a)
-        loop $! b'
+        x' <- lift (step x a)
+        loop $! x'
 {-# INLINABLE scanM #-}
 
 -- | Apply an action to all values flowing downstream
@@ -317,13 +321,11 @@ ABC<Enter>
 True
 >>>
 
-    'foldl' and 'foldM' are designed to work in conjunction with the @foldl@
-    library.
 -}
 
 -- | Strict fold of the elements of a 'Producer'
-foldl :: (Monad m) => (x -> a -> x) -> x -> (x -> b) -> Producer a m r -> m b
-foldl step x0 done p0 = loop p0 x0
+foldl :: (Monad m) => L.Fold a b -> Producer a m r -> m b
+foldl (L.Fold step begin done) p0 = loop p0 begin
   where
     loop p x = case p of
         Request _  fu -> loop (fu ()) x
@@ -342,8 +344,8 @@ foldl step x0 done p0 = loop p0 x0
 -- | Strict, monadic fold of the elements of a 'Producer'
 foldM
     :: (Monad m)
-    => (x -> a -> m x) -> m x -> (x -> m b) -> Producer a m r -> m b
-foldM step begin done p0 = do
+    => L.FoldM m a b -> Producer a m r -> m b
+foldM (L.FoldM step begin done) p0 = do
     x0 <- begin
     loop p0 x0
   where
@@ -411,7 +413,7 @@ last p0 = do
 
 -- | Count the number of elements in a 'Producer'
 length :: (Monad m) => Producer a m r -> m Int
-length = foldl (\x _ -> x + 1) 0 id
+length = foldl L.length
 {-# INLINABLE length #-}
 
 -- | Determine if a 'Producer' is empty
