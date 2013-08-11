@@ -38,6 +38,7 @@ module Pipes.Prelude (
     scanM,
     chain,
     read,
+    show,
 
     -- * Folds
     -- $folds
@@ -74,6 +75,7 @@ import Pipes.Core
 import Pipes.Internal
 import Pipes.Lift (evalStateP)
 import qualified System.IO as IO
+import qualified Prelude
 import Prelude hiding (
     all,
     any,
@@ -86,6 +88,7 @@ import Prelude hiding (
     map,
     null,
     read,
+    show,
     take,
     takeWhile,
     zip,
@@ -307,6 +310,10 @@ read = for cat $ \str -> case (reads str) of
     [(a, "")] -> yield a
     _         -> return ()
 {-# INLINABLE read #-}
+
+-- | Convert 'Show'able values to 'String's
+show :: (Monad m, Show a) => Pipe a String m r
+show = map Prelude.show
 
 {- $folds
     Use these to fold the output of a 'Producer'.  Many of these folds will stop

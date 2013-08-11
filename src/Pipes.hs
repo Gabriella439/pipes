@@ -113,7 +113,7 @@ f '~>' 'yield' = f
 'yield' :: 'Monad' m => a -> 'Pipe'   x a m ()
 @
 -}
-yield :: (Monad m) => a -> Proxy x' x a' a m a'
+yield :: (Monad m) => a -> Producer' a m ()
 yield = respond
 {-# INLINABLE yield #-}
 
@@ -188,7 +188,7 @@ f '>~' 'await' = f
 'await' :: 'Monad' m => 'Pipe'     a y m a
 @
 -}
-await :: (Monad m) => Proxy () a y' y m a
+await :: (Monad m) => Consumer' a m a
 await = request ()
 {-# INLINABLE await #-}
 
