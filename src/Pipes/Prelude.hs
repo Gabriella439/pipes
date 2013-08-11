@@ -407,8 +407,12 @@ foldl step x0 done p0 = loop p0 x0
 {-# INLINABLE foldl #-}
 
 -- | Strict, monadic fold of the elements of a 'Producer'
-foldM :: (Monad m) => (x -> a -> m x) -> x -> (x -> b) -> Producer a m r -> m b
-foldM step x0 done p0 = loop p0 x0
+foldM
+    :: (Monad m)
+    => (x -> a -> m x) -> m x -> (x -> m b) -> Producer a m r -> m b
+foldM step begin done p0 = do
+    x0 <- begin
+    loop p0 x0
   where
     loop p x = case p of
         Request _  fu -> loop (fu ()) x
@@ -416,16 +420,7 @@ foldM step x0 done p0 = loop p0 x0
             x' <- step x a
             loop (fu ()) $! x'
         M          m  -> m >>= \p' -> loop p' x
-        Pure    _     -> return (done x)
-{-
-    loop p b = do
-        x <- next p
-        case x of
-            Left   _      -> return b
-            Right (a, p') -> do
-                b' <- step b a
-                loop p' $! b'
--}
+        Pure    _     -> done x
 {-# INLINABLE foldM #-}
 
 {-| @(all predicate p)@ determines whether all the elements of @p@ satisfy the
