@@ -24,7 +24,6 @@ module Pipes.Prelude (
     -- $unfolds
     replicate,
     replicateM,
-    read,
 
     -- * Pipes
     -- $pipes
@@ -38,6 +37,7 @@ module Pipes.Prelude (
     scanl,
     scanM,
     chain,
+    read,
 
     -- * Consumers
     -- $consumers
@@ -186,15 +186,6 @@ replicateM n m = replicateM_ n $ do
     yield a
 {-# INLINABLE replicateM #-}
 
--- | Parse 'Read'able values, only forwarding the value if the parse succeeds
-read :: (Monad m, Read a) => String -> Producer' a m ()
-read str = case (reads str) of
-    [(a, "")] -> do
-        _ <- yield a
-        return ()
-    _         -> return ()
-{-# INLINABLE read #-}
-
 {- $pipes
     Use ('>->') to connect 'Producer's, 'Pipe's, and 'Consumer's:
 
@@ -312,6 +303,15 @@ chain f = for cat $ \a -> do
     _ <- yield a
     return ()
 {-# INLINABLE chain #-}
+
+-- | Parse 'Read'able values, only forwarding the value if the parse succeeds
+read :: (Monad m, Read a) => Pipe String a m r
+read = for cat $ \str -> case (reads str) of
+    [(a, "")] -> do
+        _ <- yield a
+        return ()
+    _         -> return ()
+{-# INLINABLE read #-}
 
 {- $consumers
     Feed a 'Consumer' the same value repeatedly using ('>~'):
