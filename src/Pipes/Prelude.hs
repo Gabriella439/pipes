@@ -24,7 +24,6 @@ module Pipes.Prelude (
     -- $unfolds
     replicate,
     replicateM,
-    chain,
     read,
 
     -- * Pipes
@@ -38,7 +37,7 @@ module Pipes.Prelude (
     findIndices,
     scanl,
     scanM,
-    debug,
+    chain,
 
     -- * Consumers
     -- $consumers
@@ -187,14 +186,6 @@ replicateM n m = replicateM_ n $ do
     yield a
 {-# INLINABLE replicateM #-}
 
--- | Re-'yield' the value after first applying the given action
-chain :: (Monad m) => (a -> m b) -> a -> Producer' a m ()
-chain f a = do
-    _ <- lift (f a)
-    _ <- yield a
-    return ()
-{-# INLINABLE chain #-}
-
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
 read :: (Monad m, Read a) => String -> Producer' a m ()
 read str = case (reads str) of
@@ -314,13 +305,13 @@ scanM step = loop
         loop $! b'
 {-# INLINABLE scanM #-}
 
-{-| 'print' values flowing through for debugging purposes
-
-> p >-> debug = for p (chain print)
--}
-debug :: (Show a) => Pipe a a IO r
-debug = for cat (chain print)
-{-# INLINABLE debug #-}
+-- | Apply an action to all values flowing downstream
+chain :: (Monad m) => (a -> m b) -> Pipe a a m r
+chain f = for cat $ \a -> do
+    _ <- lift (f a)
+    _ <- yield a
+    return ()
+{-# INLINABLE chain #-}
 
 {- $consumers
     Feed a 'Consumer' the same value repeatedly using ('>~'):
