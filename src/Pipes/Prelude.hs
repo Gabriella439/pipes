@@ -20,11 +20,6 @@ module Pipes.Prelude (
     stdin,
     fromHandle,
 
-    -- * Unfolds
-    -- $unfolds
-    replicate,
-    replicateM,
-
     -- * Pipes
     -- $pipes
     map,
@@ -91,7 +86,6 @@ import Prelude hiding (
     map,
     null,
     read,
-    replicate,
     scanl,
     take,
     takeWhile,
@@ -150,41 +144,6 @@ fromHandle h = go
             yield str
             go
 {-# INLINABLE fromHandle #-}
-
-{- $unfolds
-    An unfold is a 'Producer' which doubles as a stream transformer.  You use
-    'for' to apply an unfold to a stream.  This behaves like a 'concatMap',
-    generating a new 'Producer':
-
-> -- Outputs two copies of every input string
-> for P.stdin (P.replicate 2) :: Producer String IO ()
-
-    Combine multiple handlers using ('~>'):
-
->>> run $ for P.stdin (P.replicate 2 ~> lift . putStrLn)
-Test<Enter>
-Test
-Test
-ABC<Enter>
-ABC
-ABC
-...
-
--}
-
--- | @(replicate n a)@ 'yield's the value \'@a@\' a total of \'@n@\' times.
-replicate :: (Monad m) => Int -> a -> Producer' a m ()
-replicate n a = replicateM_ n (yield a)
-{-# INLINABLE replicate #-}
-
-{-| @(replicateM n m)@ calls \'@m@\' a total of \'@n@\' times, 'yield'ing each
-    result.
--}
-replicateM :: (Monad m) => Int -> m a -> Producer' a m ()
-replicateM n m = replicateM_ n $ do
-    a <- lift m
-    yield a
-{-# INLINABLE replicateM #-}
 
 {- $pipes
     Use ('>->') to connect 'Producer's, 'Pipe's, and 'Consumer's:
