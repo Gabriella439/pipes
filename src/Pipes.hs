@@ -109,8 +109,7 @@ f '~>' 'yield' = f
 {-| Produce a value
 
 @
-'yield' :: 'Monad' m => a -> 'Producer' a m ()
-'yield' :: 'Monad' m => a -> 'Pipe'   x a m ()
+'yield' :: 'Monad' m => a -> 'Pipe' x a m ()
 @
 -}
 yield :: (Monad m) => a -> Producer' a m ()
@@ -184,8 +183,7 @@ f '>~' 'await' = f
 {-| Consume a value
 
 @
-'await' :: 'Monad' m => 'Consumer' a   m a
-'await' :: 'Monad' m => 'Pipe'     a y m a
+'await' :: 'Monad' m => 'Pipe' a y m a
 @
 -}
 await :: (Monad m) => Consumer' a m a

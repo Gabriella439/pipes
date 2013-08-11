@@ -120,8 +120,6 @@ ABC
 2
 3
 
-    You can also build your own custom 'Producer's using 'yield' and the 'Monad'
-    \/ 'MonadTrans' instances for 'Producer'.
 -}
 
 {-| Read 'String's from 'IO.stdin' using 'getLine'
