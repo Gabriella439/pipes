@@ -24,7 +24,6 @@ module Pipes.Prelude (
     -- $unfolds
     replicate,
     replicateM,
-    yieldIf,
     chain,
     read,
 
@@ -188,16 +187,6 @@ replicateM n m = replicateM_ n $ do
     yield a
 {-# INLINABLE replicateM #-}
 
--- | @(yieldIf pred a)@ only re-'yield's @a@ if it satisfies the predicate @p@
-yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer' a m ()
-yieldIf predicate a =
-    if (predicate a)
-    then do
-        _ <- yield a
-        return ()
-    else return ()
-{-# INLINABLE yieldIf #-}
-
 -- | Re-'yield' the value after first applying the given action
 chain :: (Monad m) => (a -> m b) -> a -> Producer' a m ()
 chain f a = do
@@ -241,7 +230,7 @@ map f = for cat (yield . f)
 > p >-> filter predicate = for p (yieldIf predicate)
 -}
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
-filter predicate = for cat (yieldIf predicate)
+filter predicate = for cat $ \a -> when (predicate a) (yield a)
 {-# INLINABLE filter #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
@@ -424,19 +413,19 @@ foldM step begin done p0 = do
     predicate.
 -}
 all :: (Monad m) => (a -> Bool) -> Producer a m r -> m Bool
-all predicate p = null $ for p (yieldIf (not . predicate))
+all predicate p = null $ for p $ \a -> when (not $ predicate a) (yield a)
 {-# INLINABLE all #-}
 
 {-| @(any predicate p)@ determines whether any element of @p@ satisfies the
     predicate.
 -}
 any :: (Monad m) => (a -> Bool) -> Producer a m r -> m Bool
-any predicate p = liftM not $ null $ for p (yieldIf predicate)
+any predicate p = liftM not $ null $ for p $ \a -> when (predicate a) (yield a)
 {-# INLINABLE any #-}
 
 -- | Find the first value that satisfies the predicate
 find :: (Monad m) => (a -> Bool) -> Producer a m r -> m (Maybe a)
-find predicate p = head $ for p (yieldIf predicate)
+find predicate p = head $ for p  $ \a -> when (predicate a) (yield a)
 {-# INLINABLE find #-}
 
 -- | Find the index of the first value that satisfies the predicate
