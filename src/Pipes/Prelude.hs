@@ -20,6 +20,11 @@ module Pipes.Prelude (
     stdin,
     fromHandle,
 
+    -- * Consumers
+    -- $consumers
+    stdout,
+    toHandle,
+
     -- * Pipes
     -- $pipes
     map,
@@ -33,11 +38,6 @@ module Pipes.Prelude (
     scanM,
     chain,
     read,
-
-    -- * Consumers
-    -- $consumers
-    stdout,
-    toHandle,
 
     -- * Folds
     -- $folds
@@ -144,6 +144,43 @@ fromHandle h = go
             yield str
             go
 {-# INLINABLE fromHandle #-}
+
+{- $consumers
+    Feed a 'Consumer' the same value repeatedly using ('>~'):
+
+>>> run $ lift getLine >~ P.stdout
+Test<Enter>
+Test
+ABC<Enter>
+ABC
+...
+
+-}
+
+{-| Write 'String's to 'IO.stdout' using 'putStrLn'
+
+    Terminates on a broken output pipe
+-}
+stdout :: Consumer' String IO ()
+stdout = toHandle IO.stdout
+{-# INLINABLE stdout #-}
+
+{-| Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
+
+    Terminates on a broken output pipe
+-}
+toHandle :: IO.Handle -> Consumer' String IO ()
+toHandle handle = do
+    loop
+  where
+    loop = do
+        str <- await
+        x   <- lift $ try $ IO.hPutStrLn handle str
+        case x of
+            Left e@(G.IOError { G.ioe_type = t}) ->
+                lift $ unless (t == G.ResourceVanished) $ throwIO e
+            Right () -> loop
+{-# INLINABLE toHandle #-}
 
 {- $pipes
     Use ('>->') to connect 'Producer's, 'Pipe's, and 'Consumer's:
@@ -271,43 +308,6 @@ read = for cat $ \str -> case (reads str) of
         return ()
     _         -> return ()
 {-# INLINABLE read #-}
-
-{- $consumers
-    Feed a 'Consumer' the same value repeatedly using ('>~'):
-
->>> run $ lift getLine >~ P.stdout
-Test<Enter>
-Test
-ABC<Enter>
-ABC
-...
-
--}
-
-{-| Write 'String's to 'IO.stdout' using 'putStrLn'
-
-    Terminates on a broken output pipe
--}
-stdout :: Consumer' String IO ()
-stdout = toHandle IO.stdout
-{-# INLINABLE stdout #-}
-
-{-| Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
-
-    Terminates on a broken output pipe
--}
-toHandle :: IO.Handle -> Consumer' String IO ()
-toHandle handle = do
-    loop
-  where
-    loop = do
-        str <- await
-        x   <- lift $ try $ IO.hPutStrLn handle str
-        case x of
-            Left e@(G.IOError { G.ioe_type = t}) ->
-                lift $ unless (t == G.ResourceVanished) $ throwIO e
-            Right () -> loop
-{-# INLINABLE toHandle #-}
 
 {- $folds
     Use these to fold the output of a 'Producer'.  Many of these folds will stop
