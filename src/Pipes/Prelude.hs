@@ -57,6 +57,7 @@ module Pipes.Prelude (
     head,
     index,
     last,
+    length,
     null,
     toList,
 
@@ -88,6 +89,7 @@ import Prelude hiding (
     foldl,
     head,
     last,
+    length,
     map,
     null,
     read,
@@ -475,6 +477,11 @@ last p0 = do
             Left   _       -> return (Just a)
             Right (a', p') -> loop a' p'
 {-# INLINABLE last #-}
+
+-- | Count the number of elements in a 'Producer'
+length :: (Monad m) => Producer a m r -> m Int
+length = foldl (\x _ -> x + 1) 0 id
+{-# INLINABLE length #-}
 
 -- | Determine if a 'Producer' is empty
 null :: (Monad m) => Producer a m r -> m Bool
