@@ -5,6 +5,10 @@
 
 > import Pipes
 > import qualified Pipes.Prelude as P  -- or use any other qualifier you prefer
+
+    Note that 'String'-based 'IO' is inefficient.  The 'String'-based utilities
+    in this module exist only for simple demonstrations without incurring a
+    dependency on the @text@ package.
 -}
 
 {-# LANGUAGE RankNTypes #-}
@@ -38,6 +42,7 @@ module Pipes.Prelude (
     scanM,
 
     -- * Consumers
+    -- $consumers
     stdout,
     toHandle,
 
@@ -94,8 +99,8 @@ import Prelude hiding (
     zipWith )
 
 {- $producers
-    Use 'for' to iterate over 'Producer's whenever you want to perform the same
-    action for every element:
+    Use 'for' loops to iterate over 'Producer's whenever you want to perform the
+    same action for every element:
 
 > -- Echo all lines from standard input to standard output
 > run $ for P.stdin $ \str -> do
@@ -110,10 +115,6 @@ ABC<Enter>
 ABC
 ...
 
-    Note that 'String'-based 'IO' is inefficient.  These 'Producer's exist only
-    for simple demonstrations without incurring a dependency on the @text@
-    package.
-
     Don't forget about 'each', exported by the main "Pipes" module, if you want
     to transform 'Foldable's (like lists) into 'Producer's.  This is designed to
     resemble foreach notation:
@@ -127,12 +128,18 @@ ABC
     \/ 'MonadTrans' instances for 'Producer'.
 -}
 
--- | Read 'String's from 'IO.stdin' using 'getLine'
+{-| Read 'String's from 'IO.stdin' using 'getLine'
+
+    Terminates on end of input
+-}
 stdin :: Producer' String IO ()
 stdin = fromHandle IO.stdin
 {-# INLINABLE stdin #-}
 
--- | Read 'String's from a 'IO.Handle' using 'IO.hGetLine'
+{-| Read 'String's from a 'IO.Handle' using 'IO.hGetLine'
+
+    Terminates on end of input
+-}
 fromHandle :: IO.Handle -> Producer' String IO ()
 fromHandle h = go
   where
@@ -145,28 +152,14 @@ fromHandle h = go
 {-# INLINABLE fromHandle #-}
 
 {- $unfolds
-    An unfold is a 'Producer' which doubles as a stream transformer.
-
-    You use 'for' to apply an unfold to a stream.  This behaves like a
-    'concatMap', generating a new 'Producer':
+    An unfold is a 'Producer' which doubles as a stream transformer.  You use
+    'for' to apply an unfold to a stream.  This behaves like a 'concatMap',
+    generating a new 'Producer':
 
 > -- Outputs two copies of every input string
 > for P.stdin (P.replicate 2) :: Producer String IO ()
 
-    To apply an additional handler, you can either iterate over the newly minted
-    'Producer' using another 'for' loop:
-
-> run $ for (for P.stdin (P.replicate 2)) $ \str -> do
->     lift $ putStrLn str
-
-    ... or you can nest 'for' loops:
-
-> run $
->     for P.stdin $ \str1 -> do
->         for (P.replicate 2 str1) $ \str2 -> do
->             lift $ putStrLn str2
-
-    ... or you can compose the two handlers using ('~>'):
+    Combine multiple handlers using ('~>'):
 
 >>> run $ for P.stdin (P.replicate 2 ~> lift . putStrLn)
 Test<Enter>
@@ -176,25 +169,6 @@ ABC<Enter>
 ABC
 ABC
 ...
-
-    All three of the above idioms always behave identically.
-
-    Note that 'each' is also an unfold and can be used to flatten streams of
-    'Foldable' elements:
-
->>> run $ for (each [[1, 2], [4, 5]]) (lift . print)
-[1,2]
-[3,4]
->>> run $ for (each [[1, 2], [3, 4]]) (each ~> lift . print)
-1
-2
-3
-4
->>> run $ (each ~> each ~> lift . print) [[1, 2], [3, 4]]  -- This works, too!
-1
-2
-3
-4
 
 -}
 
@@ -253,9 +227,9 @@ read str = case (reads str) of
 {-# INLINABLE read #-}
 
 {- $pipes
-    Use ('>->') to transform a 'Producer' using a 'Pipe':
+    Use ('>->') to connect 'Producer's, 'Pipe's, and 'Consumer's:
 
->>> run $ for (P.stdin >-> P.takeWhile (/= "quit")) (lift . putStrLn)
+>>> run $ P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout
 Test<Enter>
 Test
 ABC<Enter>
@@ -263,37 +237,20 @@ ABC
 quit<Enter>
 >>>
 
-    You can also use ('>->') to connect 'Pipe's:
-
->>> run $ for (P.stdin >-> (P.drop 2 >-> P.take 2)) (lift . putStrLn)
-1<Enter>
-2<Enter>
-3<Enter>
-3
-4<Enter>
-4
-
-    This gives the same behavior as first connecting the 'Producer', because
-    ('>->') is associative:
-
->>> run $ for ((P.stdin >-> P.drop 2) >-> P.take 2) (lift . putStrLn)
-
-    ... so you can drop the parentheses altogether since the meaning is
-    unambiguous:
-
->>> run $ for (P.stdin >-> P.drop 2 >-> P.take 2) (lift . putStrLn)
-
-    You can also connect 'Consumer's this way, too, but most useful 'Consumer's
-    are non-trivial and you will find them all in derived @pipes@ libraries
-    instead of here.
 -}
 
--- | Apply a function to all values flowing downstream
+{-| Apply a function to all values flowing downstream
+
+> p >-> map f = for p (yield . f)
+-}
 map :: (Monad m) => (a -> b) -> Pipe a b m r
 map f = for cat (yield . f)
 {-# INLINABLE map #-}
 
--- | @(filter predicate)@ only forwards values that satisfy the predicate.
+{-| @(filter predicate)@ only forwards values that satisfy the predicate.
+
+> p >-> filter predicate = for p (yieldIf predicate)
+-}
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat (yieldIf predicate)
 {-# INLINABLE filter #-}
@@ -379,12 +336,30 @@ scanM step = loop
         loop $! b'
 {-# INLINABLE scanM #-}
 
--- | Write 'String's to 'IO.stdout' using 'putStrLn'
+{- $consumers
+    Feed a 'Consumer' the same value repeatedly using ('>~'):
+
+>>> run $ lift getLine >~ P.stdout
+Test<Enter>
+Test
+ABC<Enter>
+ABC
+...
+
+-}
+
+{-| Write 'String's to 'IO.stdout' using 'putStrLn'
+
+    Terminates on a broken output pipe
+-}
 stdout :: Consumer' String IO ()
 stdout = toHandle IO.stdout
 {-# INLINABLE stdout #-}
 
--- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
+{-| Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
+
+    Terminates on a broken output pipe
+-}
 toHandle :: IO.Handle -> Consumer' String IO ()
 toHandle handle = do
     loop
@@ -399,7 +374,7 @@ toHandle handle = do
 {-# INLINABLE toHandle #-}
 
 {- $folds
-    Use these to fold the output of a 'Producer'.  Certain folds will stop
+    Use these to fold the output of a 'Producer'.  Many of these folds will stop
     drawing elements if they can compute their result early, like 'any':
 
 >>> P.any null P.stdin
@@ -409,6 +384,8 @@ ABC<Enter>
 True
 >>>
 
+    'foldl' and 'foldM' are designed to work in conjunction with the @foldl@
+    library.
 -}
 
 -- | Strict fold of the elements of a 'Producer'
