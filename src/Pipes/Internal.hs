@@ -18,10 +18,13 @@
     any functions which can violate the monad transformer laws.
 -}
 
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE
+    FlexibleInstances
+  , MultiParamTypeClasses
+  , RankNTypes
+  , UndecidableInstances
+  , CPP
+  #-}
 module Pipes.Internal (
     Proxy(..),
     unsafeHoist,
@@ -146,15 +149,24 @@ instance (MonadReader r m) => MonadReader r (Proxy a' a b' b m) where
               Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
               Pure    r      -> Pure r
               M       m      -> M (go `liftM` local f m)
+#if MIN_VERSION_mtl(2,1,0)
     reader = lift . reader
+#else
+#endif
 
 instance (MonadState s m) => MonadState s (Proxy a' a b' b m) where
     get = lift get
     put = lift . put
+#if MIN_VERSION_mtl(2,1,0)
     state = lift . state
+#else
+#endif
 
 instance (MonadWriter w m) => MonadWriter w (Proxy a' a b' b m) where
+#if MIN_VERSION_mtl(2,1,0)
     writer = lift . writer
+#else
+#endif
     tell = lift . tell
     listen proxy = go proxy mempty
         where
