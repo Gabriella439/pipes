@@ -11,11 +11,13 @@ module Pipes (
     Proxy,
     X,
     Effect,
+    Effect',
     run,
 
     -- ** Producers
     -- $producers
     Producer,
+    Producer',
     yield,
     for,
     (~>),
@@ -24,6 +26,7 @@ module Pipes (
     -- ** Consumers
     -- $consumers
     Consumer,
+    Consumer',
     await,
     (>~),
     (~<),
