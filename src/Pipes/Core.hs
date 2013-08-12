@@ -700,17 +700,17 @@ data X
 
 {-| An effect in the base monad
 
-    'Effect's are completely self-contained: nothing goes in or out
+    'Effect's neither 'Pipes.await' nor 'Pipes.yield'
 -}
 type Effect = Proxy X () () X
 
--- | 'Producer's only 'Pipes.yield'
+-- | 'Producer's can only 'Pipes.yield'
 type Producer b = Proxy X () () b
 
--- | A unidirectional 'Proxy'.
+-- | 'Pipe's can both 'Pipes.await' and 'Pipes.yield'
 type Pipe a b = Proxy () a () b
 
--- | 'Consumer's only 'Pipes.await'
+-- | 'Consumer's can only 'Pipes.await'
 type Consumer a = Proxy () a () X
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
