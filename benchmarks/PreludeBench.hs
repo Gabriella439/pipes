@@ -51,6 +51,7 @@ preludeBenchmarks vmax =
         , bench "head"      . nf (runIdentity . P.head)
         , bench "index"     . nf (runIdentity . P.index (vmax-1))
         , bench "last"      . nf (runIdentity . P.last)
+        , bench "length"    . whnf (runIdentity . P.length)
         , bench "null"      . whnf (runIdentity  . P.null)
         , bench "toList"    . nf P.toList
         ]
@@ -59,7 +60,9 @@ preludeBenchmarks vmax =
           bench "chain"       . whnf (drain . (>-> P.chain return))
         , bench "drop"        . whnf (drain . (>-> P.drop vmax))
         , bench "dropWhile"   . whnf (drain . (>-> P.dropWhile (<= vmax)))
+        , bench "filter"      . whnf (drain . (>-> P.filter even))
         , bench "findIndices" . whnf (drain . (>-> P.findIndices (<= vmax)))
+        , bench "map"         . whnf (drain . (>-> P.map ((+) 1)))
         , bench "take"        . whnf (drain . (>-> P.take vmax))
         , bench "takeWhile"   . whnf (drain . (>-> P.takeWhile (<= vmax)))
         , bench "scan"        . whnf (drain . (>-> P.scan L.sum))
