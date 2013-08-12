@@ -111,15 +111,6 @@ ABC<Enter>
 ABC
 ...
 
-    Don't forget about 'each', exported by the main "Pipes" module, if you want
-    to transform 'Foldable's (like lists) into 'Producer's.  This is designed to
-    resemble foreach notation:
-
->>> run $ for (each [1..3]) (lift . print)
-1
-2
-3
-
 -}
 
 {-| Read 'String's from 'IO.stdin' using 'getLine'
