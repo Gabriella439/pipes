@@ -1,10 +1,29 @@
 module Common (commonMain) where
 
+{-# LANGUAGE CPP #-}
+
 import Criterion.Main (Benchmark, defaultMain)
 import Data.Maybe (fromMaybe)
 import System.Console.GetOpt
 import System.Environment (getArgs, withArgs)
-import Text.Read (readEither)
+
+-- import Text.Read (readEither)
+-- Switch to 'readEither' from "Text.Read" when Debian Stable uses base-4.6.0.0
+import Text.ParserCombinators.ReadP as P
+import Text.ParserCombinators.ReadPrec
+import Text.Read (readPrec)
+
+readEither :: Read a => String -> Either String a
+readEither s =
+  case [ x | (x,"") <- readPrec_to_S read' minPrec s ] of
+    [x] -> Right x
+    []  -> Left "Prelude.read: no parse"
+    _   -> Left "Prelude.read: ambiguous parse"
+ where
+  read' =
+    do x <- readPrec
+       lift P.skipSpaces
+       return x
 
 -- We request and extra Int parameter 'mdMax' so that
 -- it is possible to have per module default benchmark
