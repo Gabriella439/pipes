@@ -69,3 +69,19 @@ Benchmark prelude-benchmarks
         foldl     >= 1.0.0   && < 1.1,
         mtl       >= 2.0.1.0 && < 2.2,
         pipes     >= 4.0.0   && < 4.1
+
+Benchmark lift-benchmarks
+    Default-Language: Haskell2010
+    Type:             exitcode-stdio-1.0
+    HS-Source-Dirs:   benchmarks
+    Main-Is:          LiftBench.hs
+    GHC-Options:     -O2 -Wall -rtsopts -fno-warn-unused-do-bind
+
+    Build-Depends:
+        base         >= 4       && < 5  ,
+        criterion    >= 0.8     && < 0.9,
+        deepseq                         ,
+        foldl        >= 1.0.0   && < 1.1,
+        mtl          >= 2.0.1.0 && < 2.2,
+        pipes        >= 4.0.0   && < 4.1,
+        transformers >= 0.2.0.0 && < 0.4
