@@ -8,7 +8,7 @@ and connect reusable streaming components.
 * Install the [Haskell Platform](http://www.haskell.org/platform/)
 * `cabal install pipes`
 
-Then fire up ` ghci`:
+Then fire up `ghci`:
 
     $ ghci
     Prelude> import Pipes
@@ -26,11 +26,11 @@ Then fire up ` ghci`:
 
 The tutorial for version 4.0.0 is complete, and you can find the tutorial
 [here](https://github.com/Gabriel439/Haskell-Pipes-Library/blob/master/src/Pipes/Tutorial.hs)
-until @pipes-4.0.0@ is on Hackage.
+until `pipes-4.0.0` is on Hackage.
 
 ## Features
 
-* *Concise API*: Use simple commands like 'for', ('>->'), 'await', and 'yield'
+* *Concise API*: Use simple commands like `for`, `(>->)`, `await`, and `yield`
 
 * *Blazing fast*: Implementation tuned for speed
 
@@ -39,7 +39,7 @@ until @pipes-4.0.0@ is on Hackage.
 
 * *Elegant semantics*: Use practical category theory
 
-* *ListT*: Correct implementation of 'ListT' that interconverts with pipes
+* *ListT*: Correct implementation of `ListT` that interconverts with pipes
 
 * *Bidirectionality*: Implement duplex channels
 
