@@ -120,7 +120,7 @@ import Prelude hiding ((.), id)
       components
 
     You can connect these components together in four separate ways which
-    parallel to the four above types:
+    parallel the four above types:
 
     * 'for' handles 'yield's
 
@@ -851,7 +851,15 @@ You shall not pass!
 -}
 
 {- $listT
-    @pipes@ also provides a \"ListT done right\" implementation.
+    @pipes@ also provides a \"ListT done right\" implementation.  This differs
+    from the implementation in @transformers@ because this 'ListT':
+
+    * obeys the monad laws, and
+
+    * streams data immediately instead of collecting all results into memory.
+
+    The latter property is actually an elegant consequence of obeying the monad
+    laws.
 
     To bind a list within a 'ListT' computation, combine 'Select' and 'each':
 
@@ -865,11 +873,14 @@ You shall not pass!
 >     lift $ putStrLn $ "y = " ++ show y
 >     return (x, y)
 
-    You can then loop over a 'ListT' by using 'for' and 'every':
+    You can then loop over a 'ListT' by using 'every':
 
 @
  'every' :: 'Monad' m => 'ListT' m a -> 'Producer' a m ()
 @
+
+    This is designed to work with 'for', although this is not the only way to
+    consume a 'ListT':
 
 >>> run $ for (every pair) (lift . print)
 x = 1
@@ -896,16 +907,16 @@ y = 4
 > quitter :: Producer String IO ()
 > quitter = P.stdin >-> P.takeWhile (/= "quit")
 > 
-> pairs :: ListT IO String
-> pairs = do
+> pair :: ListT IO String
+> pair = do
 >     str1 <- Select quitter
 >     str2 <- Select quitter
 >     return (str1 ++ " " ++ str2)
 
-    Here we're binding standard input non-deterministically as if it were an
-    effectful list:
+    Here we're binding standard input non-deterministically (twice) as if it
+    were an effectful list:
 
->>> run $ every pairs >-> P.stdout
+>>> run $ every pair >-> P.stdout
 Daniel<Enter>
 Fischer<Enter>
 Daniel Fischer
@@ -930,65 +941,104 @@ quit<Enter>
     @pipes@ is more powerful than meets the eye so this section presents some
     non-obvious tricks you may find useful.
 
-    For example, here's the definition of 'P.map' from "Pipes.Prelude":
+    Many pipe combinators will work on unusual pipe types and the next few
+    examples will use the 'cat' pipe to demonstrate this.
+
+    For example, you can loop over the output of a 'Pipe' using 'for', which is
+    how 'P.map' is defined:
 
 > map :: (Monad m) => (a -> b) -> Pipe a b m r
-> map f = for cat $ \a -> yield (f a)
+> map f = for cat $ \x -> yield (f x)
+>
+> -- Read this as: For all values flowing downstream, apply 'f'
 
-    Notice how 'P.map' uses 'for' to loop over 'cat', which is a 'Pipe' instead
-    of a 'Producer'.  This is because 'for' has the following even more general
-    type:
+    This is equivalent to:
 
-@
- 'for' :: 'Monad' m => 'Pipe' x b m r -> (b -> 'Producer' c m ()) -> 'Pipe' x c m r
-@
+> map = forever $ do
+>     x <- await
+>     yield (f x)
 
-    We can use 'for' to loop over the output of a 'Pipe' the same way we loop
-    over the output of a 'Producer'.
+    You can also feed a 'Pipe' input using ('>~').  This means we could haved
+    instead defined the @yes@ pipe like this:
 
-    In the above code, 'cat' is the empty pipe that transmits all values
-    downstream, so you can literally read the above code as saying: \"For all
-    values flowing downstream, re-yield them after applying the function @f@\".
+> yes :: (Monad m) => Producer String m r
+> yes = return "y" >~ cat
+>
+> -- Read this as: Keep feeding "y" to downstream
 
-    You can use the dual trick for ('>~'), too:
+    This is equivalent to:
 
-> threeYs :: (Monad m) => Producer String m ()
-> threeYs = return "y" >~ P.take 3
+> yes = forever $ yield "y"
 
-    Or what if you want to print all elements from a triply-nested list:
+    You can also sequence two 'Pipe's together.  This is how 'P.drop' is
+    defined:
 
->>> run $ (each ~> each ~> each ~> lift . print) [[[1,2],[3,4]],[[5,6],[7,8]]]
-1
-2
-3
-4
-5
-6
-7
-8
+> drop :: (Monad m) => Int -> Pipe a a m r
+> drop = do
+>     replicateM_ n await
+>     cat
 
-    Another useful trick is to compose pipes within a pipe:
+    This is equivalent to:
+
+> drop = do
+>     replicateM_ n await
+>     forever $ do
+>         x <- await
+>         yield x
+
+    You can even compose pipes inside of another pipe:
 
 > customerService :: Producer String IO ()
 > customerService = do
->     each ["Hello, how can I help you?", "Hold for one second."]
->     P.stdin >-> P.takeWhile (/= "Goodbye!")
+>     each [ "Hello, how can I help you?"      -- Begin with a script
+>          , "Hold for one second."
+>          ]
+>     P.stdin >-> P.takeWhile (/= "Goodbye!")  -- Now continue with a human
 
-    Or you can simulate a Scala-like 'for' loop (for the special case of
-    collections) using 'ListT':
+    Also, you can often use 'each' in conjunction with ('~>') to traverse nested
+    data structures.  For example, you can print all non-'Nothing' elements
+    from a doubly-nested list:
 
-> run $ for (every $ do
->     i <- Select $ each [1..10]
->     j <- Select $ each [1..10]
->     return (i, j) ) (lift . print)
+>>> run $ (each ~> each ~> each ~> lift . print) [[Just 1, Nothing], [Just 2, Just 3]]
+1
+2
+3
+
+    Another neat thing to know is that 'every' has a more general type:
+
+@
+ 'every' :: ('Enumerable' t) => t m a -> 'Producer' a m ()
+@
+
+    'Enumerable' generalizes 'Foldable' and if you have an effectful container
+    of your own that you want others to traverse using @pipes@, just have your
+    container implement the 'toListT' method of the 'Enumerable' class:
+
+> class Enumerable t where
+>     toListT :: (Monad m) => t m a -> ListT m a
+
+    You can even use 'Enumerable' to traverse effectful types that are not even
+    proper containers, like 'Control.Monad.Trans.Maybe.MaybeT':
+
+> input :: MaybeT IO Int
+> input = do
+>     str <- lift getLine
+>     guard (str /= "Fail")
+
+>>> run $ every input >-> P.stdout
+Test<Enter>
+Test
+>>> run $ every input >-> P.stdout
+Fail<Enter>
+>>>
 
 -}
 
 {- $conclusion
-    This tutorial covers the core concepts of connecting, building, and reading
+    This tutorial covers the concepts of connecting, building, and reading
     @pipes@ code.  However, this library is only the core component in an
-    ecosystem of streaming components.  More powerful libraries that build upon
-    @pipes@ include:
+    ecosystem of streaming components.  Derved libraries that build immmediately
+    upon @pipes@ include:
 
     * @pipes-concurrency@: Concurrent reactive programming and message passing
 
@@ -997,10 +1047,10 @@ quit<Enter>
     * @pipes-safe@: Resource management and exception safety for @pipes@
 
     These libraries provide functionality specialized to common streaming
-    domains.  Additionally, there are several derived libraries on Hackage that
-    provide even higher-level functionality, which you can find by searching
-    under the \"Pipes\" category or by looking for packages with a @pipes-@
-    prefix in their name.  Current examples include:
+    domains.  Additionally, there are several libraries on Hackage that provide
+    even higher-level functionality, which you can find by searching under the
+    \"Pipes\" category or by looking for packages with a @pipes-@ prefix in
+    their name.  Current examples include:
 
     * @pipes-network@/@pipes-network-tls@: Networking
 
@@ -1021,8 +1071,9 @@ quit<Enter>
 
     <https://groups.google.com/forum/#!forum/haskell-pipes>
 
-    ... or you can mail the list directly at
-    <mailto:haskell-pipes@googlegroups.com>.
+    ... or you can mail the list directly at:
+
+    <mailto:haskell-pipes@googlegroups.com>
 
     Additionally, for questions regarding types or type errors, you might find
     the following appendix on types very useful.
@@ -1282,7 +1333,7 @@ quit<Enter>
     However, polymorphic type synonyms cause problems in many other cases:
 
     * They induce higher-rank types and require you to enable the @RankNTypes@
-      extension to use them in your own type signatures:
+      extension to use them in your own type signatures.
 
     * They give the wrong behavior when used in the negative position of a
       function like this:
