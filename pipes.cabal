@@ -10,12 +10,12 @@ Maintainer: Gabriel439@gmail.com
 Bug-Reports: https://github.com/Gabriel439/Haskell-Pipes-Library/issues
 Synopsis: Compositional pipelines
 Description:
-  \"Streaming done right\".  This library generalizes iteratees, generators,
-  and coroutines simply and elegantly.
+  `pipes` is a clean and powerful stream processing library that lets you build
+  and connect reusable streaming components
   .
   Advantages over traditional streaming libraries:
   .
-  * /Concise API/: Use three simple commands: ('>->'), 'await', and 'yield'
+  * /Concise API/: Use simple commands like 'for', ('>->'), 'await', and 'yield'
   .
   * /Blazing fast/: Implementation tuned for speed
   .

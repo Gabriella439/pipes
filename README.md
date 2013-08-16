@@ -1,17 +1,7 @@
 # Pipes v4.0.0
 
 `pipes` is a clean and powerful stream processing library that lets you build
-and connect reusable streaming components like Unix pipes.
-
-You should use `pipes` if you need:
-
-* effectful `Producer`s (like generators),
-
-* effectful `Consumer`s (like iteratees),
-
-* effectful `Pipe`s (like Unix pipes), or:
-
-* `ListT` done right.
+and connect reusable streaming components.
 
 ## Quick start
 
@@ -34,18 +24,22 @@ Then fire up ` ghci`:
     quit[Enter]
     Prelude P> -- Done!
 
-A new tutorial for version 4.0.0 is in progress, which you can find [here](https://github.com/Gabriel439/Haskell-Pipes-Library/blob/master/src/Pipes/Tutorial.hs).
+The tutorial for version 4.0.0 is complete, and you can find the tutorial
+[here](https://github.com/Gabriel439/Haskell-Pipes-Library/blob/master/src/Pipes/Tutorial.hs)
+until @pipes-4.0.0@ is on Hackage.
 
 ## Features
 
-* *Concise API*: Use simple commands like: `yield`, `for`, `await`, and `(>->)`
+* *Concise API*: Use simple commands like 'for', ('>->'), 'await', and 'yield'
 
 * *Blazing fast*: Implementation tuned for speed
 
-* *Lightweight Dependency*: `pipes` depends only on `transformers` and `mmorph`
-  and compiles very rapidly
+* *Lightweight Dependency*: `pipes` is small and compiles very rapidly,
+  including dependencies
 
 * *Elegant semantics*: Use practical category theory
+
+* *ListT*: Correct implementation of 'ListT' that interconverts with pipes
 
 * *Bidirectionality*: Implement duplex channels
 
