@@ -239,7 +239,7 @@ f '>->' 'cat' = f
 
 -}
 
--- | The identity 'Pipe', analogous the the Unix @cat@ program
+-- | The identity 'Pipe', analogous to the Unix @cat@ program
 cat :: (Monad m) => Pipe a a m r
 cat = pull ()
 {-# INLINABLE cat #-}

@@ -13,14 +13,14 @@ Description:
   \"Streaming done right\".  This library generalizes iteratees, generators,
   and coroutines simply and elegantly.
   .
-  Advantages over traditional iteratee\/coroutine implementations:
+  Advantages over traditional streaming libraries:
   .
-  * /Concise API/: Use three simple commands: ('>->'), 'request', and 'respond'
+  * /Concise API/: Use three simple commands: ('>->'), 'await', and 'yield'
   .
   * /Blazing fast/: Implementation tuned for speed
   .
-  * /Lightweight Dependency/: @pipes@ depends only on @transformers@ and
-    @mmorph@ and compiles very rapidly
+  * /Lightweight Dependency/: @pipes@ is small and compiles very rapidly,
+    including dependencies
   .
   * /Elegant semantics/: Use practical category theory
   .
