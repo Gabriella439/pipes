@@ -65,7 +65,7 @@ Benchmark prelude-benchmarks
 
     Build-Depends:
         base      >= 4       && < 5  ,
-        criterion >= 0.8             ,
+        criterion >= 0.8     && < 0.9,
         foldl     >= 1.0.0   && < 1.1,
-        mtl,
-        pipes     >= 4.0.0
+        mtl       >= 2.0.1.0 && < 2.2,
+        pipes     >= 4.0.0   && < 4.1
