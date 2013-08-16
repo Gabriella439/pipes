@@ -57,7 +57,7 @@ preludeBenchmarks vmax =
         ]
     , bgroup "Pipes" $ map applyBench
         [
-          bench "chain"       . whnf (drain . (>-> P.chain return))
+          bench "chain"       . whnf (drain . (>-> P.chain (\_ -> return ())))
         , bench "drop"        . whnf (drain . (>-> P.drop vmax))
         , bench "dropWhile"   . whnf (drain . (>-> P.dropWhile (<= vmax)))
         , bench "filter"      . whnf (drain . (>-> P.filter even))
