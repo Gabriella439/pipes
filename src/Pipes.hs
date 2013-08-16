@@ -358,8 +358,8 @@ every :: (Monad m, Enumerable t) => t m a -> Producer' a m ()
 every it = discard >\\ list (toListT it)
 {-# INLINABLE every #-}
 
--- | Discards all values
-discard :: (Monad m) => a -> Effect' m ()
+-- | Discards a value
+discard :: (Monad m) => a -> m ()
 discard _ = return ()
 {-# INLINABLE discard #-}
 
