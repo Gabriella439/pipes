@@ -296,9 +296,9 @@ scanM (L.FoldM step begin done) = do
 {-# INLINABLE scanM #-}
 
 -- | Apply an action to all values flowing downstream
-chain :: (Monad m) => (a -> m b) -> Pipe a a m r
+chain :: (Monad m) => (a -> m ()) -> Pipe a a m r
 chain f = for cat $ \a -> do
-    _ <- lift (f a)
+    lift (f a)
     yield a
 {-# INLINABLE chain #-}
 
@@ -328,7 +328,7 @@ True
 -}
 
 -- | Strict fold of the elements of a 'Producer'
-fold :: (Monad m) => L.Fold a b -> Producer a m r -> m b
+fold :: (Monad m) => L.Fold a b -> Producer a m () -> m b
 fold (L.Fold step begin done) p0 = loop p0 begin
   where
     loop p x = case p of
@@ -341,7 +341,7 @@ fold (L.Fold step begin done) p0 = loop p0 begin
 -- | Strict, monadic fold of the elements of a 'Producer'
 foldM
     :: (Monad m)
-    => L.FoldM m a b -> Producer a m r -> m b
+    => L.FoldM m a b -> Producer a m () -> m b
 foldM (L.FoldM step begin done) p0 = do
     x0 <- begin
     loop p0 x0
@@ -358,29 +358,29 @@ foldM (L.FoldM step begin done) p0 = do
 {-| @(all predicate p)@ determines whether all the elements of @p@ satisfy the
     predicate.
 -}
-all :: (Monad m) => (a -> Bool) -> Producer a m r -> m Bool
+all :: (Monad m) => (a -> Bool) -> Producer a m () -> m Bool
 all predicate p = null $ for p $ \a -> when (not $ predicate a) (yield a)
 {-# INLINABLE all #-}
 
 {-| @(any predicate p)@ determines whether any element of @p@ satisfies the
     predicate.
 -}
-any :: (Monad m) => (a -> Bool) -> Producer a m r -> m Bool
+any :: (Monad m) => (a -> Bool) -> Producer a m () -> m Bool
 any predicate p = liftM not $ null $ for p $ \a -> when (predicate a) (yield a)
 {-# INLINABLE any #-}
 
 -- | Find the first value that satisfies the predicate
-find :: (Monad m) => (a -> Bool) -> Producer a m r -> m (Maybe a)
+find :: (Monad m) => (a -> Bool) -> Producer a m () -> m (Maybe a)
 find predicate p = head $ for p  $ \a -> when (predicate a) (yield a)
 {-# INLINABLE find #-}
 
 -- | Find the index of the first value that satisfies the predicate
-findIndex :: (Monad m) => (a -> Bool) -> Producer a m r -> m (Maybe Int)
+findIndex :: (Monad m) => (a -> Bool) -> Producer a m () -> m (Maybe Int)
 findIndex predicate p = head (p >-> findIndices predicate)
 {-# INLINABLE findIndex #-}
 
 -- | Retrieve the first value from a 'Producer'
-head :: (Monad m) => Producer a m r -> m (Maybe a)
+head :: (Monad m) => Producer a m () -> m (Maybe a)
 head p = do
     x <- next p
     case x of
@@ -389,12 +389,12 @@ head p = do
 {-# INLINABLE head #-}
 
 -- | Index into a 'Producer'
-index :: (Monad m) => Int -> Producer a m r -> m (Maybe a)
+index :: (Monad m) => Int -> Producer a m () -> m (Maybe a)
 index n p = head (p >-> drop n)
 {-# INLINABLE index #-}
 
 -- | Retrieve the last value from a 'Producer'
-last :: (Monad m) => Producer a m r -> m (Maybe a)
+last :: (Monad m) => Producer a m () -> m (Maybe a)
 last p0 = do
     x <- next p0
     case x of
@@ -409,12 +409,12 @@ last p0 = do
 {-# INLINABLE last #-}
 
 -- | Count the number of elements in a 'Producer'
-length :: (Monad m) => Producer a m r -> m Int
+length :: (Monad m) => Producer a m () -> m Int
 length = fold L.length
 {-# INLINABLE length #-}
 
 -- | Determine if a 'Producer' is empty
-null :: (Monad m) => Producer a m r -> m Bool
+null :: (Monad m) => Producer a m () -> m Bool
 null p = do
     x <- next p
     return $ case x of
@@ -423,7 +423,7 @@ null p = do
 {-# INLINABLE null #-}
 
 -- | Convert a pure 'Producer' into a list
-toList :: Producer a Identity r -> [a]
+toList :: Producer a Identity () -> [a]
 toList = loop
   where
     loop p = case p of
@@ -440,7 +440,7 @@ toList = loop
     immediately as they are generated instead of loading all elements into
     memory.
 -}
-toListM :: (Monad m) => Producer a m r -> m [a]
+toListM :: (Monad m) => Producer a m () -> m [a]
 toListM = loop
   where
     loop p = case p of
