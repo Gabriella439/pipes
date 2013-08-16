@@ -235,14 +235,9 @@ takeWhile predicate = go
 
 -- | @(drop n)@ discards @n@ values going downstream
 drop :: (Monad m) => Int -> Pipe a a m r
-drop = go
-  where
-    go n =
-        if (n <= 0)
-        then cat
-        else do
-            await
-            go (n - 1)
+drop n = do
+    replicateM_ n await
+    cat
 {-# INLINABLE drop #-}
 
 {-| @(dropWhile p)@ discards values going downstream until one violates the
@@ -317,6 +312,7 @@ read = for cat $ \str -> case (reads str) of
 -- | Convert 'Show'able values to 'String's
 show :: (Monad m, Show a) => Pipe a String m r
 show = map Prelude.show
+{-# INLINABLE show #-}
 
 {- $folds
     Use these to fold the output of a 'Producer'.  Many of these folds will stop
@@ -340,13 +336,6 @@ fold (L.Fold step begin done) p0 = loop p0 begin
         Respond a  fu -> loop (fu ()) $! step x a
         M          m  -> m >>= \p' -> loop p' x
         Pure    _     -> return (done x)
-{-
-    loop p b = do
-        x <- next p
-        case x of
-            Left   _      -> return b
-            Right (a, p') -> loop p' $! step b a
--}
 {-# INLINABLE fold #-}
 
 -- | Strict, monadic fold of the elements of a 'Producer'
