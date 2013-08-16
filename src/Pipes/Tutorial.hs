@@ -50,9 +50,7 @@
     "Pipes.Prelude" from top to bottom.
 
     This tutorial is more extensive and explains the @pipes@ API in greater
-    detail and illustrates several idioms.  You can follow along by using the
-    complete code examples in the Appendix section at the bottom of this
-    tutorial.
+    detail and illustrates several idioms.
 -}
 
 module Pipes.Tutorial (
@@ -71,17 +69,14 @@ module Pipes.Tutorial (
     -- * Pipes
     -- $pipes
 
-    -- * Unfolds
-    -- $unfolds
-
     -- * ListT
     -- $listT
 
+    -- * Tricks
+    -- $tricks
+
     -- * Conclusion
     -- $conclusion
-
-    -- * Appendix
-    -- $appendix
     ) where
 
 import Control.Category
@@ -852,139 +847,6 @@ You shall not pass!
     Haskell for interoperability with the Haskell language and ecosystem.
 -}
 
-{- $unfolds
-    How would we write a really simple @grep@ pipe that only does exact string
-    matching?  Our first attempt might look like this:
-
-> import Control.Monad (when)
-> import Pipes
->
-> grep :: String -> Pipe String String m r
-> grep str = forever $ do
->     line <- await
->     when (str `isInfixOf` line) (yield line)
-
-    The above code grabs a single line at a time and only forwards the lines
-    that match the given 'String'.  However, while the above code is okay it is
-    not completely idiomatic @pipes@ code.
-
-    The first problem is that we are explicitly integrating the looping scheme
-    ('forever', in this case) with the string matching and filtering logic.
-    Fortunately, we can easily decouple the two by rewriting @grep@ like this:
-    
-> grep :: String -> Pipe String String m r
-> grep str = for cat $ \line ->
->     when (str `isInfixOf line) (yield line)
-
-    Wait, what?  You can write a 'for' loop over 'cat'?
-
-    If we go back to the documentation for the 'for' function, we will see this
-    simplified type signature immediately below:
-
-@
- for :: 'Monad' m => 'Pipe' x b m r -> (b -> 'Producer' c m ()) -> 'Pipe' x c m r
-@
-
-    This is an example of how @pipes@ is clever and will let you mix familiar
-    types and operations in unexpected ways.  'for' can loop over 'Pipe's the
-    same way we loop over 'Producer's.  'cat' is the empty 'Pipe' that
-    auto-forwards everything, so we just loop over 'cat' and replace every
-    'yield' with the body of the loop.
-
-    "Pipes.Prelude" also provides a convenience function that we can reuse here
-    called 'P.yieldIf':
-
-> yieldIf :: (Monad m) => (a -> Bool) -> a -> Producer a m ()
-> yieldIf predicate a = when (predicate a) (yield a)
-
-    Using 'P.yieldIf' we can simplify @grep@ even further:
-
-> grep str = for cat (P.yieldIf (str `isInfixOf`))
-
-    This formulation is more declarative of our intent.  You would read this in
-    English as \"for each value flowing downstreaming, only yield the value if
-    @str@ is an infix of it\".
-
-    However, this version is still not completely idiomatic!  The truly
-    idiomatic version would leave out the @(for cat)@ part completely, leaving
-    behind just the body of the loop:
-
-> -- Rename this since it's simpler than @grep@
-> match :: (Monad m) => String -> String -> Producer String m ()
-> match str = P.yieldIf (str `isInfixOf`)
-
-    Then we can just use `match` directly to loop over any 'Producer' we want to
-    filter:
-
-> main = run $ for P.stdin (match "Test") >-> P.stdout
-
-    @match@ is an \"unfold\", a term referring to any component that can be used
-    as the body of a @for@ loop.  All unfolds have this shape:
-
-@
- A -> 'Producer' B m ()
-@
-
-    ... and 'yield' is the trivial unfold.
-
-    So when you look at the type of @match@ you can mentally group the type like
-    this:
-
-> --                    +----------+-- 'match' takes a 'String' and returns an
-> --                    |          |   unfold
-> --                    v          v
-> match :: (Monad m) => String -> (String -> Producer String m ())
-
-    Unfolds are more idiomatic than the equivalent 'Pipe's for two reasons:
-
-    * They are simpler to write (no recursion necessary)
-
-    * You can upgrade an unfold to a 'Pipe' using @(for cat@), but you can't
-      downgrade a 'Pipe' to an unfold
-
-    However, you should never actually need to explicitly upgrade an unfold to
-    a 'Pipe'.  Any time you see yourself writing this:
-
-> -- Useless use of 'cat'
-> p >-> for cat unfold
-
-    ... you should instead be writing:
-
-> for p unfold
-
-    This is why "Pipes.Prelude" does not provide @filter@ or @map@ since you
-    get equivalent functionality by combining 'for' with 'P.yieldIf' or 'yield':
-
-> -- Filter out empty lines from standard input
-> for P.stdin (P.yieldIf (not . null)) :: Producer String IO ()
-
-> -- Map 'show' over all elements
-> for (each [1..10]) (yield . show) :: (Monad m) => Producer String m ()
-
-    Once you gain practice judiciously using unfolds you will see lots of
-    simple and elegant patterns emerge.  For example, this purely unfold-based
-    code prints out every element of a nested list:
-
->>> import Pipes
->>> import qualified Pipes.Prelude as P
->>> run $ (each ~> each ~> lift . print) [[1, 2], [3, 4]]
-1
-2
-3
-4
-
-    ... while this code lenses into a 'String', only printing values that parse
-    successfully:
-
->>> :set -XNoMonomorphismRestriction
->>> let readList = P.read :: (Monad m) => String -> Producer [String] m ()
->>> let readInt  = P.read :: (Monad m) => String -> Producer  Int     m ()
->>> run $ (readList ~> each ~> readInt ~> lift . print) "[\"1\", \"X\", \"2\"]"
-1
-2
-
--}
-
 {- $listT
     @pipes@ also provides a \"ListT done right\" implementation.
 
@@ -992,21 +854,21 @@ You shall not pass!
 
 > import Pipes
 > 
-> pairs :: ListT IO (Int, Int)
-> pairs = do
+> pair :: ListT IO (Int, Int)
+> pair = do
 >     x <- Select $ each [1, 2]
 >     lift $ putStrLn $ "x = " ++ show x
 >     y <- Select $ each [3, 4]
 >     lift $ putStrLn $ "y = " ++ show y
 >     return (x, y)
 
-    You can then over a 'ListT' by combining 'every':
+    You can then loop over a 'ListT' by using 'for' and 'every':
 
 @
  'every' :: 'Monad' m => 'ListT' m a -> 'Producer' a m ()
 @
 
->>> run $ for (every pairs) (lift . print)
+>>> run $ for (every pair) (lift . print)
 x = 1
 y = 3
 (1,3)
@@ -1061,6 +923,64 @@ quit<Enter>
     values in one batch at the end.
 -}
 
+{- $tricks
+    @pipes@ is more powerful than meets the eye so this section presents some
+    non-obvious tricks you may find useful.
+
+    For example, here's the definition of 'P.map' from "Pipes.Prelude":
+
+> map :: (Monad m) => (a -> b) -> Pipe a b m r
+> map f = for cat $ \a -> yield (f a)
+
+    Notice how 'P.map' uses 'for' to loop over 'cat', which is a 'Pipe' instead
+    of a 'Producer'.  This is because 'for' has the following even more general
+    type:
+
+@
+ 'for' :: 'Monad' m => 'Pipe' x b m r -> (b -> 'Producer' c m ()) -> 'Pipe' x c m r
+@
+
+    We can use 'for' to loop over the output of a 'Pipe' the same way we loop
+    over the output of a 'Producer'.
+
+    In the above code, 'cat' is the empty pipe that transmits all values
+    downstream, so you can literally read the above code as saying: \"For all
+    values flowing downstream, re-yield them after applying the function @f@\".
+
+    You can use the dual trick for ('>~'), too:
+
+> threeYs :: (Monad m) => Producer String m ()
+> threeYs = return "y" >~ P.take 3
+
+    Or what if you want to print all elements from a triply-nested list:
+
+>>> run $ (each ~> each ~> each ~> lift . print) [[[1,2],[3,4]],[[5,6],[7,8]]]
+1
+2
+3
+4
+5
+6
+7
+8
+
+    Another useful trick is to compose pipes within a pipe:
+
+> customerService :: Producer String IO ()
+> customerService = do
+>     each ["Hello, how can I help you?", "Hold for one second."]
+>     P.stdin >-> P.takeWhile (/= "Goodbye!")
+
+    Or you can simulate a Scala-like 'for' loop (for the special case of
+    collections) using 'ListT':
+
+> run $ for (every $ do
+>     i <- Select $ each [1..10]
+>     j <- Select $ each [1..10]
+>     return (i, j) ) (lift . print)
+
+-}
+
 {- $conclusion
     This tutorial covers the core concepts of connecting, building, and reading
     @pipes@ code.  However, this library is only the core component in an
@@ -1100,46 +1020,4 @@ quit<Enter>
 
     ... or you can mail the list directly at
     <mailto:haskell-pipes@googlegroups.com>.
--}
-
-{- $appendix
-
-@
-\-\- echo.hs
-
-import Control.Monad (unless)
-import Pipes
-import qualified System.IO as IO
-
-stdin :: Producer String IO ()
-stdin = do
-    eof <- lift $ IO.hIsEOF IO.stdin
-    unless eof $ do
-        str <- lift getLine
-        yield str
-        stdin
-
-loop :: Effect IO ()
-loop = for stdin $ \str -> do
-    lift $ putStrLn str
-
-main :: IO ()
-main = run loop
-
-\-\- nested.hs
-
-import Pipes
-import qualified Pipes.Prelude as P
-
-duplicate :: (Monad m) => a -> Producer a m ()
-duplicate x = do
-    yield x
-    yield x
-
-loop :: Producer String IO ()
-loop = for P.stdin duplicate
-
-main  = run $ for loop (lift . putStrLn)
-@
-
 -}
