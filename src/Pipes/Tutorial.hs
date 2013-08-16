@@ -102,20 +102,14 @@ import Prelude hiding ((.), id)
     effort to produce a highly-efficient program that streams data in constant
     memory.
 
-    To enforce loose coupling, components can only send or receive data in one
-    of four ways:
+    To enforce loose coupling, components can only communicate using two
+    commands:
 
-@
-              | Zero or more times | Exactly once |
- -------------+--------------------+--------------+
- Produce Data |       'yield'        | Return value |
- -------------+--------------------+--------------+
- Consume Data |       'await'        |   Argument   |
- -------------+--------------------+--------------+
-@
+    * 'yield': Send output data
 
-    The four central types correspond to the four permutations in which you can
-    enable or disable 'yield' or 'await':
+    * 'await': Receive input data
+
+    @pipes@ has four types of components built around these two commands:
 
     * 'Producer's can only 'yield' values and they model streaming sources
 
@@ -125,10 +119,10 @@ import Prelude hiding ((.), id)
       transformations
 
     * 'Effect's can neither 'yield' nor 'await' and they model non-streaming
-      components that only 'lift' effects from the base monad
+      components
 
     You can connect these components together in four separate ways which
-    closely parallel the four central types:
+    parallel to the four above types:
 
     * 'for' handles 'yield's
 
@@ -138,9 +132,10 @@ import Prelude hiding ((.), id)
 
     * ('>>=') handles return values
 
-    You know that you're done connecting things when you get an 'Effect',
-    meaning that all inputs and outputs have been handled.  You 'run' the
-    final 'Effect' to begin streaming.
+    As you connect components their types will change to reflect inputs and
+    outputs that you've fused away.  You know that you're done connecting things
+    when you get an 'Effect', meaning that you have handled all inputs and
+    outputs.  You 'run' this final 'Effect' to begin streaming.
 -}
 
 {- $producers
@@ -171,7 +166,7 @@ import Prelude hiding ((.), id)
 > stdin = do
 >     eof <- lift isEOF        -- 'lift' an 'IO' action from the base monad
 >     unless eof $ do
->         str <- lift getLine  -- Read a line of input
+>         str <- lift getLine
 >         yield str            -- 'yield' the 'String'
 >         stdin                -- Loop
 
@@ -204,46 +199,43 @@ import Prelude hiding ((.), id)
     'for' has the following type:
 
 @
- \-\-                +-- Producer      +-- The body of the       +-- Result
- \-\-                |   to loop       |   loop                  |   
- \-\-                v   over          v                         v  
- \-\-                --------------    ----------------------    --------------
- 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
+ \-\-                +-- Producer      +-- The body of the   +-- Result
+ \-\-                |   to loop       |   loop              |
+ \-\-                v   over          v                     v
+ \-\-                --------------    ------------------    ----------
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Effect' m ()) -> 'Effect' m r
 @
 
     @(for producer body)@ loops over @(producer)@, substituting each 'yield' in
-    @(producer)@ with @(body)@.  The @(body)@ may 'yield' values of its own,
-    too, and 'for' will preserve these 'yield's, which become the new output
-    type.
+    @(producer)@ with @(body)@.
 
-    You can also deduce a lot of that behavior purely from the type signature:
+    You can also deduce that behavior purely from the type signature:
 
     * The body of the loop takes exactly one argument of type @(a)@, which is
-      the same as the output type of the first 'Producer'.  Therefore, the body
-      of the loop must get its input from that 'Producer' and nowhere else.
-
-    * The output of the body of the loop has type @(b)@, which is the exact same
-      output type as the final result, therefore we conclude that the final
-      result must reuse output from the body of the loop.
+      the same as the output type of the 'Producer'.  Therefore, the body of the
+      loop must get its input from that 'Producer' and nowhere else.
 
     * The return value of the input 'Producer' matches the return value of the
       result, therefore 'for' must loop over the entire 'Producer' and not skip
       anything.
 
     Again, the above type signature is not the true type of 'for', which is
-    more general.  Think of the above type signature as saying: \"If the first
-    argument of 'for' is a 'Producer' and the second argument returns a
-    'Producer', then the final result must be a 'Producer'.\"
+    actually more general.  Think of the above type signature as saying: \"If
+    the first argument of 'for' is a 'Producer' and the second argument returns
+    a 'Effect', then the final result must be an 'Effect'.\"
 
     Click the link to 'for' to navigate to its documentation.  There you will
     see the fully general type and underneath you will see equivalent simpler
-    types.  One of these says that the body of the loop can be an 'Effect', too:
+    types.  One of these says that the body of the loop can be an 'Producer',
+    too:
 
 @
- 'for' :: 'Monad' m => 'Producer' b m r -> (b -> 'Effect' m ()) -> 'Effect' m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
 @
 
-    An 'Effect' is just a 'Producer' that never 'yield's (i.e. it only 'lift's):
+    The first type signature I showed for 'for' was a special case of this
+    slightly more general signature.  An 'Effect' is just a 'Producer' that
+    never 'yield's (i.e. an 'Effect' only 'lift's):
 
 @
  data 'X'  -- The uninhabited type
@@ -253,8 +245,8 @@ import Prelude hiding ((.), id)
 
     If a 'Producer' never 'yield's, it will type check as an 'Effect'.
 
-    This is why 'for' permits two different type signatures.  The second type
-    signature is just a special case of the first one:
+    This is why 'for' permits two different type signatures.  The first type
+    signature is just a special case of the second one:
 
 @
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
@@ -297,11 +289,11 @@ import Prelude hiding ((.), id)
     You can think of 'yield' as creating a hole and a 'for' loop is one way to
     fill that hole.
 
-    Notice how the final @loop@ only 'lift's actions and does nothing else.
-    This property is true for all 'Effect's, which are just glorified wrappers
-    around actions the base monad.  This means we can 'run' these 'Effect's to
-    remove their 'lift's and lower them back down to the equivalent action in
-    the base monad:
+    Notice how the final @loop@ only 'lift's actions from the base monad and
+    does nothing else.  This property is true for all 'Effect's, which are just
+    glorified wrappers around actions the base monad.  This means we can 'run'
+    these 'Effect's to remove their 'lift's and lower them back down to the
+    equivalent computation in the base monad:
 
 @
  'run' :: 'Monad' m => 'Effect' m r -> m r
@@ -399,10 +391,10 @@ import Prelude hiding ((.), id)
 > --     yield x
 > --     yield x
 
-    This time our @loop@ outputs 'String's, specifically two copies of every
-    line that we read from standard input.
-
-    Since @loop@ is itself a 'Producer', we can loop over our @loop@:
+    This time our @loop@ is a 'Producer' that outputs 'String's, specifically
+    two copies of each line that we read from standard input.  Since @loop@ is a
+    'Producer' we cannot 'run' it because there is still unhandled output.
+    However, we can use yet another 'for' to handle this new duplicated stream:
 
 > -- nested.hs
 >
@@ -421,8 +413,8 @@ import Prelude hiding ((.), id)
 > <Ctrl-D>
 > $
 
-    But is this feature really necessary?  Couldn't we have instead written this
-    using a nested for loop?
+    But is this really necessary?  Couldn't we have instead written this using a
+    nested for loop?
 
 > main = run $
 >     for P.stdin $ \str1 ->
@@ -440,7 +432,7 @@ import Prelude hiding ((.), id)
 \ for (for m f) g = for m (\x -> for (f x) g)
 @
 
-    We can understand the rationale behind this equality if we define the
+    We can understand the rationale behind this equality if we first define the
     following operator that is the point-free counterpart to 'for':
 
 @
@@ -451,8 +443,8 @@ import Prelude hiding ((.), id)
  (f ~> g) x = for (f x) g
 @
 
-    Using the ('~>') operator, we can transform our original equality into the
-    following more symmetric form:
+    Using ('~>') (pronounced \"into\"), we can transform our original equality
+    into the following more symmetric form:
 
 @
  f :: (Monad m) => a -> 'Producer' b m r
@@ -497,20 +489,13 @@ import Prelude hiding ((.), id)
     a stream, you get back your original stream.
 
     These three \"for loop\" laws summarize our intuition for how 'for' loops
-    should behave:
-
-> for (for m f) g = for m (\x -> for (f x) g)
->
-> for (yield x) f = f x
->
-> for m yield = m
-
-    ... and because these are just 'Category' laws in disguise that means that
-    'Producer's are composable in a rigorous sense of the word.
+    should behave and because these are 'Category' laws in disguise that means
+    that 'Producer's are composable in a rigorous sense of the word.
 
     In fact, we get more out of this than just a bunch of equations.  We also
     get a useful operator, too: ('~>').  We can use this operator to condense
-    our original code into the following more succinct form:
+    our original code into the following more succinct form that composes two
+    transformations:
 
 > main = run $ for P.stdin (duplicate ~> lift . putStrLn)
 
@@ -537,7 +522,7 @@ import Prelude hiding ((.), id)
     the 'next' command:
 
 @
- 'next' :: (Monad m) => 'Producer' a m r -> m (Either r (a, 'Producer' a m r))
+ 'next' :: 'Monad' m => 'Producer' a m r -> m ('Either' r (a, 'Producer' a m r))
 @
 
     Think of 'next' as pattern matching on the head of the 'Producer'.  This
@@ -570,25 +555,26 @@ import Prelude hiding ((.), id)
 >         -- Gracefully terminate if we got a broken pipe error
 >         Left e@(G.IOError { G.ioe_type = t}) ->
 >             lift $ unless (t == G.ResourceVanished) $ throwIO e
->         Right () -> stdout  -- Loop
+>         -- Otherwise loop
+>         Right () -> stdout
 
     'await' is the dual of 'yield': we suspend our 'Consumer' until we receive a
     new value.  If nobody provides a value (which is possible) then 'await'
     never returns.  You can think of 'await' as having the following type:
 
 @
- 'await' :: (Monad m) => 'Consumer' a m a
+ 'await' :: 'Monad' m => 'Consumer' a m a
 @
 
     One way to feed a 'Consumer' is to repeatedly feed the same input using
     using ('>~') (pronounced \"feed\"):
 
 @
- \-\-                   +- Feed       +- Consumer to    +- Returns new
- \-\-                   |  action     |  feed           |  Effect
- \-\-                   v             v                 v  
- \-\-                   ----------    --------------    ----------
- ('>~') :: (Monad m) => 'Effect' m b -> 'Consumer' b m c -> 'Effect' m c
+ \-\-                 +- Feed       +- Consumer to    +- Returns new
+ \-\-                 |  action     |  feed           |  Effect
+ \-\-                 v             v                 v  
+ \-\-                 ----------    --------------    ----------
+ ('>~') :: 'Monad' m => 'Effect' m b -> 'Consumer' b m c -> 'Effect' m c
 @
 
     This runs the given 'Effect' every time the 'Consumer' 'await's a value,
@@ -608,7 +594,7 @@ ABC
     more general type:
 
 @
- ('>~') :: (Monad m) => 'Consumer' a m b -> 'Consumer' b m c -> 'Consumer' a m c
+ ('>~') :: 'Monad' m => 'Consumer' a m b -> 'Consumer' b m c -> 'Consumer' a m c
 @
 
     ('>~') is the dual of ('~>'), composing 'Consumer's instead of 'Producer's.
@@ -760,15 +746,16 @@ ABCDEF
 > import Pipes
 > import Prelude hiding (take)
 >
-> --                          +--------- A 'Pipe' that
-> --                          |    +---- 'await's 'a's and
-> --                          |    | +-- 'yield's 'a's
-> --                          |    | |
-> --                          v    v v
-> take :: (Monad m) => Int -> Pipe a a m ()
-> take n = replicateM_ n $ do  -- Repeat the following block 'n' times
->     x <- await               -- 'await' a value of type 'a'
->     yield x                  -- 'yield' a value of type 'a'
+> --              +--------- A 'Pipe' that
+> --              |    +---- 'await's 'a's and
+> --              |    | +-- 'yield's 'a's
+> --              |    | |
+> --              v    v v
+> take ::  Int -> Pipe a a IO ()
+> take n = replicateM_ n $ do
+>     x <- await                             -- 'await' a value of type 'a'
+>     yield x                                -- 'yield' a value of type 'a'
+>     lift $ putStrLn "You shall not pass!"  -- Fly, you fools!
 
     You can use 'Pipe's to transform 'Producer's, 'Consumer's, or even other
     'Pipe's using the same ('>->') operator:
@@ -792,6 +779,7 @@ ABC<Enter>
 ABC
 42<Enter>
 42
+You shall not pass!
 >>>
 
     ... or you can pre-compose 'P.take' before 'P.stdout' to limit the number of
@@ -807,17 +795,14 @@ ABC
 
 > (p1 >-> p2) >-> p3 = p1 >-> (p2 >-> p3)
 
-    Therefore we could have left out the parentheses and there was also no need
-    to pre-group components:
+    Therefore we can just leave out the parentheses:
 
 >>> run $ P.stdin >-> take 3 >-> P.stdout
 <Exact same behavior>
 
-    ('>->') is designed to behave like the Unix pipe operator, @|@, except
-    with less quirks.
-
-    ('>->') also has an identity named 'cat' (named after the Unix @cat@
-    utility), which reforwards elements endlessly:
+    ('>->') is designed to behave like the Unix pipe operator, except with less
+    quirks.  In fact, ('>->') also has an identity named 'cat' (named after the
+    Unix @cat@ utility), which reforwards elements endlessly:
 
 > cat :: (Monad m) => Pipe a a m r
 > cat = forever $ do
@@ -843,23 +828,20 @@ ABC
 > import Prelude hiding (head)
 >
 > head :: (Monad m) => Pipe a a m ()
-> head = P.take 10
+> head = P.take
 >
 > yes :: (Monad m) => Producer String m r
 > yes = forever $ yield "y"
 >
-> main = run $ yes >-> head >-> P.stdout
+> main = run $ yes >-> head 3 >-> P.stdout
 
-    This prints out 10 \'@y@\'s, just like the equivalent Unix pipeline:
+    This prints out 3 \'@y@\'s, just like the equivalent Unix pipeline:
 
 > $ ./unix
 > y
 > y
 > y
-> y
-> y
-> y
-> y
+> $ yes | head -3
 > y
 > y
 > y
@@ -867,7 +849,7 @@ ABC
 
     This lets us write \"Haskell pipes\" instead of Unix pipes.  These are much
     easier to build than Unix pipes and we can connect them directly within
-    Haskell for type safety.
+    Haskell for interoperability with the Haskell language and ecosystem.
 -}
 
 {- $unfolds
