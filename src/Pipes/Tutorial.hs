@@ -77,6 +77,9 @@ module Pipes.Tutorial (
 
     -- * Conclusion
     -- $conclusion
+
+    -- * Appendix: Types
+    -- $types
     ) where
 
 import Control.Category
@@ -1020,4 +1023,322 @@ quit<Enter>
 
     ... or you can mail the list directly at
     <mailto:haskell-pipes@googlegroups.com>.
+
+    Additionally, for questions regarding types or type errors, you might find
+    the following appendix on types very useful.
+-}
+
+{- $types
+    @pipes@ uses parametric polymorphism (i.e. generics) to overload all
+    operations.  You've probably noticed this overloading already::
+
+    * 'yield' works within both 'Producer's and 'Pipe's
+
+    * 'await' works within both 'Consumer's and 'Pipe's
+
+    * ('>->') connects 'Producer's, 'Consumer's, and 'Pipe's in varying ways
+
+    This overloading is great when it works, but when connections fail they
+    produce type errors that appear intimidating at first.  This section
+    explains the underlying types so that you can work through type errors
+    intelligently.
+
+    'Producer's, 'Consumer's, 'Pipe's, and 'Effect's are all special cases of a
+    single underlying type: a 'Proxy'.  This overarching type permits fully
+    bidirectional communication on both an upstream and downstream interface.
+    You can think of it as having the following shape:
+
+> Proxy a' a b' b m r
+>
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> a' <==       <== b'  -- Information flowing upstream
+>     |         |
+> a  ==>       ==> b   -- Information flowing downstream
+>     |    |    |
+>     +----|----+
+>          v
+>          r
+
+    The four core types do not use the upstream flow of information.  This means
+    that the @a'@ and @b'@ in the above diagram go unused unless you use the
+    more advanced features provided in "Pipes.Core".
+
+    @pipes@ uses type synonyms to hide unused inputs or outputs and clean up
+    type signatures.  These type synonyms come in two flavors:
+
+    * Concrete type synonyms that explicitly close unused inputs and outputs of
+      the 'Proxy' type
+
+    * Polymorphic type synonyms that don't explicitly close unused inputs or
+      outputs
+
+    The concrete type synonyms use @()@ to close unused inputs and 'X' (the
+    uninhabited type) to close unused outputs:
+
+    * 'Effect': explicitly closes both ends, forbidding 'await's and 'yield's
+
+> type Effect = Proxy X () () X
+>
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> X  <==       <== ()
+>     |         |
+> () ==>       ==> X
+>     |    |    |
+>     +----|----+
+>          v
+>          r
+
+    * 'Producer': explicitly closes the upstream end, forbidding 'await's
+
+> type Producer b = Proxy X () () b
+>
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> X  <==       <== ()
+>     |         |
+> () ==>       ==> b
+>     |    |    |
+>     +----|----+
+>          v
+>          r
+
+    * 'Consumer': explicitly closes the downstream end, forbidding 'yield's
+
+> type Consumer a = Proxy () a () X
+>
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> () <==       <== ()
+>     |         |
+> a  ==>       ==> X
+>     |    |    |
+>     +----|----+
+>          v
+>          r
+
+    * 'Pipe': marks both ends open, allowing both 'await's and 'yield's
+
+> type Pipe a b = Proxy () a () b
+>
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> () <==       <== ()
+>     |         |
+> a  ==>       ==> b
+>     |    |    |
+>     +----|----+
+>          v
+>          r
+
+    When you compose 'Proxy's using ('>->') all you are doing is placing them
+    side by side and fusing them laterally.  For example, when you compose a
+    'Producer', 'Pipe', and a 'Consumer', you can think of information flowing
+    like this:
+
+>      Producer                Pipe              Consumer
+>     +---------+          +---------+          +---------+
+>     |         |          |         |          |         |
+> X  <==       <==   ()   <==       <==   ()   <==       <== ()
+>     |  stdin  |          | take 3  |          |  stdout |
+> () ==>       ==> String ==>       ==> String ==>       ==> X
+>     |    |    |          |    |    |          |    |    |
+>     +----|----+          +----|----+          +----|----+
+>          v                    v                    v
+>          ()                   ()                   ()
+
+     Composition fuses away the intermediate interfaces, leaving behind an
+     'Effect':
+
+>                   Effect
+>     +-------------------------------+
+>     |                               |
+> X  <==                             <== ()
+>     |  stdin >-> take 3 >-> stdout  |
+> () ==>                             ==> X
+>     |                               |
+>     +---------------|---------------+
+>                     v
+>                     ()
+>
+
+    @pipes@ also provides polymorphic type synonyms with apostrophes at the end
+    of their names.  These use universal quantification to leave open any unused
+    input or output ends (which I mark using @*@):
+
+    * 'Producer'': marks the upstream end unused but still open
+
+> type Producer' b m r = forall x' x . Proxy x' x () b m r
+>
+> Upstream | Downstream
+>     +---------+
+>     |         |
+>  * <==       <== ()
+>     |         |
+>  * ==>       ==> b
+>     |    |    |
+>     +----|----+
+>          v
+>          r
+
+    * 'Consumer'': marks the downstream end unused but still open
+
+> type Consumer' a m r = forall y' y . Proxy a () y' y m r
+>
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> a  <==       <== * 
+>     |         |
+> () ==>       ==> *
+>     |    |    |
+>     +----|----+
+>          v
+>          r
+
+    * 'Effect'': marks both ends unused but still open
+
+> type Effect' a m r = forall x' x y' y . Proxy x' x y' y m r
+>
+> Upstream | Downstream
+>     +---------+
+>     |         |
+>  * <==       <== * 
+>     |         |
+>  * ==>       ==> *
+>     |    |    |
+>     +----|----+
+>          v
+>          r
+
+    Note that there is no polymorphic generalization of a 'Pipe'.
+
+    Like before, if you compose a 'Producer'', a 'Pipe', and a 'Consumer'':
+
+>      Producer'               Pipe              Consumer'
+>     +---------+          +---------+          +---------+
+>     |         |          |         |          |         |
+>  * <==       <==   ()   <==       <==   ()   <==       <== *
+>     |  stdin  |          | take 3  |          |  stdout |
+>  * ==>       ==> String ==>       ==> String ==>       ==> *
+>     |    |    |          |    |    |          |    |    |
+>     +----|----+          +----|----+          +----|----+
+>          v                    v                    v
+>          ()                   ()                   ()
+
+    ... they fuse into an 'Effect'':
+
+>                   Effect'
+>     +-------------------------------+
+>     |                               |
+>  * <==                             <== *
+>     |  stdin >-> take 3 >-> stdout  |
+>  * ==>                             ==> *
+>     |                               |
+>     +---------------|---------------+
+>                     v
+>                     ()
+>
+
+    Polymorphic type synonyms come in handy when you want to keep the type as
+    general as possible.  For example, the type signature for 'yield' uses
+    'Producer'' to keep the type signature simple while still leaving the
+    upstream input end open:
+
+@
+ 'yield' :: 'Monad' m => a -> 'Producer'' a m ()
+@
+
+    This type signature lets us use 'yield' within a 'Pipe', too, because the
+    'Pipe' type synonym is a special case of the polymorphic 'Producer'' type 
+    synonym:
+
+@
+ type 'Producer'' b m r = forall x' x . 'Proxy' x' x () b m r
+ type 'Pipe'    a b m r =               'Proxy' () a () b m r
+@
+
+    The same is true for 'await', which uses the polymorphic 'Consumer'' type
+    synonym:
+
+@
+ 'await' :: 'Monad' m => 'Consumer'' a m a
+@
+
+    We can use 'await' within a 'Pipe' because a 'Pipe' is a special case of the
+    polymorphic 'Consumer'' type synonym:
+
+@
+ type 'Consumer'' a   m r = forall y' y . 'Proxy' () a y' y m r
+ type 'Pipe'      a b m r =               'Proxy' () a () b m r
+@
+
+    However, polymorphic type synonyms cause problems in many other cases:
+
+    * They induce higher-rank types and require you to enable the @RankNTypes@
+      extension to use them in your own type signatures:
+
+    * They give the wrong behavior when used in the negative position of a
+      function like this:
+
+> f :: Producer' a m r -> ...  -- Wrong
+>
+> f :: Producer  a m r -> ...  -- Right
+
+    * You can't use them within other types without the @ImpredicativeTypes@
+      extension:
+
+> io :: IO (Producer' a m r)  -- Type error
+
+    * You can't partially apply them:
+
+> stack :: MaybeT (Producer' a m) r  -- Type error
+
+    In these scenarios you should fall back on the concrete type synonyms, which
+    are better behaved.
+
+    For the purposes of debugging type errors you can just remember that:
+
+>  Input --+    +-- Output
+>          |    |
+>          v    v
+> Proxy a' a b' b m r
+>       ^    ^
+>       |    |
+>       +----+-- Ignore these
+
+    For example, let's say that you try to 'run' the 'P.stdin' 'Producer'.  This
+    produces the following type error:
+
+>>> run P.stdin
+<interactive>:4:5:
+    Couldn't match expected type `X' with actual type `String'
+    Expected type: Effect m0 r0
+      Actual type: Proxy X () () String IO ()
+    In the first argument of `run', namely `P.stdin'
+    In the expression: run P.stdin
+
+    'run' expects an 'Effect', which is equivalent to the following type:
+
+> Effect          IO () = Proxy X () () X      IO ()
+
+    ... but 'P.stdin' type-checks as a 'Producer', which has the following type:
+
+> Producer String IO () = Proxy X () () String IO ()
+
+    The fourth type variable (the output) does not match.  For an 'Effect' this
+    type variable should be closed (i.e. 'X'), but 'P.stdin' has a 'String'
+    output, thus the type error:
+
+>    Couldn't match expected type `X' with actual type `String'
+
+    Any time you get type errors like these you can work through them by
+    expanding out the type synonyms and seeing which type variables do not
+    match.
 -}
