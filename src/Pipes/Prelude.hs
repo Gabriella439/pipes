@@ -28,11 +28,13 @@ module Pipes.Prelude (
     -- * Pipes
     -- $pipes
     map,
+    mapM,
     filter,
     take,
     takeWhile,
     drop,
     dropWhile,
+    concat,
     findIndices,
     scan,
     scanM,
@@ -54,6 +56,7 @@ module Pipes.Prelude (
     length,
     null,
     toList,
+    toListM,
 
     -- * Zips
     zip,
@@ -79,6 +82,7 @@ import qualified Prelude
 import Prelude hiding (
     all,
     any,
+    concat,
     drop,
     dropWhile,
     filter,
@@ -86,6 +90,7 @@ import Prelude hiding (
     last,
     length,
     map,
+    mapM,
     null,
     read,
     show,
@@ -186,13 +191,17 @@ quit<Enter>
 
 -}
 
-{-| Apply a function to all values flowing downstream
-
-> p >-> map f = for p (yield . f)
--}
+-- | Apply a function to all values flowing downstream
 map :: (Monad m) => (a -> b) -> Pipe a b m r
 map f = for cat (yield . f)
 {-# INLINABLE map #-}
+
+-- | Apply a monadic function to all values flowing downstream
+mapM :: (Monad m) => (a -> m b) -> Pipe a b m r
+mapM f = for cat $ \a -> do
+    b <- lift (f a)
+    yield b
+{-# INLINABLE mapM #-}
 
 {-| @(filter predicate)@ only forwards values that satisfy the predicate.
 
@@ -250,6 +259,11 @@ dropWhile predicate = go
                 yield a
                 cat
 {-# INLINABLE dropWhile #-}
+
+-- | Flatten all 'Foldable' elements flowing downstream
+concat :: (Monad m, Foldable f) => Pipe (f a) a m r
+concat = for cat each
+{-# INLINABLE concat #-}
 
 -- | Outputs the indices of all elements that satisfied the predicate
 findIndices :: (Monad m) => (a -> Bool) -> Pipe a Int m r
@@ -429,6 +443,25 @@ toList = loop
         M         m  -> loop (runIdentity m)
         Pure    _    -> []
 {-# INLINABLE toList #-}
+
+{-| Convert an effectful 'Producer' into a list
+
+    Note: 'toListM' is not an idiomatic use of @pipes@, but I provide it for
+    simple testing purposes.  Idiomatic @pipes@ style consumes the elements
+    immediately as they are generated instead of loading all elements into
+    memory.
+-}
+toListM :: (Monad m) => Producer a m r -> m [a]
+toListM = loop
+  where
+    loop p = case p of
+        Request _ fu -> loop (fu ())
+        Respond a fu -> do
+            as <- loop (fu ())
+            return (a:as)
+        M         m  -> m >>= loop
+        Pure    _    -> return []
+{-# INLINABLE toListM #-}
 
 -- | Zip two 'Producer's
 zip :: (Monad m)
