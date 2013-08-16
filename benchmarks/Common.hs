@@ -1,7 +1,5 @@
 module Common (commonMain) where
 
-{-# LANGUAGE CPP #-}
-
 import Criterion.Main (Benchmark, defaultMain)
 import Data.Maybe (fromMaybe)
 import System.Console.GetOpt
