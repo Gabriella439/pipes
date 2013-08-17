@@ -750,10 +750,9 @@ ABCDEF
 > --              |    | |
 > --              v    v v
 > take ::  Int -> Pipe a a IO ()
-> take n = replicateM_ n $ do
->     x <- await                             -- 'await' a value of type 'a'
->     yield x                                -- 'yield' a value of type 'a'
->     lift $ putStrLn "You shall not pass!"  -- Fly, you fools!
+> take n = do replicateM_ n $  do x <- await         -- 'await' a value of type 'a'
+>                                 yield x            -- 'yield' a value of type 'a'
+>             lift $ putStrLn "You shall not pass!"  -- Fly, you fools!
 
     You can use 'Pipe's to transform 'Producer's, 'Consumer's, or even other
     'Pipe's using the same ('>->') operator:
