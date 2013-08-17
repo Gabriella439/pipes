@@ -4,7 +4,12 @@
     library.
 -}
 
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes, CPP #-}
+
+#if __GLASGOW_HASKELL__ >= 702
+{-# LANGUAGE Trustworthy #-}
+#endif
+{- The rewrite RULES require the 'TrustWorthy' annotation. -}
 
 module Pipes (
     -- * The Proxy Monad Transformer
@@ -136,6 +141,16 @@ for :: (Monad m)
     ->       Proxy x' x c' c m a'
 for = (//>)
 {-# INLINABLE for #-}
+
+{-# RULES
+    "for cat f" forall f .
+        for cat f =
+            let go = do
+                    x <- await
+                    f x
+                    go
+            in  go
+  #-}
 
 {-| Compose loop bodies
 
