@@ -825,7 +825,7 @@ You shall not pass!
 > import qualified Pipes.Prelude as P  -- Pipes.Prelude provides 'take', too
 > import Prelude hiding (head)
 >
-> head :: (Monad m) => Pipe a a m ()
+> head :: (Monad m) => Int -> Pipe a a m ()
 > head = P.take
 >
 > yes :: (Monad m) => Producer String m r
