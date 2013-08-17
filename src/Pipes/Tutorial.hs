@@ -232,16 +232,14 @@ import Prelude hiding ((.), id)
 @
 
     The first type signature I showed for 'for' was a special case of this
-    slightly more general signature.  An 'Effect' is just a 'Producer' that
-    never 'yield's (i.e. an 'Effect' only 'lift's):
+    slightly more general signature.  A 'Producer' that never 'yield's is also
+    an 'Effect':
 
 @
  data 'X'  -- The uninhabited type
 
 \ type 'Effect' m r = 'Producer' 'X' m r
 @
-
-    If a 'Producer' never 'yield's, it will type check as an 'Effect'.
 
     This is why 'for' permits two different type signatures.  The first type
     signature is just a special case of the second one:
@@ -903,13 +901,13 @@ y = 4
 > import Pipes
 > import qualified Pipes.Prelude as P
 > 
-> quitter :: Producer String IO ()
-> quitter = P.stdin >-> P.takeWhile (/= "quit")
+> input :: Producer String IO ()
+> input = P.stdin >-> P.takeWhile (/= "quit")
 > 
 > pair :: ListT IO String
 > pair = do
->     str1 <- Select quitter
->     str2 <- Select quitter
+>     str1 <- Select input
+>     str2 <- Select input
 >     return (str1 ++ " " ++ str2)
 
     Here we're binding standard input non-deterministically (twice) as if it
@@ -1036,7 +1034,7 @@ Fail<Enter>
 {- $conclusion
     This tutorial covers the concepts of connecting, building, and reading
     @pipes@ code.  However, this library is only the core component in an
-    ecosystem of streaming components.  Derved libraries that build immmediately
+    ecosystem of streaming components.  Derived libraries that build immediately
     upon @pipes@ include:
 
     * @pipes-concurrency@: Concurrent reactive programming and message passing

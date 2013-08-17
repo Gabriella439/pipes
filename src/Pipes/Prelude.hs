@@ -504,7 +504,7 @@ tee p = evalStateP Nothing $ do
     dn _ = return ()
 {-# INLINABLE tee #-}
 
-{-| Transform a unidirectional 'Pipe' to a bidirectional 'Pipe'
+{-| Transform a unidirectional 'Pipe' to a bidirectional 'Proxy'
 
 > generalize (f >-> g) = generalize f >+> generalize g
 >
