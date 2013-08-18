@@ -986,13 +986,13 @@ quit<Enter>
     defined:
 
 > drop :: (Monad m) => Int -> Pipe a a m r
-> drop = do
+> drop n = do
 >     replicateM_ n await
 >     cat
 
     This is equivalent to:
 
-> drop = do
+> drop n = do
 >     replicateM_ n await
 >     forever $ do
 >         x <- await
