@@ -1237,7 +1237,7 @@ Fail<Enter>
 
     * 'Consumer'': marks the downstream end unused but still open
 
-> type Consumer' a m r = forall y' y . Proxy a () y' y m r
+> type Consumer' a m r = forall y' y . Proxy () a y' y m r
 >
 > Upstream | Downstream
 >     +---------+
