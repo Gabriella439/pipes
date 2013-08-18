@@ -287,8 +287,8 @@ import Prelude hiding ((.), id)
 
     Notice how the final @loop@ only 'lift's actions from the base monad and
     does nothing else.  This property is true for all 'Effect's, which are just
-    glorified wrappers around actions the base monad.  This means we can 'run'
-    these 'Effect's to remove their 'lift's and lower them back down to the
+    glorified wrappers around actions in the base monad.  This means we can 'run'
+    these 'Effect's to remove their 'lift's and lower them back to the
     equivalent computation in the base monad:
 
 @
@@ -336,7 +336,7 @@ import Prelude hiding ((.), id)
     code equivalent to what a sufficiently careful Haskell programmer would
     write.
 
-    You can also use 'for' to loop over lists, too.  To do so, convert the list
+    You can also use 'for' to loop over lists.  To do so, convert the list
     to a 'Producer' using 'each', which is exported by default from "Pipes":
 
 > each :: (Monad m) => [a] -> Producer a m ()
@@ -489,7 +489,7 @@ import Prelude hiding ((.), id)
     that 'Producer's are composable in a rigorous sense of the word.
 
     In fact, we get more out of this than just a bunch of equations.  We also
-    get a useful operator, too: ('~>').  We can use this operator to condense
+    get a useful operator: ('~>').  We can use this operator to condense
     our original code into the following more succinct form that composes two
     transformations:
 
@@ -510,7 +510,7 @@ import Prelude hiding ((.), id)
 -}
 
 {- $consumers
-    Sometimes you don't want use a 'for' loop because you don't want to consume
+    Sometimes you don't want to use a 'for' loop because you don't want to consume
     every element of a 'Producer' or because you don't want to process every
     value of a 'Producer' the exact same way.
 
@@ -891,7 +891,7 @@ y = 3
 y = 4
 (2,4)
 
-    You can also go the other way, too, binding 'Producer's directly within a
+    You can also go the other way, binding 'Producer's directly within a
     'ListT'.  In fact, this is actually what 'Select' was already doing:
 
 > Select :: Producer a m () -> ListT m a
