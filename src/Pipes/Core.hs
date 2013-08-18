@@ -802,7 +802,7 @@ p1 <+< p2 = p2 >+> p1
 f <\\ p = p //> f
 {-# INLINABLE (<\\) #-}
 
--- | Equivalent t0 ('>\\') with the arguments flipped
+-- | Equivalent to ('>\\') with the arguments flipped
 (//<)
     :: (Monad m)
     =>        Proxy b' b y' y m c
