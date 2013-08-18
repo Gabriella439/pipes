@@ -150,6 +150,13 @@ for = (//>)
                     f x
                     go
             in  go
+  ; "m >~ cat" forall m .
+        m >~ cat =
+            let go = do
+                    x <- m
+                    yield x
+                    go
+            in  go
   #-}
 
 {-| Compose loop bodies
