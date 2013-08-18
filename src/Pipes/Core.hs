@@ -263,8 +263,8 @@ f '/>/' 'respond' = f
 
 -}
 
-{-| Send a value of type @b@ downstream and block waiting for a reply of type
-    @b'@
+{-| Send a value of type @a@ downstream and block waiting for a reply of type
+    @a'@
 
     'respond' is the identity of the respond category.
 -}
