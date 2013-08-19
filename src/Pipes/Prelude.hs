@@ -205,7 +205,7 @@ mapM f = for cat $ \a -> do
 
 {-| @(filter predicate)@ only forwards values that satisfy the predicate.
 
-> p >-> filter predicate = for p (yieldIf predicate)
+> p >-> filter predicate = for p (filter predicate)
 -}
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat $ \a -> when (predicate a) (yield a)
