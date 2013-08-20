@@ -203,10 +203,7 @@ mapM f = for cat $ \a -> do
     yield b
 {-# INLINABLE mapM #-}
 
-{-| @(filter predicate)@ only forwards values that satisfy the predicate.
-
-> p >-> filter predicate = for p (yieldIf predicate)
--}
+-- | @(filter predicate)@ only forwards values that satisfy the predicate.
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat $ \a -> when (predicate a) (yield a)
 {-# INLINABLE filter #-}
