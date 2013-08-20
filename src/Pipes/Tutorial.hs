@@ -610,10 +610,10 @@ ABC
 >
 > -- more concise: doubleUp = (++) <$> await <*> await
 
-    We can now insert this in between @(lift getLine)@ and @printN@ and see what
+    We can now insert this in between @(lift getLine)@ and @stdout@ and see what
     happens:
 
->>> run $ lift getLine >~ doubleUp >~ printN 3
+>>> run $ lift getLine >~ doubleUp >~ stdout
 Test<Enter>
 ing<Enter>
 Testing
@@ -623,8 +623,9 @@ ABCDEF
 42<Enter>
 000<Enter>
 42000
+...
 
-    'doubleUp' splits every request from 'printN' into two separate requests and
+    'doubleUp' splits every request from 'stdout' into two separate requests and
     returns back the concatenated result.
 
     We didn't need to parenthesize the above chain of ('>~') operators, because
