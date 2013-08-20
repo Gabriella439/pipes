@@ -263,8 +263,8 @@ f '/>/' 'respond' = f
 
 -}
 
-{-| Send a value of type @b@ downstream and block waiting for a reply of type
-    @b'@
+{-| Send a value of type @a@ downstream and block waiting for a reply of type
+    @a'@
 
     'respond' is the identity of the respond category.
 -}
@@ -802,7 +802,7 @@ p1 <+< p2 = p2 >+> p1
 f <\\ p = p //> f
 {-# INLINABLE (<\\) #-}
 
--- | Equivalent t0 ('>\\') with the arguments flipped
+-- | Equivalent to ('>\\') with the arguments flipped
 (//<)
     :: (Monad m)
     =>        Proxy b' b y' y m c

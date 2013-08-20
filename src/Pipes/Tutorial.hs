@@ -287,8 +287,8 @@ import Prelude hiding ((.), id)
 
     Notice how the final @loop@ only 'lift's actions from the base monad and
     does nothing else.  This property is true for all 'Effect's, which are just
-    glorified wrappers around actions the base monad.  This means we can 'run'
-    these 'Effect's to remove their 'lift's and lower them back down to the
+    glorified wrappers around actions in the base monad.  This means we can 'run'
+    these 'Effect's to remove their 'lift's and lower them back to the
     equivalent computation in the base monad:
 
 @
@@ -336,7 +336,7 @@ import Prelude hiding ((.), id)
     code equivalent to what a sufficiently careful Haskell programmer would
     write.
 
-    You can also use 'for' to loop over lists, too.  To do so, convert the list
+    You can also use 'for' to loop over lists.  To do so, convert the list
     to a 'Producer' using 'each', which is exported by default from "Pipes":
 
 > each :: (Monad m) => [a] -> Producer a m ()
@@ -489,7 +489,7 @@ import Prelude hiding ((.), id)
     that 'Producer's are composable in a rigorous sense of the word.
 
     In fact, we get more out of this than just a bunch of equations.  We also
-    get a useful operator, too: ('~>').  We can use this operator to condense
+    get a useful operator: ('~>').  We can use this operator to condense
     our original code into the following more succinct form that composes two
     transformations:
 
@@ -510,7 +510,7 @@ import Prelude hiding ((.), id)
 -}
 
 {- $consumers
-    Sometimes you don't want use a 'for' loop because you don't want to consume
+    Sometimes you don't want to use a 'for' loop because you don't want to consume
     every element of a 'Producer' or because you don't want to process every
     value of a 'Producer' the exact same way.
 
@@ -689,10 +689,12 @@ ABCDEF
 > <Ctrl-D>
 > $
 
-    ('>->') matches every 'await' in the 'Consumer' with a 'yield' in the
-    'Producer'.  Every time 'P.stdout' awaits a 'String' it transfers control
-    to 'P.stdin' and every time 'P.stdin' yields a 'String' it transfers control
-    back to 'P.stdout'.
+    ('>->') is \"pull-based\" meaning that control flow begins at the most
+    downstream component (i.e. 'P.stdout' in the above example).  Any time a
+    component 'await's a value it blocks and transfers control upstream and
+    every time a component 'yield's a value it blocks and transfers control back
+    downstream, satisfying the 'await'.  So in the above example, ('>->')
+    matches every 'await' from 'P.stdout' with a 'yield' from 'P.stdin'.
 
     Streaming stops when either 'P.stdin' terminates (i.e. end of input) or
     'P.stdout' terminates (i.e. broken pipe).  This is why ('>->') requires that
@@ -797,22 +799,25 @@ You shall not pass!
 <Exact same behavior>
 
     ('>->') is designed to behave like the Unix pipe operator, except with less
-    quirks.  In fact, ('>->') also has an identity named 'cat' (named after the
-    Unix @cat@ utility), which reforwards elements endlessly:
+    quirks.  In fact, we can continue the analogy to Unix by defining 'cat'
+    (named after the Unix @cat@ utility), which reforwards elements endlessly:
 
 > cat :: (Monad m) => Pipe a a m r
 > cat = forever $ do
 >     x <- await
 >     yield x
 
-    Therefore, ('>->') and 'cat' form a 'Category', specifically the category of
-    Unix pipes:
+     'cat' is the identity of ('>->'), meaning that 'cat' satisfies the
+     following two laws:
 
 > -- Useless use of 'cat'
 > cat >-> p = p
 >
 > -- Forwarding output to 'cat' does nothing
 > p >-> cat = p
+
+    Therefore, ('>->') and 'cat' form a 'Category', specifically the category of
+    Unix pipes, and 'Pipe's are also composable.
 
     A lot of Unix tools have very simple definitions when written using @pipes@:
 
@@ -892,7 +897,17 @@ y = 3
 y = 4
 (2,4)
 
-    You can also go the other way, too, binding 'Producer's directly within a
+    Note that 'ListT' is lazy and only produces as many elements as we request:
+
+>>> import qualified Pipes.Prelude as P
+>>> run $ for (every pair >-> P.take 2) (lift . print)
+x = 1
+y = 3
+(1,3)
+y = 4
+(1,4)
+
+    You can also go the other way, binding 'Producer's directly within a
     'ListT'.  In fact, this is actually what 'Select' was already doing:
 
 > Select :: Producer a m () -> ListT m a
@@ -972,13 +987,13 @@ quit<Enter>
     defined:
 
 > drop :: (Monad m) => Int -> Pipe a a m r
-> drop = do
+> drop n = do
 >     replicateM_ n await
 >     cat
 
     This is equivalent to:
 
-> drop = do
+> drop n = do
 >     replicateM_ n await
 >     forever $ do
 >         x <- await
@@ -1238,14 +1253,14 @@ Fail<Enter>
 
     * 'Consumer'': marks the downstream end unused but still open
 
-> type Consumer' a m r = forall y' y . Proxy a () y' y m r
+> type Consumer' a m r = forall y' y . Proxy () a y' y m r
 >
 > Upstream | Downstream
 >     +---------+
 >     |         |
-> a  <==       <== * 
+> () <==       <== * 
 >     |         |
-> () ==>       ==> *
+> a  ==>       ==> *
 >     |    |    |
 >     +----|----+
 >          v
