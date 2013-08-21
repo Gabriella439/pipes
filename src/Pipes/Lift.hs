@@ -7,32 +7,39 @@
 
 module Pipes.Lift (
     -- * ErrorT
+    errorP,
     runErrorP,
     catchError,
     liftCatchError,
 
     -- * MaybeT
+    maybeP,
     runMaybeP,
 
     -- * ReaderT
+    readerP,
     runReaderP,
 
     -- * StateT
+    stateP,
     runStateP,
     evalStateP,
     execStateP,
 
     -- * WriterT
     -- $writert
+    writerP,
     runWriterP,
     execWriterP,
 
     -- * RWST
+    rwsP,
     runRWSP,
     evalRWSP,
     execRWSP
     ) where
 
+import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.Error as E
 import qualified Control.Monad.Trans.Maybe as M
 import qualified Control.Monad.Trans.Reader as R
@@ -42,7 +49,17 @@ import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
 
--- | Run 'E.ErrorT' in the base monad
+-- | Apply 'E.ErrorT' to the base monad
+errorP
+    :: (Monad m, E.Error e)
+    => Proxy a' a b' b m (Either e r)
+    -> Proxy a' a b' b (E.ErrorT e m) r
+errorP p = do
+    x <- unsafeHoist lift p
+    lift $ E.ErrorT (return x)
+{-# INLINABLE errorP #-}
+
+-- | Wrap the base monad in 'E.ErrorT'
 runErrorP
     :: (Monad m)
     => Proxy a' a b' b (E.ErrorT e m) r -> Proxy a' a b' b m (Either e r)
@@ -80,6 +97,15 @@ catchError p0 f = go p0
                 Right p' -> go p' )) ))
 {-# INLINABLE catchError #-}
 
+-- | Wrap the base monad in 'M.MaybeT'
+maybeP
+    :: (Monad m)
+    => Proxy a' a b' b m (Maybe r) -> Proxy a' a b' b (M.MaybeT m) r
+maybeP p = do
+    x <- unsafeHoist lift p
+    lift $ M.MaybeT (return x)
+{-# INLINABLE maybeP #-}
+
 -- | Run 'M.MaybeT' in the base monad
 runMaybeP
     :: (Monad m)
@@ -97,6 +123,15 @@ runMaybeP = go
                 Just p' -> go p' ) )
 {-# INLINABLE runMaybeP #-}
 
+-- | Wrap the base monad in 'R.ReaderT'
+readerP
+    :: (Monad m)
+    => (i -> Proxy a' a b' b m r) -> Proxy a' a b' b (R.ReaderT i m) r
+readerP k = do
+    i <- lift R.ask
+    unsafeHoist lift (k i)
+{-# INLINABLE readerP #-}
+
 -- | Run 'R.ReaderT' in the base monad
 runReaderP
     :: (Monad m)
@@ -111,6 +146,17 @@ runReaderP i = go
             p' <- R.runReaderT m i
             return (go p') )
 {-# INLINABLE runReaderP #-}
+
+-- | Wrap the base monad in 'S.StateT'
+stateP
+    :: (Monad m)
+    => (s -> Proxy a' a b' b m (r, s)) -> Proxy a' a b' b (S.StateT s m) r
+stateP k = do
+    s <- lift S.get
+    (r, s') <- unsafeHoist lift (k s)
+    lift (S.put s')
+    return r
+{-# INLINABLE stateP #-}
 
 -- | Run 'S.StateT' in the base monad
 runStateP
@@ -150,6 +196,16 @@ execStateP s = fmap snd . runStateP s
     have any lazy fields.
 -}
 
+-- | Wrap the base monad in 'W.WriterT'
+writerP
+    :: (Monad m, Monoid w)
+    => Proxy a' a b' b m (r, w) -> Proxy a' a b' b (W.WriterT w m) r
+writerP p = do
+    (r, w) <- unsafeHoist lift p
+    lift $ W.tell w
+    return r
+{-# INLINABLE writerP #-}
+
 -- | Run 'W.WriterT' in the base monad
 runWriterP
     :: (Monad m, Monoid w)
@@ -172,6 +228,21 @@ execWriterP
     => Proxy a' a b' b (W.WriterT w m) r -> Proxy a' a b' b m w
 execWriterP = fmap snd . runWriterP
 {-# INLINABLE execWriterP #-}
+
+-- | Wrap the base monad in 'RWS.RWST'
+rwsP
+    :: (Monad m, Monoid w)
+    => (i -> s -> Proxy a' a b' b m (r, s, w))
+    -> Proxy a' a b' b (RWS.RWST i w s m) r
+rwsP k = do
+    i <- lift RWS.ask
+    s <- lift RWS.get
+    (r, s', w) <- unsafeHoist lift (k i s)
+    lift $ do
+        RWS.put s'
+        RWS.tell w
+    return r
+{-# INLINABLE rwsP #-}
 
 -- | Run 'RWST' in the base monad
 runRWSP :: (Monad m, Monoid w)
