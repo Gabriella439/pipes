@@ -49,7 +49,7 @@ import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
 
--- | Apply 'E.ErrorT' to the base monad
+-- | Wrap the base monad in 'E.ErrorT'
 errorP
     :: (Monad m, E.Error e)
     => Proxy a' a b' b m (Either e r)
@@ -59,7 +59,7 @@ errorP p = do
     lift $ E.ErrorT (return x)
 {-# INLINABLE errorP #-}
 
--- | Wrap the base monad in 'E.ErrorT'
+-- | Run 'E.ErrorT' in the base monad
 runErrorP
     :: (Monad m)
     => Proxy a' a b' b (E.ErrorT e m) r -> Proxy a' a b' b m (Either e r)
