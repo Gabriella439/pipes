@@ -68,7 +68,6 @@ module Pipes.Prelude (
     ) where
 
 import Control.Exception (throwIO, try)
-import qualified Control.Foldl as L
 import Control.Monad (liftM, replicateM_, when, unless)
 import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
@@ -268,8 +267,8 @@ findIndices predicate = loop 0
 {-# INLINABLE findIndices #-}
 
 -- | Strict left scan
-scan :: (Monad m) => L.Fold a b -> Pipe a b m r
-scan (L.Fold step begin done) = loop begin
+scan :: (Monad m) => (x -> a -> x) -> x -> (x -> b) -> Pipe a b m r
+scan step begin done = loop begin
   where
     loop x = do
         yield (done x)
@@ -279,8 +278,8 @@ scan (L.Fold step begin done) = loop begin
 {-# INLINABLE scan #-}
 
 -- | Strict, monadic left scan
-scanM :: (Monad m) => L.FoldM m a b -> Pipe a b m r
-scanM (L.FoldM step begin done) = do
+scanM :: (Monad m) => (x -> a -> m x) -> m x -> (x -> m b) -> Pipe a b m r
+scanM step begin done = do
     x <- lift begin
     loop x
   where
@@ -325,8 +324,8 @@ True
 -}
 
 -- | Strict fold of the elements of a 'Producer'
-fold :: (Monad m) => L.Fold a b -> Producer a m () -> m b
-fold (L.Fold step begin done) p0 = loop p0 begin
+fold :: (Monad m) => (x -> a -> x) -> x -> (x -> b) -> Producer a m () -> m b
+fold step begin done p0 = loop p0 begin
   where
     loop p x = case p of
         Request _  fu -> loop (fu ()) x
@@ -338,8 +337,8 @@ fold (L.Fold step begin done) p0 = loop p0 begin
 -- | Strict, monadic fold of the elements of a 'Producer'
 foldM
     :: (Monad m)
-    => L.FoldM m a b -> Producer a m () -> m b
-foldM (L.FoldM step begin done) p0 = do
+    => (x -> a -> m x) -> m x -> (x -> m b) -> Producer a m () -> m b
+foldM step begin done p0 = do
     x0 <- begin
     loop p0 x0
   where
@@ -407,7 +406,7 @@ last p0 = do
 
 -- | Count the number of elements in a 'Producer'
 length :: (Monad m) => Producer a m () -> m Int
-length = fold L.length
+length = fold (\n _ -> n + 1) 0 id
 {-# INLINABLE length #-}
 
 -- | Determine if a 'Producer' is empty

@@ -43,7 +43,6 @@ Library
     HS-Source-Dirs: src
     Build-Depends:
         base         >= 4       && < 5  ,
-        foldl        >= 1.0.0   && < 1.1,
         mmorph       >= 1.0.0   && < 1.1,
         mtl          >= 2.0.1.0 && < 2.2,
         transformers >= 0.2.0.0 && < 0.4
@@ -66,7 +65,6 @@ Benchmark prelude-benchmarks
     Build-Depends:
         base      >= 4       && < 5  ,
         criterion >= 0.8     && < 0.9,
-        foldl     >= 1.0.0   && < 1.1,
         mtl       >= 2.0.1.0 && < 2.2,
         pipes     >= 4.0.0   && < 4.1
 
@@ -81,7 +79,6 @@ Benchmark lift-benchmarks
         base         >= 4       && < 5  ,
         criterion    >= 0.8     && < 0.9,
         deepseq                         ,
-        foldl        >= 1.0.0   && < 1.1,
         mtl          >= 2.0.1.0 && < 2.2,
         pipes        >= 4.0.0   && < 4.1,
         transformers >= 0.2.0.0 && < 0.4

@@ -30,8 +30,11 @@ enumFromTo n1 n2 = loop n1
 drain :: Producer b Identity r -> r
 drain p = runIdentity $ run $ for p discard
 
-msum :: FoldM Identity Int Int
-msum = L.FoldM (\a b -> return $ a + b) (return 0) return
+msum :: (Monad m) => Producer Int m () -> m Int
+msum = P.foldM (\a b -> return $ a + b) (return 0) return
+
+scanMSum :: (Monad m) => Pipe Int Int m r
+scanMSum = P.scanM (\x y -> return (x + y)) (return 0) return
 
 -- Using runIdentity seems to reduce outlier counts.
 preludeBenchmarks :: Int -> [Benchmark]
@@ -46,8 +49,8 @@ preludeBenchmarks vmax =
         , bench "any"       . whnf (runIdentity . P.any (> vmax))
         , bench "find"      . whnf (runIdentity . P.find (== vmax))
         , bench "findIndex" . whnf (runIdentity . P.findIndex (== vmax))
-        , bench "fold"      . whnf (runIdentity . P.fold L.sum)
-        , bench "foldM"     . whnf (runIdentity . P.foldM msum)
+        , bench "fold"      . whnf (runIdentity . P.fold (+) 0 id)
+        , bench "foldM"     . whnf (runIdentity . msum)
         , bench "head"      . nf (runIdentity . P.head)
         , bench "index"     . nf (runIdentity . P.index (vmax-1))
         , bench "last"      . nf (runIdentity . P.last)
@@ -65,8 +68,8 @@ preludeBenchmarks vmax =
         , bench "map"         . whnf (drain . (>-> P.map ((+) 1)))
         , bench "take"        . whnf (drain . (>-> P.take vmax))
         , bench "takeWhile"   . whnf (drain . (>-> P.takeWhile (<= vmax)))
-        , bench "scan"        . whnf (drain . (>-> P.scan L.sum))
-        , bench "scanM"       . whnf (drain . (>-> P.scanM msum))
+        , bench "scan"        . whnf (drain . (>-> P.scan (+) 0 id))
+        , bench "scanM"       . whnf (drain . (>-> scanMSum))
         ]
     , bgroup "Zips" $ map applyBench
         [
