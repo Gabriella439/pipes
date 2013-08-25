@@ -9,6 +9,10 @@
     Note that 'String'-based 'IO' is inefficient.  The 'String'-based utilities
     in this module exist only for simple demonstrations without incurring a
     dependency on the @text@ package.
+
+    Also, 'stdin' and 'stdout' remove and add newlines, respectively.  This
+    behavior is intended to simplify examples.  The upcoming 'ByteString' and
+    'Text' utilities for @pipes@ will preserve newlines.
 -}
 
 {-# LANGUAGE RankNTypes #-}
