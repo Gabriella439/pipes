@@ -16,13 +16,13 @@ defaultMax = 1000000
 main :: IO ()
 main = commonMain defaultMax preludeBenchmarks
 
-enumFromTo :: Int -> Int -> Producer Int Identity ()
-enumFromTo n1 n2 = loop n1
+enumFromTo :: (Int -> a) -> Int -> Int -> Producer a Identity ()
+enumFromTo f n1 n2 = loop n1
     where
         loop n =
             if n <= n2
             then do
-                yield n
+                yield $! f n
                 loop $! n + 1
             else return ()
 {-# INLINABLE enumFromTo #-}
@@ -40,9 +40,9 @@ scanMSum = P.scanM (\x y -> return (x + y)) (return 0) return
 preludeBenchmarks :: Int -> [Benchmark]
 preludeBenchmarks vmax =
     let applyBench b = b benchEnum_p
-        benchEnum_p  = enumFromTo 1 vmax
+        benchEnum_p  = enumFromTo id 1 vmax
     in
-    [ 
+    [
       bgroup "Folds" $ map applyBench
         [
           bench "all"       . whnf (runIdentity . P.all (<= vmax))
@@ -65,11 +65,14 @@ preludeBenchmarks vmax =
         , bench "dropWhile"   . whnf (drain . (>-> P.dropWhile (<= vmax)))
         , bench "filter"      . whnf (drain . (>-> P.filter even))
         , bench "findIndices" . whnf (drain . (>-> P.findIndices (<= vmax)))
-        , bench "map"         . whnf (drain . (>-> P.map ((+) 1)))
+        , bench "map"         . whnf (drain . (>-> P.map id))
+        , bench "mapM"        . whnf (drain . (>-> P.mapM return))
         , bench "take"        . whnf (drain . (>-> P.take vmax))
         , bench "takeWhile"   . whnf (drain . (>-> P.takeWhile (<= vmax)))
         , bench "scan"        . whnf (drain . (>-> P.scan (+) 0 id))
         , bench "scanM"       . whnf (drain . (>-> scanMSum))
+        ] ++ [
+          bench "concat" $ whnf (drain . (>-> P.concat)) $ enumFromTo Just 1 vmax
         ]
     , bgroup "Zips" $ map applyBench
         [
@@ -78,7 +81,7 @@ preludeBenchmarks vmax =
         ]
     , bgroup "enumFromTo.vs.each"
         [
-          bench "enumFromTo" $ whnf (drain . enumFromTo 1) vmax
+          bench "enumFromTo" $ whnf (drain . enumFromTo id 1) vmax
         , bench "each"       $ whnf (drain . each) [1..vmax]
         ]
     ]
