@@ -133,7 +133,7 @@ import Prelude hiding ((.), id)
     As you connect components their types will change to reflect inputs and
     outputs that you've fused away.  You know that you're done connecting things
     when you get an 'Effect', meaning that you have handled all inputs and
-    outputs.  You 'run' this final 'Effect' to begin streaming.
+    outputs.  You 'P.run' this final 'Effect' to begin streaming.
 -}
 
 {- $producers
@@ -289,26 +289,33 @@ import Prelude hiding ((.), id)
 
     Notice how the final @loop@ only 'lift's actions from the base monad and
     does nothing else.  This property is true for all 'Effect's, which are just
-    glorified wrappers around actions in the base monad.  This means we can 'run'
+    glorified wrappers around actions in the base monad.  This means we can run
     these 'Effect's to remove their 'lift's and lower them back to the
     equivalent computation in the base monad:
 
 @
- 'run' :: 'Monad' m => 'Effect' m r -> m r
+ 'runEffect' :: 'Monad' m => 'Effect' m r -> m r
 @
 
-    This is the real type signature of 'run', which refuses to accept anything
-    other than an 'Effect'.  This ensures that we handle all inputs and outputs
-    before streaming data:
+    This is the real type signature of 'runEffect', which refuses to accept
+    anything other than an 'Effect'.  This ensures that we handle all inputs and
+    outputs before streaming data:
 
 > -- echo.hs
 >
 > main :: IO ()
-> main = run loop
+> main = runEffect loop
 
     ... or you could inline the entire @loop@ into the following one-liner:
 
-> main = run $ for stdin (lift . putStrLn)
+> main = runEffect $ for stdin (lift . putStrLn)
+
+    ... or if you really want to play code golf you can use 'P.run' from
+    "Pipes.Prelude", which is a synonym for 'runEffect':
+
+> import qualified Pipes.Prelude as P
+>
+> main = P.run $ for stdin (lift . putStrLn)
 
     Our final program loops over standard input and echoes every line to
     standard output until we hit @Ctrl-D@ to end the input stream:
@@ -346,7 +353,7 @@ import Prelude hiding ((.), id)
 
     Combine 'for' and 'each' to iterate over lists using a \"foreach\" loop:
 
->>> run $ for (each [1..4]) (lift . print)
+>>> runEffect $ for (each [1..4]) (lift . print)
 1
 2
 3
@@ -360,7 +367,7 @@ import Prelude hiding ((.), id)
 
      So you can loop over any 'Foldable' container or even a 'Maybe':
 
->>> run $ for (each (Just 1)) (lift . print)
+>>> runEffect $ for (each (Just 1)) (lift . print)
 1
 
 -}
@@ -391,12 +398,12 @@ import Prelude hiding ((.), id)
 
     This time our @loop@ is a 'Producer' that outputs 'String's, specifically
     two copies of each line that we read from standard input.  Since @loop@ is a
-    'Producer' we cannot 'run' it because there is still unhandled output.
+    'Producer' we cannot 'P.run' it because there is still unhandled output.
     However, we can use yet another 'for' to handle this new duplicated stream:
 
 > -- nested.hs
 >
-> main = run $ for loop (lift . putStrLn)
+> main = runEffect $ for loop (lift . putStrLn)
 
     This creates a program which echoes every line from standard input to
     standard output twice:
@@ -414,7 +421,7 @@ import Prelude hiding ((.), id)
     But is this really necessary?  Couldn't we have instead written this using a
     nested for loop?
 
-> main = run $
+> main = runEffect $
 >     for P.stdin $ \str1 ->
 >         for (duplicate str1) $ \str2 ->
 >             lift $ putStrLn str
@@ -495,7 +502,7 @@ import Prelude hiding ((.), id)
     our original code into the following more succinct form that composes two
     transformations:
 
-> main = run $ for P.stdin (duplicate ~> lift . putStrLn)
+> main = runEffect $ for P.stdin (duplicate ~> lift . putStrLn)
 
     This means that we can also choose to program in a more functional style and
     think of stream processing in terms of composing transformations using
@@ -581,7 +588,7 @@ import Prelude hiding ((.), id)
     This runs the given 'Effect' every time the 'Consumer' 'await's a value,
     using the return value of the 'Effect' to supply the input:
 
->>> run $ lift getLine >~ stdout
+>>> runEffect $ lift getLine >~ stdout
 Test<Enter>
 Test
 ABC<Enter>
@@ -618,7 +625,7 @@ ABC
     We can now insert this in between @(lift getLine)@ and @stdout@ and see what
     happens:
 
->>> run $ lift getLine >~ doubleUp >~ stdout
+>>> runEffect $ lift getLine >~ doubleUp >~ stdout
 Test<Enter>
 ing<Enter>
 Testing
@@ -670,14 +677,14 @@ ABCDEF
  ('>->') :: 'Monad' m => 'Producer' a m r -> 'Consumer' a m r -> 'Effect' m r
 @
 
-    This returns an 'Effect' which we can 'run':
+    This returns an 'Effect' which we can 'P.run':
 
 > -- echo2.hs
 >
 > import Pipes
 > import qualified Pipes.Prelude as P  -- Pipes.Prelude also provides 'stdout'
 >
-> main = run $ P.stdin >-> P.stdout
+> main = runEffect $ P.stdin >-> P.stdout
 
     This program is more declarative of our intent: we want to stream values
     from 'P.stdin' to 'P.stdout'.  The above \"pipeline\" not only echoes
@@ -719,7 +726,8 @@ ABCDEF
 >
 > main = do
 >     hSetBuffering stdout NoBuffering
->     str <- run $ ("End of input!" <$ P.stdin) >-> ("Broken pipe!" <$ P.stdout)
+>     str <- runEffect $
+>         ("End of input!" <$ P.stdin) >-> ("Broken pipe!" <$ P.stdout)
 >     hPutStrLn stderr str
 
     This lets us diagnose whether the 'Producer' or 'Consumer' terminated first:
@@ -734,7 +742,7 @@ ABCDEF
 > Broken pipe!
 > $
 
-    You might wonder why ('>->') returns an 'Effect' that we have to 'run'
+    You might wonder why ('>->') returns an 'Effect' that we have to 'P.run'
     instead of directly returning an action in the base monad.  This is because
     you can connect things other than 'Producer's and 'Consumer's, like 'Pipe's,
     which are effectful stream transformations.
@@ -775,7 +783,7 @@ ABCDEF
 > maxInput :: Int -> Producer String IO ()
 > maxInput n = P.stdin >-> take n
 
->>> run $ maxInput 3 >-> P.stdout
+>>> runEffect $ maxInput 3 >-> P.stdout
 Test<Enter>
 Test
 ABC<Enter>
@@ -791,7 +799,7 @@ You shall not pass!
 > maxOutput :: Int -> Consumer String IO ()
 > maxOutput n = take n >-> P.stdout
 
->>> run $ P.stdin >-> maxOutput 3
+>>> runEffect $ P.stdin >-> maxOutput 3
 <Exact same behavior>
 
     Those both gave the same behavior because ('>->') is associative:
@@ -800,7 +808,7 @@ You shall not pass!
 
     Therefore we can just leave out the parentheses:
 
->>> run $ P.stdin >-> take 3 >-> P.stdout
+>>> runEffect $ P.stdin >-> take 3 >-> P.stdout
 <Exact same behavior>
 
     ('>->') is designed to behave like the Unix pipe operator, except with less
@@ -839,7 +847,7 @@ You shall not pass!
 > yes :: (Monad m) => Producer String m r
 > yes = forever $ yield "y"
 >
-> main = run $ yes >-> head 3 >-> P.stdout
+> main = runEffect $ yes >-> head 3 >-> P.stdout
 
     This prints out 3 \'@y@\'s, just like the equivalent Unix pipeline:
 
@@ -889,7 +897,7 @@ You shall not pass!
 
     You can then use your 'ListT' within a 'for' loop:
 
->>> run $ for (every pair) (lift . print)
+>>> runEffect $ for (every pair) (lift . print)
 x = 1
 y = 3
 (1,3)
@@ -903,13 +911,13 @@ y = 4
 
     ... or a pipeline:
 
->>> run $ every pair >-> P.show >-> P.stdout
+>>> runEffect $ every pair >-> P.show >-> P.stdout
 <Exact same behavior>
 
     Note that 'ListT' is lazy and only produces as many elements as we request:
 
 >>> import qualified Pipes.Prelude as P
->>> run $ for (every pair >-> P.take 2) (lift . print)
+>>> runEffect $ for (every pair >-> P.take 2) (lift . print)
 x = 1
 y = 3
 (1,3)
@@ -938,7 +946,7 @@ y = 4
     Here we're binding standard input non-deterministically (twice) as if it
     were an effectful list:
 
->>> run $ every pair >-> P.stdout
+>>> runEffect $ every pair >-> P.stdout
 Daniel<Enter>
 Fischer<Enter>
 Daniel Fischer
@@ -1021,7 +1029,7 @@ quit<Enter>
     data structures.  For example, you can print all non-'Nothing' elements
     from a doubly-nested list:
 
->>> run $ (each ~> each ~> each ~> lift . print) [[Just 1, Nothing], [Just 2, Just 3]]
+>>> runEffect $ (each ~> each ~> each ~> lift . print) [[Just 1, Nothing], [Just 2, Just 3]]
 1
 2
 3
@@ -1047,10 +1055,10 @@ quit<Enter>
 >     str <- lift getLine
 >     guard (str /= "Fail")
 
->>> run $ every input >-> P.stdout
+>>> runEffect $ every input >-> P.stdout
 Test<Enter>
 Test
->>> run $ every input >-> P.stdout
+>>> runEffect $ every input >-> P.stdout
 Fail<Enter>
 >>>
 
@@ -1386,18 +1394,18 @@ Fail<Enter>
 >       |    |
 >       +----+-- Ignore these
 
-    For example, let's say that you try to 'run' the 'P.stdin' 'Producer'.  This
-    produces the following type error:
+    For example, let's say that you try to 'P.run' the 'P.stdin' 'Producer'.
+    This produces the following type error:
 
->>> run P.stdin
+>>> runEffect P.stdin
 <interactive>:4:5:
     Couldn't match expected type `X' with actual type `String'
     Expected type: Effect m0 r0
       Actual type: Proxy X () () String IO ()
-    In the first argument of `run', namely `P.stdin'
-    In the expression: run P.stdin
+    In the first argument of `runEffect', namely `P.stdin'
+    In the expression: runEffect P.stdin
 
-    'run' expects an 'Effect', which is equivalent to the following type:
+    'runEffect' expects an 'Effect', which is equivalent to the following type:
 
 > Effect          IO () = Proxy X () () X      IO ()
 
