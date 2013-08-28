@@ -28,8 +28,7 @@
 module Pipes.Internal (
     Proxy(..),
     unsafeHoist,
-    liftCatchError,
-    observe
+    observe,
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)))
@@ -37,7 +36,6 @@ import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
@@ -185,31 +183,17 @@ instance (MonadWriter w m) => MonadWriter w (Proxy a' a b' b m) where
               M       m      -> M (go `liftM` m)
               Pure    (r, f) -> M (pass (return (Pure r, f)))
 
--- | Catch an error using a catch function for the base monad
-liftCatchError
-    :: (Monad m)
-    => (   m (Proxy a' a b' b m r)
-        -> (e -> m (Proxy a' a b' b m r))
-        -> m (Proxy a' a b' b m r) )
-    -- ^
-    ->    (Proxy a' a b' b m r
-        -> (e -> Proxy a' a b' b m r)
-        -> Proxy a' a b' b m r)
-    -- ^
-liftCatchError c p0 f = go p0
-  where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        Pure    r      -> Pure r
-        M          m   -> M ((do
-            p' <- m
-            return (go p') ) `c` (\e -> return (f e)) )
-{-# INLINABLE liftCatchError #-}
-
 instance (MonadError e m) => MonadError e (Proxy a' a b' b m) where
     throwError = lift . throwError
-    catchError = liftCatchError catchError
+    catchError p0 f = go p0
+      where
+        go p = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ))
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+            Pure    r      -> Pure r
+            M          m   -> M ((do
+                p' <- m
+                return (go p') ) `catchError` (\e -> return (f e)) )
 
 {-| The monad transformer laws are correct when viewed through the 'observe'
     function:

@@ -97,6 +97,28 @@ catchError p0 f = go p0
                 Right p' -> go p' )) ))
 {-# INLINABLE catchError #-}
 
+-- | Catch an error using a catch function for the base monad
+liftCatchError
+    :: (Monad m)
+    => (   m (Proxy a' a b' b m r)
+        -> (e -> m (Proxy a' a b' b m r))
+        -> m (Proxy a' a b' b m r) )
+    -- ^
+    ->    (Proxy a' a b' b m r
+        -> (e -> Proxy a' a b' b m r)
+        -> Proxy a' a b' b m r)
+    -- ^
+liftCatchError c p0 f = go p0
+  where
+    go p = case p of
+        Request a' fa  -> Request a' (\a  -> go (fa  a ))
+        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+        Pure    r      -> Pure r
+        M          m   -> M ((do
+            p' <- m
+            return (go p') ) `c` (\e -> return (f e)) )
+{-# INLINABLE liftCatchError #-}
+
 -- | Wrap the base monad in 'M.MaybeT'
 maybeP
     :: (Monad m)
