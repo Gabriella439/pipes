@@ -68,7 +68,8 @@ module Pipes.Prelude (
 
     -- * Utilities
     tee,
-    generalize
+    generalize,
+    run
     ) where
 
 import Control.Exception (throwIO, try)
@@ -520,3 +521,8 @@ generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
         x <- respond a
         lift $ put x
 {-# INLINABLE generalize #-}
+
+-- | Convenient synonym for 'runEffect'
+run :: (Monad m) => Effect m r -> m r
+run = runEffect
+{-# INLINABLE run #-}

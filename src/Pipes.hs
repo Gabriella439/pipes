@@ -17,7 +17,7 @@ module Pipes (
     X,
     Effect,
     Effect',
-    run,
+    runEffect,
 
     -- ** Producers
     -- $producers
