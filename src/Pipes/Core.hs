@@ -8,11 +8,9 @@
     unidirectional operations exported by the "Pipes" module if you can.  You
     should only use this module if you require advanced features like:
 
-    * bidirectional communication,
+    * bidirectional communication, or:
 
-    * push-based 'Pipe's, or:
-
-    * polymorphic type synonyms (for library writers).
+    * push-based 'Pipe's.
 -}
 
 {-# LANGUAGE CPP, RankNTypes, EmptyDataDecls #-}
