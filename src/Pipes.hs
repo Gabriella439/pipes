@@ -105,11 +105,11 @@ f '~>' 'yield' = f
 'for' ('yield' x) f = f x
 
 \-\- Re-yielding every element of a stream returns the original stream
-'for' m 'yield' = m
+'for' s 'yield' = s
 
 \-\- Nested for loops can become a sequential 'for' loops if the inner loop
 \-\- body ignores the outer loop variable
-'for' m (\\a -\> 'for' (f a) g) = 'for' ('for' m f) g = 'for' m (f '~>' g)
+'for' s (\\a -\> 'for' (f a) g) = 'for' ('for' s f) g = 'for' s (f '~>' g)
 @
 
 -}

@@ -183,8 +183,10 @@ import Prelude hiding ((.), id)
     you may be able to use 'yield' in other contexts, too.\"
 
     Click the link to 'yield' to navigate to its documentation.  There you will
-    see the fully general type and underneath you will see equivalent simpler
-    types.  One of these says that 'yield' can also be used within a 'Pipe':
+    see that 'yield' actually uses the 'Producer'' (with an apostrophe) type
+    synonym which hides a lot of polymorphism behind a simple veneer.  The
+    documentation for 'yield' says that you can also use 'yield' within a
+    'Pipe', too, because of this polymorphism:
 
 @
  'yield' :: 'Monad' m => a -> 'Pipe' x a m ()
@@ -217,10 +219,10 @@ import Prelude hiding ((.), id)
       result, therefore 'for' must loop over the entire 'Producer' and not skip
       anything.
 
-    Again, the above type signature is not the true type of 'for', which is
-    actually more general.  Think of the above type signature as saying: \"If
-    the first argument of 'for' is a 'Producer' and the second argument returns
-    a 'Effect', then the final result must be an 'Effect'.\"
+    The above type signature is not the true type of 'for', which is actually
+    more general.  Think of the above type signature as saying: \"If the first
+    argument of 'for' is a 'Producer' and the second argument returns a
+    'Effect', then the final result must be an 'Effect'.\"
 
     Click the link to 'for' to navigate to its documentation.  There you will
     see the fully general type and underneath you will see equivalent simpler
@@ -232,8 +234,8 @@ import Prelude hiding ((.), id)
 @
 
     The first type signature I showed for 'for' was a special case of this
-    slightly more general signature.  A 'Producer' that never 'yield's is also
-    an 'Effect':
+    slightly more general signature because a 'Producer' that never 'yield's is
+    also an 'Effect':
 
 @
  data 'X'  -- The uninhabited type
@@ -421,11 +423,11 @@ import Prelude hiding ((.), id)
     equality, which always holds no matter what:
 
 @
- \-\- m :: (Monad m) =>      'Producer' a m ()  -- i.e. \'P.stdin\'
+ \-\- s :: (Monad m) =>      'Producer' a m ()  -- i.e. \'P.stdin\'
  \-\- f :: (Monad m) => a -> 'Producer' b m ()  -- i.e. \'duplicate\'
  \-\- g :: (Monad m) => b -> 'Producer' c m ()  -- i.e. \'(lift . putStrLn)\'
 
-\ for (for m f) g = for m (\x -> for (f x) g)
+\ for (for s f) g = for s (\x -> for (f x) g)
 @
 
     We can understand the rationale behind this equality if we first define the
@@ -479,7 +481,7 @@ import Prelude hiding ((.), id)
     If we translate the right identity law to use 'for' instead of ('~>') we
     get:
 
-> for m yield = m
+> for s yield = s
 
     This just says that if the only thing you do is re-'yield' every element of
     a stream, you get back your original stream.
@@ -553,6 +555,9 @@ import Prelude hiding ((.), id)
 >             lift $ unless (t == G.ResourceVanished) $ throwIO e
 >         -- Otherwise loop
 >         Right () -> stdout
+
+    Boy, that's ugly!  However, the beauty of loose coupling is that we only
+    have to write it once.
 
     'await' is the dual of 'yield': we suspend our 'Consumer' until we receive a
     new value.  If nobody provides a value (which is possible) then 'await'
@@ -751,8 +756,8 @@ ABCDEF
 > --              |    | |
 > --              v    v v
 > take ::  Int -> Pipe a a IO ()
-> take n = do replicateM_ n $  do x <- await         -- 'await' a value of type 'a'
->                                 yield x            -- 'yield' a value of type 'a'
+> take n = do replicateM_ n $ do x <- await          -- 'await' a value of type 'a'
+>                                yield x             -- 'yield' a value of type 'a'
 >             lift $ putStrLn "You shall not pass!"  -- Fly, you fools!
 
     You can use 'Pipe's to transform 'Producer's, 'Consumer's, or even other
@@ -882,8 +887,7 @@ You shall not pass!
  'every' :: 'Monad' m => 'ListT' m a -> 'Producer' a m ()
 @
 
-    This is designed to work with 'for', although this is not the only way to
-    consume a 'ListT':
+    You can then use your 'ListT' within a 'for' loop:
 
 >>> run $ for (every pair) (lift . print)
 x = 1
@@ -896,6 +900,11 @@ y = 3
 (2,3)
 y = 4
 (2,4)
+
+    ... or a pipeline:
+
+>>> run $ every pair >-> P.show >-> P.stdout
+<Exact same behavior>
 
     Note that 'ListT' is lazy and only produces as many elements as we request:
 
