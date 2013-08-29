@@ -107,12 +107,12 @@ import Prelude hiding (
     same action for every element:
 
 > -- Echo all lines from standard input to standard output
-> run $ for P.stdin $ \str -> do
+> runEffect $ for P.stdin $ \str -> do
 >     lift $ putStrLn str
 
     ... or more concisely:
 
->>> run $ for P.stdin (lift . putStrLn)
+>>> runEffect $ for P.stdin (lift . putStrLn)
 Test<Enter>
 Test
 ABC<Enter>
@@ -147,7 +147,7 @@ fromHandle h = go
 {- $consumers
     Feed a 'Consumer' the same value repeatedly using ('>~'):
 
->>> run $ lift getLine >~ P.stdout
+>>> runEffect $ lift getLine >~ P.stdout
 Test<Enter>
 Test
 ABC<Enter>
@@ -178,7 +178,7 @@ toHandle handle = for cat $ \str -> lift (IO.hPutStrLn handle str)
 {- $pipes
     Use ('>->') to connect 'Producer's, 'Pipe's, and 'Consumer's:
 
->>> run $ P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout
+>>> runEffect $ P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout
 Test<Enter>
 Test
 ABC<Enter>
