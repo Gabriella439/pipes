@@ -417,7 +417,7 @@ import Prelude hiding ((.), id)
 > main = runEffect $
 >     for P.stdin $ \str1 ->
 >         for (duplicate str1) $ \str2 ->
->             lift $ putStrLn str
+>             lift $ putStrLn str2
 
     Yes, we could have!  In fact, this is a special case of the following
     equality, which always holds no matter what:
@@ -605,8 +605,6 @@ ABC
     following intermediate 'Consumer' that requests two 'String's and returns
     them concatenated:
 
-> -- printn.hs
->
 > doubleUp :: (Monad m) => Consumer String m String
 > doubleUp = do
 >     str1 <- await
@@ -904,12 +902,12 @@ y = 4
 
     ... or a pipeline:
 
+>>> import qualified Pipes.Prelude as P
 >>> runEffect $ every pair >-> P.show >-> P.stdout
 <Exact same behavior>
 
     Note that 'ListT' is lazy and only produces as many elements as we request:
 
->>> import qualified Pipes.Prelude as P
 >>> runEffect $ for (every pair >-> P.take 2) (lift . print)
 x = 1
 y = 3
