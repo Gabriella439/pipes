@@ -75,6 +75,7 @@ import Control.Exception (throwIO, try)
 import Control.Monad (liftM, replicateM_, when, unless)
 import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
+import Foreign.C.Error (Errno(Errno), ePIPE)
 import qualified GHC.IO.Exception as G
 import Pipes
 import Pipes.Core
@@ -165,9 +166,12 @@ stdout = do
     str <- await
     x   <- lift $ try (putStrLn str)
     case x of
-        Left e@(G.IOError { G.ioe_type = t}) ->
-            lift $ unless (t == G.ResourceVanished) $ throwIO e
-        Right () -> stdout
+       Left (G.IOError { G.ioe_type  = G.ResourceVanished
+                       , G.ioe_errno = Just ioe })
+            | Errno ioe == ePIPE
+                -> return ()
+       Left e   -> lift (throwIO e)
+       Right () -> stdout
 {-# INLINABLE stdout #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
