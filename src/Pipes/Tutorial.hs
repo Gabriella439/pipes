@@ -226,8 +226,8 @@ import Prelude hiding ((.), id)
 
     Click the link to 'for' to navigate to its documentation.  There you will
     see the fully general type and underneath you will see equivalent simpler
-    types.  One of these says that the body of the loop can be an 'Producer',
-    too:
+    types.  One of these says that if the body of the loop is an'Producer', then
+    the result is a 'Producer', too:
 
 @
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
@@ -336,9 +336,9 @@ import Prelude hiding ((.), id)
     @pipes@, but with @pipes@ we can decouple the input and output logic from
     each other.  When we connect them back together, we still produce streaming
     code equivalent to what a sufficiently careful Haskell programmer would
-    write.
+    have written.
 
-    You can also use 'for' to loop over lists.  To do so, convert the list
+    You can also use 'for' to loop over lists, too.  To do so, convert the list
     to a 'Producer' using 'each', which is exported by default from "Pipes":
 
 > each :: (Monad m) => [a] -> Producer a m ()
@@ -427,7 +427,7 @@ import Prelude hiding ((.), id)
  \-\- f :: (Monad m) => a -> 'Producer' b m ()  -- i.e. \'duplicate\'
  \-\- g :: (Monad m) => b -> 'Producer' c m ()  -- i.e. \'(lift . putStrLn)\'
 
-\ for (for s f) g = for s (\x -> for (f x) g)
+\ for (for s f) g = for s (\\x -> for (f x) g)
 @
 
     We can understand the rationale behind this equality if we first define the
@@ -442,7 +442,7 @@ import Prelude hiding ((.), id)
 @
 
     Using ('~>') (pronounced \"into\"), we can transform our original equality
-    into the following more symmetric form:
+    into the following more symmetric equation:
 
 @
  f :: (Monad m) => a -> 'Producer' b m r
@@ -556,9 +556,6 @@ import Prelude hiding ((.), id)
 >         -- Otherwise loop
 >         Right () -> stdout
 
-    Boy, that's ugly!  However, the beauty of loose coupling is that we only
-    have to write it once.
-
     'await' is the dual of 'yield': we suspend our 'Consumer' until we receive a
     new value.  If nobody provides a value (which is possible) then 'await'
     never returns.  You can think of 'await' as having the following type:
@@ -578,8 +575,11 @@ import Prelude hiding ((.), id)
  ('>~') :: 'Monad' m => 'Effect' m b -> 'Consumer' b m c -> 'Effect' m c
 @
 
-    This runs the given 'Effect' every time the 'Consumer' 'await's a value,
-    using the return value of the 'Effect' to supply the input:
+    @(draw >~ consumer)@ loops over @(consumer)@, substituting each 'await' in
+    @(consumer)@ with @(draw)@.
+
+    So the following code replaces every 'await' in 'P.stdout' with
+    @(lift getLine)@ and then removes all the 'lift's:
 
 >>> runEffect $ lift getLine >~ stdout
 Test<Enter>
@@ -657,7 +657,7 @@ ABCDEF
     Our previous programs were unsatisfactory because they were biased either
     towards the 'Producer' end or the 'Consumer' end.  As a result, we had to
     choose between gracefully handling end of input (using 'P.stdin') or
-    gracefully handling broken pipes (using 'P.stdout'), but not both at the
+    gracefully handling end of output (using 'P.stdout'), but not both at the
     same time.
 
     However, we don't need to restrict ourselves to using 'Producer's
@@ -695,7 +695,7 @@ ABCDEF
     ('>->') is \"pull-based\" meaning that control flow begins at the most
     downstream component (i.e. 'P.stdout' in the above example).  Any time a
     component 'await's a value it blocks and transfers control upstream and
-    every time a component 'yield's a value it blocks and transfers control back
+    every time a component 'yield's a value it blocks and restores control back
     downstream, satisfying the 'await'.  So in the above example, ('>->')
     matches every 'await' from 'P.stdout' with a 'yield' from 'P.stdin'.
 
@@ -740,7 +740,7 @@ ABCDEF
 
     A 'Pipe' is a monad transformer that is a mix between a 'Producer' and
     'Consumer', because a 'Pipe' can both 'await' and 'yield'.  The following
-    example 'Pipe' behaves like the Prelude's 'take', only allowing a fixed
+    example 'Pipe' is analagous to the Prelude's 'take', only allowing a fixed
     number of values to flow through:
 
 > -- take.hs
@@ -755,9 +755,11 @@ ABCDEF
 > --              |    | |
 > --              v    v v
 > take ::  Int -> Pipe a a IO ()
-> take n = do replicateM_ n $ do x <- await          -- 'await' a value of type 'a'
->                                yield x             -- 'yield' a value of type 'a'
->             lift $ putStrLn "You shall not pass!"  -- Fly, you fools!
+> take n = do
+>     replicateM_ n $ do                     -- Repeat this block 'n' times
+>         x <- await                         -- 'await' a value of type 'a'
+>         yield x                            -- 'yield' a value of type 'a'
+>     lift $ putStrLn "You shall not pass!"  -- Fly, you fools!
 
     You can use 'Pipe's to transform 'Producer's, 'Consumer's, or even other
     'Pipe's using the same ('>->') operator:
@@ -886,7 +888,7 @@ You shall not pass!
  'every' :: 'Monad' m => 'ListT' m a -> 'Producer' a m ()
 @
 
-    You can then use your 'ListT' within a 'for' loop:
+    So you can use your 'ListT' within a 'for' loop:
 
 >>> runEffect $ for (every pair) (lift . print)
 x = 1
@@ -928,16 +930,16 @@ y = 4
 > input :: Producer String IO ()
 > input = P.stdin >-> P.takeWhile (/= "quit")
 > 
-> pair :: ListT IO String
-> pair = do
->     str1 <- Select input
->     str2 <- Select input
->     return (str1 ++ " " ++ str2)
+> name :: ListT IO String
+> name = do
+>     firstName <- Select input
+>     lastName  <- Select input
+>     return (firstName ++ " " ++ lastName)
 
     Here we're binding standard input non-deterministically (twice) as if it
     were an effectful list:
 
->>> runEffect $ every pair >-> P.stdout
+>>> runEffect $ every name >-> P.stdout
 Daniel<Enter>
 Fischer<Enter>
 Daniel Fischer
@@ -975,7 +977,7 @@ quit<Enter>
 
     This is equivalent to:
 
-> map = forever $ do
+> map f = forever $ do
 >     x <- await
 >     yield (f x)
 
@@ -985,7 +987,7 @@ quit<Enter>
 > yes :: (Monad m) => Producer String m r
 > yes = return "y" >~ cat
 >
-> -- Read this as: Keep feeding "y" to downstream
+> -- Read this as: Keep feeding "y" downstream
 
     This is equivalent to:
 
