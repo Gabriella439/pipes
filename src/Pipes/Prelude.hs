@@ -158,27 +158,21 @@ ABC
 
 {-| Write 'String's to 'IO.stdout' using 'putStrLn'
 
-    Terminates on a broken output pipe
+    Unlike 'toHandle', 'stdout' gracefully terminates on a broken output pipe
 -}
 stdout :: Consumer' String IO ()
-stdout = toHandle IO.stdout
+stdout = do
+    str <- await
+    x   <- lift $ try (putStrLn str)
+    case x of
+        Left e@(G.IOError { G.ioe_type = t}) ->
+            lift $ unless (t == G.ResourceVanished) $ throwIO e
+        Right () -> stdout
 {-# INLINABLE stdout #-}
 
-{-| Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
-
-    Terminates on a broken output pipe
--}
+-- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: IO.Handle -> Consumer' String IO ()
-toHandle handle = do
-    loop
-  where
-    loop = do
-        str <- await
-        x   <- lift $ try $ IO.hPutStrLn handle str
-        case x of
-            Left e@(G.IOError { G.ioe_type = t}) ->
-                lift $ unless (t == G.ResourceVanished) $ throwIO e
-            Right () -> loop
+toHandle handle = for cat $ \str -> lift (IO.hPutStrLn handle str)
 {-# INLINABLE toHandle #-}
 
 {- $pipes
