@@ -133,7 +133,7 @@ import Prelude hiding ((.), id)
     As you connect components their types will change to reflect inputs and
     outputs that you've fused away.  You know that you're done connecting things
     when you get an 'Effect', meaning that you have handled all inputs and
-    outputs.  You 'P.run' this final 'Effect' to begin streaming.
+    outputs.  You run this final 'Effect' to begin streaming.
 -}
 
 {- $producers
@@ -310,13 +310,6 @@ import Prelude hiding ((.), id)
 
 > main = runEffect $ for stdin (lift . putStrLn)
 
-    ... or if you really want to play code golf you can use 'P.run' from
-    "Pipes.Prelude", which is a synonym for 'runEffect':
-
-> import qualified Pipes.Prelude as P
->
-> main = P.run $ for stdin (lift . putStrLn)
-
     Our final program loops over standard input and echoes every line to
     standard output until we hit @Ctrl-D@ to end the input stream:
 
@@ -398,7 +391,7 @@ import Prelude hiding ((.), id)
 
     This time our @loop@ is a 'Producer' that outputs 'String's, specifically
     two copies of each line that we read from standard input.  Since @loop@ is a
-    'Producer' we cannot 'P.run' it because there is still unhandled output.
+    'Producer' we cannot run it because there is still unhandled output.
     However, we can use yet another 'for' to handle this new duplicated stream:
 
 > -- nested.hs
@@ -677,7 +670,7 @@ ABCDEF
  ('>->') :: 'Monad' m => 'Producer' a m r -> 'Consumer' a m r -> 'Effect' m r
 @
 
-    This returns an 'Effect' which we can 'P.run':
+    This returns an 'Effect' which we can run:
 
 > -- echo2.hs
 >
@@ -742,10 +735,10 @@ ABCDEF
 > Broken pipe!
 > $
 
-    You might wonder why ('>->') returns an 'Effect' that we have to 'P.run'
-    instead of directly returning an action in the base monad.  This is because
-    you can connect things other than 'Producer's and 'Consumer's, like 'Pipe's,
-    which are effectful stream transformations.
+    You might wonder why ('>->') returns an 'Effect' that we have to run instead
+    of directly returning an action in the base monad.  This is because you can
+    connect things other than 'Producer's and 'Consumer's, like 'Pipe's, which
+    are effectful stream transformations.
 
     A 'Pipe' is a monad transformer that is a mix between a 'Producer' and
     'Consumer', because a 'Pipe' can both 'await' and 'yield'.  The following
@@ -1394,8 +1387,8 @@ Fail<Enter>
 >       |    |
 >       +----+-- Ignore these
 
-    For example, let's say that you try to 'P.run' the 'P.stdin' 'Producer'.
-    This produces the following type error:
+    For example, let's say that you try to run the 'P.stdin' 'Producer'.  This
+    produces the following type error:
 
 >>> runEffect P.stdin
 <interactive>:4:5:
