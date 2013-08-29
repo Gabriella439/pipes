@@ -71,6 +71,18 @@ These represent the core areas that I envision for `pipes`.  The latter three
 libraries represent the more pragmatic face of the ecosystem and make design
 tradeoffs where there is no known elegant solution.
 
+Derived libraries that build on top of these include:
+
+* `pipes-network` and `pipes-network-tls`: Networking support
+
+* `pipes-attoparsec`: High-efficiency streaming parsing
+
+* `pipes-zlib`: Compression and decompression
+
+* `pipes-binary`: Streaming serialization and deserialization
+
+* `pipes-aeson`: Streaming JSON encoding and decoding
+
 ## Development Status
 
 The `pipes` ecosystem is in the middle of a transition to use the new 4.0.0 API.
