@@ -39,6 +39,7 @@ module Pipes.Prelude (
     drop,
     dropWhile,
     concat,
+    elemIndices,
     findIndices,
     scan,
     scanM,
@@ -52,13 +53,21 @@ module Pipes.Prelude (
     foldM,
     all,
     any,
+    and,
+    or,
+    elem,
+    notElem,
     find,
     findIndex,
     head,
     index,
     last,
     length,
+    maximum,
+    minimum,
     null,
+    sum,
+    product,
     toList,
     toListM,
 
@@ -85,19 +94,27 @@ import qualified System.IO as IO
 import qualified Prelude
 import Prelude hiding (
     all,
+    and,
     any,
     concat,
     drop,
     dropWhile,
+    elem,
     filter,
     head,
     last,
     length,
     map,
     mapM,
+    maximum,
+    minimum,
+    notElem,
     null,
+    or,
+    product,
     read,
     show,
+    sum,
     take,
     takeWhile,
     zip,
@@ -258,6 +275,11 @@ concat :: (Monad m, Foldable f) => Pipe (f a) a m r
 concat = for cat each
 {-# INLINABLE concat #-}
 
+-- | Outputs the indices of all elements that match the given element
+elemIndices :: (Monad m, Eq a) => a -> Pipe a Int m r
+elemIndices a = findIndices (a ==)
+{-# INLINABLE elemIndices #-}
+
 -- | Outputs the indices of all elements that satisfied the predicate
 findIndices :: (Monad m) => (a -> Bool) -> Pipe a Int m r
 findIndices predicate = loop 0
@@ -367,17 +389,43 @@ any :: (Monad m) => (a -> Bool) -> Producer a m () -> m Bool
 any predicate p = liftM not $ null $ for p $ \a -> when (predicate a) (yield a)
 {-# INLINABLE any #-}
 
--- | Find the first value that satisfies the predicate
+-- | Determines whether all elements are 'True'
+and :: (Monad m) => Producer Bool m () -> m Bool
+and = all id
+{-# INLINABLE and #-}
+
+-- | Determines whether any element is 'True'
+or :: (Monad m) => Producer Bool m () -> m Bool
+or = any id
+{-# INLINABLE or #-}
+
+{-| @(elem a p)@ returns 'True' if @p@ has an element equal to @a@, 'False'
+    otherwise
+-}
+elem :: (Monad m, Eq a) => a -> Producer a m () -> m Bool
+elem a = any (a ==) 
+{-# INLINABLE elem #-}
+
+{-| @(notElem a)@ returns 'False' if @p@ has an element equal to @a@, 'True'
+    otherwise
+-}
+notElem :: (Monad m, Eq a) => a -> Producer a m () -> m Bool
+notElem a = all (a /=)
+{-# INLINABLE notElem #-}
+
+-- | Find the first element of a 'Producer' that satisfies the predicate
 find :: (Monad m) => (a -> Bool) -> Producer a m () -> m (Maybe a)
 find predicate p = head $ for p  $ \a -> when (predicate a) (yield a)
 {-# INLINABLE find #-}
 
--- | Find the index of the first value that satisfies the predicate
+{-| Find the index of the first element of a 'Producer' that satisfies the
+    predicate
+-}
 findIndex :: (Monad m) => (a -> Bool) -> Producer a m () -> m (Maybe Int)
 findIndex predicate p = head (p >-> findIndices predicate)
 {-# INLINABLE findIndex #-}
 
--- | Retrieve the first value from a 'Producer'
+-- | Retrieve the first element from a 'Producer'
 head :: (Monad m) => Producer a m () -> m (Maybe a)
 head p = do
     x <- next p
@@ -391,7 +439,7 @@ index :: (Monad m) => Int -> Producer a m () -> m (Maybe a)
 index n p = head (p >-> drop n)
 {-# INLINABLE index #-}
 
--- | Retrieve the last value from a 'Producer'
+-- | Retrieve the last element from a 'Producer'
 last :: (Monad m) => Producer a m () -> m (Maybe a)
 last p0 = do
     x <- next p0
@@ -411,6 +459,24 @@ length :: (Monad m) => Producer a m () -> m Int
 length = fold (\n _ -> n + 1) 0 id
 {-# INLINABLE length #-}
 
+-- | Find the maximum element of a 'Producer'
+maximum :: (Monad m, Ord a) => Producer a m () -> m (Maybe a)
+maximum = fold step Nothing id
+  where
+    step x a = Just $ case x of
+        Nothing -> a
+        Just a' -> max a a'
+{-# INLINABLE maximum #-}
+
+-- | Find the minimum element of a 'Producer'
+minimum :: (Monad m, Ord a) => Producer a m () -> m (Maybe a)
+minimum = fold step Nothing id
+  where
+    step x a = Just $ case x of
+        Nothing -> a
+        Just a' -> min a a'
+{-# INLINABLE minimum #-}
+
 -- | Determine if a 'Producer' is empty
 null :: (Monad m) => Producer a m () -> m Bool
 null p = do
@@ -419,6 +485,16 @@ null p = do
         Left  _ -> True
         Right _ -> False
 {-# INLINABLE null #-}
+
+-- | Compute the sum of the elements of a 'Producer'
+sum :: (Monad m, Num a) => Producer a m () -> m a
+sum = fold (+) 0 id
+{-# INLINABLE sum #-}
+
+-- | Compute the product of the elements of a 'Producer'
+product :: (Monad m, Num a) => Producer a m () -> m a
+product = fold (*) 1 id
+{-# INLINABLE product #-}
 
 -- | Convert a pure 'Producer' into a list
 toList :: Producer a Identity () -> [a]
