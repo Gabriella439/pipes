@@ -192,7 +192,7 @@ stdout = do
 {-# INLINABLE stdout #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
-toHandle :: IO.Handle -> Consumer' String IO ()
+toHandle :: IO.Handle -> Consumer' String IO r
 toHandle handle = for cat $ \str -> lift (IO.hPutStrLn handle str)
 {-# INLINABLE toHandle #-}
 
