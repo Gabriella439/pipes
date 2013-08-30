@@ -290,21 +290,21 @@ p1 >-> p2 = (\() -> p1) +>> p2
     ('>>=') corresponds to 'for', calling the second computation once for each
     time the first computation 'yield's.
 -}
-newtype ListT m a = Select { list :: Producer a m () }
+newtype ListT m a = Select { unListT :: Producer a m () }
 
 instance (Monad m) => Functor (ListT m) where
-    fmap f p = Select (for (list p) (\a -> yield (f a)))
+    fmap f p = Select (for (unListT p) (\a -> yield (f a)))
 
 instance (Monad m) => Applicative (ListT m) where
     pure a = Select (yield a)
     mf <*> mx = Select (
-        for (list mf) (\f ->
-        for (list mx) (\x ->
+        for (unListT mf) (\f ->
+        for (unListT mx) (\x ->
         yield (f x) ) ) )
 
 instance (Monad m) => Monad (ListT m) where
     return a = Select (yield a)
-    m >>= f  = Select (for (list m) (\a -> list (f a)))
+    m >>= f  = Select (for (unListT m) (\a -> unListT (f a)))
 
 instance MonadTrans ListT where
     lift m = Select (do
@@ -317,15 +317,15 @@ instance (MonadIO m) => MonadIO (ListT m) where
 instance (Monad m) => Alternative (ListT m) where
     empty = Select (return ())
     p1 <|> p2 = Select (do
-        list p1
-        list p2 )
+        unListT p1
+        unListT p2 )
 
 instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
 
 instance MFunctor ListT where
-    hoist morph = Select . hoist morph . list
+    hoist morph = Select . hoist morph . unListT
 
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
@@ -377,7 +377,7 @@ each = F.mapM_ yield
 
 -- | Convert an 'Enumerable' to a 'Producer'
 every :: (Monad m, Enumerable t) => t m a -> Producer' a m ()
-every it = discard >\\ list (toListT it)
+every it = discard >\\ unListT (toListT it)
 {-# INLINABLE every #-}
 
 -- | Discards a value
