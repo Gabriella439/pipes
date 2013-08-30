@@ -170,7 +170,7 @@ stdout = do
                        , G.ioe_errno = Just ioe })
             | Errno ioe == ePIPE
                 -> return ()
-       Left e   -> lift (throwIO e)
+       Left  e  -> lift (throwIO e)
        Right () -> stdout
 {-# INLINABLE stdout #-}
 
