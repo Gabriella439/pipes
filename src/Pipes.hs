@@ -14,7 +14,7 @@
 module Pipes (
     -- * The Proxy Monad Transformer
     Proxy,
-    X,
+    Void,
     Effect,
     Effect',
     runEffect,

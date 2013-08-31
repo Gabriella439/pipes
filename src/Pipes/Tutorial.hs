@@ -238,9 +238,9 @@ import Prelude hiding ((.), id)
     also an 'Effect':
 
 @
- data 'X'  -- The uninhabited type
+ data 'Void'  -- The uninhabited type
 
-\ type 'Effect' m r = 'Producer' 'X' m r
+\ type 'Effect' m r = 'Producer' 'Void' m r
 @
 
     This is why 'for' permits two different type signatures.  The first type
@@ -249,10 +249,10 @@ import Prelude hiding ((.), id)
 @
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
 
-\ -- Specialize \'b\' to \'X\'
- 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' 'X' m ()) -> 'Producer' 'X' m r
+\ -- Specialize \'b\' to \'Void\'
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' 'Void' m ()) -> 'Producer' 'Void' m r
 
-\ -- Producer X = Effect
+\ -- Producer Void = Effect
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Effect'     m ()) -> 'Effect'     m r
 @
 
@@ -1148,49 +1148,49 @@ Fail<Enter>
     * Polymorphic type synonyms that don't explicitly close unused inputs or
       outputs
 
-    The concrete type synonyms use @()@ to close unused inputs and 'X' (the
+    The concrete type synonyms use @()@ to close unused inputs and 'Void' (the
     uninhabited type) to close unused outputs:
 
     * 'Effect': explicitly closes both ends, forbidding 'await's and 'yield's
 
-> type Effect = Proxy X () () X
+> type Effect = Proxy Void () ()Void 
 >
-> Upstream | Downstream
->     +---------+
->     |         |
-> X  <==       <== ()
->     |         |
-> () ==>       ==> X
->     |    |    |
->     +----|----+
->          v
->          r
+>    Upstream | Downstream
+>        +---------+
+>        |         |
+> Void  <==       <== ()
+>        |         |
+> ()    ==>       ==> Void
+>        |    |    |
+>        +----|----+
+>             v
+>             r
 
     * 'Producer': explicitly closes the upstream end, forbidding 'await's
 
-> type Producer b = Proxy X () () b
+> type Producer b = Proxy Void () () b
 >
-> Upstream | Downstream
->     +---------+
->     |         |
-> X  <==       <== ()
->     |         |
-> () ==>       ==> b
->     |    |    |
->     +----|----+
->          v
->          r
+>    Upstream | Downstream
+>        +---------+
+>        |         |
+> Void  <==       <== ()
+>        |         |
+> ()    ==>       ==> b
+>        |    |    |
+>        +----|----+
+>             v
+>             r
 
     * 'Consumer': explicitly closes the downstream end, forbidding 'yield's
 
-> type Consumer a = Proxy () a () X
+> type Consumer a = Proxy () a () Void
 >
 > Upstream | Downstream
 >     +---------+
 >     |         |
 > () <==       <== ()
 >     |         |
-> a  ==>       ==> X
+> a  ==>       ==> Void
 >     |    |    |
 >     +----|----+
 >          v
@@ -1216,31 +1216,30 @@ Fail<Enter>
     'Producer', 'Pipe', and a 'Consumer', you can think of information flowing
     like this:
 
->      Producer                Pipe              Consumer
->     +---------+          +---------+          +---------+
->     |         |          |         |          |         |
-> X  <==       <==   ()   <==       <==   ()   <==       <== ()
->     |  stdin  |          | take 3  |          |  stdout |
-> () ==>       ==> String ==>       ==> String ==>       ==> X
->     |    |    |          |    |    |          |    |    |
->     +----|----+          +----|----+          +----|----+
->          v                    v                    v
->          ()                   ()                   ()
+>         Producer                Pipe              Consumer
+>        +---------+          +---------+          +---------+
+>        |         |          |         |          |         |
+> Void  <==       <==   ()   <==       <==   ()   <==       <== ()
+>        |  stdin  |          | take 3  |          |  stdout |
+> ()    ==>       ==> String ==>       ==> String ==>       ==> Void
+>        |    |    |          |    |    |          |    |    |
+>        +----|----+          +----|----+          +----|----+
+>             v                    v                    v
+>             ()                   ()                   ()
 
      Composition fuses away the intermediate interfaces, leaving behind an
      'Effect':
 
->                   Effect
->     +-------------------------------+
->     |                               |
-> X  <==                             <== ()
->     |  stdin >-> take 3 >-> stdout  |
-> () ==>                             ==> X
->     |                               |
->     +---------------|---------------+
->                     v
->                     ()
->
+>                      Effect
+>        +-------------------------------+
+>        |                               |
+> Void  <==                             <== ()
+>        |  stdin >-> take 3 >-> stdout  |
+> ()    ==>                             ==> Void
+>        |                               |
+>        +---------------|---------------+
+>                        v
+>                        ()
 
     @pipes@ also provides polymorphic type synonyms with apostrophes at the end
     of their names.  These use universal quantification to leave open any unused
@@ -1392,25 +1391,25 @@ Fail<Enter>
 
 >>> runEffect P.stdin
 <interactive>:4:5:
-    Couldn't match expected type `X' with actual type `String'
+    Couldn't match expected type `Void' with actual type `String'
     Expected type: Effect m0 r0
-      Actual type: Proxy X () () String IO ()
+      Actual type: Proxy Void () () String IO ()
     In the first argument of `runEffect', namely `P.stdin'
     In the expression: runEffect P.stdin
 
     'runEffect' expects an 'Effect', which is equivalent to the following type:
 
-> Effect          IO () = Proxy X () () X      IO ()
+> Effect          IO () = Proxy Void () () Void   IO ()
 
     ... but 'P.stdin' type-checks as a 'Producer', which has the following type:
 
-> Producer String IO () = Proxy X () () String IO ()
+> Producer String IO () = Proxy Void () () String IO ()
 
     The fourth type variable (the output) does not match.  For an 'Effect' this
-    type variable should be closed (i.e. 'X'), but 'P.stdin' has a 'String'
+    type variable should be closed (i.e. 'Void'), but 'P.stdin' has a 'String'
     output, thus the type error:
 
->    Couldn't match expected type `X' with actual type `String'
+>    Couldn't match expected type `Void' with actual type `String'
 
     Any time you get type errors like these you can work through them by
     expanding out the type synonyms and seeing which type variables do not

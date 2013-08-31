@@ -62,7 +62,7 @@ module Pipes.Core (
     reflect,
 
     -- * Concrete Type Synonyms
-    X,
+    Void,
     Effect,
     Producer,
     Pipe,
@@ -694,36 +694,36 @@ reflect = go
 {-# INLINABLE reflect #-}
 
 -- | The empty type, denoting a closed output
-data X
+data Void
 
 {-| An effect in the base monad
 
     'Effect's neither 'Pipes.await' nor 'Pipes.yield'
 -}
-type Effect = Proxy X () () X
+type Effect = Proxy Void () () Void
 
 -- | 'Producer's can only 'Pipes.yield'
-type Producer b = Proxy X () () b
+type Producer b = Proxy Void () () b
 
 -- | 'Pipe's can both 'Pipes.await' and 'Pipes.yield'
 type Pipe a b = Proxy () a () b
 
 -- | 'Consumer's can only 'Pipes.await'
-type Consumer a = Proxy () a () X
+type Consumer a = Proxy () a () Void
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
     'Client's only 'request' and never 'respond'.
 -}
-type Client a' a = Proxy a' a () X
+type Client a' a = Proxy a' a () Void
 
 {-| @Server b' b@ receives requests of type @b'@ and sends responses of type
     @b@.
 
     'Server's only 'respond' and never 'request'.
 -}
-type Server b' b = Proxy X () b' b
+type Server b' b = Proxy Void () b' b
 
 -- | Like 'Effect', but with a polymorphic type
 type Effect' m r = forall x' x y' y . Proxy x' x y' y m r
