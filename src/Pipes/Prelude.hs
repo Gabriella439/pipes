@@ -82,7 +82,6 @@ module Pipes.Prelude (
 
 import Control.Exception (throwIO, try)
 import Control.Monad (liftM, replicateM_, when, unless)
-import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
 import Foreign.C.Error (Errno(Errno), ePIPE)

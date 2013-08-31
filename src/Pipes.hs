@@ -55,6 +55,7 @@ module Pipes (
 
     -- * Re-exports
     -- $reexports
+    module Control.Monad.IO.Class,
     module Control.Monad.Trans.Class,
     module Control.Monad.Morph,
     module Data.Foldable
@@ -395,6 +396,8 @@ p2 <-< p1 = p1 >-> p2
 {-# INLINABLE (<-<) #-}
 
 {- $reexports
+    "Control.Monad.IO.Class" re-exports 'MonadIO'.
+
     "Control.Monad.Trans.Class" re-exports 'MonadTrans'.
 
     "Control.Monad.Morph" re-exports 'MFunctor'.
