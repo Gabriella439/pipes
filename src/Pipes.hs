@@ -247,7 +247,7 @@ p2 ~< p1 = p1 >~ p2
 {- $pipes
     Use 'await' and 'yield' to build 'Pipe's and ('>->') to connect 'Pipe's.
 
-    'cat' and ('>->') obey the 'Control.Category' laws:
+    'cat' and ('>->') obey the 'Control.Category.Category' laws:
 
 @
 \-\- Useless use of cat
