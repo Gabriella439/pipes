@@ -82,6 +82,7 @@ module Pipes.Prelude (
 
 import Control.Exception (throwIO, try)
 import Control.Monad (liftM, replicateM_, when, unless)
+import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
 import Foreign.C.Error (Errno(Errno), ePIPE)
@@ -143,7 +144,7 @@ ABC
 
     Terminates on end of input
 -}
-stdin :: Producer' String IO ()
+stdin :: (MonadIO m) => Producer' String m ()
 stdin = fromHandle IO.stdin
 {-# INLINABLE stdin #-}
 
@@ -151,13 +152,13 @@ stdin = fromHandle IO.stdin
 
     Terminates on end of input
 -}
-fromHandle :: IO.Handle -> Producer' String IO ()
+fromHandle :: (MonadIO m) => IO.Handle -> Producer' String m ()
 fromHandle h = go
   where
     go = do
-        eof <- lift $ IO.hIsEOF h
+        eof <- liftIO $ IO.hIsEOF h
         unless eof $ do
-            str <- lift $ IO.hGetLine h
+            str <- liftIO $ IO.hGetLine h
             yield str
             go
 {-# INLINABLE fromHandle #-}
@@ -178,22 +179,22 @@ ABC
 
     Unlike 'toHandle', 'stdout' gracefully terminates on a broken output pipe
 -}
-stdout :: Consumer' String IO ()
+stdout :: (MonadIO m) => Consumer' String m ()
 stdout = do
     str <- await
-    x   <- lift $ try (putStrLn str)
+    x   <- liftIO $ try (putStrLn str)
     case x of
        Left (G.IOError { G.ioe_type  = G.ResourceVanished
                        , G.ioe_errno = Just ioe })
             | Errno ioe == ePIPE
                 -> return ()
-       Left  e  -> lift (throwIO e)
+       Left  e  -> liftIO (throwIO e)
        Right () -> stdout
 {-# INLINABLE stdout #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
-toHandle :: IO.Handle -> Consumer' String IO r
-toHandle handle = for cat $ \str -> lift (IO.hPutStrLn handle str)
+toHandle :: (MonadIO m) => IO.Handle -> Consumer' String m r
+toHandle handle = for cat $ \str -> liftIO (IO.hPutStrLn handle str)
 {-# INLINABLE toHandle #-}
 
 {- $pipes
