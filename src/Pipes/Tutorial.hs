@@ -226,7 +226,7 @@ import Prelude hiding ((.), id)
 
     Click the link to 'for' to navigate to its documentation.  There you will
     see the fully general type and underneath you will see equivalent simpler
-    types.  One of these says that if the body of the loop is an'Producer', then
+    types.  One of these says that if the body of the loop is a 'Producer', then
     the result is a 'Producer', too:
 
 @
@@ -247,13 +247,13 @@ import Prelude hiding ((.), id)
     signature is just a special case of the second one:
 
 @
- 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b    m ()) -> 'Producer' b    m r
 
 \ -- Specialize \'b\' to \'Void\'
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' 'Void' m ()) -> 'Producer' 'Void' m r
 
 \ -- Producer Void = Effect
- 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Effect'     m ()) -> 'Effect'     m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Effect'        m ()) -> 'Effect'        m r
 @
 
     This is the same trick that all @pipes@ functions use to work with various
@@ -268,7 +268,7 @@ import Prelude hiding ((.), id)
 >
 > loop :: Effect IO ()
 > loop = for stdinLn $ \str -> do  -- Read this like: "for str in stdinLn"
->     lift $ putStrLn str        -- The body of the 'for' loop
+>     lift $ putStrLn str          -- The body of the 'for' loop
 >
 > -- more concise: loop = for stdinLn (lift . putStrLn)
 
@@ -906,7 +906,7 @@ y = 4
     ... or a pipeline:
 
 >>> import qualified Pipes.Prelude as P
->>> runEffect $ every pair >-> P.show >-> P.stdoutLn
+>>> runEffect $ every pair >-> P.print
 <Exact same behavior>
 
     Note that 'ListT' is lazy and only produces as many elements as we request:
@@ -921,7 +921,9 @@ y = 4
     You can also go the other way, binding 'Producer's directly within a
     'ListT'.  In fact, this is actually what 'Select' was already doing:
 
-> Select :: Producer a m () -> ListT m a
+@
+ 'Select' :: 'Producer' a m () -> 'ListT' m a
+@
 
     This lets you write crazy code like:
 
@@ -1084,6 +1086,8 @@ Fail<Enter>
 
     * @pipes-attoparsec@: High-performance parsing
 
+    * @pipes-aeson@: JSON serialization and deserialization
+
     Even these derived packages still do not explore the full potential of
     @pipes@ functionality, which actually permits bidirectional communication.
     Advanced @pipes@ users can explore this library in greater detail by
@@ -1154,7 +1158,7 @@ Fail<Enter>
 
     * 'Effect': explicitly closes both ends, forbidding 'await's and 'yield's
 
-> type Effect = Proxy Void () ()Void 
+> type Effect = Proxy Void () () Void 
 >
 >    Upstream | Downstream
 >        +---------+
