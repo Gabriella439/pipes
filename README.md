@@ -16,7 +16,7 @@ Then fire up `ghci`:
 
 ... and echo standard input to standard output until you enter `quit`.
 
-    Prelude Pipes P> runEffect $ P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout
+    Prelude Pipes P> runEffect $ P.stdinLn >-> P.takeWhile (/= "quit") >-> P.stdoutLn
     Test[Enter]
     Test
     Apple[Enter]
