@@ -142,7 +142,7 @@ import Prelude hiding ((.), id)
     This 'yield' command lets you send output downstream to an anonymous
     handler, decoupling how you generate values from how you consume them.
 
-    The following @stdin@ 'Producer' shows how to incrementally read in
+    The following @stdinLn@ 'Producer' shows how to incrementally read in
     'String's from standard input and 'yield' them downstream, terminating
     gracefully when reaching the end of the input:
 
@@ -152,21 +152,21 @@ import Prelude hiding ((.), id)
 > import Pipes
 > import System.IO (isEOF)
 >
-> --       +--------+-- A 'Producer' that yields 'String's
-> --       |        |
-> --       |        |      +-- Every monad transformer has a base monad.
-> --       |        |      |   This time the base monad is 'IO'.
-> --       |        |      |  
-> --       |        |      |  +-- Every monadic action has a return value.
-> --       |        |      |  |   This action returns '()' when finished
-> --       v        v      v  v
-> stdin :: Producer String IO ()
-> stdin = do
+> --         +--------+-- A 'Producer' that yields 'String's
+> --         |        |
+> --         |        |      +-- Every monad transformer has a base monad.
+> --         |        |      |   This time the base monad is 'IO'.
+> --         |        |      |  
+> --         |        |      |  +-- Every monadic action has a return value.
+> --         |        |      |  |   This action returns '()' when finished
+> --         v        v      v  v
+> stdinLn :: Producer String IO ()
+> stdinLn = do
 >     eof <- lift isEOF        -- 'lift' an 'IO' action from the base monad
 >     unless eof $ do
 >         str <- lift getLine
 >         yield str            -- 'yield' the 'String'
->         stdin                -- Loop
+>         stdinLn              -- Loop
 
     'yield' emits a value, suspending the current 'Producer' until the value is
     consumed.  If nobody consumes the value (which is possible) then 'yield'
@@ -195,7 +195,7 @@ import Prelude hiding ((.), id)
     Use simpler types like these to guide you until you understand the fully
     general type.
 
-    'for' loops are the simplest way to consume a 'Producer' like @stdin@.
+    'for' loops are the simplest way to consume a 'Producer' like @stdinLn@.
     'for' has the following type:
 
 @
@@ -267,22 +267,22 @@ import Prelude hiding ((.), id)
 > -- echo.hs
 >
 > loop :: Effect IO ()
-> loop = for stdin $ \str -> do  -- Read this like: "for str in stdin"
+> loop = for stdinLn $ \str -> do  -- Read this like: "for str in stdinLn"
 >     lift $ putStrLn str        -- The body of the 'for' loop
 >
-> -- more concise: loop = for stdin (lift . putStrLn)
+> -- more concise: loop = for stdinLn (lift . putStrLn)
 
-    In this example, 'for' loops over @stdin@ and replaces every 'yield' in
-    @stdin@ with the body of the loop, printing each line.  This is exactly
+    In this example, 'for' loops over @stdinLn@ and replaces every 'yield' in
+    @stdinLn@ with the body of the loop, printing each line.  This is exactly
     equivalent to the following code, which I've placed side-by-side with the
-    original definition of @stdin@ for comparison:
+    original definition of @stdinLn@ for comparison:
 
-> loop = do                      |  stdin = do
+> loop = do                      |  stdinLn = do
 >     eof <- lift isEOF          |      eof <- lift isEOF
 >     unless eof $ do            |      unless eof $ do
 >         str <- lift getLine    |          str <- lift getLine
 >         (lift . putStrLn) str  |          yield str
->         loop                   |          stdin
+>         loop                   |          stdinLn
 
     You can think of 'yield' as creating a hole and a 'for' loop is one way to
     fill that hole.
@@ -308,7 +308,7 @@ import Prelude hiding ((.), id)
 
     ... or you could inline the entire @loop@ into the following one-liner:
 
-> main = runEffect $ for stdin (lift . putStrLn)
+> main = runEffect $ for stdinLn (lift . putStrLn)
 
     Our final program loops over standard input and echoes every line to
     standard output until we hit @Ctrl-D@ to end the input stream:
@@ -373,7 +373,7 @@ import Prelude hiding ((.), id)
 > -- nested.hs
 >
 > import Pipes
-> import qualified Pipes.Prelude as P  -- Pipes.Prelude already has 'stdin'
+> import qualified Pipes.Prelude as P  -- Pipes.Prelude already has 'stdinLn'
 > 
 > duplicate :: (Monad m) => a -> Producer a m ()
 > duplicate x = do
@@ -381,11 +381,11 @@ import Prelude hiding ((.), id)
 >     yield x
 >
 > loop :: Producer String IO ()
-> loop = for P.stdin duplicate
+> loop = for P.stdinLn duplicate
 >
 > -- This is the exact same as:
 > --
-> -- loop = for P.stdin $ \x -> do
+> -- loop = for P.stdinLn $ \x -> do
 > --     yield x
 > --     yield x
 
@@ -415,7 +415,7 @@ import Prelude hiding ((.), id)
     nested for loop?
 
 > main = runEffect $
->     for P.stdin $ \str1 ->
+>     for P.stdinLn $ \str1 ->
 >         for (duplicate str1) $ \str2 ->
 >             lift $ putStrLn str2
 
@@ -423,7 +423,7 @@ import Prelude hiding ((.), id)
     equality, which always holds no matter what:
 
 @
- \-\- s :: (Monad m) =>      'Producer' a m ()  -- i.e. \'P.stdin\'
+ \-\- s :: (Monad m) =>      'Producer' a m ()  -- i.e. \'P.stdinLn\'
  \-\- f :: (Monad m) => a -> 'Producer' b m ()  -- i.e. \'duplicate\'
  \-\- g :: (Monad m) => b -> 'Producer' c m ()  -- i.e. \'(lift . putStrLn)\'
 
@@ -495,7 +495,7 @@ import Prelude hiding ((.), id)
     our original code into the following more succinct form that composes two
     transformations:
 
-> main = runEffect $ for P.stdin (duplicate ~> lift . putStrLn)
+> main = runEffect $ for P.stdinLn (duplicate ~> lift . putStrLn)
 
     This means that we can also choose to program in a more functional style and
     think of stream processing in terms of composing transformations using
@@ -533,7 +533,7 @@ import Prelude hiding ((.), id)
     'await' command. This 'await' command lets you receive input from an
     anonymous upstream source.
 
-    The following @stdout@ 'Consumer' shows how to incrementally 'await'
+    The following @stdoutLn@ 'Consumer' shows how to incrementally 'await'
     'String's and print them to standard output, terminating gracefully when
     receiving a broken pipe error:
 
@@ -542,11 +542,11 @@ import Prelude hiding ((.), id)
 > import qualified GHC.IO.Exception as G
 > import Pipes
 >
-> --        +--------+-- A 'Consumer' that awaits 'String's
-> --        |        |
-> --        v        v
-> stdout :: Consumer String IO ()
-> stdout = do
+> --          +--------+-- A 'Consumer' that awaits 'String's
+> --          |        |
+> --          v        v
+> stdoutLn :: Consumer String IO ()
+> stdoutLn = do
 >     str <- await  -- 'await' a 'String'
 >     x   <- lift $ try $ putStrLn str
 >     case x of
@@ -554,7 +554,7 @@ import Prelude hiding ((.), id)
 >         Left e@(G.IOError { G.ioe_type = t}) ->
 >             lift $ unless (t == G.ResourceVanished) $ throwIO e
 >         -- Otherwise loop
->         Right () -> stdout
+>         Right () -> stdoutLn
 
     'await' is the dual of 'yield': we suspend our 'Consumer' until we receive a
     new value.  If nobody provides a value (which is possible) then 'await'
@@ -578,10 +578,10 @@ import Prelude hiding ((.), id)
     @(draw >~ consumer)@ loops over @(consumer)@, substituting each 'await' in
     @(consumer)@ with @(draw)@.
 
-    So the following code replaces every 'await' in 'P.stdout' with
+    So the following code replaces every 'await' in 'P.stdoutLn' with
     @(lift getLine)@ and then removes all the 'lift's:
 
->>> runEffect $ lift getLine >~ stdout
+>>> runEffect $ lift getLine >~ stdoutLn
 Test<Enter>
 Test
 ABC<Enter>
@@ -613,10 +613,10 @@ ABC
 >
 > -- more concise: doubleUp = (++) <$> await <*> await
 
-    We can now insert this in between @(lift getLine)@ and @stdout@ and see what
-    happens:
+    We can now insert this in between @(lift getLine)@ and @stdoutLn@ and see
+    what happens:
 
->>> runEffect $ lift getLine >~ doubleUp >~ stdout
+>>> runEffect $ lift getLine >~ doubleUp >~ stdoutLn
 Test<Enter>
 ing<Enter>
 Testing
@@ -628,7 +628,8 @@ ABCDEF
 42000
 ...
 
-    'doubleUp' splits every request from 'stdout' into two separate requests and
+    'doubleUp' splits every request from 'stdoutLn' into two separate requests
+    and
     returns back the concatenated result.
 
     We didn't need to parenthesize the above chain of ('>~') operators, because
@@ -656,8 +657,8 @@ ABCDEF
 {- $pipes
     Our previous programs were unsatisfactory because they were biased either
     towards the 'Producer' end or the 'Consumer' end.  As a result, we had to
-    choose between gracefully handling end of input (using 'P.stdin') or
-    gracefully handling end of output (using 'P.stdout'), but not both at the
+    choose between gracefully handling end of input (using 'P.stdinLn') or
+    gracefully handling end of output (using 'P.stdoutLn'), but not both at the
     same time.
 
     However, we don't need to restrict ourselves to using 'Producer's
@@ -673,12 +674,12 @@ ABCDEF
 > -- echo2.hs
 >
 > import Pipes
-> import qualified Pipes.Prelude as P  -- Pipes.Prelude also provides 'stdout'
+> import qualified Pipes.Prelude as P  -- Pipes.Prelude also provides 'stdoutLn'
 >
-> main = runEffect $ P.stdin >-> P.stdout
+> main = runEffect $ P.stdinLn >-> P.stdoutLn
 
     This program is more declarative of our intent: we want to stream values
-    from 'P.stdin' to 'P.stdout'.  The above \"pipeline\" not only echoes
+    from 'P.stdinLn' to 'P.stdoutLn'.  The above \"pipeline\" not only echoes
     standard input to standard output, but also handles both end of input and
     broken pipe errors:
 
@@ -693,15 +694,15 @@ ABCDEF
 > $
 
     ('>->') is \"pull-based\" meaning that control flow begins at the most
-    downstream component (i.e. 'P.stdout' in the above example).  Any time a
+    downstream component (i.e. 'P.stdoutLn' in the above example).  Any time a
     component 'await's a value it blocks and transfers control upstream and
     every time a component 'yield's a value it blocks and restores control back
     downstream, satisfying the 'await'.  So in the above example, ('>->')
-    matches every 'await' from 'P.stdout' with a 'yield' from 'P.stdin'.
+    matches every 'await' from 'P.stdoutLn' with a 'yield' from 'P.stdinLn'.
 
-    Streaming stops when either 'P.stdin' terminates (i.e. end of input) or
-    'P.stdout' terminates (i.e. broken pipe).  This is why ('>->') requires that
-    both the 'Producer' and 'Consumer' share the same type of return value:
+    Streaming stops when either 'P.stdinLn' terminates (i.e. end of input) or
+    'P.stdoutLn' terminates (i.e. broken pipe).  This is why ('>->') requires
+    that both the 'Producer' and 'Consumer' share the same type of return value:
     whichever one terminates first provides the return value for the entire
     'Effect'.
 
@@ -718,7 +719,7 @@ ABCDEF
 > main = do
 >     hSetBuffering stdout NoBuffering
 >     str <- runEffect $
->         ("End of input!" <$ P.stdin) >-> ("Broken pipe!" <$ P.stdout)
+>         ("End of input!" <$ P.stdinLn) >-> ("Broken pipe!" <$ P.stdoutLn)
 >     hPutStrLn stderr str
 
     This lets us diagnose whether the 'Producer' or 'Consumer' terminated first:
@@ -770,13 +771,13 @@ ABCDEF
  ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Pipe'   b c m r -> 'Pipe'   a c m r
 @
 
-    For example, you can compose 'P.take' after 'P.stdin' to limit the number of
-    lines drawn from standard input:
+    For example, you can compose 'P.take' after 'P.stdinLn' to limit the number
+    of lines drawn from standard input:
 
 > maxInput :: Int -> Producer String IO ()
-> maxInput n = P.stdin >-> take n
+> maxInput n = P.stdinLn >-> take n
 
->>> runEffect $ maxInput 3 >-> P.stdout
+>>> runEffect $ maxInput 3 >-> P.stdoutLn
 Test<Enter>
 Test
 ABC<Enter>
@@ -786,13 +787,13 @@ ABC
 You shall not pass!
 >>>
 
-    ... or you can pre-compose 'P.take' before 'P.stdout' to limit the number of
-    lines written to standard output:
+    ... or you can pre-compose 'P.take' before 'P.stdoutLn' to limit the number
+    of lines written to standard output:
 
 > maxOutput :: Int -> Consumer String IO ()
-> maxOutput n = take n >-> P.stdout
+> maxOutput n = take n >-> P.stdoutLn
 
->>> runEffect $ P.stdin >-> maxOutput 3
+>>> runEffect $ P.stdinLn >-> maxOutput 3
 <Exact same behavior>
 
     Those both gave the same behavior because ('>->') is associative:
@@ -801,7 +802,7 @@ You shall not pass!
 
     Therefore we can just leave out the parentheses:
 
->>> runEffect $ P.stdin >-> take 3 >-> P.stdout
+>>> runEffect $ P.stdinLn >-> take 3 >-> P.stdoutLn
 <Exact same behavior>
 
     ('>->') is designed to behave like the Unix pipe operator, except with less
@@ -840,7 +841,7 @@ You shall not pass!
 > yes :: (Monad m) => Producer String m r
 > yes = forever $ yield "y"
 >
-> main = runEffect $ yes >-> head 3 >-> P.stdout
+> main = runEffect $ yes >-> head 3 >-> P.stdoutLn
 
     This prints out 3 \'@y@\'s, just like the equivalent Unix pipeline:
 
@@ -905,7 +906,7 @@ y = 4
     ... or a pipeline:
 
 >>> import qualified Pipes.Prelude as P
->>> runEffect $ every pair >-> P.show >-> P.stdout
+>>> runEffect $ every pair >-> P.show >-> P.stdoutLn
 <Exact same behavior>
 
     Note that 'ListT' is lazy and only produces as many elements as we request:
@@ -928,7 +929,7 @@ y = 4
 > import qualified Pipes.Prelude as P
 > 
 > input :: Producer String IO ()
-> input = P.stdin >-> P.takeWhile (/= "quit")
+> input = P.stdinLn >-> P.takeWhile (/= "quit")
 > 
 > name :: ListT IO String
 > name = do
@@ -939,7 +940,7 @@ y = 4
     Here we're binding standard input non-deterministically (twice) as if it
     were an effectful list:
 
->>> runEffect $ every name >-> P.stdout
+>>> runEffect $ every name >-> P.stdoutLn
 Daniel<Enter>
 Fischer<Enter>
 Daniel Fischer
@@ -1016,7 +1017,7 @@ quit<Enter>
 >     each [ "Hello, how can I help you?"      -- Begin with a script
 >          , "Hold for one second."
 >          ]
->     P.stdin >-> P.takeWhile (/= "Goodbye!")  -- Now continue with a human
+>     P.stdinLn >-> P.takeWhile (/= "Goodbye!")  -- Now continue with a human
 
     Also, you can often use 'each' in conjunction with ('~>') to traverse nested
     data structures.  For example, you can print all non-'Nothing' elements
@@ -1048,10 +1049,10 @@ quit<Enter>
 >     str <- lift getLine
 >     guard (str /= "Fail")
 
->>> runEffect $ every input >-> P.stdout
+>>> runEffect $ every input >-> P.stdoutLn
 Test<Enter>
 Test
->>> runEffect $ every input >-> P.stdout
+>>> runEffect $ every input >-> P.stdoutLn
 Fail<Enter>
 >>>
 
@@ -1216,30 +1217,30 @@ Fail<Enter>
     'Producer', 'Pipe', and a 'Consumer', you can think of information flowing
     like this:
 
->         Producer                Pipe              Consumer
->        +---------+          +---------+          +---------+
->        |         |          |         |          |         |
-> Void  <==       <==   ()   <==       <==   ()   <==       <== ()
->        |  stdin  |          | take 3  |          |  stdout |
-> ()    ==>       ==> String ==>       ==> String ==>       ==> Void
->        |    |    |          |    |    |          |    |    |
->        +----|----+          +----|----+          +----|----+
->             v                    v                    v
->             ()                   ()                   ()
+>           Producer                Pipe                 Consumer
+>        +-----------+          +----------+          +------------+
+>        |           |          |          |          |            |
+> Void  <==         <==   ()   <==        <==   ()   <==          <== ()
+>        |  stdinLn  |          |  take 3  |          |  stdoutLn  |
+> ()    ==>         ==> String ==>        ==> String ==>          ==> Void
+>        |     |     |          |    |     |          |      |     |
+>        +-----|-----+          +----|-----+          +------|-----+
+>              v                     v                       v
+>              ()                    ()                      ()
 
      Composition fuses away the intermediate interfaces, leaving behind an
      'Effect':
 
->                      Effect
->        +-------------------------------+
->        |                               |
-> Void  <==                             <== ()
->        |  stdin >-> take 3 >-> stdout  |
-> ()    ==>                             ==> Void
->        |                               |
->        +---------------|---------------+
->                        v
->                        ()
+>                       Effect
+>        +-----------------------------------+
+>        |                                   |
+> Void  <==                                 <== ()
+>        |  stdinLn >-> take 3 >-> stdoutLn  |
+> ()    ==>                                 ==> Void
+>        |                                   |
+>        +----------------|------------------+
+>                         v
+>                         ()
 
     @pipes@ also provides polymorphic type synonyms with apostrophes at the end
     of their names.  These use universal quantification to leave open any unused
@@ -1294,30 +1295,29 @@ Fail<Enter>
 
     Like before, if you compose a 'Producer'', a 'Pipe', and a 'Consumer'':
 
->      Producer'               Pipe              Consumer'
->     +---------+          +---------+          +---------+
->     |         |          |         |          |         |
->  * <==       <==   ()   <==       <==   ()   <==       <== *
->     |  stdin  |          | take 3  |          |  stdout |
->  * ==>       ==> String ==>       ==> String ==>       ==> *
->     |    |    |          |    |    |          |    |    |
->     +----|----+          +----|----+          +----|----+
->          v                    v                    v
->          ()                   ()                   ()
+>        Producer'               Pipe                 Consumer'
+>     +-----------+          +----------+          +------------+
+>     |           |          |          |          |            |
+>  * <==         <==   ()   <==        <==   ()   <==          <== *
+>     |  stdinLn  |          |  take 3  |          |  stdoutLn  |
+>  * ==>         ==> String ==>        ==> String ==>          ==> *
+>     |     |     |          |     |    |          |      |     |
+>     +-----|-----+          +-----|----+          +------|-----+
+>           v                      v                      v
+>           ()                     ()                     ()
 
     ... they fuse into an 'Effect'':
 
->                   Effect'
->     +-------------------------------+
->     |                               |
->  * <==                             <== *
->     |  stdin >-> take 3 >-> stdout  |
->  * ==>                             ==> *
->     |                               |
->     +---------------|---------------+
->                     v
->                     ()
->
+>                    Effect'
+>     +-----------------------------------+
+>     |                                   |
+>  * <==                                 <== *
+>     |  stdinLn >-> take 3 >-> stdoutLn  |
+>  * ==>                                 ==> *
+>     |                                   |
+>     +----------------|------------------+
+>                      v
+>                      ()
 
     Polymorphic type synonyms come in handy when you want to keep the type as
     general as possible.  For example, the type signature for 'yield' uses
@@ -1386,27 +1386,28 @@ Fail<Enter>
 >       |    |
 >       +----+-- Ignore these
 
-    For example, let's say that you try to run the 'P.stdin' 'Producer'.  This
+    For example, let's say that you try to run the 'P.stdinLn' 'Producer'.  This
     produces the following type error:
 
->>> runEffect P.stdin
+>>> runEffect P.stdinLn
 <interactive>:4:5:
     Couldn't match expected type `Void' with actual type `String'
     Expected type: Effect m0 r0
       Actual type: Proxy Void () () String IO ()
-    In the first argument of `runEffect', namely `P.stdin'
-    In the expression: runEffect P.stdin
+    In the first argument of `runEffect', namely `P.stdinLn'
+    In the expression: runEffect P.stdinLn
 
     'runEffect' expects an 'Effect', which is equivalent to the following type:
 
 > Effect          IO () = Proxy Void () () Void   IO ()
 
-    ... but 'P.stdin' type-checks as a 'Producer', which has the following type:
+    ... but 'P.stdinLn' type-checks as a 'Producer', which has the following
+    type:
 
 > Producer String IO () = Proxy Void () () String IO ()
 
     The fourth type variable (the output) does not match.  For an 'Effect' this
-    type variable should be closed (i.e. 'Void'), but 'P.stdin' has a 'String'
+    type variable should be closed (i.e. 'Void'), but 'P.stdinLn' has a 'String'
     output, thus the type error:
 
 >    Couldn't match expected type `Void' with actual type `String'

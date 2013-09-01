@@ -10,7 +10,7 @@
     in this module exist only for simple demonstrations without incurring a
     dependency on the @text@ package.
 
-    Also, 'stdin' and 'stdout' remove and add newlines, respectively.  This
+    Also, 'stdinLn' and 'stdoutLn' remove and add newlines, respectively.  This
     behavior is intended to simplify examples.  The upcoming 'ByteString' and
     'Text' utilities for @pipes@ will preserve newlines.
 -}
@@ -21,12 +21,12 @@
 module Pipes.Prelude (
     -- * Producers
     -- $producers
-    stdin,
+    stdinLn,
     fromHandle,
 
     -- * Consumers
     -- $consumers
-    stdout,
+    stdoutLn,
     toHandle,
 
     -- * Pipes
@@ -125,12 +125,12 @@ import Prelude hiding (
     same action for every element:
 
 > -- Echo all lines from standard input to standard output
-> runEffect $ for P.stdin $ \str -> do
+> runEffect $ for P.stdinLn $ \str -> do
 >     lift $ putStrLn str
 
     ... or more concisely:
 
->>> runEffect $ for P.stdin (lift . putStrLn)
+>>> runEffect $ for P.stdinLn (lift . putStrLn)
 Test<Enter>
 Test
 ABC<Enter>
@@ -143,9 +143,9 @@ ABC
 
     Terminates on end of input
 -}
-stdin :: (MonadIO m) => Producer' String m ()
-stdin = fromHandle IO.stdin
-{-# INLINABLE stdin #-}
+stdinLn :: (MonadIO m) => Producer' String m ()
+stdinLn = fromHandle IO.stdin
+{-# INLINABLE stdinLn #-}
 
 {-| Read 'String's from a 'IO.Handle' using 'IO.hGetLine'
 
@@ -165,7 +165,7 @@ fromHandle h = go
 {- $consumers
     Feed a 'Consumer' the same value repeatedly using ('>~'):
 
->>> runEffect $ lift getLine >~ P.stdout
+>>> runEffect $ lift getLine >~ P.stdoutLn
 Test<Enter>
 Test
 ABC<Enter>
@@ -176,20 +176,22 @@ ABC
 
 {-| Write 'String's to 'IO.stdout' using 'putStrLn'
 
-    Unlike 'toHandle', 'stdout' gracefully terminates on a broken output pipe
+    Unlike 'toHandle', 'stdoutLn' gracefully terminates on a broken output pipe
 -}
-stdout :: (MonadIO m) => Consumer' String m ()
-stdout = do
-    str <- await
-    x   <- liftIO $ try (putStrLn str)
-    case x of
-       Left (G.IOError { G.ioe_type  = G.ResourceVanished
-                       , G.ioe_errno = Just ioe })
-            | Errno ioe == ePIPE
-                -> return ()
-       Left  e  -> liftIO (throwIO e)
-       Right () -> stdout
-{-# INLINABLE stdout #-}
+stdoutLn :: (MonadIO m) => Consumer' String m ()
+stdoutLn = go
+  where
+    go = do
+        str <- await
+        x   <- liftIO $ try (putStrLn str)
+        case x of
+           Left (G.IOError { G.ioe_type  = G.ResourceVanished
+                           , G.ioe_errno = Just ioe })
+                | Errno ioe == ePIPE
+                    -> return ()
+           Left  e  -> liftIO (throwIO e)
+           Right () -> go
+{-# INLINABLE stdoutLn #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: (MonadIO m) => IO.Handle -> Consumer' String m r
@@ -199,7 +201,7 @@ toHandle handle = for cat $ \str -> liftIO (IO.hPutStrLn handle str)
 {- $pipes
     Use ('>->') to connect 'Producer's, 'Pipe's, and 'Consumer's:
 
->>> runEffect $ P.stdin >-> P.takeWhile (/= "quit") >-> P.stdout
+>>> runEffect $ P.stdinLn >-> P.takeWhile (/= "quit") >-> P.stdoutLn
 Test<Enter>
 Test
 ABC<Enter>
@@ -338,7 +340,7 @@ show = map Prelude.show
     Use these to fold the output of a 'Producer'.  Many of these folds will stop
     drawing elements if they can compute their result early, like 'any':
 
->>> P.any null P.stdin
+>>> P.any null P.stdinLn
 Test<Enter>
 ABC<Enter>
 <Enter>
