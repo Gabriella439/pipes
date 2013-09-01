@@ -27,6 +27,7 @@ module Pipes.Prelude (
     -- * Consumers
     -- $consumers
     stdoutLn,
+    print,
     toHandle,
 
     -- * Pipes
@@ -111,6 +112,7 @@ import Prelude hiding (
     notElem,
     null,
     or,
+    print,
     product,
     read,
     show,
@@ -192,6 +194,11 @@ stdoutLn = go
            Left  e  -> liftIO (throwIO e)
            Right () -> go
 {-# INLINABLE stdoutLn #-}
+
+-- | 'print' all consumed values
+print :: (MonadIO m) => (Show a) => Consumer' a m ()
+print = show >-> stdoutLn
+{-# INLINABLE print #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: (MonadIO m) => IO.Handle -> Consumer' String m r
