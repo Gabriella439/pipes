@@ -22,6 +22,7 @@ module Pipes.Prelude (
     -- * Producers
     -- $producers
     stdinLn,
+    readLn,
     fromHandle,
 
     -- * Consumers
@@ -115,6 +116,7 @@ import Prelude hiding (
     print,
     product,
     read,
+    readLn,
     show,
     sum,
     take,
@@ -148,6 +150,11 @@ ABC
 stdinLn :: (MonadIO m) => Producer' String m ()
 stdinLn = fromHandle IO.stdin
 {-# INLINABLE stdinLn #-}
+
+-- | 'read' values from 'IO.stdin'
+readLn :: (MonadIO m) => (Read a) => Producer' a m ()
+readLn = stdinLn >-> read
+{-# INLINABLE readLn #-}
 
 {-| Read 'String's from a 'IO.Handle' using 'IO.hGetLine'
 
@@ -195,7 +202,7 @@ stdoutLn = go
            Right () -> go
 {-# INLINABLE stdoutLn #-}
 
--- | 'print' all consumed values
+-- | 'print' values to 'IO.stdout'
 print :: (MonadIO m) => (Show a) => Consumer' a m ()
 print = show >-> stdoutLn
 {-# INLINABLE print #-}
