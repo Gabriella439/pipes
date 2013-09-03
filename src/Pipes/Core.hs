@@ -88,6 +88,7 @@ module Pipes.Core (
     (<<+)
     ) where
 
+import Data.Void (Void)
 import Pipes.Internal (Proxy(..))
 
 {- $proxy
@@ -692,9 +693,6 @@ reflect = go
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure    r      -> Pure r
 {-# INLINABLE reflect #-}
-
--- | The empty type, denoting a closed output
-data Void
 
 {-| An effect in the base monad
 

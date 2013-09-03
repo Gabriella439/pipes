@@ -45,7 +45,8 @@ Library
         base         >= 4       && < 5  ,
         mmorph       >= 1.0.0   && < 1.1,
         mtl          >= 2.0.1.0 && < 2.2,
-        transformers >= 0.2.0.0 && < 0.4
+        transformers >= 0.2.0.0 && < 0.4,
+        void         >= 0.6
     Exposed-Modules:
         Pipes,
         Pipes.Core,
