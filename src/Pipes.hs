@@ -138,7 +138,9 @@ yield = respond
 -}
 for :: (Monad m)
     =>       Proxy x' x b' b m a'
+    -- ^
     -> (b -> Proxy x' x c' c m b')
+    -- ^
     ->       Proxy x' x c' c m a'
 for = (//>)
 {-# INLINABLE for #-}
@@ -174,7 +176,9 @@ for = (//>)
 (~>)
     :: (Monad m)
     => (a -> Proxy x' x b' b m a')
+    -- ^
     -> (b -> Proxy x' x c' c m b')
+    -- ^
     -> (a -> Proxy x' x c' c m a')
 (~>) = (/>/)
 {-# INLINABLE (~>) #-}
@@ -183,7 +187,9 @@ for = (//>)
 (<~)
     :: (Monad m)
     => (b -> Proxy x' x c' c m b')
+    -- ^
     -> (a -> Proxy x' x b' b m a')
+    -- ^
     -> (a -> Proxy x' x c' c m a')
 g <~ f = f ~> g
 {-# INLINABLE (<~) #-}
@@ -230,7 +236,9 @@ await = request ()
 (>~)
     :: (Monad m)
     => Proxy a' a y' y m b
+    -- ^
     -> Proxy () b y' y m c
+    -- ^
     -> Proxy a' a y' y m c
 p1 >~ p2 = (\() -> p1) >\\ p2
 {-# INLINABLE (>~) #-}
@@ -239,7 +247,9 @@ p1 >~ p2 = (\() -> p1) >\\ p2
 (~<)
     :: (Monad m)
     => Proxy () b y' y m c
+    -- ^
     -> Proxy a' a y' y m b
+    -- ^
     -> Proxy a' a y' y m c
 p2 ~< p1 = p1 >~ p2
 {-# INLINABLE (~<) #-}
@@ -279,7 +289,9 @@ cat = pull ()
 (>->)
     :: (Monad m)
     => Proxy a' a () b m r
+    -- ^
     -> Proxy () b c' c m r
+    -- ^
     -> Proxy a' a c' c m r
 p1 >-> p2 = (\() -> p1) +>> p2
 {-# INLINABLE (>->) #-}
@@ -390,7 +402,9 @@ discard _ = return ()
 (<-<)
     :: (Monad m)
     => Proxy () b c' c m r
+    -- ^
     -> Proxy a' a () b m r
+    -- ^
     -> Proxy a' a c' c m r
 p2 <-< p1 = p1 >-> p2
 {-# INLINABLE (<-<) #-}
