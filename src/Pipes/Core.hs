@@ -109,7 +109,7 @@ import Pipes.Internal (Proxy(..))
 
     You can connect proxies together in five different ways:
 
-    * ('Pipes.>->'): connect pull-based streams
+    * ('Pipes.>+>'): connect pull-based streams
 
     * ('Pipes.>~>'): connect push-based streams
 
