@@ -204,7 +204,7 @@ stdoutLn = go
 
 -- | 'print' values to 'IO.stdout'
 print :: (MonadIO m) => (Show a) => Consumer' a m r
-print = for cat (lift . print)
+print = for cat (liftIO . Prelude.print)
 {-# INLINABLE print #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
