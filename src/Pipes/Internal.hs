@@ -195,7 +195,7 @@ instance (MonadError e m) => MonadError e (Proxy a' a b' b m) where
                 p' <- m
                 return (go p') ) `catchError` (\e -> return (f e)) )
 
-instance (Alternative m, Monad m) => Alternative (Proxy a' a b' b m) where
+instance (MonadPlus m) => Alternative (Proxy a' a b' b m) where
     empty = lift empty
     p0 <|> p1 = go p0
       where
