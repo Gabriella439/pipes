@@ -984,7 +984,7 @@ quit<Enter>
 >     x <- await
 >     yield (f x)
 
-    You can also feed a 'Pipe' input using ('>~').  This means we could haved
+    You can also feed a 'Pipe' input using ('>~').  This means we could have
     instead defined the @yes@ pipe like this:
 
 > yes :: (Monad m) => Producer String m r
