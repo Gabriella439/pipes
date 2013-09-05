@@ -1,10 +1,8 @@
 {-# LANGUAGE RankNTypes #-}
 module Main (main) where
 
-import Criterion.Main hiding (run, parseArgs)
+import Criterion.Main
 import Common (commonMain)
-import Control.Foldl (FoldM)
-import qualified Control.Foldl as L
 import Control.Monad.Identity (Identity, runIdentity)
 import Pipes
 import qualified Pipes.Prelude as P
@@ -28,7 +26,7 @@ enumFromTo f n1 n2 = loop n1
 {-# INLINABLE enumFromTo #-}
 
 drain :: Producer b Identity r -> r
-drain p = runIdentity $ run $ for p discard
+drain p = runIdentity $ runEffect $ for p discard
 
 msum :: (Monad m) => Producer Int m () -> m Int
 msum = P.foldM (\a b -> return $ a + b) (return 0) return
