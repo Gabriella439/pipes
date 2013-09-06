@@ -82,10 +82,9 @@ liftBenchmarks vmax =
         ]
     , bgroup "WriterT" $ applyBench
         [
+        -- Running WriterP after runEffect will space leak.
           bench "runWriterP_B"  . nf (runB runWriterP . w_bench)
-        , bench "runWriterP_A"  . nf (runA W.runWriterT . w_bench)
         , bench "execWriterP_B" . nf (runB execWriterP . w_bench)
-        , bench "execWriterP_A" . nf (runA W.execWriterT .w_bench)
         ]
     , bgroup "RWSP" $
         let defT f = (\d -> f d 1 0)
