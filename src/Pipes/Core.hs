@@ -88,7 +88,7 @@ module Pipes.Core (
     (<<+)
     ) where
 
-import Data.Void (Void)
+import Data.Void (Void, absurd)
 import Pipes.Internal (Proxy(..))
 
 {- $proxy
@@ -126,8 +126,8 @@ runEffect :: (Monad m) => Effect m r -> m r
 runEffect = go
   where
     go p = case p of
-        Request _ fa  -> go (fa  ())
-        Respond _ fb' -> go (fb' ())
+        Request v _ -> absurd v
+        Respond v _ -> absurd v
         M       m   -> m >>= go
         Pure    r   -> return r
 {-# INLINABLE runEffect #-}
