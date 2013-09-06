@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Gergely Risko, 2013.  gergely@risko.hu
+#
+# Public domain.  Please relicense this script any way you see fit.
+# I encourage you copying this to your own Travis tested project.
+# If license questions come up, please email me.
+#
+# This is only for the travis integration of HFlags, HFlags itself is
+# still licensed Apache License Version 2.0, for more info see COPYING.
+
+set -e
+set -x
+
+. /opt/ceh/scripts/ceh-profile.sh
+
+cabal update
+cabal install --only-dependencies --enable-tests --enable-benchmarks
+cabal configure --user --enable-tests --enable-benchmarks
+cabal build
+cabal bench
+cabal install

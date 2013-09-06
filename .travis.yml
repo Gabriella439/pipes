@@ -1,0 +1,14 @@
+# Gergely Risko, 2013.  gergely@risko.hu
+#
+# Public domain.  Please relicense this script any way you see fit.
+# I encourage you copying this to your own Travis tested project.
+# If license questions come up, please email me.
+#
+# This is only for the travis integration of HFlags, HFlags itself is
+# still licensed Apache License Version 2.0, for more info see COPYING.
+language: c
+install: bash ./.travis.ceh
+script: bash ./.travis.main
+env:
+  - CEH_GHC64=
+  - CEH_GHC64=1
