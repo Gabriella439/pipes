@@ -377,7 +377,7 @@ next :: (Monad m) => Producer a m r -> m (Either r (a, Producer a m r))
 next = go
   where
     go p = case p of
-        Request _ fu -> go (fu ())
+        Request v fu -> v `seq` go (fu ())
         Respond a fu -> return (Right (a, fu ()))
         M         m  -> m >>= go
         Pure    r    -> return (Left r)

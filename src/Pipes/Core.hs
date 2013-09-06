@@ -126,8 +126,8 @@ runEffect :: (Monad m) => Effect m r -> m r
 runEffect = go
   where
     go p = case p of
-        Request _ fa  -> go (fa  ())
-        Respond _ fb' -> go (fb' ())
+        Request v fa  -> v `seq` go (fa  ())
+        Respond v fb' -> v `seq` go (fb' ())
         M       m   -> m >>= go
         Pure    r   -> return r
 {-# INLINABLE runEffect #-}
