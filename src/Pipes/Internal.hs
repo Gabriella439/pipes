@@ -196,16 +196,8 @@ instance (MonadError e m) => MonadError e (Proxy a' a b' b m) where
                 return (go p') ) `catchError` (\e -> return (f e)) )
 
 instance (MonadPlus m) => Alternative (Proxy a' a b' b m) where
-    empty = lift mzero
-    p0 <|> p1 = go p0
-      where
-        go p = case p of
-            Request a' fa  -> Request a' (\a  -> go (fa  a ))
-            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            Pure    r      -> Pure r
-            M          m   -> M ((do
-                p' <- m
-                return (go p') ) `mplus` return p1 )
+    empty = mzero
+    (<|>) = mplus
 
 instance (MonadPlus m) => MonadPlus (Proxy a' a b' b m) where
     mzero = lift mzero
