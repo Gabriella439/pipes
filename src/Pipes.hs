@@ -70,6 +70,7 @@ import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as F
+import Data.Void (absurd)
 import Pipes.Internal (Proxy(..))
 import Pipes.Core
 
@@ -377,7 +378,7 @@ next :: (Monad m) => Producer a m r -> m (Either r (a, Producer a m r))
 next = go
   where
     go p = case p of
-        Request _ fu -> go (fu ())
+        Request v _  -> absurd v
         Respond a fu -> return (Right (a, fu ()))
         M         m  -> m >>= go
         Pure    r    -> return (Left r)
