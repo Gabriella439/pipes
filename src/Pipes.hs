@@ -14,7 +14,6 @@
 module Pipes (
     -- * The Proxy Monad Transformer
     Proxy,
-    Void,
     Effect,
     Effect',
     runEffect,
@@ -58,7 +57,8 @@ module Pipes (
     module Control.Monad.IO.Class,
     module Control.Monad.Trans.Class,
     module Control.Monad.Morph,
-    module Data.Foldable
+    module Data.Foldable,
+    module Data.Void
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -70,7 +70,8 @@ import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as F
-import Data.Void (absurd)
+import Data.Void (Void)
+import qualified Data.Void as V
 import Pipes.Internal (Proxy(..))
 import Pipes.Core
 
@@ -378,7 +379,7 @@ next :: (Monad m) => Producer a m r -> m (Either r (a, Producer a m r))
 next = go
   where
     go p = case p of
-        Request v _  -> absurd v
+        Request v _  -> V.absurd v
         Respond a fu -> return (Right (a, fu ()))
         M         m  -> m >>= go
         Pure    r    -> return (Left r)
@@ -418,4 +419,6 @@ p2 <-< p1 = p1 >-> p2
     "Control.Monad.Morph" re-exports 'MFunctor'.
 
     "Data.Foldable" re-exports 'Foldable' (the class name only)
+
+    "Data.Void" re-exports 'Void'.
 -}
