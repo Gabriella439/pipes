@@ -534,20 +534,28 @@ import Prelude hiding ((.), id)
     anonymous upstream source.
 
     The following @stdoutLn@ 'Consumer' shows how to incrementally 'await'
-    'String's and print them to standard output, terminating gracefully when
-    receiving a broken pipe error:
+    'String's and print them to standard output:
 
-> import Control.Monad (unless)
-> import Control.Exception (try, throwIO)
-> import qualified GHC.IO.Exception as G
+> import Control.Monad
 > import Pipes
 >
 > --          +--------+-- A 'Consumer' that awaits 'String's
 > --          |        |
 > --          v        v
 > stdoutLn :: Consumer String IO ()
-> stdoutLn = do
+> stdoutLn = forever $ do
 >     str <- await  -- 'await' a 'String'
+>     lift $ putStrLn str
+
+    However, let's complicate this example by modifying @stdoutLn@ to terminate
+    gracefully when receiving a broken pipe error:
+
+> import Control.Exception (try, throwIO)
+> import qualified GHC.IO.Exception as G
+>
+> stdoutLn :: Consumer String IO ()
+> stdoutLn = do
+>     str <- await
 >     x   <- lift $ try $ putStrLn str
 >     case x of
 >         -- Gracefully terminate if we got a broken pipe error
@@ -555,6 +563,8 @@ import Prelude hiding ((.), id)
 >             lift $ unless (t == G.ResourceVanished) $ throwIO e
 >         -- Otherwise loop
 >         Right () -> stdoutLn
+
+    That code is ugly, but thanks to modularity we only need to write it once.
 
     'await' is the dual of 'yield': we suspend our 'Consumer' until we receive a
     new value.  If nobody provides a value (which is possible) then 'await'
@@ -658,8 +668,8 @@ ABCDEF
     Our previous programs were unsatisfactory because they were biased either
     towards the 'Producer' end or the 'Consumer' end.  As a result, we had to
     choose between gracefully handling end of input (using 'P.stdinLn') or
-    gracefully handling end of output (using 'P.stdoutLn'), but not both at the
-    same time.
+    gracefully handling end of output (using the modified 'P.stdoutLn'), but not
+    both at the same time.
 
     However, we don't need to restrict ourselves to using 'Producer's
     exclusively or 'Consumer's exclusively.  We can connect 'Producer's and
@@ -674,9 +684,10 @@ ABCDEF
 > -- echo2.hs
 >
 > import Pipes
-> import qualified Pipes.Prelude as P  -- Pipes.Prelude also provides 'stdoutLn'
+> import qualified Pipes.Prelude as P
 >
-> main = runEffect $ P.stdinLn >-> P.stdoutLn
+> -- Using the modified 'stdoutLn' that terminates on broken pipes
+> main = runEffect $ P.stdinLn >-> stdoutLn
 
     This program is more declarative of our intent: we want to stream values
     from 'P.stdinLn' to 'P.stdoutLn'.  The above \"pipeline\" not only echoes
