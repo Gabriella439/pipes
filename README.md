@@ -85,6 +85,8 @@ Derived libraries that build on top of these include:
 
 ## Development Status
 
+[![Build Status](https://travis-ci.org/Gabriel439/Haskell-Pipes-Library.png)](https://travis-ci.org/Gabriel439/Haskell-Pipes-Library)
+
 The `pipes` ecosystem is in the middle of a transition to use the new 4.0.0 API.
 This version should be the last significant API change for the core `pipes`
 library, although downstream libraries may still exhibit some API instability
