@@ -84,10 +84,13 @@ module Pipes.Prelude (
     generalize
     ) where
 
+import Control.Exception (throwIO, try)
 import Control.Monad (liftM, replicateM_, when, unless)
 import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.Void (absurd)
+import Foreign.C.Error (Errno(Errno), ePIPE)
+import qualified GHC.IO.Exception as G
 import Pipes
 import Pipes.Core
 import Pipes.Internal
@@ -192,8 +195,19 @@ ABC
 
     Unlike 'toHandle', 'stdoutLn' gracefully terminates on a broken output pipe
 -}
-stdoutLn :: (MonadIO m) => Consumer' String m r
-stdoutLn = for cat (liftIO . putStrLn)
+stdoutLn :: (MonadIO m) => Consumer' String m ()
+stdoutLn = go
+  where
+    go = do
+        str <- await
+        x   <- liftIO $ try (putStrLn str)
+        case x of
+           Left (G.IOError { G.ioe_type  = G.ResourceVanished
+                           , G.ioe_errno = Just ioe })
+                | Errno ioe == ePIPE
+                    -> return ()
+           Left  e  -> liftIO (throwIO e)
+           Right () -> go
 {-# INLINABLE stdoutLn #-}
 
 -- | 'print' values to 'IO.stdout'
