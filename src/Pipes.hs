@@ -91,7 +91,7 @@ infixr 7 <-<
 
 @
 \-\- Substituting \'yield\' with \'f\' gives \'f\'
-'yield' '~>' f
+'yield' '~>' f = f
 
 \-\- Substituting every \'yield\' with another \'yield\' does nothing
 f '~>' 'yield' = f
