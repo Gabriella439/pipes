@@ -542,7 +542,7 @@ import Prelude hiding ((.), id)
 > --          +--------+-- A 'Consumer' that awaits 'String's
 > --          |        |
 > --          v        v
-> stdoutLn :: Consumer String IO ()
+> stdoutLn :: Consumer String IO r
 > stdoutLn = forever $ do
 >     str <- await  -- 'await' a 'String'
 >     lift $ putStrLn str
