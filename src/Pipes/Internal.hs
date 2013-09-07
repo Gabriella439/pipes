@@ -26,6 +26,7 @@
   , CPP
   #-}
 module Pipes.Internal (
+    -- * Internal
     Proxy(..),
     unsafeHoist,
     observe,

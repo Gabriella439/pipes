@@ -213,9 +213,9 @@ execStateP s = fmap snd . runStateP s
 
     This means that until @transformers@ adds a truly strict 'W.WriterT', you
     should consider unwrapping 'W.WriterT' first using 'runWriterP' or
-    'execWriterP' before 'Pipes.run'ning your 'Proxy'.  You will get better
-    performance this way and eliminate space leaks if your accumulator doesn't
-    have any lazy fields.
+    'execWriterP' before running your 'Proxy'.  You will get better performance
+    this way and eliminate space leaks if your accumulator doesn't have any lazy
+    fields.
 -}
 
 -- | Wrap the base monad in 'W.WriterT'
@@ -266,7 +266,7 @@ rwsP k = do
     return r
 {-# INLINABLE rwsP #-}
 
--- | Run 'RWST' in the base monad
+-- | Run 'RWS.RWST' in the base monad
 runRWSP :: (Monad m, Monoid w)
         => i
         -> s
@@ -284,7 +284,7 @@ runRWSP i = go mempty
             wt `seq` return (go w' s' p') )
 {-# INLINABLE runRWSP #-}
 
--- | Evaluate 'RWST' in the base monad
+-- | Evaluate 'RWS.RWST' in the base monad
 evalRWSP :: (Monad m, Monoid w)
          => i
          -> s
@@ -294,7 +294,7 @@ evalRWSP i s = fmap go . runRWSP i s
     where go (r, _, w) = (r, w)
 {-# INLINABLE evalRWSP #-}
 
--- | Execute 'RWST' in the base monad
+-- | Execute 'RWS.RWST' in the base monad
 execRWSP :: (Monad m, Monoid w)
          => i
          -> s
