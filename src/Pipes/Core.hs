@@ -13,7 +13,7 @@
     * push-based 'Pipe's.
 -}
 
-{-# LANGUAGE CPP, RankNTypes, EmptyDataDecls #-}
+{-# LANGUAGE CPP, RankNTypes #-}
 
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
