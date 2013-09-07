@@ -24,6 +24,7 @@ module Pipes.Prelude (
     stdinLn,
     readLn,
     fromHandle,
+    replicateM,
 
     -- * Consumers
     -- $consumers
@@ -36,6 +37,7 @@ module Pipes.Prelude (
     map,
     mapM,
     filter,
+    filterM,
     take,
     takeWhile,
     drop,
@@ -152,7 +154,7 @@ stdinLn :: (MonadIO m) => Producer' String m ()
 stdinLn = fromHandle IO.stdin
 {-# INLINABLE stdinLn #-}
 
--- | 'read' values from 'IO.stdin'
+-- | 'read' values from 'IO.stdin', ignoring failed parses
 readLn :: (MonadIO m) => (Read a) => Producer' a m ()
 readLn = stdinLn >-> read
 {-# INLINABLE readLn #-}
@@ -171,6 +173,11 @@ fromHandle h = go
             yield str
             go
 {-# INLINABLE fromHandle #-}
+
+-- | Repeat a monadic action a fixed number of times, 'yield'ing each result
+replicateM :: (Monad m) => Int -> m a -> Producer a m ()
+replicateM n m = lift m >~ take n
+{-# INLINABLE replicateM #-}
 
 {- $consumers
     Feed a 'Consumer' the same value repeatedly using ('>~'):
@@ -242,6 +249,15 @@ mapM f = for cat $ \a -> do
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat $ \a -> when (predicate a) (yield a)
 {-# INLINABLE filter #-}
+
+{-| @(filterM predicate)@ only forwards values that satisfy the monadic
+    predicate
+-}
+filterM :: (Monad m) => (a -> m Bool) -> Pipe a a m r
+filterM predicate = for cat $ \a -> do
+    b <- lift (predicate a)
+    when b (yield a)
+{-# INLINABLE filterM #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> Pipe a a m ()
