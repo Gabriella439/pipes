@@ -62,7 +62,6 @@ module Pipes.Core (
     reflect,
 
     -- * Concrete Type Synonyms
-    Void,
     Effect,
     Producer,
     Pipe,
