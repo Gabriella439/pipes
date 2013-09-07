@@ -221,7 +221,7 @@ import Prelude hiding ((.), id)
 
     The above type signature is not the true type of 'for', which is actually
     more general.  Think of the above type signature as saying: \"If the first
-    argument of 'for' is a 'Producer' and the second argument returns a
+    argument of 'for' is a 'Producer' and the second argument returns an
     'Effect', then the final result must be an 'Effect'.\"
 
     Click the link to 'for' to navigate to its documentation.  There you will
@@ -984,7 +984,7 @@ quit<Enter>
 >     x <- await
 >     yield (f x)
 
-    You can also feed a 'Pipe' input using ('>~').  This means we could haved
+    You can also feed a 'Pipe' input using ('>~').  This means we could have
     instead defined the @yes@ pipe like this:
 
 > yes :: (Monad m) => Producer String m r

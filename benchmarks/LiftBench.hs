@@ -8,7 +8,7 @@ import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import qualified Control.Monad.Trans.RWS.Strict as RWS
-import Criterion.Main hiding (run)
+import Criterion.Main
 import Data.Monoid
 import Pipes
 import Pipes.Lift
@@ -51,11 +51,11 @@ rwsp_bench = iter act
 
 -- Run before Proxy
 runB :: (a -> Effect Identity r) -> a -> r
-runB f a = runIdentity $ run $ f a
+runB f a = runIdentity $ runEffect $ f a
 
 -- Run after Proxy
 runA :: (Monad m) => (m r -> Identity a) -> Effect m r -> a
-runA f a = runIdentity $ f (run a)
+runA f a = runIdentity $ f (runEffect a)
 
 liftBenchmarks :: Int -> [Benchmark]
 liftBenchmarks vmax =
@@ -82,10 +82,9 @@ liftBenchmarks vmax =
         ]
     , bgroup "WriterT" $ applyBench
         [
+        -- Running WriterP after runEffect will space leak.
           bench "runWriterP_B"  . nf (runB runWriterP . w_bench)
-        , bench "runWriterP_A"  . nf (runA W.runWriterT . w_bench)
         , bench "execWriterP_B" . nf (runB execWriterP . w_bench)
-        , bench "execWriterP_A" . nf (runA W.execWriterT .w_bench)
         ]
     , bgroup "RWSP" $
         let defT f = (\d -> f d 1 0)
