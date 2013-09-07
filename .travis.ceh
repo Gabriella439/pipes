@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Gergely Risko, 2013.  gergely@risko.hu
+#
+# Public domain.  Please relicense this script any way you see fit.
+# I encourage you copying this to your own Travis tested project.
+# If license questions come up, please email me.
+#
+# This is only for the travis integration of HFlags, HFlags itself is
+# still licensed Apache License Version 2.0, for more info see COPYING.
+
+set -e
+set -x
+
+sudo mkdir /opt/ceh /nix
+sudo chown $USER. /opt/ceh /nix
+chmod 0700 /opt/ceh /nix
+cd /opt/ceh
+git clone git://github.com/errge/ceh.git .
+ln -s $HOME home
+/opt/ceh/scripts/ceh-init.sh
