@@ -25,7 +25,7 @@ Then fire up `ghci`:
     Prelude P> -- Done!
 
 To learn more, read the
-[pipes tutorial](http://hackage.haskell.org/package/pipes).
+[pipes tutorial](http://hackage.haskell.org/packages/archive/pipes/4.0.0/doc/html/Pipes-Tutorial.html).
 
 ## Features
 
