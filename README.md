@@ -24,9 +24,8 @@ Then fire up `ghci`:
     quit[Enter]
     Prelude P> -- Done!
 
-The tutorial for version 4.0.0 is complete, and you can find the tutorial
-[here](https://github.com/Gabriel439/Haskell-Pipes-Library/blob/master/src/Pipes/Tutorial.hs)
-until `pipes-4.0.0` is on Hackage.
+To learn more, read the
+[pipes tutorial](http://hackage.haskell.org/package/pipes).
 
 ## Features
 
