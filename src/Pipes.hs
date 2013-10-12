@@ -70,6 +70,7 @@ import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as F
+import Data.Monoid (Monoid(..))
 import Data.Void (Void)
 import qualified Data.Void as V
 import Pipes.Internal (Proxy(..))
@@ -338,6 +339,11 @@ instance (Monad m) => Alternative (ListT m) where
 instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
+    
+
+instance (Monad m) => Monoid (ListT m a) where
+    mempty = empty
+    mappend = (<|>)
 
 instance MFunctor ListT where
     hoist morph = Select . hoist morph . enumerate
