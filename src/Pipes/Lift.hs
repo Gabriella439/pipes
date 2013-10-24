@@ -392,13 +392,12 @@ runRWSPB  i s p = (\b -> RWS.runRWST b i s) . runSubPipeTB p
 {-# INLINABLE runRWSPB #-}
 
 -- | Evaluate 'RWS.RWST' in the base monad
-{-
-evalRWSP :: (Monad m, Monoid w)
-         => i
-         -> s
-         -> Proxy a' a b' b (RWS.RWST i w s m) r
-         -> Proxy a' a b' b m (r, w)
--}
+evalRWSP
+  :: (Monad m, Data.Monoid.Monoid t2) =>
+     a
+     -> a1
+     -> Pipe a2 b (RWS.RWST a t2 a1 m) r
+     -> Pipe a2 b m (r, t2)
 evalRWSP      = (directionalize .) . evalRWSPB
 {-# INLINABLE evalRWSP #-}
 
@@ -416,13 +415,12 @@ evalRWSPB i s = (fmap f .) . runRWSPB i s
 
 -- todo fix type sigs below
 -- | Execute 'RWS.RWST' in the base monad
-{-
-execRWSP :: (Monad m, Monoid w)
-         => i
-         -> s
-         -> Proxy a' a b' b (RWS.RWST i w s m) r
-         -> Proxy a' a b' b m (s, w)
--}
+execRWSP
+  :: (Monad m, Data.Monoid.Monoid t) =>
+     a
+     -> a1
+     -> Pipe a2 b (RWS.RWST a t a1 m) r
+     -> Pipe a2 b m (a1, t) 
 execRWSP      = (directionalize .) . execRWSPB
 {-# INLINABLE execRWSP #-}
 
