@@ -79,7 +79,14 @@ yield :: (Monad m) => a -> Producer' a m ()
 yield = respond
 {-# INLINABLE yield #-}
 
-generalize = undefined
+generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
+  where
+    up () = do
+        x <- lift S.get
+        request x
+    dn a = do
+        x <- respond a
+        lift $ S.put x
 
 fromToLifted
   :: (Monad (t m), Monad (t (Pipe a b m)), Monad m, 
@@ -392,8 +399,7 @@ evalRWSP :: (Monad m, Monoid w)
          -> Proxy a' a b' b (RWS.RWST i w s m) r
          -> Proxy a' a b' b m (r, w)
 -}
-evalRWSP i s = fmap go . runRWSP i s
-    where go (r, _, w) = (r, w)
+evalRWSP      = (directionalize .) . evalRWSPB
 {-# INLINABLE evalRWSP #-}
 
 evalRWSPB
@@ -417,8 +423,7 @@ execRWSP :: (Monad m, Monoid w)
          -> Proxy a' a b' b (RWS.RWST i w s m) r
          -> Proxy a' a b' b m (s, w)
 -}
-execRWSP i s = fmap go . runRWSP i s
-    where go (_, s', w) = (s', w)
+execRWSP      = (directionalize .) . execRWSPB
 {-# INLINABLE execRWSP #-}
 
 execRWSPB
