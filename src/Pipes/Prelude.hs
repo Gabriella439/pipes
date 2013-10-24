@@ -36,7 +36,7 @@ module Pipes.Prelude (
     -- $pipes
     map,
     mapM,
-    mapMaybe,
+    mapFoldable,
     filter,
     filterM,
     take,
@@ -246,12 +246,12 @@ mapM f = for cat $ \a -> do
     yield b
 {-# INLINABLE mapM #-}
 
-{- | Apply a function to all values flowing downstream,
-     and discard the ones mapped to 'Nothing'.
+{- | Apply a function to all values flowing downstream, and
+     forward each element of the result.
 -}
-mapMaybe :: (Monad m) => (a -> Maybe b) -> Pipe a b m r
-mapMaybe f = for cat $ \a -> maybe (return ()) yield (f a)
-{-# INLINABLE mapMaybe #-}
+mapFoldable :: (Monad m, Foldable t) => (a -> t b) -> Pipe a b m r
+mapFoldable f = for cat (each . f)
+{-# INLINABLE mapFoldable #-}
 
 -- | @(filter predicate)@ only forwards values that satisfy the predicate.
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
