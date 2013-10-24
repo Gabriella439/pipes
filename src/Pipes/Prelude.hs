@@ -436,7 +436,7 @@ or = any id
     otherwise
 -}
 elem :: (Monad m, Eq a) => a -> Producer a m () -> m Bool
-elem a = any (a ==) 
+elem a = any (a ==)
 {-# INLINABLE elem #-}
 
 {-| @(notElem a)@ returns 'False' if @p@ has an element equal to @a@, 'True'
