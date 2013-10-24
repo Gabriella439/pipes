@@ -617,7 +617,7 @@ tee p = evalStateP Nothing $ do
 >
 > generalize cat = pull
 -}
-generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
+-- pjw generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
 generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
   where
     up () = do
