@@ -36,6 +36,7 @@ module Pipes.Prelude (
     -- $pipes
     map,
     mapM,
+    mapFoldable,
     filter,
     filterM,
     take,
@@ -245,6 +246,13 @@ mapM f = for cat $ \a -> do
     yield b
 {-# INLINABLE mapM #-}
 
+{- | Apply a function to all values flowing downstream, and
+     forward each element of the result.
+-}
+mapFoldable :: (Monad m, Foldable t) => (a -> t b) -> Pipe a b m r
+mapFoldable f = for cat (each . f)
+{-# INLINABLE mapFoldable #-}
+
 -- | @(filter predicate)@ only forwards values that satisfy the predicate.
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat $ \a -> when (predicate a) (yield a)
@@ -436,7 +444,7 @@ or = any id
     otherwise
 -}
 elem :: (Monad m, Eq a) => a -> Producer a m () -> m Bool
-elem a = any (a ==) 
+elem a = any (a ==)
 {-# INLINABLE elem #-}
 
 {-| @(notElem a)@ returns 'False' if @p@ has an element equal to @a@, 'True'
