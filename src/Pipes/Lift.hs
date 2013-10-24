@@ -4,6 +4,9 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE Rank2Types #-}
+{-# language NoMonomorphismRestriction #-}
+
 
 module Pipes.Lift (
     -- * ErrorT
@@ -39,7 +42,7 @@ module Pipes.Lift (
     execRWSP
     ) where
 
-import Control.Monad.Trans.Class (lift)
+-- import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.Error as E
 import qualified Control.Monad.Trans.Maybe as M
 import qualified Control.Monad.Trans.Reader as R
@@ -52,6 +55,11 @@ import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
 import Pipes.Core
 
+import Control.Monad.Morph -- (hoist)
+-- import Control.Monad.Trans.Class ()
+
+import Control.Monad (forever)
+
 (>->)
     :: (Monad m)
     => Proxy a' a () b m r
@@ -62,6 +70,14 @@ import Pipes.Core
 
 p1 >-> p2 = (\() -> p1) +>> p2
 {-# INLINABLE (>->) #-}
+
+await :: (Monad m) => Consumer' a m a
+await = request ()
+{-# INLINABLE await #-}
+
+yield :: (Monad m) => a -> Producer' a m ()
+yield = respond
+{-# INLINABLE yield #-}
 
 generalize = undefined
 
@@ -95,14 +111,14 @@ runSubPipeTB
      (a -> Proxy x'1 b1 b' b (t m) r) -> a -> t (Proxy x'1 b1 b' b m) r
 runSubPipeTB =  (runEffect' .) . fromToLiftedB
 
-unitD :: Monad m => Proxy x' x () () m b
+-- unitD :: Monad m => Proxy x' x () () m b
 unitD = forever $ yield ()
 
-unitU :: Monad m => Proxy () a y' y m b
+-- unitU :: Monad m => Proxy () a y' y m b
 unitU = forever $ await >> yield ()
 
-runEffect' :: Monad m => Proxy () () () () m r -> m r
-runEffect'   p = runEffect $ unitD  >-> p >-> unitU
+-- runEffect' :: Monad m => Proxy () () () () m r -> m r
+runEffect'   p = runEffect $ unitD  >-> p -- >-> unitU
 
 -- | This can be considered the inverse of generalize from the Pipes.Prelude 
 specialize :: (() -> t) -> t
@@ -369,11 +385,13 @@ runRWSPB  i s p = (\b -> RWS.runRWST b i s) . runSubPipeTB p
 {-# INLINABLE runRWSPB #-}
 
 -- | Evaluate 'RWS.RWST' in the base monad
+{-
 evalRWSP :: (Monad m, Monoid w)
          => i
          -> s
          -> Proxy a' a b' b (RWS.RWST i w s m) r
          -> Proxy a' a b' b m (r, w)
+-}
 evalRWSP i s = fmap go . runRWSP i s
     where go (r, _, w) = (r, w)
 {-# INLINABLE evalRWSP #-}
@@ -392,11 +410,13 @@ evalRWSPB i s = (fmap f .) . runRWSPB i s
 
 -- todo fix type sigs below
 -- | Execute 'RWS.RWST' in the base monad
+{-
 execRWSP :: (Monad m, Monoid w)
          => i
          -> s
          -> Proxy a' a b' b (RWS.RWST i w s m) r
          -> Proxy a' a b' b m (s, w)
+-}
 execRWSP i s = fmap go . runRWSP i s
     where go (_, s', w) = (s', w)
 {-# INLINABLE execRWSP #-}
