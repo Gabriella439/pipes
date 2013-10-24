@@ -46,8 +46,69 @@ import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import qualified Control.Monad.Trans.RWS.Strict as RWS
+import qualified Control.Monad.Trans.Cont as Cont
+
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
+import Pipes.Core
+
+(>->)
+    :: (Monad m)
+    => Proxy a' a () b m r
+    -- ^
+    -> Proxy () b c' c m r
+    -- ^
+    -> Proxy a' a c' c m r
+
+p1 >-> p2 = (\() -> p1) +>> p2
+{-# INLINABLE (>->) #-}
+
+generalize = undefined
+
+fromToLifted
+  :: (Monad (t m), Monad (t (Pipe a b m)), Monad m, 
+      MonadTrans t, MFunctor t) =>
+     Pipe a b (t m) r -> Effect (t (Pipe a b m)) r
+fromToLifted    =  directionalize fromToLiftedB
+
+fromToLiftedB
+  :: (Monad (t (Proxy x'1 b1 b' b m)), Monad m, Monad (t m),
+      MonadTrans t, MFunctor t) =>
+     (a -> Proxy x'1 b1 b' b (t m) a')
+     -> a ->  Effect' (t (Proxy x'1 b1 b' b m)) a'
+fromToLiftedB p = (//> (lift . lift . respond)) --  yield two layers lower
+                . ((lift . lift .request) >\\)  --  awiat two lyaers lower
+                . hoist (hoist lift)            --  Insert new layer for pipe to
+                                                -- connect to
+                . p                             -- Proxy
+
+
+runSubPipeT
+  :: (Monad (t m), Monad (t (Pipe a b m)), Monad m,
+      MonadTrans t, MFunctor t) =>
+     Pipe a b (t m) r -> t (Pipe a b m) r
+runSubPipeT    = directionalize runSubPipeTB
+
+runSubPipeTB
+  :: (Monad (t (Proxy x'1 b1 b' b m)), Monad m, Monad (t m),
+      MonadTrans t, MFunctor t) =>
+     (a -> Proxy x'1 b1 b' b (t m) r) -> a -> t (Proxy x'1 b1 b' b m) r
+runSubPipeTB =  (runEffect' .) . fromToLiftedB
+
+unitD :: Monad m => Proxy x' x () () m b
+unitD = forever $ yield ()
+
+unitU :: Monad m => Proxy () a y' y m b
+unitU = forever $ await >> yield ()
+
+runEffect' :: Monad m => Proxy () () () () m r -> m r
+runEffect'   p = runEffect $ unitD  >-> p >-> unitU
+
+-- | This can be considered the inverse of generalize from the Pipes.Prelude 
+specialize :: (() -> t) -> t
+specialize p = p ()
+
+directionalize p = specialize . p . generalize
 
 -- | Wrap the base monad in 'E.ErrorT'
 errorP
@@ -61,20 +122,17 @@ errorP p = do
 
 -- | Run 'E.ErrorT' in the base monad
 runErrorP
-    :: (Monad m)
-    => Proxy a' a b' b (E.ErrorT e m) r -> Proxy a' a b' b m (Either e r)
-runErrorP = go
-  where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        Pure    r      -> Pure (Right r)
-        M          m   -> M (do
-            x <- E.runErrorT m
-            return (case x of
-                Left  e  -> Pure (Left e)
-                Right p' -> go p' ) )
+  :: (Monad m, E.Error e) =>
+     Pipe a b (E.ErrorT e m) r -> Pipe a b m (Either e r)
+runErrorP     = directionalize runErrorPB
 {-# INLINABLE runErrorP #-}
+
+runErrorPB
+  :: (Monad m, E.Error e) =>
+     (a -> Proxy x'1 b1 b' b (E.ErrorT e m) a1)
+     -> a -> Proxy x'1 b1 b' b m (Either e a1)
+runErrorPB    = (E.runErrorT .) . runSubPipeTB 
+{-# INLINABLE runErrorPB #-}
 
 -- | Catch an error in the base monad
 catchError
@@ -130,20 +188,17 @@ maybeP p = do
 
 -- | Run 'M.MaybeT' in the base monad
 runMaybeP
-    :: (Monad m)
-    => Proxy a' a b' b (M.MaybeT m) r -> Proxy a' a b' b m (Maybe r)
-runMaybeP = go
-  where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        Pure    r      -> Pure (Just r)
-        M          m   -> M (do
-            x <- M.runMaybeT m
-            return (case x of
-                Nothing -> Pure Nothing
-                Just p' -> go p' ) )
+  :: Monad m =>
+     Pipe a b (M.MaybeT m) r -> Pipe a b m (Maybe r)
+runMaybeP     = directionalize  runMaybePB
 {-# INLINABLE runMaybeP #-}
+
+runMaybePB
+  :: Monad m => 
+     (a -> Proxy x'1 b1 b' b (M.MaybeT m) a1)
+     -> a -> Proxy x'1 b1 b' b m (Maybe a1)
+runMaybePB    = (M.runMaybeT .)  . runSubPipeTB
+{-# INLINABLE runMaybePB #-}
 
 -- | Wrap the base monad in 'R.ReaderT'
 readerP
@@ -156,18 +211,18 @@ readerP k = do
 
 -- | Run 'R.ReaderT' in the base monad
 runReaderP
-    :: (Monad m)
-    => i -> Proxy a' a b' b (R.ReaderT i m) r -> Proxy a' a b' b m r
-runReaderP i = go
-  where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        Pure    r      -> Pure r
-        M          m   -> M (do
-            p' <- R.runReaderT m i
-            return (go p') )
+  :: Monad m =>
+     i -> Pipe a b (R.ReaderT i m) r -> Pipe a b m r
+runReaderP    = directionalize . runReaderPB
 {-# INLINABLE runReaderP #-}
+
+runReaderPB
+  :: Monad m =>
+     i
+     -> (c -> Proxy a' a b' b (R.ReaderT i m) r)
+     -> c -> Proxy a' a b' b m r
+runReaderPB r = ((`R.runReaderT` r) .) . runSubPipeTB
+{-# INLINABLE runReaderPB #-}
 
 -- | Wrap the base monad in 'S.StateT'
 stateP
@@ -182,30 +237,51 @@ stateP k = do
 
 -- | Run 'S.StateT' in the base monad
 runStateP
-    :: (Monad m)
-    => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m (r, s)
-runStateP = go
-  where
-    go s p = case p of
-        Request a' fa  -> Request a' (\a  -> go s (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go s (fb' b'))
-        Pure    r      -> Pure (r, s)
-        M          m   -> M (do
-            (p', s') <- S.runStateT m s
-            return (go s' p') )
+  :: Monad m =>
+     s -> Pipe a b (S.StateT s m) r -> Pipe a b m (r, s)
+runStateP     = directionalize . runStatePB
 {-# INLINABLE runStateP #-}
+
+runStatePB
+  :: Monad m => 
+     s
+     -> (c -> Proxy a' a b' b (S.StateT s m) r)
+     -> c
+     -> Proxy a' a b' b m (r, s)
+runStatePB  s = ((`S.runStateT` s) .) . runSubPipeTB
+{-# INLINABLE runStatePB #-}
 
 -- | Evaluate 'S.StateT' in the base monad
 evalStateP
-    :: (Monad m) => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m r
-evalStateP s = fmap fst . runStateP s
+  :: Monad m =>
+     c -> Pipe a b (S.StateT c m) r -> Pipe a b m r
+evalStateP    = directionalize . evalStatePB
 {-# INLINABLE evalStateP #-}
+
+evalStatePB
+  :: Monad m =>
+     s
+     -> (c -> Proxy a' a b' b (S.StateT s m) r)
+     -> c
+     -> Proxy a' a b' b m r
+evalStatePB s = (fmap fst .) . runStatePB s
+{-# INLINABLE evalStatePB #-}
 
 -- | Execute 'S.StateT' in the base monad
 execStateP
-    :: (Monad m) => s -> Proxy a' a b' b (S.StateT s m) r -> Proxy a' a b' b m s
-execStateP s = fmap snd . runStateP s
+  :: Monad m =>
+     s -> Pipe a b (S.StateT s m) r -> Pipe a b m s
+execStateP    = directionalize . execStatePB
 {-# INLINABLE execStateP #-}
+
+execStatePB
+  :: Monad m =>
+     s
+     -> (c -> Proxy a' a b' b (S.StateT s m) r)
+     -> c
+     -> Proxy a' a b' b m s
+execStatePB s = (fmap snd .) . runStatePB s
+{-# INLINABLE execStatePB #-}
 
 {- $writert
     Note that 'runWriterP' and 'execWriterP' will keep the accumulator in
@@ -230,26 +306,32 @@ writerP p = do
 
 -- | Run 'W.WriterT' in the base monad
 runWriterP
-    :: (Monad m, Monoid w)
-    => Proxy a' a b' b (W.WriterT w m) r -> Proxy a' a b' b m (r, w)
-runWriterP = go mempty
-  where
-    go w p = case p of
-        Request a' fa  -> Request a' (\a  -> go w (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go w (fb' b'))
-        Pure  r      -> Pure (r, w)
-        M        m   -> M (do
-            (p', w') <- W.runWriterT m
-            let wt = mappend w w'
-            wt `seq` return (go wt p') )
+  :: (Monad m, Data.Monoid.Monoid w) =>
+     Pipe a b (W.WriterT w m) r -> Pipe a b m (r, w) 
+runWriterP    = directionalize runWriterPB
 {-# INLINABLE runWriterP #-}
+
+runWriterPB
+  :: (Monad m, Data.Monoid.Monoid w) =>
+     (c -> Proxy a' a b' b (W.WriterT w m) r)
+     -> c -> Proxy a' a b' b m (r, w)
+runWriterPB   = (W.runWriterT .) . runSubPipeTB
+{-# INLINABLE runWriterPB #-}
 
 -- | Execute 'W.WriterT' in the base monad
 execWriterP
-    :: (Monad m, Monoid w)
-    => Proxy a' a b' b (W.WriterT w m) r -> Proxy a' a b' b m w
-execWriterP = fmap snd . runWriterP
+  :: (Monad m, Data.Monoid.Monoid w) =>
+     Pipe a b (W.WriterT w m) r -> Pipe a b m w
+execWriterP   = directionalize execWriterPB
 {-# INLINABLE execWriterP #-}
+
+execWriterPB
+  :: (Monad m, Data.Monoid.Monoid w) =>
+     (c -> Proxy a' a b' b (W.WriterT w m) r)
+     -> c -> Proxy a' a b' b m w
+execWriterPB  = (fmap snd .) . runWriterPB
+{-# INLINABLE execWriterPB #-}
+
 
 -- | Wrap the base monad in 'RWS.RWST'
 rwsP
@@ -267,22 +349,24 @@ rwsP k = do
 {-# INLINABLE rwsP #-}
 
 -- | Run 'RWS.RWST' in the base monad
-runRWSP :: (Monad m, Monoid w)
-        => i
-        -> s
-        -> Proxy a' a b' b (RWS.RWST i w s m) r
-        -> Proxy a' a b' b m (r, s, w)
-runRWSP i = go mempty
-  where
-    go w s p = case p of
-        Request a' fa  -> Request a' (\a  -> go w s (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go w s (fb' b'))
-        Pure    r      -> Pure (r, s, w)
-        M          m   -> M (do
-            (p', s', w') <- RWS.runRWST m i s
-            let wt = mappend w w'
-            wt `seq` return (go w' s' p') )
+runRWSP
+  :: (Monad m, Data.Monoid.Monoid w) =>
+     a
+     -> a1
+     -> Pipe a2 b (RWS.RWST a w a1 m) r
+     -> Proxy () a2 () b m (r, a1, w)
+runRWSP         = (directionalize .) . runRWSPB 
 {-# INLINABLE runRWSP #-}
+
+runRWSPB
+  :: (Monad m, Data.Monoid.Monoid w) =>
+     r
+     -> s
+     -> (a -> Proxy x'1 b1 b' b (RWS.RWST r w s m) a1)
+     -> a
+     -> Proxy x'1 b1 b' b m (a1, s, w)
+runRWSPB  i s p = (\b -> RWS.runRWST b i s) . runSubPipeTB p
+{-# INLINABLE runRWSPB #-}
 
 -- | Evaluate 'RWS.RWST' in the base monad
 evalRWSP :: (Monad m, Monoid w)
@@ -294,6 +378,19 @@ evalRWSP i s = fmap go . runRWSP i s
     where go (r, _, w) = (r, w)
 {-# INLINABLE evalRWSP #-}
 
+evalRWSPB
+  :: (Monad m, Data.Monoid.Monoid t2) =>
+     r
+     -> t
+     -> (a -> Proxy x'1 b1 b' b (RWS.RWST r t2 t m) t1)
+     -> a
+     -> Proxy x'1 b1 b' b m (t1, t2)
+evalRWSPB i s = (fmap f .) . runRWSPB i s
+  where f x = let (r, _, w) = x in (r, w)
+{-# INLINABLE evalRWSPB #-}
+
+
+-- todo fix type sigs below
 -- | Execute 'RWS.RWST' in the base monad
 execRWSP :: (Monad m, Monoid w)
          => i
@@ -303,3 +400,24 @@ execRWSP :: (Monad m, Monoid w)
 execRWSP i s = fmap go . runRWSP i s
     where go (_, s', w) = (s', w)
 {-# INLINABLE execRWSP #-}
+
+execRWSPB
+  :: (Monad m, Data.Monoid.Monoid t2) =>
+     r
+     -> t1
+     -> (a -> Proxy x'1 b1 b' b (RWS.RWST r t2 t1 m) t)
+     -> a
+     -> Proxy x'1 b1 b' b m (t1, t2)
+execRWSPB i s = (fmap f .) . runRWSPB i s
+  where f x = let (_, s, w) = x in (s, w)
+{-# INLINABLE execRWSPB #-}
+
+{- todo
+
+evalRWSP      = (directionalize .) . evalRWSPB
+
+
+evalRWSPB i s = (fmap f .) . runRWSPB i s
+  where f x = let (r, _, w) = x in (r, w)
+-}
+
