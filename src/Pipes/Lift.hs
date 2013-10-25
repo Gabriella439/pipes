@@ -10,35 +10,45 @@ module Pipes.Lift (
     -- * ErrorT
     errorP,
     runErrorP,
+    runErrorPB,
     catchError,
     liftCatchError,
 
     -- * MaybeT
     maybeP,
     runMaybeP,
+    runMaybePB,
 
     -- * ReaderT
     readerP,
     runReaderP,
+    runReaderPB,
 
     -- * StateT
     stateP,
     runStateP,
+    runStatePB,
     evalStateP,
     evalStatePB,
     execStateP,
+    execStatePB,
 
     -- * WriterT
     -- $writert
     writerP,
     runWriterP,
+    runWriterPB,
     execWriterP,
+    execWriterPB,
 
     -- * RWST
     rwsP,
     runRWSP,
+    runRWSPB,
     evalRWSP,
+    evalRWSPB,
     execRWSP,
+    execRWSPB,
 
     directionalize,
     runEffect',
