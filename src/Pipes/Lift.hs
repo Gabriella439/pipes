@@ -5,6 +5,10 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Rank2Types #-}
+-- {-# LANGUAGE ImpredicativeTypes#-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+-- {-# LANGUAGE LiberalTypeSynonyms #-}
+-- {-# LANGUAGE TypeSynonymInstances #-}
 
 module Pipes.Lift (
     -- * ErrorT
@@ -50,10 +54,14 @@ module Pipes.Lift (
     execRWSP,
     execRWSPB,
 
+    runSubPipeT,
+    runSubPipeTB,
+
     directionalize,
+    specialize, 
     runEffect',
     unitD,
-    unitU
+--    unitU
     ) where
 
 -- import Control.Monad.Trans.Class (lift)
@@ -93,21 +101,6 @@ yield :: (Monad m) => a -> Producer' a m ()
 yield = respond
 {-# INLINABLE yield #-}
 
--- generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
--- :: Monad m => Proxy () b1 () b m r -> () -> Pipe b1 b m r
-generalize p  = evalStatePB undefined  $ up >+>  (\() -> hoist lift p) >+> dn 
-  where
-    up () = do
-        x <- lift S.get
-        a <- request x
-        respond a
-        up ()
-    dn a = do
-        lift $ S.put a
-        x <- request ()
-        a2 <- respond x
-        dn a2
-
 fromToLifted
   :: (Monad (t m), Monad (t (Pipe a b m)), Monad m, 
       MonadTrans t, MFunctor t) =>
@@ -126,10 +119,18 @@ fromToLiftedB p = (//> (lift . lift . respond)) --  yield two layers lower
                 . p                             -- Proxy
 
 
+{-
 runSubPipeT
-  :: (Monad (t m), Monad (t (Pipe a b m)), Monad m,
+  :: (Monad (t m), Monad (t (Pipe' a b m)), Monad m,
       MonadTrans t, MFunctor t) =>
-     Pipe a b (t m) r -> t (Pipe a b m) r
+     Pipe' a b (t m) r -> t (Pipe' a b m) r
+runSubPipeT
+  :: (Monad (t m), Monad (t (Proxy x b1 x b m)),
+      Monad m, Control.Monad.Morph.MFunctor t,
+      MonadTrans t) =>
+     Pipes.Internal.Proxy b'1 b1 b' b (t m) r
+     -> t (Pipes.Internal.Proxy x b1 x b m) r
+-}
 runSubPipeT    = directionalize runSubPipeTB
 
 runSubPipeTB
@@ -141,8 +142,10 @@ runSubPipeTB =  (runEffect' .) . fromToLiftedB
 unitD :: Monad m => Proxy x' x () () m b
 unitD = forever $ yield ()
 
+{-
 unitU :: Monad m => Proxy () a () () m b
 unitU = forever $ await >> yield ()
+-}
 
 runEffect'
   :: Monad m =>
@@ -150,19 +153,23 @@ runEffect'
 runEffect'   p = runEffect $ unitD  >-> p -- >-> unitU
 
 -- | This can be considered the inverse of generalize from the Pipes.Prelude 
-specialize :: (() -> t) -> t
-specialize p = p ()
+specialize :: forall x t . (x -> t) -> t
+-- specialize :: (x -> Proxy x' a' x a m r) -> Proxy x' a' x a m r
+specialize p = p undefined
 
 {-
 directionalize
   :: Monad m =>
      ((s -> Proxy s b1 s b m r) -> a -> c) -> Proxy () b1 () b m r -> c
 -}
+{-
 directionalize
-  :: Monad m =>
-     ((s -> Proxy s b1 s b m r) -> () -> c)
-     -> Proxy () b1 () b m r -> c
-directionalize p = specialize . p . generalize
+  :: Monad m => forall x .
+     ((s -> Proxy s b1 s b m r) -> x -> c)
+     -> Proxy x b1 x b m r -> c
+-}
+-- directionalize p = specialize . p . generalize
+directionalize p = (specialize . p) . (\f -> (\_ -> f))
 
 -- | Wrap the base monad in 'E.ErrorT'
 errorP
@@ -290,9 +297,19 @@ stateP k = do
 {-# INLINABLE stateP #-}
 
 -- | Run 'S.StateT' in the base monad
+{-
 runStateP
   :: Monad m =>
      s -> Pipe a b (S.StateT s m) r -> Pipe a b m (r, s)
+-}
+{-
+evalStateP
+  :: Monad m =>
+     a
+     -> Proxy
+          x1 a' () a1 (S.StateT a m) r
+     -> Proxy x' a' x a1 m r
+-}
 runStateP     = directionalize . runStatePB
 {-# INLINABLE runStateP #-}
 
@@ -306,9 +323,11 @@ runStatePB  s = ((`S.runStateT` s) .) . runSubPipeTB
 {-# INLINABLE runStatePB #-}
 
 -- | Evaluate 'S.StateT' in the base monad
+{-
 evalStateP
   :: Monad m =>
      c -> Pipe a b (S.StateT c m) r -> Pipe a b m r
+-}
 evalStateP    = directionalize . evalStatePB
 {-# INLINABLE evalStateP #-}
 
