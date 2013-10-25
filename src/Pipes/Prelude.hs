@@ -618,16 +618,12 @@ tee p = evalStateP Nothing $ do
 > generalize cat = pull
 -}
 generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
-generalize p  = evalStatePB undefined  $ up >+>  (\() -> hoist lift p) >+> dn  
+generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
   where
     up () = do
         x <- lift get
-        a <- request x
-        respond a
-        up ()
+        request x
     dn a = do
-        lift $ put a
-        x <- request ()
-        a2 <- respond x
-        dn a2
+        x <- respond a
+        lift $ put x
 {-# INLINABLE generalize #-}
