@@ -17,6 +17,8 @@
 
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+{-# language NoMonomorphismRestriction #-}
+
 
 module Pipes.Prelude (
     -- * Producers
@@ -94,7 +96,7 @@ import qualified GHC.IO.Exception as G
 import Pipes
 import Pipes.Core
 import Pipes.Internal
-import Pipes.Lift (evalStateP)
+import Pipes.Lift (evalStatePB, evalStateP)
 import qualified System.IO as IO
 import qualified Prelude
 import Prelude hiding (
@@ -617,13 +619,17 @@ tee p = evalStateP Nothing $ do
 >
 > generalize cat = pull
 -}
--- pjw generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
-generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
+generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
+generalize p  = evalStatePB undefined  $ up >+>  (\() -> hoist lift p) >+> dn  
   where
     up () = do
         x <- lift get
-        request x
+        a <- request x
+        respond a
+        up ()
     dn a = do
-        x <- respond a
-        lift $ put x
+        lift $ put a
+        x <- request ()
+        a2 <- respond x
+        dn a2
 {-# INLINABLE generalize #-}

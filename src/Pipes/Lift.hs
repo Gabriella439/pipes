@@ -27,6 +27,7 @@ module Pipes.Lift (
     stateP,
     runStateP,
     evalStateP,
+    evalStatePB,
     execStateP,
 
     -- * WriterT
@@ -39,7 +40,12 @@ module Pipes.Lift (
     rwsP,
     runRWSP,
     evalRWSP,
-    execRWSP
+    execRWSP,
+
+    directionalize,
+    runEffect',
+    unitD,
+    unitU
     ) where
 
 -- import Control.Monad.Trans.Class (lift)
@@ -49,7 +55,6 @@ import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import qualified Control.Monad.Trans.RWS.Strict as RWS
-import qualified Control.Monad.Trans.Cont as Cont
 
 import Data.Monoid (Monoid(mempty, mappend))
 import Pipes.Internal
@@ -57,6 +62,7 @@ import Pipes.Core
 
 import Control.Monad.Morph -- (hoist)
 -- import Control.Monad.Trans.Class ()
+import qualified Data.Void as V
 
 import Control.Monad (forever)
 
@@ -79,14 +85,20 @@ yield :: (Monad m) => a -> Producer' a m ()
 yield = respond
 {-# INLINABLE yield #-}
 
-generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
+-- generalize :: (Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
+-- :: Monad m => Proxy () b1 () b m r -> () -> Pipe b1 b m r
+generalize p  = evalStatePB undefined  $ up >+>  (\() -> hoist lift p) >+> dn 
   where
     up () = do
         x <- lift S.get
-        request x
+        a <- request x
+        respond a
+        up ()
     dn a = do
-        x <- respond a
-        lift $ S.put x
+        lift $ S.put a
+        x <- request ()
+        a2 <- respond x
+        dn a2
 
 fromToLifted
   :: (Monad (t m), Monad (t (Pipe a b m)), Monad m, 
@@ -118,19 +130,30 @@ runSubPipeTB
      (a -> Proxy x'1 b1 b' b (t m) r) -> a -> t (Proxy x'1 b1 b' b m) r
 runSubPipeTB =  (runEffect' .) . fromToLiftedB
 
--- unitD :: Monad m => Proxy x' x () () m b
+unitD :: Monad m => Proxy x' x () () m b
 unitD = forever $ yield ()
 
--- unitU :: Monad m => Proxy () a y' y m b
+unitU :: Monad m => Proxy () a () () m b
 unitU = forever $ await >> yield ()
 
--- runEffect' :: Monad m => Proxy () () () () m r -> m r
+runEffect'
+  :: Monad m =>
+     Proxy () () () V.Void m r -> m r
 runEffect'   p = runEffect $ unitD  >-> p -- >-> unitU
 
 -- | This can be considered the inverse of generalize from the Pipes.Prelude 
 specialize :: (() -> t) -> t
 specialize p = p ()
 
+{-
+directionalize
+  :: Monad m =>
+     ((s -> Proxy s b1 s b m r) -> a -> c) -> Proxy () b1 () b m r -> c
+-}
+directionalize
+  :: Monad m =>
+     ((s -> Proxy s b1 s b m r) -> () -> c)
+     -> Proxy () b1 () b m r -> c
 directionalize p = specialize . p . generalize
 
 -- | Wrap the base monad in 'E.ErrorT'
