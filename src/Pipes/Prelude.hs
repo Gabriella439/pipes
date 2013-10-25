@@ -17,8 +17,6 @@
 
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
-{-# language NoMonomorphismRestriction #-}
-
 
 module Pipes.Prelude (
     -- * Producers

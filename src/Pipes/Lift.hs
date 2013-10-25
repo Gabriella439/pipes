@@ -5,8 +5,6 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Rank2Types #-}
-{-# language NoMonomorphismRestriction #-}
-
 
 module Pipes.Lift (
     -- * ErrorT
