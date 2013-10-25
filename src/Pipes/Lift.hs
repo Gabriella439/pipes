@@ -5,7 +5,6 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module Pipes.Lift (
     -- * ErrorT
@@ -57,10 +56,6 @@ module Pipes.Lift (
     fromToLiftedB,
 
     directionalize,
-    specialize, 
-    runEffect',
-    unitD,
---    unitU
     ) where
 
 -- import Control.Monad.Trans.Class (lift)
@@ -81,25 +76,6 @@ import qualified Data.Void as V
 
 import Control.Monad (forever)
 
-(>->)
-    :: (Monad m)
-    => Proxy a' a () b m r
-    -- ^
-    -> Proxy () b c' c m r
-    -- ^
-    -> Proxy a' a c' c m r
-
-p1 >-> p2 = (\() -> p1) +>> p2
-{-# INLINABLE (>->) #-}
-
-await :: (Monad m) => Consumer' a m a
-await = request ()
-{-# INLINABLE await #-}
-
-yield :: (Monad m) => a -> Producer' a m ()
-yield = respond
-{-# INLINABLE yield #-}
-
 fromToLifted
   :: (Monad (t (Proxy a' a b' b m)), Monad m,
       Monad (t m), MFunctor t,
@@ -119,7 +95,6 @@ fromToLiftedB p = (//> (lift . lift . respond)) --  yield two layers lower
                                                 -- connect to
                 . p                             -- Proxy
 
-
 runSubPipeT
   :: (Monad (t (Proxy x'1 b1 b' b m)), Monad m,
       Monad (t m), MFunctor t,
@@ -132,27 +107,19 @@ runSubPipeTB
   :: (Monad (t (Proxy x'1 b1 b' b m)), Monad m, Monad (t m),
       MonadTrans t, MFunctor t) =>
      (a -> Proxy x'1 b1 b' b (t m) r) -> a -> t (Proxy x'1 b1 b' b m) r
-runSubPipeTB =  (runEffect' .) . fromToLiftedB
-
-unitD :: Monad m => Proxy x' x () () m b
-unitD = forever $ yield ()
-
-{-
-unitU :: Monad m => Proxy () a () () m b
-unitU = forever $ await >> yield ()
--}
-
-runEffect'
-  :: Monad m =>
-     Proxy () () () V.Void m r -> m r
-runEffect'   p = runEffect $ unitD  >-> p -- >-> unitU
+runSubPipeTB =  (runEffect .) . fromToLiftedB
 
 -- | This can be considered the inverse of generalize from the Pipes.Prelude 
 -- specialize :: forall x t . (x -> t) -> t
 -- specialize :: (x -> Proxy x' a' x a m r) -> Proxy x' a' x a m r
-specialize p = p ()
-generalize f = (\_ -> f)
 
+specialize :: (() -> t) -> t
+specialize p = p ()
+
+generalize :: a -> b -> a
+generalize = const
+
+directionalize :: ((t -> a) -> () -> c) -> a -> c
 directionalize p = specialize . p . generalize
 
 -- | Wrap the base monad in 'E.ErrorT'
@@ -183,24 +150,16 @@ runErrorPB    = (E.runErrorT .) . runSubPipeTB
 
 -- | Catch an error in the base monad
 catchError
-    :: (Monad m) 
+    :: (Monad m, E.Error e) 
     => Proxy a' a b' b (E.ErrorT e m) r
     -- ^
-    -> (e -> Proxy a' a b' b (E.ErrorT f m) r)
+    -> (e -> Proxy a' a b' b (E.ErrorT e m) r)
     -- ^
-    -> Proxy a' a b' b (E.ErrorT f m) r
-catchError p0 f = go p0
-  where
-    go p = case p of
-        Request a' fa  -> Request a' (\a  -> go (fa  a ))
-        Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        Pure    r      -> Pure r
-        M          m   -> M (E.ErrorT (do
-            x <- E.runErrorT m
-            return (Right (case x of
-                Left  e  -> f  e
-                Right p' -> go p' )) ))
+    -> Proxy a' a b' b (E.ErrorT e m) r
+catchError e h = errorP . E.runErrorT $ 
+    E.catchError (runSubPipeT e) (runSubPipeT . h)
 {-# INLINABLE catchError #-}
+
 
 -- | Catch an error using a catch function for the base monad
 liftCatchError
