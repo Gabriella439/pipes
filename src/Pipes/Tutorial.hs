@@ -1282,7 +1282,7 @@ Fail<Enter>
 
     * 'Effect'': marks both ends unused but still open
 
-> type Effect' a m r = forall x' x y' y . Proxy x' x y' y m r
+> type Effect' m r = forall x' x y' y . Proxy x' x y' y m r
 >
 > Upstream | Downstream
 >     +---------+
