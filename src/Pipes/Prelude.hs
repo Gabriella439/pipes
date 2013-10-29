@@ -212,7 +212,7 @@ stdoutLn = go
 {-# INLINABLE stdoutLn #-}
 
 -- | 'print' values to 'IO.stdout'
-print :: (MonadIO m) => (Show a) => Consumer' a m r
+print :: (MonadIO m, Show a) => Consumer' a m r
 print = for cat (liftIO . Prelude.print)
 {-# INLINABLE print #-}
 
