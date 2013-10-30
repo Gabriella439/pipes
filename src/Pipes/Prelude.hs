@@ -218,7 +218,7 @@ print = for cat (liftIO . Prelude.print)
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: (MonadIO m) => IO.Handle -> Consumer' String m r
-toHandle handle = for cat $ \str -> liftIO (IO.hPutStrLn handle str)
+toHandle handle = for cat (liftIO . IO.hPutStrLn handle)
 {-# INLINABLE toHandle #-}
 
 {- $pipes
