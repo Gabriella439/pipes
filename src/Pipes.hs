@@ -4,6 +4,8 @@
     library.
 -}
 
+{-# language NoMonomorphismRestriction #-} -- pjw
+
 {-# LANGUAGE RankNTypes, CPP #-}
 
 #if __GLASGOW_HASKELL__ >= 702
