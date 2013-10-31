@@ -94,7 +94,7 @@ import qualified GHC.IO.Exception as G
 import Pipes
 import Pipes.Core
 import Pipes.Internal
-import Pipes.Lift (evalStatePB, evalStateP)
+import Pipes.Lift (evalStateP)
 import qualified System.IO as IO
 import qualified Prelude
 import Prelude hiding (
