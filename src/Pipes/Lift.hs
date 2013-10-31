@@ -71,11 +71,11 @@ fromToLifted p =
     (lift . lift .request) >\\ hoist (hoist lift) p //> (lift . lift . respond)
 
 runSubPipeT
-  :: (Monad (t (Proxy x'1 b1 b' b m)), Monad m,
+  :: (Monad (t (Proxy a' a b' b m)), Monad m,
       Monad (t m), MFunctor t,
       MonadTrans t) =>
-     Proxy x'1 b1 b' b (t m) r
-     -> t (Proxy x'1 b1 b' b m) r
+     Proxy a' a b' b (t m) r
+     -> t (Proxy a' a b' b m) r
 runSubPipeT p =  runEffect $ fromToLifted p
 
 
