@@ -39,10 +39,12 @@ module Pipes.Lift (
     evalRWSP,
     execRWSP,
 
+    -- * Utilities
     distribute
 
     ) where
 
+import Control.Monad.Morph (hoist, MFunctor(..))
 import Control.Monad.Trans.Class (lift, MonadTrans(..))
 import qualified Control.Monad.Trans.Error as E
 import qualified Control.Monad.Trans.Maybe as M
@@ -50,31 +52,9 @@ import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import qualified Control.Monad.Trans.RWS.Strict as RWS
-
-import Data.Monoid (Monoid(mempty, mappend))
+import Data.Monoid (Monoid)
 import Pipes.Internal
 import Pipes.Core
-
-import Control.Monad.Morph (hoist, MFunctor(..))
-
-
-fromToLifted
-  :: (Monad (t (Proxy a' a b' b m)), Monad m,
-      Monad (t m), MFunctor t,
-      MonadTrans t) =>
-     Proxy a' a b' b (t m) r
-     -> Proxy x' x y' y (t (Proxy a' a b' b m)) r
-fromToLifted p = 
-    (lift . lift .request) >\\ hoist (hoist lift) p //> (lift . lift . respond)
-
-distribute
-  :: (Monad (t (Proxy a' a b' b m)), Monad m,
-      Monad (t m), MFunctor t,
-      MonadTrans t) =>
-     Proxy a' a b' b (t m) r
-     -> t (Proxy a' a b' b m) r
-distribute p =  runEffect $ fromToLifted p
-
 
 -- | Wrap the base monad in 'E.ErrorT'
 errorP
@@ -88,9 +68,9 @@ errorP p = do
 
 -- | Run 'E.ErrorT' in the base monad
 runErrorP
-  :: (Monad m, E.Error e) =>
-     Proxy a' a b' b (E.ErrorT e m) r
-     -> Proxy a' a b' b m (Either e r)
+    :: (Monad m, E.Error e)
+    => Proxy a' a b' b (E.ErrorT e m) r
+    -> Proxy a' a b' b m (Either e r)
 runErrorP    = E.runErrorT . distribute 
 {-# INLINABLE runErrorP #-}
 
@@ -140,9 +120,9 @@ maybeP p = do
 
 -- | Run 'M.MaybeT' in the base monad
 runMaybeP
-  :: Monad m =>
-     Proxy a' a b' b (M.MaybeT m) r
-     -> Proxy a' a b' b m (Maybe r)
+    :: (Monad m)
+    => Proxy a' a b' b (M.MaybeT m) r
+    -> Proxy a' a b' b m (Maybe r)
 runMaybeP p = M.runMaybeT $ distribute p
 {-# INLINABLE runMaybeP #-}
 
@@ -157,10 +137,10 @@ readerP k = do
 
 -- | Run 'R.ReaderT' in the base monad
 runReaderP
-  :: Monad m =>
-     i
-     -> Proxy a' a b' b (R.ReaderT i m) r
-     -> Proxy a' a b' b m r
+    :: (Monad m)
+    => i
+    -> Proxy a' a b' b (R.ReaderT i m) r
+    -> Proxy a' a b' b m r
 runReaderP r p = (`R.runReaderT` r) $ distribute p
 {-# INLINABLE runReaderP #-}
 
@@ -177,28 +157,28 @@ stateP k = do
 
 -- | Run 'S.StateT' in the base monad
 runStateP
-  :: Monad m =>
-     s
-     -> Proxy a' a b' b (S.StateT s m) r
-     -> Proxy a' a b' b m (r, s)
+    :: (Monad m)
+    => s
+    -> Proxy a' a b' b (S.StateT s m) r
+    -> Proxy a' a b' b m (r, s)
 runStateP s p = (`S.runStateT` s) $ distribute p
 {-# INLINABLE runStateP #-}
 
 -- | Evaluate 'S.StateT' in the base monad
 evalStateP
-  :: Monad m =>
-     s
-     -> Proxy a' a b' b (S.StateT s m) r
-     -> Proxy a' a b' b m r
+    :: (Monad m)
+    => s
+    -> Proxy a' a b' b (S.StateT s m) r
+    -> Proxy a' a b' b m r
 evalStateP s p = fmap fst $ runStateP s p
 {-# INLINABLE evalStateP #-}
 
 -- | Execute 'S.StateT' in the base monad
 execStateP
-  :: Monad m =>
-     s
-     -> Proxy a' a b' b (S.StateT s m) r
-     -> Proxy a' a b' b m s
+    :: (Monad m)
+    => s
+    -> Proxy a' a b' b (S.StateT s m) r
+    -> Proxy a' a b' b m s
 execStateP s p = fmap snd $ runStateP s p
 {-# INLINABLE execStateP #-}
 
@@ -225,17 +205,17 @@ writerP p = do
 
 -- | Run 'W.WriterT' in the base monad
 runWriterP
-  :: (Monad m, Data.Monoid.Monoid w) =>
-     Proxy a' a b' b (W.WriterT w m) r
-     -> Proxy a' a b' b m (r, w)
+    :: (Monad m, Data.Monoid.Monoid w)
+    => Proxy a' a b' b (W.WriterT w m) r
+    -> Proxy a' a b' b m (r, w)
 runWriterP p = W.runWriterT $ distribute p
 {-# INLINABLE runWriterP #-}
 
 -- | Execute 'W.WriterT' in the base monad
 execWriterP
-  :: (Monad m, Data.Monoid.Monoid w) =>
-     Proxy a' a b' b (W.WriterT w m) r
-     -> Proxy a' a b' b m w
+    :: (Monad m, Data.Monoid.Monoid w)
+    => Proxy a' a b' b (W.WriterT w m) r
+    -> Proxy a' a b' b m w
 execWriterP p = fmap snd $ runWriterP p
 {-# INLINABLE execWriterP #-}
 
@@ -257,34 +237,51 @@ rwsP k = do
 
 -- | Run 'RWS.RWST' in the base monad
 runRWSP
-  :: (Monad m, Monoid w) =>
-     r
-     -> s
-     -> Proxy a' a b' b (RWS.RWST r w s m) d
-     -> Proxy a' a b' b m (d, s, w)
+    :: (Monad m, Monoid w)
+    => r
+    -> s
+    -> Proxy a' a b' b (RWS.RWST r w s m) d
+    -> Proxy a' a b' b m (d, s, w)
 runRWSP  i s p = (\b -> RWS.runRWST b i s) $ distribute p
 {-# INLINABLE runRWSP #-}
 
 -- | Evaluate 'RWS.RWST' in the base monad
 evalRWSP
-  :: (Monad m, Monoid w) =>
-     r
-     -> s
-     -> Proxy a' a b' b (RWS.RWST r w s m) d
-     -> Proxy a' a b' b m (d, w)
+    :: (Monad m, Monoid w)
+    => r
+    -> s
+    -> Proxy a' a b' b (RWS.RWST r w s m) d
+    -> Proxy a' a b' b m (d, w)
 evalRWSP i s p = fmap f $ runRWSP i s p
-  where f x = let (r, _, w) = x in (r, w)
+  where
+    f x = let (r, _, w) = x in (r, w)
 {-# INLINABLE evalRWSP #-}
 
 
 -- todo fix type sigs below
 -- | Execute 'RWS.RWST' in the base monad
 execRWSP
-  :: (Monad m, Monoid w) =>
-     r
-     -> s
-     -> Proxy a' a b' b (RWS.RWST r w s m) d
-     -> Proxy a' a b' b m (s, w)
+    :: (Monad m, Monoid w)
+    => r
+    -> s
+    -> Proxy a' a b' b (RWS.RWST r w s m) d
+    -> Proxy a' a b' b m (s, w)
 execRWSP i s p = fmap f $ runRWSP i s p
-  where f x = let (_, s, w) = x in (s, w)
+  where
+    f x = let (_, s', w) = x in (s', w)
 {-# INLINABLE execRWSP #-}
+
+-- | Distribute 'Proxy' over a monad transformer
+distribute
+    ::  ( Monad m
+        , MonadTrans t
+        , MFunctor t
+        , Monad (t m)
+        , Monad (t (Proxy a' a b' b m))
+        )
+    => Proxy a' a b' b (t m) r
+    -- ^ 
+    -> t (Proxy a' a b' b m) r
+    -- ^ 
+distribute p =  runEffect $
+    (lift . lift .request) >\\ hoist (hoist lift) p //> (lift . lift . respond)
