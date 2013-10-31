@@ -277,5 +277,7 @@ distribute
     -- ^ 
     -> t (Proxy a' a b' b m) r
     -- ^ 
-distribute p =  runEffect $
-    (lift . lift .request) >\\ hoist (hoist lift) p //> (lift . lift . respond)
+distribute p =  runEffect $ request' >\\ unsafeHoist (hoist lift) p //> respond'
+  where
+    request' = lift . lift . request
+    respond' = lift . lift . respond
