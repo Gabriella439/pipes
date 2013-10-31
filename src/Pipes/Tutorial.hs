@@ -1419,4 +1419,23 @@ Fail<Enter>
     Any time you get type errors like these you can work through them by
     expanding out the type synonyms and seeing which type variables do not
     match.
+
+    You may also consult this table of type synonyms to more easily compare
+    them:
+
+> type Effect             = Proxy Void () () Void
+> type Producer         b = Proxy Void () () b
+> type Consumer    a      = Proxy ()   a  () Void
+> type Pipe        a    b = Proxy ()   a  () b
+>
+> type Server        b' b = Proxy Void () b' b 
+> type Client   a' a      = Proxy a'   a  () Void
+>
+> type Effect'            m r = forall x' x y' y . Proxy x' x y' y m r
+> type Producer'        b m r = forall x' x      . Proxy x' x () b m r
+> type Consumer'   a      m r = forall      y' y . Proxy () a y' y m r
+>
+> type Server'       b' b m r = forall x' x      . Proxy x' x b' b m r
+> type Client'  a' a      m r = forall      y' y . Proxy a' a y' y m r
+
 -}
