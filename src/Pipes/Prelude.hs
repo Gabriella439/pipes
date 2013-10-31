@@ -36,6 +36,7 @@ module Pipes.Prelude (
     -- $pipes
     map,
     mapM,
+    mapFoldable,
     filter,
     filterM,
     take,
@@ -211,13 +212,13 @@ stdoutLn = go
 {-# INLINABLE stdoutLn #-}
 
 -- | 'print' values to 'IO.stdout'
-print :: (MonadIO m) => (Show a) => Consumer' a m r
+print :: (MonadIO m, Show a) => Consumer' a m r
 print = for cat (liftIO . Prelude.print)
 {-# INLINABLE print #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: (MonadIO m) => IO.Handle -> Consumer' String m r
-toHandle handle = for cat $ \str -> liftIO (IO.hPutStrLn handle str)
+toHandle handle = for cat (liftIO . IO.hPutStrLn handle)
 {-# INLINABLE toHandle #-}
 
 {- $pipes
@@ -244,6 +245,13 @@ mapM f = for cat $ \a -> do
     b <- lift (f a)
     yield b
 {-# INLINABLE mapM #-}
+
+{- | Apply a function to all values flowing downstream, and
+     forward each element of the result.
+-}
+mapFoldable :: (Monad m, Foldable t) => (a -> t b) -> Pipe a b m r
+mapFoldable f = for cat (each . f)
+{-# INLINABLE mapFoldable #-}
 
 -- | @(filter predicate)@ only forwards values that satisfy the predicate.
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
@@ -436,7 +444,7 @@ or = any id
     otherwise
 -}
 elem :: (Monad m, Eq a) => a -> Producer a m () -> m Bool
-elem a = any (a ==) 
+elem a = any (a ==)
 {-# INLINABLE elem #-}
 
 {-| @(notElem a)@ returns 'False' if @p@ has an element equal to @a@, 'True'
