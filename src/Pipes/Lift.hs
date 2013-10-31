@@ -3,9 +3,6 @@
     actions so that they work in the 'Proxy' monad transformer.
 -}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE Rank2Types #-}
-
 module Pipes.Lift (
     -- * ErrorT
     errorP,
