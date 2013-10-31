@@ -135,8 +135,6 @@ yield = respond
 @
 'for' :: 'Monad' m => 'Producer' b m r -> (b -> 'Effect'       m ()) -> 'Effect'       m r
 'for' :: 'Monad' m => 'Producer' b m r -> (b -> 'Producer'   c m ()) -> 'Producer'   c m r
-'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Effect'       m ()) -> 'Consumer' x   m r
-'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Producer'   c m ()) -> 'Pipe'     x c m r
 'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Consumer' x   m ()) -> 'Consumer' x   m r
 'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Pipe'     x c m ()) -> 'Pipe'     x c m r
 @
@@ -172,8 +170,6 @@ for = (//>)
 @
 ('~>') :: 'Monad' m => (a -> 'Producer' b m r) -> (b -> 'Effect'       m ()) -> (a -> 'Effect'       m r)
 ('~>') :: 'Monad' m => (a -> 'Producer' b m r) -> (b -> 'Producer'   c m ()) -> (a -> 'Producer'   c m r)
-('~>') :: 'Monad' m => (a -> 'Pipe'   x b m r) -> (b -> 'Effect'       m ()) -> (a -> 'Consumer' x   m r)
-('~>') :: 'Monad' m => (a -> 'Pipe'   x b m r) -> (b -> 'Producer'   c m ()) -> (a -> 'Pipe'     x c m r)
 ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m r) -> (b -> 'Consumer' x   m ()) -> (a -> 'Consumer' x   m r)
 ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m r) -> (b -> 'Pipe'     x c m ()) -> (a -> 'Pipe'     x c m r)
 @
@@ -232,8 +228,6 @@ await = request ()
 @
 ('>~') :: 'Monad' m => 'Effect'       m b -> 'Consumer' b   m c -> 'Effect'       m c
 ('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Consumer' b   m c -> 'Consumer' a   m c
-('>~') :: 'Monad' m => 'Effect'       m b -> 'Pipe'     b y m c -> 'Producer'   y m c
-('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
 ('>~') :: 'Monad' m => 'Producer'   y m b -> 'Pipe'     b y m c -> 'Producer'   y m c
 ('>~') :: 'Monad' m => 'Pipe'     a y m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
 @
