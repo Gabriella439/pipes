@@ -50,8 +50,8 @@ import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Data.Monoid (Monoid)
-import Pipes.Internal
-import Pipes.Core
+import Pipes.Internal (Proxy(..), unsafeHoist)
+import Pipes.Core (runEffect, request, respond, (//>), (>\\))
 
 -- | Wrap the base monad in 'E.ErrorT'
 errorP
@@ -82,7 +82,6 @@ catchError
 catchError e h = errorP . E.runErrorT $ 
     E.catchError (distribute e) (distribute . h)
 {-# INLINABLE catchError #-}
-
 
 -- | Catch an error using a catch function for the base monad
 liftCatchError
@@ -254,8 +253,6 @@ evalRWSP i s p = fmap f $ runRWSP i s p
     f x = let (r, _, w) = x in (r, w)
 {-# INLINABLE evalRWSP #-}
 
-
--- todo fix type sigs below
 -- | Execute 'RWS.RWST' in the base monad
 execRWSP
     :: (Monad m, Monoid w)
