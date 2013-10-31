@@ -6,8 +6,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Rank2Types #-}
 
-{-# LANGUAGE NoMonomorphismRestriction #-}
-
 module Pipes.Lift (
     -- * ErrorT
     errorP,
@@ -41,8 +39,7 @@ module Pipes.Lift (
     evalRWSP,
     execRWSP,
 
-    runSubPipeT,
-    fromToLifted,
+    distribute
 
     ) where
 
@@ -70,13 +67,13 @@ fromToLifted
 fromToLifted p = 
     (lift . lift .request) >\\ hoist (hoist lift) p //> (lift . lift . respond)
 
-runSubPipeT
+distribute
   :: (Monad (t (Proxy a' a b' b m)), Monad m,
       Monad (t m), MFunctor t,
       MonadTrans t) =>
      Proxy a' a b' b (t m) r
      -> t (Proxy a' a b' b m) r
-runSubPipeT p =  runEffect $ fromToLifted p
+distribute p =  runEffect $ fromToLifted p
 
 
 -- | Wrap the base monad in 'E.ErrorT'
@@ -94,7 +91,7 @@ runErrorP
   :: (Monad m, E.Error e) =>
      Proxy a' a b' b (E.ErrorT e m) r
      -> Proxy a' a b' b m (Either e r)
-runErrorP    = E.runErrorT . runSubPipeT 
+runErrorP    = E.runErrorT . distribute 
 {-# INLINABLE runErrorP #-}
 
 -- | Catch an error in the base monad
@@ -106,7 +103,7 @@ catchError
     -- ^
     -> Proxy a' a b' b (E.ErrorT e m) r
 catchError e h = errorP . E.runErrorT $ 
-    E.catchError (runSubPipeT e) (runSubPipeT . h)
+    E.catchError (distribute e) (distribute . h)
 {-# INLINABLE catchError #-}
 
 
@@ -146,7 +143,7 @@ runMaybeP
   :: Monad m =>
      Proxy a' a b' b (M.MaybeT m) r
      -> Proxy a' a b' b m (Maybe r)
-runMaybeP p = M.runMaybeT $ runSubPipeT p
+runMaybeP p = M.runMaybeT $ distribute p
 {-# INLINABLE runMaybeP #-}
 
 -- | Wrap the base monad in 'R.ReaderT'
@@ -164,7 +161,7 @@ runReaderP
      i
      -> Proxy a' a b' b (R.ReaderT i m) r
      -> Proxy a' a b' b m r
-runReaderP r p = (`R.runReaderT` r) $ runSubPipeT p
+runReaderP r p = (`R.runReaderT` r) $ distribute p
 {-# INLINABLE runReaderP #-}
 
 -- | Wrap the base monad in 'S.StateT'
@@ -184,7 +181,7 @@ runStateP
      s
      -> Proxy a' a b' b (S.StateT s m) r
      -> Proxy a' a b' b m (r, s)
-runStateP s p = (`S.runStateT` s) $ runSubPipeT p
+runStateP s p = (`S.runStateT` s) $ distribute p
 {-# INLINABLE runStateP #-}
 
 -- | Evaluate 'S.StateT' in the base monad
@@ -231,7 +228,7 @@ runWriterP
   :: (Monad m, Data.Monoid.Monoid w) =>
      Proxy a' a b' b (W.WriterT w m) r
      -> Proxy a' a b' b m (r, w)
-runWriterP p = W.runWriterT $ runSubPipeT p
+runWriterP p = W.runWriterT $ distribute p
 {-# INLINABLE runWriterP #-}
 
 -- | Execute 'W.WriterT' in the base monad
@@ -265,7 +262,7 @@ runRWSP
      -> s
      -> Proxy a' a b' b (RWS.RWST r w s m) d
      -> Proxy a' a b' b m (d, s, w)
-runRWSP  i s p = (\b -> RWS.runRWST b i s) $ runSubPipeT p
+runRWSP  i s p = (\b -> RWS.runRWST b i s) $ distribute p
 {-# INLINABLE runRWSP #-}
 
 -- | Evaluate 'RWS.RWST' in the base monad
