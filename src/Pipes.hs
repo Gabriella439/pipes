@@ -317,6 +317,7 @@ instance (Monad m) => Applicative (ListT m) where
 instance (Monad m) => Monad (ListT m) where
     return a = Select (yield a)
     m >>= f  = Select (for (enumerate m) (\a -> enumerate (f a)))
+    fail _   = mzero
 
 instance MonadTrans ListT where
     lift m = Select (do
