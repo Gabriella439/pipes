@@ -83,3 +83,19 @@ Benchmark lift-benchmarks
         mtl          >= 2.0.1.0 && < 2.2,
         pipes        >= 4.0.0   && < 4.1,
         transformers >= 0.2.0.0 && < 0.4
+
+test-suite tests
+    Default-Language: Haskell2010
+    Type:             exitcode-stdio-1.0
+    HS-Source-Dirs:   tests
+    Main-Is:          Main.hs
+    GHC-Options:      -Wall -threaded -rtsopts -with-rtsopts=-N -fno-warn-missing-signatures
+
+    Build-Depends:
+        base                       >= 4       && < 5   ,
+        pipes                      >= 4.0.0   && < 4.1 ,
+        QuickCheck                 >= 2.4     && < 3   ,
+        mtl                        >= 2.0.1   && < 2.2 ,
+        test-framework             >= 0.4     && < 1   ,
+        test-framework-quickcheck2 >= 0.2.0   && < 0.4 ,
+        transformers               >= 0.2.0.0 && < 0.4
