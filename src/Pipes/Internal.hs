@@ -167,22 +167,25 @@ instance (MonadWriter w m) => MonadWriter w (Proxy a' a b' b m) where
 #else
 #endif
     tell = lift . tell
-    listen proxy = go proxy mempty
-        where
-          go p w = case p of
-              Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
-              Respond b  fb' -> Respond b  (\b' -> go (fb' b') w)
-              Pure    r      -> Pure (r, w)
-              M       m      -> M (
-                (\(p', w') -> go p' $! mappend w w') `liftM` listen m)
+    listen p0 = go p0 mempty
+      where
+        go p w = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b') w)
+            M       m      -> M (do
+                (p', w') <- listen m
+                return (go p' $! mappend w w') )
+            Pure    r      -> Pure (r, w)
 
-    pass = go
-        where
-          go p = case p of
-              Request a' fa  -> Request a' (\a  -> go (fa  a ))
-              Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-              M       m      -> M (go `liftM` m)
-              Pure    (r, f) -> M (pass (return (Pure r, f)))
+    pass p0 = go p0 mempty
+      where
+        go p w = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b') w)
+            M       m      -> M (do
+                (p', w') <- listen m
+                return (go p' $! mappend w w') )
+            Pure    (r, f) -> M (pass (return (Pure r, \_ -> f w)))
 
 instance (MonadError e m) => MonadError e (Proxy a' a b' b m) where
     throwError = lift . throwError
