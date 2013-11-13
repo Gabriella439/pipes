@@ -4,9 +4,13 @@
     library.
 -}
 
-{-# language NoMonomorphismRestriction #-} -- pjw
-
-{-# LANGUAGE RankNTypes, CPP #-}
+{-# LANGUAGE
+    RankNTypes
+  , CPP
+  , FlexibleInstances
+  , MultiParamTypeClasses
+  , UndecidableInstances
+  #-}
 
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
@@ -66,8 +70,11 @@ module Pipes (
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.Error (MonadError(..), ErrorT(runErrorT))
+import Control.Monad.Reader (MonadReader(..))
+import Control.Monad.State (MonadState(..))
+import Control.Monad.Writer (MonadWriter(..))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.Monad.Trans.Error (ErrorT(runErrorT))
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Data.Foldable (Foldable)
@@ -337,13 +344,66 @@ instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
     
+instance MFunctor ListT where
+    hoist morph = Select . hoist morph . enumerate
 
 instance (Monad m) => Monoid (ListT m a) where
     mempty = empty
     mappend = (<|>)
 
-instance MFunctor ListT where
-    hoist morph = Select . hoist morph . enumerate
+instance (MonadState s m) => MonadState s (ListT m) where
+    get     = lift  get
+
+    put   s = lift (put   s)
+
+#if MIN_VERSION_mtl(2,1,0)
+    state f = lift (state f)
+#else
+#endif
+
+instance (MonadWriter w m) => MonadWriter w (ListT m) where
+#if MIN_VERSION_mtl(2,1,0)
+    writer = lift . writer
+#else
+#endif
+
+    tell w = lift (tell w)
+
+    listen l = Select (go (enumerate l) mempty)
+      where
+        go p w = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
+            Respond b  fb' -> Respond (b, w)  (\b' -> go (fb' b') w)
+            M          m   -> M (do
+                (p', w') <- listen m
+                return (go p' $! mappend w w') )
+            Pure    r      -> Pure r
+
+    pass l = Select (go (enumerate l) mempty)
+      where
+        go p w = case p of
+            Request  a'     fa  -> Request a' (\a  -> go (fa  a ) w)
+            Respond (b, f)  fb' -> M (pass (return
+                (Respond b (\b' -> go (fb' b') (f w)), \_ -> f w) ))
+            M               m   -> M (do
+                (p', w') <- listen m
+                return (go p' $! mappend w w') )
+            Pure    r           -> Pure r
+
+instance (MonadReader i m) => MonadReader i (ListT m) where
+    ask = lift ask
+
+    local f l = Select (local f (enumerate l))
+
+#if MIN_VERSION_mtl(2,1,0)
+    reader f = lift (reader f)
+#else
+#endif
+
+instance (MonadError e m) => MonadError e (ListT m) where
+    throwError e = lift (throwError e)
+
+    catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
 
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
