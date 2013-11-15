@@ -127,6 +127,7 @@ unsafeHoist nat = go
         Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
         M          m   -> M (nat (m >>= \p' -> return (go p')))
         Pure       r   -> Pure r
+{-# INLINABLE unsafeHoist #-}
 
 instance MFunctor (Proxy a' a b' b) where
     hoist nat p0 = go (observe p0) where

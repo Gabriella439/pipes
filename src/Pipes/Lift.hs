@@ -281,3 +281,4 @@ distribute p =  runEffect $ request' >\\ unsafeHoist (hoist lift) p //> respond'
   where
     request' = lift . lift . request
     respond' = lift . lift . respond
+{-# INLINABLE distribute #-}
