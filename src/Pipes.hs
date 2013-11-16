@@ -156,7 +156,7 @@ for = (//>)
 {-# INLINABLE for #-}
 
 {-# RULES
-    "for (for p f) g" forall p f g . for (for p f) g = for p (f ~> g)
+    "for (for p f) g" forall p f g . for (for p f) g = for p (\a -> for (f a) g)
 
   ; "for p yield" forall p . for p yield = p
 
