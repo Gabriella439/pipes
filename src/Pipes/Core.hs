@@ -18,11 +18,7 @@
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
 #endif
-{- The rewrite RULES require the 'TrustWorthy' annotation.  Their proofs are
-   pretty trivial since they are just inlining the definition of their
-   respective operators.  GHC doesn't do this inlining automatically for these
-   functions because they are recursive.
--}
+-- The rewrite RULES require the 'TrustWorthy' annotation.
 
 module Pipes.Core (
     -- * Proxy Monad Transformer
@@ -832,3 +828,18 @@ k ~<< p = p >>~ k
     -- ^
 k <<+ p = p +>> k
 {-# INLINABLE (<<+) #-}
+
+{-# RULES
+    "(p //> f) //> g" forall p f g . (p //> f) //> g = p //> (\a -> f a //> g)
+
+  ; "p //> respond" forall p . p //> respond = p
+
+  ; "respond x //> f" forall x f . respond x //>  f = f x
+
+  ; "f >\\ (g >\\ p)" forall f g p . f >\\ (g >\\ p) = (\a -> f >\\ g a) >\\ p
+
+  ; "request >\\ p" forall p . request >\\ p = p
+
+  ; "f >\\ request x" forall f x . f >\\ request x = f x
+
+  #-}
