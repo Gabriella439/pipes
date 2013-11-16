@@ -156,13 +156,26 @@ for = (//>)
 {-# INLINABLE for #-}
 
 {-# RULES
-    "for cat f" forall f .
+    "for (for p f) g" forall p f g . for (for p f) g = for p (f ~> g)
+
+  ; "for p yield" forall p . for p yield = p
+
+  ; "for (yield x) f" forall x f . for (yield x) f = f x
+
+  ; "for cat f" forall f .
         for cat f =
             let go = do
                     x <- await
                     f x
                     go
             in  go
+
+  ; "f >~ (g >~ p)" forall f g p . f >~ (g >~ p) = (f >~ g) >~ p
+
+  ; "await >~ p" forall p . await >~ p = p
+
+  ; "p >~ await" forall p . p >~ await = p
+
   ; "m >~ cat" forall m .
         m >~ cat =
             let go = do

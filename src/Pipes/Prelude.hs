@@ -15,8 +15,12 @@
     'Text' utilities for @pipes@ will preserve newlines.
 -}
 
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes, CPP #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+#if __GLASGOW_HASKELL__ >= 702
+{-# LANGUAGE Trustworthy #-}
+#endif
+{- The rewrite RULES require the 'TrustWorthy' annotation. -}
 
 module Pipes.Prelude (
     -- * Producers
@@ -216,10 +220,19 @@ print :: (MonadIO m, Show a) => Consumer' a m r
 print = for cat (liftIO . Prelude.print)
 {-# INLINABLE print #-}
 
+{-# RULES
+    "p >-> print" forall p . p >-> print = for p (liftIO . Prelude.print)
+  #-}
+
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: (MonadIO m) => IO.Handle -> Consumer' String m r
 toHandle handle = for cat (liftIO . IO.hPutStrLn handle)
 {-# INLINABLE toHandle #-}
+
+{-# RULES
+    "p >-> toHandle handle" forall p handle .
+        p >-> toHandle handle = for p (liftIO . IO.hPutStrLn handle)
+  #-}
 
 {- $pipes
     Use ('>->') to connect 'Producer's, 'Pipe's, and 'Consumer's:
@@ -239,12 +252,31 @@ map :: (Monad m) => (a -> b) -> Pipe a b m r
 map f = for cat (yield . f)
 {-# INLINABLE map #-}
 
+{-# RULES
+    "p >-> map f" forall p f . p >-> map f = for p (yield . f)
+
+  ; "map f >-> p" forall p f . map f >-> p = (do
+        a <- await
+        return (f a) ) >~ p
+  #-}
+
 -- | Apply a monadic function to all values flowing downstream
 mapM :: (Monad m) => (a -> m b) -> Pipe a b m r
 mapM f = for cat $ \a -> do
     b <- lift (f a)
     yield b
 {-# INLINABLE mapM #-}
+
+{-# RULES
+    "p >-> mapM f" forall p f . p >-> mapM f = for p (\a -> do
+        b <- lift (f a)
+        yield b )
+
+  ; "mapM f >-> p" forall p f . mapM f >-> p = (do
+        a <- await
+        b <- lift (f a)
+        return b ) >~ p
+  #-}
 
 {- | Apply a function to all values flowing downstream, and
      forward each element of the result.
@@ -253,10 +285,19 @@ mapFoldable :: (Monad m, Foldable t) => (a -> t b) -> Pipe a b m r
 mapFoldable f = for cat (each . f)
 {-# INLINABLE mapFoldable #-}
 
+{-# RULES
+    "p >-> mapFoldable f" forall p f . p >-> mapFoldable f = for p (each . f)
+  #-}
+
 -- | @(filter predicate)@ only forwards values that satisfy the predicate.
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat $ \a -> when (predicate a) (yield a)
 {-# INLINABLE filter #-}
+
+{-# RULES
+    "p >-> filter predicate" forall p predicate.
+        p >-> filter predicate = for p (\a -> when (predicate a) (yield a))
+  #-}
 
 {-| @(filterM predicate)@ only forwards values that satisfy the monadic
     predicate
@@ -266,6 +307,13 @@ filterM predicate = for cat $ \a -> do
     b <- lift (predicate a)
     when b (yield a)
 {-# INLINABLE filterM #-}
+
+{-# RULES
+    "p >-> filterM predicate" forall p predicate .
+        p >-> filterM predicate = for p (\a -> do
+            b <- lift (predicate a)
+            when b (yield a) )
+  #-}
 
 -- | @(take n)@ only allows @n@ values to pass through
 take :: (Monad m) => Int -> Pipe a a m ()
@@ -316,6 +364,10 @@ concat :: (Monad m, Foldable f) => Pipe (f a) a m r
 concat = for cat each
 {-# INLINABLE concat #-}
 
+{-# RULES
+    "p >-> concat" forall p . p >-> concat = for p each
+  #-}
+
 -- | Outputs the indices of all elements that match the given element
 elemIndices :: (Monad m, Eq a) => a -> Pipe a Int m r
 elemIndices a = findIndices (a ==)
@@ -363,12 +415,31 @@ chain f = for cat $ \a -> do
     yield a
 {-# INLINABLE chain #-}
 
+{-# RULES
+    "p >-> chain f" forall p f .
+        p >-> chain f = for p (\a -> do
+            lift (f a)
+            yield a )
+  ; "chain f >-> p" forall p f .
+        chain f >-> p = (do
+            a <- await
+            lift (f a)
+            return a ) >~ p
+  #-}
+
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
 read :: (Monad m, Read a) => Pipe String a m r
 read = for cat $ \str -> case (reads str) of
     [(a, "")] -> yield a
     _         -> return ()
 {-# INLINABLE read #-}
+
+{-# RULES
+    "p >-> read" forall p .
+        p >-> read = for p (\str -> case (reads str) of
+            [(a, "")] -> yield a
+            _         -> return () )
+  #-}
 
 -- | Convert 'Show'able values to 'String's
 show :: (Monad m, Show a) => Pipe a String m r
@@ -420,14 +491,14 @@ foldM step begin done p0 = do
     predicate.
 -}
 all :: (Monad m) => (a -> Bool) -> Producer a m () -> m Bool
-all predicate p = null $ for p $ \a -> when (not $ predicate a) (yield a)
+all predicate p = null $ p >-> filter (not . predicate)
 {-# INLINABLE all #-}
 
 {-| @(any predicate p)@ determines whether any element of @p@ satisfies the
     predicate.
 -}
 any :: (Monad m) => (a -> Bool) -> Producer a m () -> m Bool
-any predicate p = liftM not $ null $ for p $ \a -> when (predicate a) (yield a)
+any predicate p = liftM not $ null (p >-> filter predicate)
 {-# INLINABLE any #-}
 
 -- | Determines whether all elements are 'True'
@@ -456,7 +527,7 @@ notElem a = all (a /=)
 
 -- | Find the first element of a 'Producer' that satisfies the predicate
 find :: (Monad m) => (a -> Bool) -> Producer a m () -> m (Maybe a)
-find predicate p = head $ for p  $ \a -> when (predicate a) (yield a)
+find predicate p = head (p >-> filter predicate)
 {-# INLINABLE find #-}
 
 {-| Find the index of the first element of a 'Producer' that satisfies the
