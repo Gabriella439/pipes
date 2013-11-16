@@ -25,81 +25,88 @@
 module Pipes.Prelude (
     -- * Producers
     -- $producers
-    stdinLn,
-    readLn,
-    fromHandle,
-    replicateM,
+      stdinLn
+    , readLn
+    , fromHandle
+    , replicateM
 
     -- * Consumers
     -- $consumers
-    stdoutLn,
-    print,
-    toHandle,
+    , stdoutLn
+    , print
+    , toHandle
 
     -- * Pipes
     -- $pipes
-    map,
-    mapM,
-    mapFoldable,
-    filter,
-    filterM,
-    take,
-    takeWhile,
-    drop,
-    dropWhile,
-    concat,
-    elemIndices,
-    findIndices,
-    scan,
-    scanM,
-    chain,
-    read,
-    show,
+    , map
+    , mapM
+    , mapFoldable
+    , filter
+    , filterM
+    , take
+    , takeWhile
+    , drop
+    , dropWhile
+    , concat
+    , elemIndices
+    , findIndices
+    , scan
+    , scanM
+    , chain
+    , read
+    , show
 
     -- * Folds
     -- $folds
-    fold,
-    foldM,
-    all,
-    any,
-    and,
-    or,
-    elem,
-    notElem,
-    find,
-    findIndex,
-    head,
-    index,
-    last,
-    length,
-    maximum,
-    minimum,
-    null,
-    sum,
-    product,
-    toList,
-    toListM,
+    , fold
+    , foldM
+    , all
+    , any
+    , and
+    , or
+    , elem
+    , notElem
+    , find
+    , findIndex
+    , head
+    , index
+    , last
+    , length
+    , maximum
+    , minimum
+    , null
+    , sum
+    , product
+    , toList
+    , toListM
 
     -- * Zips
-    zip,
-    zipWith,
-
+    , zip
+    , zipWith
+#ifndef haskell98
     -- * Utilities
-    tee,
-    generalize
+    , tee
+    , generalize
+#endif
     ) where
 
 import Control.Exception (throwIO, try)
 import Control.Monad (liftM, replicateM_, when, unless)
+#ifndef haskell98
 import Control.Monad.Trans.State.Strict (get, put)
+#endif
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.Void (absurd)
 import Foreign.C.Error (Errno(Errno), ePIPE)
 import qualified GHC.IO.Exception as G
 import Pipes
+#ifndef haskell98
 import Pipes.Core
+#endif
 import Pipes.Internal
+#ifndef haskell98
 import Pipes.Lift (evalStateP)
+#endif
 import qualified System.IO as IO
 import qualified Prelude
 import Prelude hiding (
@@ -669,6 +676,7 @@ zipWith f = go
                         go p1' p2'
 {-# INLINABLE zipWith #-}
 
+#ifndef haskell98
 {-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
     downstream
 -}
@@ -708,3 +716,4 @@ generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
         x <- respond a
         lift $ put x
 {-# INLINABLE generalize #-}
+#endif

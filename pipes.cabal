@@ -39,14 +39,22 @@ Source-Repository head
     Location: https://github.com/Gabriel439/Haskell-Pipes-Library
 
 Library
-    Default-Language: Haskell2010
+    if !flag(haskell98)
+        Default-Language: Haskell2010
+    else
+        Default-Language: Haskell98
+
     HS-Source-Dirs: src
     Build-Depends:
         base         >= 4       && < 5  ,
-        mmorph       >= 1.0.0   && < 1.1,
-        mtl          >= 2.0.1.0 && < 2.2,
         transformers >= 0.2.0.0 && < 0.4,
         void                       < 0.7
+
+    if !flag(haskell98)
+        Build-Depends:
+            mmorph       >= 1.0.0   && < 1.1,
+            mtl          >= 2.0.1.0 && < 2.2
+
     Exposed-Modules:
         Pipes,
         Pipes.Core,
@@ -55,6 +63,10 @@ Library
         Pipes.Prelude,
         Pipes.Tutorial
     GHC-Options: -O2 -Wall
+
+    if flag(haskell98)
+      CPP-Options: -Dhaskell98
+
 
 Benchmark prelude-benchmarks
     Default-Language: Haskell2010
@@ -99,3 +111,7 @@ Benchmark lift-benchmarks
         mtl          >= 2.0.1.0 && < 2.2,
         pipes        >= 4.0.0   && < 4.1,
         transformers >= 0.2.0.0 && < 0.4
+
+Flag haskell98
+  Description: Haskell98 compliant subset of pipes.
+  Default:     False

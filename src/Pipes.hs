@@ -62,21 +62,25 @@ module Pipes (
     -- $reexports
     module Control.Monad.IO.Class,
     module Control.Monad.Trans.Class,
+#ifndef haskell98
     module Control.Monad.Morph,
+#endif
     module Data.Foldable,
     module Data.Void
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
-import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.IO.Class (MonadIO(liftIO)) -- transformers
+#ifndef haskell98
 import Control.Monad.Error (MonadError(..), ErrorT(runErrorT))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
-import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
-import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
+#endif
+import Control.Monad.Trans.Class (MonadTrans(lift)) --transformers
+import Control.Monad.Trans.Identity (IdentityT(runIdentityT)) --transformers
+import Control.Monad.Trans.Maybe (MaybeT(runMaybeT)) --transformers
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as F
 import Data.Monoid (Monoid(..))
@@ -86,7 +90,9 @@ import Pipes.Internal (Proxy(..))
 import Pipes.Core
 
 -- Re-exports
+#ifndef haskell98
 import Control.Monad.Morph (MFunctor(hoist))
+#endif
 
 infixl 4 <~
 infixr 4 ~>
@@ -356,14 +362,17 @@ instance (Monad m) => Alternative (ListT m) where
 instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
-    
+
+#ifndef haskell98
 instance MFunctor ListT where
     hoist morph = Select . hoist morph . enumerate
+#endif
 
 instance (Monad m) => Monoid (ListT m a) where
     mempty = empty
     mappend = (<|>)
 
+#ifndef haskell98
 instance (MonadState s m) => MonadState s (ListT m) where
     get     = lift  get
 
@@ -371,13 +380,11 @@ instance (MonadState s m) => MonadState s (ListT m) where
 
 #if MIN_VERSION_mtl(2,1,0)
     state f = lift (state f)
-#else
 #endif
 
 instance (MonadWriter w m) => MonadWriter w (ListT m) where
 #if MIN_VERSION_mtl(2,1,0)
     writer = lift . writer
-#else
 #endif
 
     tell w = lift (tell w)
@@ -410,14 +417,13 @@ instance (MonadReader i m) => MonadReader i (ListT m) where
 
 #if MIN_VERSION_mtl(2,1,0)
     reader f = lift (reader f)
-#else
 #endif
 
 instance (MonadError e m) => MonadError e (ListT m) where
     throwError e = lift (throwError e)
 
     catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
-
+#endif
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
 -}
@@ -439,12 +445,14 @@ instance Enumerable MaybeT where
             Nothing -> return ()
             Just a  -> yield a
 
+#ifndef haskell98
 instance Enumerable (ErrorT e) where
     toListT m = Select $ do
         x <- lift $ runErrorT m
         case x of
             Left  _ -> return ()
             Right a -> yield a
+#endif
 
 {-| Consume the first value from a 'Producer'
 
