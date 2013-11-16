@@ -217,21 +217,22 @@ stdoutLn = go
 
 -- | 'print' values to 'IO.stdout'
 print :: (MonadIO m, Show a) => Consumer' a m r
-print = for cat (liftIO . Prelude.print)
+print = for cat (\a -> liftIO (Prelude.print a))
 {-# INLINABLE print #-}
 
 {-# RULES
-    "p >-> print" forall p . p >-> print = for p (liftIO . Prelude.print)
+    "p >-> print" forall p .
+        p >-> print = for p (\a -> liftIO (Prelude.print a))
   #-}
 
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: (MonadIO m) => IO.Handle -> Consumer' String m r
-toHandle handle = for cat (liftIO . IO.hPutStrLn handle)
+toHandle handle = for cat (\str -> liftIO (IO.hPutStrLn handle str))
 {-# INLINABLE toHandle #-}
 
 {-# RULES
     "p >-> toHandle handle" forall p handle .
-        p >-> toHandle handle = for p (liftIO . IO.hPutStrLn handle)
+        p >-> toHandle handle = for p (\str -> liftIO (IO.hPutStrLn handle str))
   #-}
 
 {- $pipes
@@ -249,11 +250,11 @@ quit<Enter>
 
 -- | Apply a function to all values flowing downstream
 map :: (Monad m) => (a -> b) -> Pipe a b m r
-map f = for cat (yield . f)
+map f = for cat (\a -> yield (f a))
 {-# INLINABLE map #-}
 
 {-# RULES
-    "p >-> map f" forall p f . p >-> map f = for p (yield . f)
+    "p >-> map f" forall p f . p >-> map f = for p (\a -> yield (f a))
 
   ; "map f >-> p" forall p f . map f >-> p = (do
         a <- await
@@ -282,11 +283,12 @@ mapM f = for cat $ \a -> do
      forward each element of the result.
 -}
 mapFoldable :: (Monad m, Foldable t) => (a -> t b) -> Pipe a b m r
-mapFoldable f = for cat (each . f)
+mapFoldable f = for cat (\a -> each (f a))
 {-# INLINABLE mapFoldable #-}
 
 {-# RULES
-    "p >-> mapFoldable f" forall p f . p >-> mapFoldable f = for p (each . f)
+    "p >-> mapFoldable f" forall p f .
+        p >-> mapFoldable f = for p (\a -> each (f a))
   #-}
 
 -- | @(filter predicate)@ only forwards values that satisfy the predicate.
@@ -491,7 +493,7 @@ foldM step begin done p0 = do
     predicate.
 -}
 all :: (Monad m) => (a -> Bool) -> Producer a m () -> m Bool
-all predicate p = null $ p >-> filter (not . predicate)
+all predicate p = null $ p >-> filter (\a -> not (predicate a))
 {-# INLINABLE all #-}
 
 {-| @(any predicate p)@ determines whether any element of @p@ satisfies the
