@@ -14,7 +14,7 @@ import Pipes
 import Pipes.Lift
 
 defaultMax :: Int
-defaultMax = 1000000
+defaultMax = 10000
 
 instance NFData a => NFData (Sum a)
 

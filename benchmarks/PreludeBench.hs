@@ -9,7 +9,7 @@ import qualified Pipes.Prelude as P
 import Prelude hiding (enumFromTo)
 
 defaultMax :: Int
-defaultMax = 1000000
+defaultMax = 10000
 
 main :: IO ()
 main = commonMain defaultMax preludeBenchmarks
