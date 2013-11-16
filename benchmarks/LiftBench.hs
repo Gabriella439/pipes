@@ -80,6 +80,7 @@ liftBenchmarks vmax =
         , bench "execStateP_B" . whnf (runB (execStateP 0) . s_bench)
         , bench "execStateP_A" . whnf (runA (defT S.execStateT) . s_bench)
         ]
+{-
     , bgroup "WriterT" $ applyBench
         [
         -- Running WriterP after runEffect will space leak.
@@ -97,4 +98,5 @@ liftBenchmarks vmax =
         , bench "execRWSP_B" . nf (runB (execRWSP 1 0) . rwsp_bench)
         , bench "execRWSP_A" . nf (runA (defT RWS.execRWST) . rwsp_bench)
         ]
+-}
     ]
