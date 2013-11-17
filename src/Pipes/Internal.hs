@@ -35,12 +35,10 @@ module Pipes.Internal (
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
-#ifndef haskell98
-import Control.Monad.Morph (MFunctor(hoist))
-#endif
 import Control.Monad.Trans.Class (MonadTrans(lift))
 #ifndef haskell98
 import Control.Monad (liftM)
+import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))

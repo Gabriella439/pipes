@@ -72,12 +72,6 @@ module Pipes (
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO)) -- transformers
-#ifndef haskell98
-import Control.Monad.Error (MonadError(..), ErrorT(runErrorT))
-import Control.Monad.Reader (MonadReader(..))
-import Control.Monad.State (MonadState(..))
-import Control.Monad.Writer (MonadWriter(..))
-#endif
 import Control.Monad.Trans.Class (MonadTrans(lift)) --transformers
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT)) --transformers
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT)) --transformers
@@ -88,6 +82,12 @@ import Data.Void (Void)
 import qualified Data.Void as V
 import Pipes.Internal (Proxy(..))
 import Pipes.Core
+#ifndef haskell98
+import Control.Monad.Error (MonadError(..), ErrorT(runErrorT))
+import Control.Monad.Reader (MonadReader(..))
+import Control.Monad.State (MonadState(..))
+import Control.Monad.Writer (MonadWriter(..))
+#endif
 
 -- Re-exports
 #ifndef haskell98
@@ -424,6 +424,7 @@ instance (MonadError e m) => MonadError e (ListT m) where
 
     catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
 #endif
+
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
 -}

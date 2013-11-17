@@ -92,23 +92,19 @@ module Pipes.Prelude (
 
 import Control.Exception (throwIO, try)
 import Control.Monad (liftM, replicateM_, when, unless)
-#ifndef haskell98
-import Control.Monad.Trans.State.Strict (get, put)
-#endif
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.Void (absurd)
 import Foreign.C.Error (Errno(Errno), ePIPE)
 import qualified GHC.IO.Exception as G
 import Pipes
-#ifndef haskell98
-import Pipes.Core
-#endif
 import Pipes.Internal
-#ifndef haskell98
-import Pipes.Lift (evalStateP)
-#endif
 import qualified System.IO as IO
 import qualified Prelude
+#ifndef haskell98
+import Control.Monad.Trans.State.Strict (get, put)
+import Pipes.Core
+import Pipes.Lift (evalStateP)
+#endif
 import Prelude hiding (
     all,
     and,
