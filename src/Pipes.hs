@@ -73,6 +73,7 @@ import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.IO.Class (MonadIO(liftIO)) -- transformers
 import Control.Monad.Trans.Class (MonadTrans(lift)) --transformers
+import Control.Monad.Trans.Error (ErrorT(runErrorT))
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT)) --transformers
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT)) --transformers
 import Data.Foldable (Foldable)
@@ -83,7 +84,7 @@ import qualified Data.Void as V
 import Pipes.Internal (Proxy(..))
 import Pipes.Core
 #ifndef haskell98
-import Control.Monad.Error (MonadError(..), ErrorT(runErrorT))
+import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
@@ -446,14 +447,12 @@ instance Enumerable MaybeT where
             Nothing -> return ()
             Just a  -> yield a
 
-#ifndef haskell98
 instance Enumerable (ErrorT e) where
     toListT m = Select $ do
         x <- lift $ runErrorT m
         case x of
             Left  _ -> return ()
             Right a -> yield a
-#endif
 
 {-| Consume the first value from a 'Producer'
 
