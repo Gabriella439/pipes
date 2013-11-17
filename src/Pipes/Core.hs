@@ -15,72 +15,72 @@
 
 {-# LANGUAGE CPP, RankNTypes #-}
 
+-- The rewrite RULES require the 'TrustWorthy' annotation
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
 #endif
--- The rewrite RULES require the 'TrustWorthy' annotation.
 
 module Pipes.Core (
     -- * Proxy Monad Transformer
     -- $proxy
-    Proxy,
-    runEffect,
+      Proxy
+    , runEffect
 
     -- * Categories
     -- $categories
 
     -- ** Respond
     -- $respond
-    respond,
-    (/>/),
-    (//>),
+    , respond
+    , (/>/)
+    , (//>)
 
     -- ** Request
     -- $request
-    request,
-    (\>\),
-    (>\\),
+    , request
+    , (\>\)
+    , (>\\)
 
     -- ** Push
     -- $push
-    push,
-    (>~>),
-    (>>~),
+    , push
+    , (>~>)
+    , (>>~)
 
     -- ** Pull
     -- $pull
-    pull,
-    (>+>),
-    (+>>),
+    , pull
+    , (>+>)
+    , (+>>)
 
     -- ** Reflect
     -- $reflect
-    reflect,
+    , reflect
 
     -- * Concrete Type Synonyms
-    Effect,
-    Producer,
-    Pipe,
-    Consumer,
-    Client,
-    Server,
+    , Effect
+    , Producer
+    , Pipe
+    , Consumer
+    , Client
+    , Server
 
     -- * Polymorphic Type Synonyms
-    Effect',
-    Producer',
-    Consumer',
-    Client',
-    Server',
+    , Effect'
+    , Producer'
+    , Consumer'
+    , Client'
+    , Server'
 
     -- * Flipped operators
-    (\<\),
-    (/</),
-    (<~<),
-    (~<<),
-    (<+<),
-    (<\\),
-    (//<),
-    (<<+)
+    , (\<\)
+    , (/</)
+    , (<~<)
+    , (~<<)
+    , (<+<)
+    , (<\\)
+    , (//<)
+    , (<<+)
     ) where
 
 import Data.Void (Void, absurd)
@@ -127,8 +127,7 @@ runEffect = go
         Pure    r   -> return r
 {-# INLINABLE runEffect #-}
 
-{-
-   * Keep proxy composition lower in precedence than function composition, which
+{- * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
 
 

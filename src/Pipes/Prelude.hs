@@ -17,10 +17,11 @@
 
 {-# LANGUAGE RankNTypes, CPP #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
+-- The rewrite RULES require the 'TrustWorthy' annotation
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
 #endif
-{- The rewrite RULES require the 'TrustWorthy' annotation. -}
 
 module Pipes.Prelude (
     -- * Producers
@@ -106,34 +107,35 @@ import Pipes.Core
 import Pipes.Lift (evalStateP)
 #endif
 import Prelude hiding (
-    all,
-    and,
-    any,
-    concat,
-    drop,
-    dropWhile,
-    elem,
-    filter,
-    head,
-    last,
-    length,
-    map,
-    mapM,
-    maximum,
-    minimum,
-    notElem,
-    null,
-    or,
-    print,
-    product,
-    read,
-    readLn,
-    show,
-    sum,
-    take,
-    takeWhile,
-    zip,
-    zipWith )
+      all
+    , and
+    , any
+    , concat
+    , drop
+    , dropWhile
+    , elem
+    , filter
+    , head
+    , last
+    , length
+    , map
+    , mapM
+    , maximum
+    , minimum
+    , notElem
+    , null
+    , or
+    , print
+    , product
+    , read
+    , readLn
+    , show
+    , sum
+    , take
+    , takeWhile
+    , zip
+    , zipWith
+    )
 
 {- $producers
     Use 'for' loops to iterate over 'Producer's whenever you want to perform the

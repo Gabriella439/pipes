@@ -2,6 +2,7 @@
     'Control.Monad.Trans.Class.lift'ed.  These functions lift these remaining
     actions so that they work in the 'Proxy' monad transformer.
 -}
+
 {-# LANGUAGE CPP #-}
 
 module Pipes.Lift (
@@ -54,9 +55,6 @@ module Pipes.Lift (
 
     ) where
 
-#ifndef haskell98
-import Control.Monad.Morph (hoist, MFunctor(..))
-#endif
 import Control.Monad.Trans.Class (lift, MonadTrans(..))
 import qualified Control.Monad.Trans.Error as E
 import qualified Control.Monad.Trans.Maybe as M
@@ -67,6 +65,7 @@ import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Data.Monoid (Monoid)
 import Pipes.Internal (Proxy(..), unsafeHoist)
 #ifndef haskell98
+import Control.Monad.Morph (hoist, MFunctor(..))
 import Pipes.Core (runEffect, request, respond, (//>), (>\\))
 #endif
 

@@ -12,61 +12,61 @@
   , UndecidableInstances
   #-}
 
+-- The rewrite RULES require the 'TrustWorthy' annotation
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
 #endif
-{- The rewrite RULES require the 'TrustWorthy' annotation. -}
 
 module Pipes (
     -- * The Proxy Monad Transformer
-    Proxy,
-    Effect,
-    Effect',
-    runEffect,
+      Proxy
+    , Effect
+    , Effect'
+    , runEffect
 
     -- ** Producers
     -- $producers
-    Producer,
-    Producer',
-    yield,
-    for,
-    (~>),
-    (<~),
+    , Producer
+    , Producer'
+    , yield
+    , for
+    , (~>)
+    , (<~)
 
     -- ** Consumers
     -- $consumers
-    Consumer,
-    Consumer',
-    await,
-    (>~),
-    (~<),
+    , Consumer
+    , Consumer'
+    , await
+    , (>~)
+    , (~<)
 
     -- ** Pipes
     -- $pipes
-    Pipe,
-    cat,
-    (>->),
-    (<-<),
+    , Pipe
+    , cat
+    , (>->)
+    , (<-<)
 
     -- * ListT
-    ListT(..),
-    Enumerable(..),
+    , ListT(..)
+    , Enumerable(..)
 
     -- * Utilities
-    next,
-    each,
-    every,
-    discard,
+    , next
+    , each
+    , every
+    , discard
 
     -- * Re-exports
     -- $reexports
-    module Control.Monad.IO.Class,
-    module Control.Monad.Trans.Class,
+    , module Control.Monad.IO.Class
+    , module Control.Monad.Trans.Class
 #ifndef haskell98
-    module Control.Monad.Morph,
+    , module Control.Monad.Morph
 #endif
-    module Data.Foldable,
-    module Data.Void
+    , module Data.Foldable
+    , module Data.Void
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -500,8 +500,10 @@ p2 <-< p1 = p1 >-> p2
 
     "Control.Monad.Trans.Class" re-exports 'MonadTrans'.
 
+#ifndef haskell98
     "Control.Monad.Morph" re-exports 'MFunctor'.
 
+#endif
     "Data.Foldable" re-exports 'Foldable' (the class name only)
 
     "Data.Void" re-exports 'Void'.

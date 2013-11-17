@@ -25,11 +25,17 @@
   , UndecidableInstances
   , CPP
   #-}
+
+-- The rewrite RULES require the 'TrustWorthy' annotation
+#if __GLASGOW_HASKELL__ >= 702
+{-# LANGUAGE Trustworthy #-}
+#endif
+
 module Pipes.Internal (
     -- * Internal
-    Proxy(..),
-    unsafeHoist,
-    observe,
+      Proxy(..)
+    , unsafeHoist
+    , observe,
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -37,7 +43,6 @@ import Control.Monad (MonadPlus(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 #ifndef haskell98
-import Control.Monad (liftM)
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
@@ -154,7 +159,7 @@ instance (MonadReader r m) => MonadReader r (Proxy a' a b' b m) where
               Request a' fa  -> Request a' (\a  -> go (fa  a ))
               Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
               Pure    r      -> Pure r
-              M       m      -> M (go `liftM` local f m)
+              M       m      -> M (local f m >>= \r -> return (go r))
 #if MIN_VERSION_mtl(2,1,0)
     reader = lift . reader
 #endif
