@@ -1358,27 +1358,46 @@ Fail<Enter>
 
     However, polymorphic type synonyms cause problems in many other cases:
 
-    * They induce higher-rank types and require you to enable the @RankNTypes@
-      extension to use them in your own type signatures.
-
-    * They give the wrong behavior when used in the negative position of a
-      function like this:
+    * They usually give the wrong behavior when used as the argument of a
+      function (known as the \"negative\" or \"contravariant\" position) like
+      this:
 
 > f :: Producer' a m r -> ...  -- Wrong
 >
 > f :: Producer  a m r -> ...  -- Right
 
-    * You can't use them within other types without the @ImpredicativeTypes@
-      extension:
+      The former function only accepts polymorphic 'Producer's as arguments.
+      The latter function accepts both polymorphic and concrete 'Producer's,
+      which is probably what you want.
 
-> io :: IO (Producer' a m r)  -- Type error
+    * Even when you desire a polymorphic argument, this induces a higher-ranked
+      type, because it translates to a @forall@ which you cannot factor out to
+      the top-level to simplify the type signature:
 
-    * You can't partially apply them:
+> f :: (forall x' x y' . Proxy x' x y' m r) -> ...
+
+      These kinds of type signatures require the @RankNTypes@ extension.
+
+    * Even when you have polymorphic type synonyms as the result of a function
+      (i.e.  the \"positive\" or \"covariant\" position), recent versions of
+      @ghc@ such still require the @RankNTypes@ extension.  For example, the
+      'Pipes.Prelude.fromHandle' function from "Pipes.Prelude" requires
+      @RankNTypes@ to compile correctly on @ghc-7.6.3@:
+
+> fromHandle :: (MonadIO m) => Handle -> Producer' String m ()
+
+    * You can't use polymorphic type synonyms inside other type constructors
+      without the @ImpredicativeTypes@ extension:
+
+> io :: IO (Producer' a m r)  -- Type error without ImpredicativeTypes
+
+    * You can't partially apply polymorphic type synonyms:
 
 > stack :: MaybeT (Producer' a m) r  -- Type error
 
     In these scenarios you should fall back on the concrete type synonyms, which
-    are better behaved.
+    are better behaved.  If concrete type synonyms are unsatisfactory, then ask
+    @ghc@ to infer the most general type signature and use that.
 
     For the purposes of debugging type errors you can just remember that:
 
