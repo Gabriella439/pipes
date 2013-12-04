@@ -4,72 +4,78 @@
     library.
 -}
 
-{-# language NoMonomorphismRestriction #-} -- pjw
+{-# LANGUAGE
+    RankNTypes
+  , CPP
+  , FlexibleInstances
+  , MultiParamTypeClasses
+  , UndecidableInstances
+  #-}
 
-{-# LANGUAGE RankNTypes, CPP #-}
-
+-- The rewrite RULES require the 'TrustWorthy' annotation
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
 #endif
-{- The rewrite RULES require the 'TrustWorthy' annotation. -}
 
 module Pipes (
     -- * The Proxy Monad Transformer
-    Proxy,
-    Effect,
-    Effect',
-    runEffect,
+      Proxy
+    , Effect
+    , Effect'
+    , runEffect
 
     -- ** Producers
     -- $producers
-    Producer,
-    Producer',
-    yield,
-    for,
-    (~>),
-    (<~),
+    , Producer
+    , Producer'
+    , yield
+    , for
+    , (~>)
+    , (<~)
 
     -- ** Consumers
     -- $consumers
-    Consumer,
-    Consumer',
-    await,
-    (>~),
-    (~<),
+    , Consumer
+    , Consumer'
+    , await
+    , (>~)
+    , (~<)
 
     -- ** Pipes
     -- $pipes
-    Pipe,
-    cat,
-    (>->),
-    (<-<),
+    , Pipe
+    , cat
+    , (>->)
+    , (<-<)
 
     -- * ListT
-    ListT(..),
-    Enumerable(..),
+    , ListT(..)
+    , Enumerable(..)
 
     -- * Utilities
-    next,
-    each,
-    every,
-    discard,
+    , next
+    , each
+    , every
+    , discard
 
     -- * Re-exports
     -- $reexports
-    module Control.Monad.IO.Class,
-    module Control.Monad.Trans.Class,
-    module Control.Monad.Morph,
-    module Data.Foldable,
-    module Data.Void
+    , module Control.Monad.IO.Class
+    , module Control.Monad.Trans.Class
+#ifndef haskell98
+    , module Control.Monad.Morph
+#endif
+    , module Data.Foldable
+    , module Data.Void
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
-import Control.Monad.IO.Class (MonadIO(liftIO))
-import Control.Monad.Trans.Class (MonadTrans(lift))
+import Control.Monad.IO.Class (MonadIO(liftIO)) -- transformers
+import Control.Monad.Trans.Class (MonadTrans(lift)) --transformers
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
-import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
-import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
+import Control.Monad.Trans.Identity (IdentityT(runIdentityT)) --transformers
+import Control.Monad.Trans.Maybe (MaybeT(runMaybeT)) --transformers
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as F
 import Data.Monoid (Monoid(..))
@@ -77,9 +83,17 @@ import Data.Void (Void)
 import qualified Data.Void as V
 import Pipes.Internal (Proxy(..))
 import Pipes.Core
+#ifndef haskell98
+import Control.Monad.Error (MonadError(..))
+import Control.Monad.Reader (MonadReader(..))
+import Control.Monad.State (MonadState(..))
+import Control.Monad.Writer (MonadWriter(..))
+#endif
 
 -- Re-exports
+#ifndef haskell98
 import Control.Monad.Morph (MFunctor(hoist))
+#endif
 
 infixl 4 <~
 infixr 4 ~>
@@ -149,13 +163,26 @@ for = (//>)
 {-# INLINABLE for #-}
 
 {-# RULES
-    "for cat f" forall f .
+    "for (for p f) g" forall p f g . for (for p f) g = for p (\a -> for (f a) g)
+
+  ; "for p yield" forall p . for p yield = p
+
+  ; "for (yield x) f" forall x f . for (yield x) f = f x
+
+  ; "for cat f" forall f .
         for cat f =
             let go = do
                     x <- await
                     f x
                     go
             in  go
+
+  ; "f >~ (g >~ p)" forall f g p . f >~ (g >~ p) = (f >~ g) >~ p
+
+  ; "await >~ p" forall p . await >~ p = p
+
+  ; "p >~ await" forall p . p >~ await = p
+
   ; "m >~ cat" forall m .
         m >~ cat =
             let go = do
@@ -336,14 +363,68 @@ instance (Monad m) => Alternative (ListT m) where
 instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
-    
+
+#ifndef haskell98
+instance MFunctor ListT where
+    hoist morph = Select . hoist morph . enumerate
+#endif
 
 instance (Monad m) => Monoid (ListT m a) where
     mempty = empty
     mappend = (<|>)
 
-instance MFunctor ListT where
-    hoist morph = Select . hoist morph . enumerate
+#ifndef haskell98
+instance (MonadState s m) => MonadState s (ListT m) where
+    get     = lift  get
+
+    put   s = lift (put   s)
+
+#if MIN_VERSION_mtl(2,1,0)
+    state f = lift (state f)
+#endif
+
+instance (MonadWriter w m) => MonadWriter w (ListT m) where
+#if MIN_VERSION_mtl(2,1,0)
+    writer = lift . writer
+#endif
+
+    tell w = lift (tell w)
+
+    listen l = Select (go (enumerate l) mempty)
+      where
+        go p w = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
+            Respond b  fb' -> Respond (b, w)  (\b' -> go (fb' b') w)
+            M          m   -> M (do
+                (p', w') <- listen m
+                return (go p' $! mappend w w') )
+            Pure    r      -> Pure r
+
+    pass l = Select (go (enumerate l) mempty)
+      where
+        go p w = case p of
+            Request  a'     fa  -> Request a' (\a  -> go (fa  a ) w)
+            Respond (b, f)  fb' -> M (pass (return
+                (Respond b (\b' -> go (fb' b') (f w)), \_ -> f w) ))
+            M               m   -> M (do
+                (p', w') <- listen m
+                return (go p' $! mappend w w') )
+            Pure    r           -> Pure r
+
+instance (MonadReader i m) => MonadReader i (ListT m) where
+    ask = lift ask
+
+    local f l = Select (local f (enumerate l))
+
+#if MIN_VERSION_mtl(2,1,0)
+    reader f = lift (reader f)
+#endif
+
+instance (MonadError e m) => MonadError e (ListT m) where
+    throwError e = lift (throwError e)
+
+    catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
+#endif
 
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
@@ -419,8 +500,10 @@ p2 <-< p1 = p1 >-> p2
 
     "Control.Monad.Trans.Class" re-exports 'MonadTrans'.
 
+#ifndef haskell98
     "Control.Monad.Morph" re-exports 'MFunctor'.
 
+#endif
     "Data.Foldable" re-exports 'Foldable' (the class name only)
 
     "Data.Void" re-exports 'Void'.

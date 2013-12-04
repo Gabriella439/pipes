@@ -25,23 +25,31 @@
   , UndecidableInstances
   , CPP
   #-}
+
+-- The rewrite RULES require the 'TrustWorthy' annotation
+#if __GLASGOW_HASKELL__ >= 702
+{-# LANGUAGE Trustworthy #-}
+#endif
+
 module Pipes.Internal (
     -- * Internal
-    Proxy(..),
-    unsafeHoist,
-    observe,
+      Proxy(..)
+    , unsafeHoist
+    , observe,
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
-import Control.Monad (liftM, MonadPlus(..))
+import Control.Monad (MonadPlus(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Trans.Class (MonadTrans(lift))
+#ifndef haskell98
+import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
 import Data.Monoid (mempty,mappend)
+#endif
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
     an upstream and downstream interface.
@@ -127,7 +135,9 @@ unsafeHoist nat = go
         Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
         M          m   -> M (nat (m >>= \p' -> return (go p')))
         Pure       r   -> Pure r
+{-# INLINABLE unsafeHoist #-}
 
+#ifndef haskell98
 instance MFunctor (Proxy a' a b' b) where
     hoist nat p0 = go (observe p0) where
         go p = case p of
@@ -135,10 +145,12 @@ instance MFunctor (Proxy a' a b' b) where
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (nat (m >>= \p' -> return (go p')))
             Pure       r   -> Pure r
+#endif
 
 instance (MonadIO m) => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
 
+#ifndef haskell98
 instance (MonadReader r m) => MonadReader r (Proxy a' a b' b m) where
     ask = lift ask
     local f = go
@@ -147,10 +159,9 @@ instance (MonadReader r m) => MonadReader r (Proxy a' a b' b m) where
               Request a' fa  -> Request a' (\a  -> go (fa  a ))
               Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
               Pure    r      -> Pure r
-              M       m      -> M (go `liftM` local f m)
+              M       m      -> M (local f m >>= \r -> return (go r))
 #if MIN_VERSION_mtl(2,1,0)
     reader = lift . reader
-#else
 #endif
 
 instance (MonadState s m) => MonadState s (Proxy a' a b' b m) where
@@ -158,31 +169,32 @@ instance (MonadState s m) => MonadState s (Proxy a' a b' b m) where
     put = lift . put
 #if MIN_VERSION_mtl(2,1,0)
     state = lift . state
-#else
 #endif
 
 instance (MonadWriter w m) => MonadWriter w (Proxy a' a b' b m) where
 #if MIN_VERSION_mtl(2,1,0)
     writer = lift . writer
-#else
 #endif
     tell = lift . tell
-    listen proxy = go proxy mempty
-        where
-          go p w = case p of
-              Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
-              Respond b  fb' -> Respond b  (\b' -> go (fb' b') w)
-              Pure    r      -> Pure (r, w)
-              M       m      -> M (
-                (\(p', w') -> go p' $! mappend w w') `liftM` listen m)
+    listen p0 = go p0 mempty
+      where
+        go p w = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b') w)
+            M       m      -> M (do
+                (p', w') <- listen m
+                return (go p' $! mappend w w') )
+            Pure    r      -> Pure (r, w)
 
-    pass = go
-        where
-          go p = case p of
-              Request a' fa  -> Request a' (\a  -> go (fa  a ))
-              Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-              M       m      -> M (go `liftM` m)
-              Pure    (r, f) -> M (pass (return (Pure r, f)))
+    pass p0 = go p0 mempty
+      where
+        go p w = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b') w)
+            M       m      -> M (do
+                (p', w') <- listen m
+                return (go p' $! mappend w w') )
+            Pure    (r, f) -> M (pass (return (Pure r, \_ -> f w)))
 
 instance (MonadError e m) => MonadError e (Proxy a' a b' b m) where
     throwError = lift . throwError
@@ -195,6 +207,7 @@ instance (MonadError e m) => MonadError e (Proxy a' a b' b m) where
             M          m   -> M ((do
                 p' <- m
                 return (go p') ) `catchError` (\e -> return (f e)) )
+#endif
 
 instance (MonadPlus m) => Alternative (Proxy a' a b' b m) where
     empty = mzero

@@ -1,5 +1,5 @@
 Name: pipes
-Version: 4.0.0
+Version: 4.0.1
 Cabal-Version: >= 1.10
 Build-Type: Simple
 License: BSD3
@@ -39,14 +39,22 @@ Source-Repository head
     Location: https://github.com/Gabriel439/Haskell-Pipes-Library
 
 Library
-    Default-Language: Haskell2010
+    if !flag(haskell98)
+        Default-Language: Haskell2010
+    else
+        Default-Language: Haskell98
+
     HS-Source-Dirs: src
     Build-Depends:
         base         >= 4       && < 5  ,
-        mmorph       >= 1.0.0   && < 1.1,
-        mtl          >= 2.0.1.0 && < 2.2,
         transformers >= 0.2.0.0 && < 0.4,
         void                       < 0.7
+
+    if !flag(haskell98)
+        Build-Depends:
+            mmorph       >= 1.0.0   && < 1.1,
+            mtl          >= 2.0.1.0 && < 2.2
+
     Exposed-Modules:
         Pipes,
         Pipes.Core,
@@ -55,6 +63,10 @@ Library
         Pipes.Prelude,
         Pipes.Tutorial
     GHC-Options: -O2 -Wall
+
+    if flag(haskell98)
+      CPP-Options: -Dhaskell98
+
 
 Benchmark prelude-benchmarks
     Default-Language: Haskell2010
@@ -65,24 +77,9 @@ Benchmark prelude-benchmarks
 
     Build-Depends:
         base      >= 4       && < 5  ,
-        criterion >= 0.8     && < 0.9,
+        criterion >= 0.6.2.1 && < 0.9,
         mtl       >= 2.0.1.0 && < 2.2,
         pipes     >= 4.0.0   && < 4.1
-
-Benchmark lift-benchmarks
-    Default-Language: Haskell2010
-    Type:             exitcode-stdio-1.0
-    HS-Source-Dirs:   benchmarks
-    Main-Is:          LiftBench.hs
-    GHC-Options:     -O2 -Wall -rtsopts -fno-warn-unused-do-bind
-
-    Build-Depends:
-        base         >= 4       && < 5  ,
-        criterion    >= 0.8     && < 0.9,
-        deepseq                         ,
-        mtl          >= 2.0.1.0 && < 2.2,
-        pipes        >= 4.0.0   && < 4.1,
-        transformers >= 0.2.0.0 && < 0.4
 
 test-suite tests
     Default-Language: Haskell2010
@@ -99,3 +96,22 @@ test-suite tests
         test-framework             >= 0.4     && < 1   ,
         test-framework-quickcheck2 >= 0.2.0   && < 0.4 ,
         transformers               >= 0.2.0.0 && < 0.4
+
+Benchmark lift-benchmarks
+    Default-Language: Haskell2010
+    Type:             exitcode-stdio-1.0
+    HS-Source-Dirs:   benchmarks
+    Main-Is:          LiftBench.hs
+    GHC-Options:     -O2 -Wall -rtsopts -fno-warn-unused-do-bind
+
+    Build-Depends:
+        base         >= 4       && < 5  ,
+        criterion    >= 0.6.2.1 && < 0.9,
+        deepseq                         ,
+        mtl          >= 2.0.1.0 && < 2.2,
+        pipes        >= 4.0.0   && < 4.1,
+        transformers >= 0.2.0.0 && < 0.4
+
+Flag haskell98
+  Description: Haskell98 compliant subset of pipes.
+  Default:     False

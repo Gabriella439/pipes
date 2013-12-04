@@ -15,76 +15,72 @@
 
 {-# LANGUAGE CPP, RankNTypes #-}
 
+-- The rewrite RULES require the 'TrustWorthy' annotation
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
 #endif
-{- The rewrite RULES require the 'TrustWorthy' annotation.  Their proofs are
-   pretty trivial since they are just inlining the definition of their
-   respective operators.  GHC doesn't do this inlining automatically for these
-   functions because they are recursive.
--}
 
 module Pipes.Core (
     -- * Proxy Monad Transformer
     -- $proxy
-    Proxy,
-    runEffect,
+      Proxy
+    , runEffect
 
     -- * Categories
     -- $categories
 
     -- ** Respond
     -- $respond
-    respond,
-    (/>/),
-    (//>),
+    , respond
+    , (/>/)
+    , (//>)
 
     -- ** Request
     -- $request
-    request,
-    (\>\),
-    (>\\),
+    , request
+    , (\>\)
+    , (>\\)
 
     -- ** Push
     -- $push
-    push,
-    (>~>),
-    (>>~),
+    , push
+    , (>~>)
+    , (>>~)
 
     -- ** Pull
     -- $pull
-    pull,
-    (>+>),
-    (+>>),
+    , pull
+    , (>+>)
+    , (+>>)
 
     -- ** Reflect
     -- $reflect
-    reflect,
+    , reflect
 
     -- * Concrete Type Synonyms
-    Effect,
-    Producer,
-    Pipe,
-    Consumer,
-    Client,
-    Server,
+    , Effect
+    , Producer
+    , Pipe
+    , Consumer
+    , Client
+    , Server
 
     -- * Polymorphic Type Synonyms
-    Effect',
-    Producer',
-    Consumer',
-    Client',
-    Server',
+    , Effect'
+    , Producer'
+    , Consumer'
+    , Client'
+    , Server'
 
     -- * Flipped operators
-    (\<\),
-    (/</),
-    (<~<),
-    (~<<),
-    (<+<),
-    (<\\),
-    (//<),
-    (<<+)
+    , (\<\)
+    , (/</)
+    , (<~<)
+    , (~<<)
+    , (<+<)
+    , (<\\)
+    , (//<)
+    , (<<+)
     ) where
 
 import Data.Void (Void, absurd)
@@ -131,8 +127,7 @@ runEffect = go
         Pure    r   -> return r
 {-# INLINABLE runEffect #-}
 
-{-
-   * Keep proxy composition lower in precedence than function composition, which
+{- * Keep proxy composition lower in precedence than function composition, which
      is 9 at the time of of this comment, so that users can write things like:
 
 
@@ -832,3 +827,18 @@ k ~<< p = p >>~ k
     -- ^
 k <<+ p = p +>> k
 {-# INLINABLE (<<+) #-}
+
+{-# RULES
+    "(p //> f) //> g" forall p f g . (p //> f) //> g = p //> (\a -> f a //> g)
+
+  ; "p //> respond" forall p . p //> respond = p
+
+  ; "respond x //> f" forall x f . respond x //>  f = f x
+
+  ; "f >\\ (g >\\ p)" forall f g p . f >\\ (g >\\ p) = (\a -> f >\\ g a) >\\ p
+
+  ; "request >\\ p" forall p . request >\\ p = p
+
+  ; "f >\\ request x" forall f x . f >\\ request x = f x
+
+  #-}
