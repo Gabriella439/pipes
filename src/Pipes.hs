@@ -471,8 +471,15 @@ next = go
 
 -- | Convert a 'F.Foldable' to a 'Producer'
 each :: (Monad m, F.Foldable f) => f a -> Producer' a m ()
-each = F.mapM_ yield
+each = F.foldr (\a p -> yield a >> p) (return ())
 {-# INLINABLE each #-}
+{-  The above code is the same as:
+
+> each = Data.Foldable.mapM_ yield
+
+    ... except writing it directly in terms of `Data.Foldable.foldr` improves
+    build/foldr fusion
+-}
 
 -- | Convert an 'Enumerable' to a 'Producer'
 every :: (Monad m, Enumerable t) => t m a -> Producer' a m ()
