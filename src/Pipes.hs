@@ -470,7 +470,7 @@ next = go
 {-# INLINABLE next #-}
 
 -- | Convert a 'F.Foldable' to a 'Producer'
-each :: (Monad m, F.Foldable f) => f a -> Producer' a m ()
+each :: (Monad m, Foldable f) => f a -> Producer' a m ()
 each = F.foldr (\a p -> yield a >> p) (return ())
 {-# INLINABLE each #-}
 {-  The above code is the same as:
@@ -513,5 +513,5 @@ p2 <-< p1 = p1 >-> p2
 #endif
     "Data.Foldable" re-exports 'Foldable' (the class name only)
 
-    "Data.Void" re-exports 'Void'.
+    "Data.Void" re-exports 'Void'
 -}

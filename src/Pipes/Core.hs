@@ -81,9 +81,13 @@ module Pipes.Core (
     , (<\\)
     , (//<)
     , (<<+)
+
+    -- * Re-exports
+    , module Data.Void
     ) where
 
-import Data.Void (Void, absurd)
+import Data.Void (Void)
+import qualified Data.Void as V
 import Pipes.Internal (Proxy(..))
 
 {- $proxy
@@ -121,8 +125,8 @@ runEffect :: (Monad m) => Effect m r -> m r
 runEffect = go
   where
     go p = case p of
-        Request v _ -> absurd v
-        Respond v _ -> absurd v
+        Request v _ -> V.absurd v
+        Respond v _ -> V.absurd v
         M       m   -> m >>= go
         Pure    r   -> return r
 {-# INLINABLE runEffect #-}
@@ -842,3 +846,7 @@ k <<+ p = p +>> k
   ; "f >\\ request x" forall f x . f >\\ request x = f x
 
   #-}
+
+{- $reexports
+    @Data.Void@ re-exports the 'Void' type
+-}
