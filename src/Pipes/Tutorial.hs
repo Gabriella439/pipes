@@ -80,6 +80,9 @@ module Pipes.Tutorial (
 
     -- * Appendix: Types
     -- $types
+
+    -- * Appendix: Time Complexity
+    -- $timecomplexity
     ) where
 
 import Control.Category
@@ -1457,4 +1460,49 @@ Fail<Enter>
 > type Server'       b' b m r = forall x' x      . Proxy x' x b' b m r
 > type Client'  a' a      m r = forall      y' y . Proxy a' a y' y m r
 
+-}
+
+{- $timecomplexity
+    There are three functions that give quadratic time complexity when used in
+    within @pipes@:
+
+    * 'sequence'
+
+    * 'replicateM'
+
+    * 'mapM'
+
+    For example, the time complexity of this code segment scales quadratically
+    with `n`:
+
+> import Control.Monad (replicateM)
+> import Pipes
+>
+> quadratic :: Int -> Consumer a m [a]
+> quadratic n = replicateM n await
+
+    These three functions are generally bad practice to use, because all three
+    of them correspond to \"ListT done wrong\", building a list in memory
+    instead of streaming results.
+
+    However, sometimes situations arise where one deliberately intends to build
+    a list in memory.  The solution is to use the \"codensity transformation\"
+    to transform the code to run with linear time complexity.  This involves:
+
+    * wrapping the code in the @Codensity@ monad transformer (from
+      @Control.Monad.Codensity@ module of the @kan-extensions@ package) using
+      'lift'
+
+    * applying 'sequence' \/ 'replicateM' \/ 'mapM'
+
+    * unwrapping the code using @lowerCodensity@
+
+    To illustrate this, we'd transform the above example to:
+
+> import Control.Monad.Codensity (lowerCodensity)
+> 
+> linear :: (Monad m) => Int -> Consumer a m [a]
+> linear n = lowerCodensity $ replicateM n $ lift await
+
+    This will produce the exact same result, but in linear time.
 -}
