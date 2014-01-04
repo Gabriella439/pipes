@@ -71,11 +71,11 @@ module Pipes (
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(mzero, mplus))
-import Control.Monad.IO.Class (MonadIO(liftIO)) -- transformers
-import Control.Monad.Trans.Class (MonadTrans(lift)) --transformers
+import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
-import Control.Monad.Trans.Identity (IdentityT(runIdentityT)) --transformers
-import Control.Monad.Trans.Maybe (MaybeT(runMaybeT)) --transformers
+import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
+import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as F
 import Data.Monoid (Monoid(..))

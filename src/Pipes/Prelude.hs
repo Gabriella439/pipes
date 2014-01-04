@@ -11,8 +11,9 @@
     dependency on the @text@ package.
 
     Also, 'stdinLn' and 'stdoutLn' remove and add newlines, respectively.  This
-    behavior is intended to simplify examples.  The upcoming 'ByteString' and
-    'Text' utilities for @pipes@ will preserve newlines.
+    behavior is intended to simplify examples.  The corresponding @stdin@ and
+    @stdout@ utilities from @pipes-bytestring@ and @pipes-text@ preserve
+    newlines.
 -}
 
 {-# LANGUAGE RankNTypes, CPP #-}
@@ -98,14 +99,14 @@ import Data.Void (absurd)
 import Foreign.C.Error (Errno(Errno), ePIPE)
 import qualified GHC.IO.Exception as G
 import Pipes
+import Pipes.Core
 import Pipes.Internal
 import qualified System.IO as IO
-import qualified Prelude
 #ifndef haskell98
 import Control.Monad.Trans.State.Strict (get, put)
-import Pipes.Core
 import Pipes.Lift (evalStateP)
 #endif
+import qualified Prelude
 import Prelude hiding (
       all
     , and
@@ -548,9 +549,9 @@ findIndex predicate p = head (p >-> findIndices predicate)
 head :: (Monad m) => Producer a m () -> m (Maybe a)
 head p = do
     x <- next p
-    case x of
-        Left   _     -> return Nothing
-        Right (a, _) -> return (Just a)
+    return $ case x of
+        Left   _     -> Nothing
+        Right (a, _) -> Just a
 {-# INLINABLE head #-}
 
 -- | Index into a 'Producer'
