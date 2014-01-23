@@ -58,6 +58,7 @@ module Pipes.Core (
     , reflect
 
     -- * Concrete Type Synonyms
+    , X
     , Effect
     , Producer
     , Pipe
@@ -83,12 +84,10 @@ module Pipes.Core (
     , (<<+)
 
     -- * Re-exports
-    , module Data.Void
+    , closed
     ) where
 
-import Data.Void (Void)
-import qualified Data.Void as V
-import Pipes.Internal (Proxy(..))
+import Pipes.Internal (Proxy(..), X, closed)
 
 {- $proxy
     Diagrammatically, you can think of a 'Proxy' as having the following shape:
@@ -125,8 +124,8 @@ runEffect :: (Monad m) => Effect m r -> m r
 runEffect = go
   where
     go p = case p of
-        Request v _ -> V.absurd v
-        Respond v _ -> V.absurd v
+        Request v _ -> closed v
+        Respond v _ -> closed v
         M       m   -> m >>= go
         Pure    r   -> return r
 {-# INLINABLE runEffect #-}
@@ -696,30 +695,30 @@ reflect = go
 
     'Effect's neither 'Pipes.await' nor 'Pipes.yield'
 -}
-type Effect = Proxy Void () () Void
+type Effect = Proxy X () () X
 
 -- | 'Producer's can only 'Pipes.yield'
-type Producer b = Proxy Void () () b
+type Producer b = Proxy X () () b
 
 -- | 'Pipe's can both 'Pipes.await' and 'Pipes.yield'
 type Pipe a b = Proxy () a () b
 
 -- | 'Consumer's can only 'Pipes.await'
-type Consumer a = Proxy () a () Void
+type Consumer a = Proxy () a () X
 
 {-| @Client a' a@ sends requests of type @a'@ and receives responses of
     type @a@.
 
     'Client's only 'request' and never 'respond'.
 -}
-type Client a' a = Proxy a' a () Void
+type Client a' a = Proxy a' a () X
 
 {-| @Server b' b@ receives requests of type @b'@ and sends responses of type
     @b@.
 
     'Server's only 'respond' and never 'request'.
 -}
-type Server b' b = Proxy Void () b' b
+type Server b' b = Proxy X () b' b
 
 -- | Like 'Effect', but with a polymorphic type
 type Effect' m r = forall x' x y' y . Proxy x' x y' y m r
@@ -846,7 +845,3 @@ k <<+ p = p +>> k
   ; "f >\\ request x" forall f x . f >\\ request x = f x
 
   #-}
-
-{- $reexports
-    @Data.Void@ re-exports the 'Void' type
--}

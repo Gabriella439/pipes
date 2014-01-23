@@ -241,9 +241,9 @@ import Prelude hiding ((.), id)
     also an 'Effect':
 
 @
- data 'Void'  -- The uninhabited type
+ data 'X'  -- The uninhabited type
 
-\ type 'Effect' m r = 'Producer' 'Void' m r
+\ type 'Effect' m r = 'Producer' 'X' m r
 @
 
     This is why 'for' permits two different type signatures.  The first type
@@ -252,10 +252,10 @@ import Prelude hiding ((.), id)
 @
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b    m ()) -> 'Producer' b    m r
 
-\ -- Specialize \'b\' to \'Void\'
- 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' 'Void' m ()) -> 'Producer' 'Void' m r
+\ -- Specialize \'b\' to \'X\'
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' 'X' m ()) -> 'Producer' 'X' m r
 
-\ -- Producer Void = Effect
+\ -- Producer X = Effect
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Effect'        m ()) -> 'Effect'        m r
 @
 
@@ -1156,49 +1156,49 @@ Fail<Enter>
     * Polymorphic type synonyms that don't explicitly close unused inputs or
       outputs
 
-    The concrete type synonyms use @()@ to close unused inputs and 'Void' (the
+    The concrete type synonyms use @()@ to close unused inputs and 'X' (the
     uninhabited type) to close unused outputs:
 
     * 'Effect': explicitly closes both ends, forbidding 'await's and 'yield's
 
-> type Effect = Proxy Void () () Void 
+> type Effect = Proxy X () () X
 >
->    Upstream | Downstream
->        +---------+
->        |         |
-> Void  <==       <== ()
->        |         |
-> ()    ==>       ==> Void
->        |    |    |
->        +----|----+
->             v
->             r
+>  Upstream | Downstream
+>     +---------+
+>     |         |
+> X  <==       <== ()
+>     |         |
+> () ==>       ==> X
+>     |    |    |
+>     +----|----+
+>          v
+>          r
 
     * 'Producer': explicitly closes the upstream end, forbidding 'await's
 
-> type Producer b = Proxy Void () () b
+> type Producer b = Proxy X () () b
 >
->    Upstream | Downstream
->        +---------+
->        |         |
-> Void  <==       <== ()
->        |         |
-> ()    ==>       ==> b
->        |    |    |
->        +----|----+
->             v
->             r
+> Upstream | Downstream
+>     +---------+
+>     |         |
+> X  <==       <== ()
+>     |         |
+> () ==>       ==> b
+>     |    |    |
+>     +----|----+
+>          v
+>          r
 
     * 'Consumer': explicitly closes the downstream end, forbidding 'yield's
 
-> type Consumer a = Proxy () a () Void
+> type Consumer a = Proxy () a () X
 >
 > Upstream | Downstream
 >     +---------+
 >     |         |
 > () <==       <== ()
 >     |         |
-> a  ==>       ==> Void
+> a  ==>       ==> X
 >     |    |    |
 >     +----|----+
 >          v
@@ -1224,30 +1224,30 @@ Fail<Enter>
     'Producer', 'Pipe', and a 'Consumer', you can think of information flowing
     like this:
 
->           Producer                Pipe                 Consumer
->        +-----------+          +----------+          +------------+
->        |           |          |          |          |            |
-> Void  <==         <==   ()   <==        <==   ()   <==          <== ()
->        |  stdinLn  |          |  take 3  |          |  stdoutLn  |
-> ()    ==>         ==> String ==>        ==> String ==>          ==> Void
->        |     |     |          |    |     |          |      |     |
->        +-----|-----+          +----|-----+          +------|-----+
->              v                     v                       v
->              ()                    ()                      ()
+>        Producer                Pipe                 Consumer
+>     +-----------+          +----------+          +------------+
+>     |           |          |          |          |            |
+> X  <==         <==   ()   <==        <==   ()   <==          <== ()
+>     |  stdinLn  |          |  take 3  |          |  stdoutLn  |
+> () ==>         ==> String ==>        ==> String ==>          ==> X
+>     |     |     |          |    |     |          |      |     |
+>     +-----|-----+          +----|-----+          +------|-----+
+>           v                     v                       v
+>           ()                    ()                      ()
 
      Composition fuses away the intermediate interfaces, leaving behind an
      'Effect':
 
->                       Effect
->        +-----------------------------------+
->        |                                   |
-> Void  <==                                 <== ()
->        |  stdinLn >-> take 3 >-> stdoutLn  |
-> ()    ==>                                 ==> Void
->        |                                   |
->        +----------------|------------------+
->                         v
->                         ()
+>                    Effect
+>     +-----------------------------------+
+>     |                                   |
+> X  <==                                 <== ()
+>     |  stdinLn >-> take 3 >-> stdoutLn  |
+> () ==>                                 ==> X
+>     |                                   |
+>     +----------------|------------------+
+>                      v
+>                      ()
 
     @pipes@ also provides polymorphic type synonyms with apostrophes at the end
     of their names.  These use universal quantification to leave open any unused
@@ -1417,26 +1417,26 @@ Fail<Enter>
 
 >>> runEffect P.stdinLn
 <interactive>:4:5:
-    Couldn't match expected type `Void' with actual type `String'
+    Couldn't match expected type `X' with actual type `String'
     Expected type: Effect m0 r0
-      Actual type: Proxy Void () () String IO ()
+      Actual type: Proxy X () () String IO ()
     In the first argument of `runEffect', namely `P.stdinLn'
     In the expression: runEffect P.stdinLn
 
     'runEffect' expects an 'Effect', which is equivalent to the following type:
 
-> Effect          IO () = Proxy Void () () Void   IO ()
+> Effect          IO () = Proxy X () () X      IO ()
 
     ... but 'P.stdinLn' type-checks as a 'Producer', which has the following
     type:
 
-> Producer String IO () = Proxy Void () () String IO ()
+> Producer String IO () = Proxy X () () String IO ()
 
     The fourth type variable (the output) does not match.  For an 'Effect' this
-    type variable should be closed (i.e. 'Void'), but 'P.stdinLn' has a 'String'
+    type variable should be closed (i.e. 'X'), but 'P.stdinLn' has a 'String'
     output, thus the type error:
 
->    Couldn't match expected type `Void' with actual type `String'
+>    Couldn't match expected type `X' with actual type `String'
 
     Any time you get type errors like these you can work through them by
     expanding out the type synonyms and seeing which type variables do not
@@ -1445,13 +1445,13 @@ Fail<Enter>
     You may also consult this table of type synonyms to more easily compare
     them:
 
-> type Effect             = Proxy Void () () Void
-> type Producer         b = Proxy Void () () b
-> type Consumer    a      = Proxy ()   a  () Void
-> type Pipe        a    b = Proxy ()   a  () b
+> type Effect             = Proxy X  () () X
+> type Producer         b = Proxy X  () () b
+> type Consumer    a      = Proxy () a  () X
+> type Pipe        a    b = Proxy () a  () b
 >
-> type Server        b' b = Proxy Void () b' b 
-> type Client   a' a      = Proxy a'   a  () Void
+> type Server        b' b = Proxy X  () b' b 
+> type Client   a' a      = Proxy a' a  () X
 >
 > type Effect'            m r = forall x' x y' y . Proxy x' x y' y m r
 > type Producer'        b m r = forall x' x      . Proxy x' x () b m r

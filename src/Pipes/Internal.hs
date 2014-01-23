@@ -35,7 +35,9 @@ module Pipes.Internal (
     -- * Internal
       Proxy(..)
     , unsafeHoist
-    , observe,
+    , observe
+    , X
+    , closed
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -248,3 +250,16 @@ observe p0 = M (go p0) where
         M          m'  -> m' >>= go
         Pure    r      -> return (Pure r)
 {-# INLINABLE observe #-}
+
+{-| The empty type, used to close output ends
+
+    When @Data.Void@ is merged into @base@, this will change to:
+
+> type X = Void
+-}
+newtype X = X X
+
+-- | Use 'closed' to \"handle\" impossible outputs
+closed :: X -> a
+closed (X x) = closed x
+{-# INLINABLE closed #-}
