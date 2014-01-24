@@ -4,7 +4,7 @@ Cabal-Version: >= 1.10
 Build-Type: Simple
 License: BSD3
 License-File: LICENSE
-Copyright: 2012, 2013 Gabriel Gonzalez
+Copyright: 2012-2014 Gabriel Gonzalez
 Author: Gabriel Gonzalez
 Maintainer: Gabriel439@gmail.com
 Bug-Reports: https://github.com/Gabriel439/Haskell-Pipes-Library/issues
