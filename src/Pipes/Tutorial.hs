@@ -344,7 +344,7 @@ import Prelude hiding ((.), id)
     You can also use 'for' to loop over lists, too.  To do so, convert the list
     to a 'Producer' using 'each', which is exported by default from "Pipes":
 
-> each :: (Monad m) => [a] -> Producer a m ()
+> each :: Monad m => [a] -> Producer a m ()
 > each as = mapM_ yield as
 
     Combine 'for' and 'each' to iterate over lists using a \"foreach\" loop:
@@ -378,7 +378,7 @@ import Prelude hiding ((.), id)
 > import Pipes
 > import qualified Pipes.Prelude as P  -- Pipes.Prelude already has 'stdinLn'
 > 
-> duplicate :: (Monad m) => a -> Producer a m ()
+> duplicate :: Monad m => a -> Producer a m ()
 > duplicate x = do
 >     yield x
 >     yield x
@@ -426,9 +426,9 @@ import Prelude hiding ((.), id)
     equality, which always holds no matter what:
 
 @
- \-\- s :: (Monad m) =>      'Producer' a m ()  -- i.e. \'P.stdinLn\'
- \-\- f :: (Monad m) => a -> 'Producer' b m ()  -- i.e. \'duplicate\'
- \-\- g :: (Monad m) => b -> 'Producer' c m ()  -- i.e. \'(lift . putStrLn)\'
+ \-\- s :: Monad m =>      'Producer' a m ()  -- i.e. \'P.stdinLn\'
+ \-\- f :: Monad m => a -> 'Producer' b m ()  -- i.e. \'duplicate\'
+ \-\- g :: Monad m => b -> 'Producer' c m ()  -- i.e. \'(lift . putStrLn)\'
 
 \ for (for s f) g = for s (\\x -> for (f x) g)
 @
@@ -437,7 +437,7 @@ import Prelude hiding ((.), id)
     following operator that is the point-free counterpart to 'for':
 
 @
- (~>) :: (Monad m)
+ (~>) :: Monad m
       => (a -> 'Producer' b m r)
       -> (b -> 'Producer' c m r)
       -> (a -> 'Producer' c m r)
@@ -448,9 +448,9 @@ import Prelude hiding ((.), id)
     into the following more symmetric equation:
 
 @
- f :: (Monad m) => a -> 'Producer' b m r
- g :: (Monad m) => b -> 'Producer' c m r
- h :: (Monad m) => c -> 'Producer' d m r
+ f :: Monad m => a -> 'Producer' b m r
+ g :: Monad m => b -> 'Producer' c m r
+ h :: Monad m => c -> 'Producer' d m r
 
 \ \-\- Associativity
  (f ~> g) ~> h = f ~> (g ~> h)
@@ -608,7 +608,7 @@ ABC
     following intermediate 'Consumer' that requests two 'String's and returns
     them concatenated:
 
-> doubleUp :: (Monad m) => Consumer String m String
+> doubleUp :: Monad m => Consumer String m String
 > doubleUp = do
 >     str1 <- await
 >     str2 <- await
@@ -812,7 +812,7 @@ You shall not pass!
     quirks.  In fact, we can continue the analogy to Unix by defining 'cat'
     (named after the Unix @cat@ utility), which reforwards elements endlessly:
 
-> cat :: (Monad m) => Pipe a a m r
+> cat :: Monad m => Pipe a a m r
 > cat = forever $ do
 >     x <- await
 >     yield x
@@ -838,10 +838,10 @@ You shall not pass!
 > import qualified Pipes.Prelude as P  -- Pipes.Prelude provides 'take', too
 > import Prelude hiding (head)
 >
-> head :: (Monad m) => Int -> Pipe a a m ()
+> head :: Monad m => Int -> Pipe a a m ()
 > head = P.take
 >
-> yes :: (Monad m) => Producer String m r
+> yes :: Monad m => Producer String m r
 > yes = forever $ yield "y"
 >
 > main = runEffect $ yes >-> head 3 >-> P.stdoutLn
@@ -976,7 +976,7 @@ quit<Enter>
     For example, you can loop over the output of a 'Pipe' using 'for', which is
     how 'P.map' is defined:
 
-> map :: (Monad m) => (a -> b) -> Pipe a b m r
+> map :: Monad m => (a -> b) -> Pipe a b m r
 > map f = for cat $ \x -> yield (f x)
 >
 > -- Read this as: For all values flowing downstream, apply 'f'
@@ -990,7 +990,7 @@ quit<Enter>
     You can also feed a 'Pipe' input using ('>~').  This means we could have
     instead defined the @yes@ pipe like this:
 
-> yes :: (Monad m) => Producer String m r
+> yes :: Monad m => Producer String m r
 > yes = return "y" >~ cat
 >
 > -- Read this as: Keep feeding "y" downstream
@@ -1002,7 +1002,7 @@ quit<Enter>
     You can also sequence two 'Pipe's together.  This is how 'P.drop' is
     defined:
 
-> drop :: (Monad m) => Int -> Pipe a a m r
+> drop :: Monad m => Int -> Pipe a a m r
 > drop n = do
 >     replicateM_ n await
 >     cat
@@ -1036,7 +1036,7 @@ quit<Enter>
     Another neat thing to know is that 'every' has a more general type:
 
 @
- 'every' :: ('Enumerable' t) => t m a -> 'Producer' a m ()
+ 'every' :: ('Monad' m, 'Enumerable' t) => t m a -> 'Producer' a m ()
 @
 
     'Enumerable' generalizes 'Foldable' and if you have an effectful container
@@ -1044,7 +1044,7 @@ quit<Enter>
     container implement the 'toListT' method of the 'Enumerable' class:
 
 > class Enumerable t where
->     toListT :: (Monad m) => t m a -> ListT m a
+>     toListT :: Monad m => t m a -> ListT m a
 
     You can even use 'Enumerable' to traverse effectful types that are not even
     proper containers, like 'Control.Monad.Trans.Maybe.MaybeT':
@@ -1387,7 +1387,7 @@ Fail<Enter>
       'Pipes.Prelude.fromHandle' function from "Pipes.Prelude" requires
       @RankNTypes@ to compile correctly on @ghc-7.6.3@:
 
-> fromHandle :: (MonadIO m) => Handle -> Producer' String m ()
+> fromHandle :: MonadIO m => Handle -> Producer' String m ()
 
     * You can't use polymorphic type synonyms inside other type constructors
       without the @ImpredicativeTypes@ extension:
@@ -1501,7 +1501,7 @@ Fail<Enter>
 
 > import Control.Monad.Codensity (lowerCodensity)
 > 
-> linear :: (Monad m) => Int -> Consumer a m [a]
+> linear :: Monad m => Int -> Consumer a m [a]
 > linear n = lowerCodensity $ replicateM n $ lift await
 
     This will produce the exact same result, but in linear time.

@@ -138,7 +138,7 @@ f '~>' 'yield' = f
 'yield' :: 'Monad' m => a -> 'Pipe' x a m ()
 @
 -}
-yield :: (Monad m) => a -> Producer' a m ()
+yield :: Monad m => a -> Producer' a m ()
 yield = respond
 {-# INLINABLE yield #-}
 
@@ -151,7 +151,7 @@ yield = respond
 'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Pipe'     x c m ()) -> 'Pipe'     x c m r
 @
 -}
-for :: (Monad m)
+for :: Monad m
     =>       Proxy x' x b' b m a'
     -- ^
     -> (b -> Proxy x' x c' c m b')
@@ -200,7 +200,7 @@ for = (//>)
 @
 -}
 (~>)
-    :: (Monad m)
+    :: Monad m
     => (a -> Proxy x' x b' b m a')
     -- ^
     -> (b -> Proxy x' x c' c m b')
@@ -211,7 +211,7 @@ for = (//>)
 
 -- | ('~>') with the arguments flipped
 (<~)
-    :: (Monad m)
+    :: Monad m
     => (b -> Proxy x' x c' c m b')
     -- ^
     -> (a -> Proxy x' x b' b m a')
@@ -244,7 +244,7 @@ f '>~' 'await' = f
 'await' :: 'Monad' m => 'Pipe' a y m a
 @
 -}
-await :: (Monad m) => Consumer' a m a
+await :: Monad m => Consumer' a m a
 await = request ()
 {-# INLINABLE await #-}
 
@@ -258,7 +258,7 @@ await = request ()
 @
 -}
 (>~)
-    :: (Monad m)
+    :: Monad m
     => Proxy a' a y' y m b
     -- ^
     -> Proxy () b y' y m c
@@ -269,7 +269,7 @@ p1 >~ p2 = (\() -> p1) >\\ p2
 
 -- | ('>~') with the arguments flipped
 (~<)
-    :: (Monad m)
+    :: Monad m
     => Proxy () b y' y m c
     -- ^
     -> Proxy a' a y' y m b
@@ -297,7 +297,7 @@ f '>->' 'cat' = f
 -}
 
 -- | The identity 'Pipe', analogous to the Unix @cat@ program
-cat :: (Monad m) => Pipe a a m r
+cat :: Monad m => Pipe a a m r
 cat = pull ()
 {-# INLINABLE cat #-}
 
@@ -311,7 +311,7 @@ cat = pull ()
 @
 -}
 (>->)
-    :: (Monad m)
+    :: Monad m
     => Proxy a' a () b m r
     -- ^
     -> Proxy () b c' c m r
@@ -428,7 +428,7 @@ instance (MonadError e m) => MonadError e (ListT m) where
     containers to 'ListT's.
 -}
 class Enumerable t where
-    toListT :: (Monad m) => t m a -> ListT m a
+    toListT :: Monad m => t m a -> ListT m a
 
 instance Enumerable ListT where
     toListT = id
@@ -457,7 +457,7 @@ instance Enumerable (ErrorT e) where
     'next' either fails with a 'Left' if the 'Producer' terminates or succeeds
     with a 'Right' providing the next value and the remainder of the 'Producer'.
 -}
-next :: (Monad m) => Producer a m r -> m (Either r (a, Producer a m r))
+next :: Monad m => Producer a m r -> m (Either r (a, Producer a m r))
 next = go
   where
     go p = case p of
@@ -485,13 +485,13 @@ every it = discard >\\ enumerate (toListT it)
 {-# INLINABLE every #-}
 
 -- | Discards a value
-discard :: (Monad m) => a -> m ()
+discard :: Monad m => a -> m ()
 discard _ = return ()
 {-# INLINABLE discard #-}
 
 -- | ('>->') with the arguments flipped
 (<-<)
-    :: (Monad m)
+    :: Monad m
     => Proxy () b c' c m r
     -- ^
     -> Proxy a' a () b m r

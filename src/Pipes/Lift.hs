@@ -103,7 +103,7 @@ catchError e h = errorP . E.runErrorT $
 
 -- | Catch an error using a catch function for the base monad
 liftCatchError
-    :: (Monad m)
+    :: Monad m
     => (   m (Proxy a' a b' b m r)
         -> (e -> m (Proxy a' a b' b m r))
         -> m (Proxy a' a b' b m r) )
@@ -125,7 +125,7 @@ liftCatchError c p0 f = go p0
 
 -- | Wrap the base monad in 'M.MaybeT'
 maybeP
-    :: (Monad m)
+    :: Monad m
     => Proxy a' a b' b m (Maybe r) -> Proxy a' a b' b (M.MaybeT m) r
 maybeP p = do
     x <- unsafeHoist lift p
@@ -135,7 +135,7 @@ maybeP p = do
 #ifndef haskell98
 -- | Run 'M.MaybeT' in the base monad
 runMaybeP
-    :: (Monad m)
+    :: Monad m
     => Proxy a' a b' b (M.MaybeT m) r
     -> Proxy a' a b' b m (Maybe r)
 runMaybeP p = M.runMaybeT $ distribute p
@@ -144,7 +144,7 @@ runMaybeP p = M.runMaybeT $ distribute p
 
 -- | Wrap the base monad in 'R.ReaderT'
 readerP
-    :: (Monad m)
+    :: Monad m
     => (i -> Proxy a' a b' b m r) -> Proxy a' a b' b (R.ReaderT i m) r
 readerP k = do
     i <- lift R.ask
@@ -154,7 +154,7 @@ readerP k = do
 #ifndef haskell98
 -- | Run 'R.ReaderT' in the base monad
 runReaderP
-    :: (Monad m)
+    :: Monad m
     => i
     -> Proxy a' a b' b (R.ReaderT i m) r
     -> Proxy a' a b' b m r
@@ -164,7 +164,7 @@ runReaderP r p = (`R.runReaderT` r) $ distribute p
 
 -- | Wrap the base monad in 'S.StateT'
 stateP
-    :: (Monad m)
+    :: Monad m
     => (s -> Proxy a' a b' b m (r, s)) -> Proxy a' a b' b (S.StateT s m) r
 stateP k = do
     s <- lift S.get
@@ -176,7 +176,7 @@ stateP k = do
 #ifndef haskell98
 -- | Run 'S.StateT' in the base monad
 runStateP
-    :: (Monad m)
+    :: Monad m
     => s
     -> Proxy a' a b' b (S.StateT s m) r
     -> Proxy a' a b' b m (r, s)
@@ -185,7 +185,7 @@ runStateP s p = (`S.runStateT` s) $ distribute p
 
 -- | Evaluate 'S.StateT' in the base monad
 evalStateP
-    :: (Monad m)
+    :: Monad m
     => s
     -> Proxy a' a b' b (S.StateT s m) r
     -> Proxy a' a b' b m r
@@ -194,7 +194,7 @@ evalStateP s p = fmap fst $ runStateP s p
 
 -- | Execute 'S.StateT' in the base monad
 execStateP
-    :: (Monad m)
+    :: Monad m
     => s
     -> Proxy a' a b' b (S.StateT s m) r
     -> Proxy a' a b' b m s
@@ -226,7 +226,7 @@ writerP p = do
 #ifndef haskell98
 -- | Run 'W.WriterT' in the base monad
 runWriterP
-    :: (Monad m, Data.Monoid.Monoid w)
+    :: (Monad m, Monoid w)
     => Proxy a' a b' b (W.WriterT w m) r
     -> Proxy a' a b' b m (r, w)
 runWriterP p = W.runWriterT $ distribute p
@@ -234,7 +234,7 @@ runWriterP p = W.runWriterT $ distribute p
 
 -- | Execute 'W.WriterT' in the base monad
 execWriterP
-    :: (Monad m, Data.Monoid.Monoid w)
+    :: (Monad m, Monoid w)
     => Proxy a' a b' b (W.WriterT w m) r
     -> Proxy a' a b' b m w
 execWriterP p = fmap snd $ runWriterP p
