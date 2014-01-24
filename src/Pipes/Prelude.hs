@@ -95,7 +95,6 @@ module Pipes.Prelude (
 import Control.Exception (throwIO, try)
 import Control.Monad (liftM, replicateM_, when, unless)
 import Data.Functor.Identity (Identity, runIdentity)
-import Data.Void (absurd)
 import Foreign.C.Error (Errno(Errno), ePIPE)
 import qualified GHC.IO.Exception as G
 import Pipes
@@ -472,7 +471,7 @@ fold :: (Monad m) => (x -> a -> x) -> x -> (x -> b) -> Producer a m () -> m b
 fold step begin done p0 = loop p0 begin
   where
     loop p x = case p of
-        Request v  _  -> absurd v
+        Request v  _  -> closed v
         Respond a  fu -> loop (fu ()) $! step x a
         M          m  -> m >>= \p' -> loop p' x
         Pure    _     -> return (done x)
@@ -487,7 +486,7 @@ foldM step begin done p0 = do
     loop p0 x0
   where
     loop p x = case p of
-        Request v  _  -> absurd v
+        Request v  _  -> closed v
         Respond a  fu -> do
             x' <- step x a
             loop (fu ()) $! x'
@@ -621,7 +620,7 @@ toList :: Producer a Identity () -> [a]
 toList = loop
   where
     loop p = case p of
-        Request v _  -> absurd v
+        Request v _  -> closed v
         Respond a fu -> a:loop (fu ())
         M         m  -> loop (runIdentity m)
         Pure    _    -> []
@@ -638,7 +637,7 @@ toListM :: (Monad m) => Producer a m () -> m [a]
 toListM = loop
   where
     loop p = case p of
-        Request v _  -> absurd v
+        Request v _  -> closed v
         Respond a fu -> do
             as <- loop (fu ())
             return (a:as)
@@ -696,7 +695,7 @@ tee p = evalStateP Nothing $ do
         a <- await
         lift $ put (Just a)
         return a
-    dn v = absurd v
+    dn v = closed v
 {-# INLINABLE tee #-}
 
 {-| Transform a unidirectional 'Pipe' to a bidirectional 'Proxy'
