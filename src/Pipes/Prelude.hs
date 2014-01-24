@@ -42,6 +42,7 @@ module Pipes.Prelude (
     -- $pipes
     , map
     , mapM
+    , sequence
     , mapFoldable
     , filter
     , filterM
@@ -129,6 +130,7 @@ import Prelude hiding (
     , product
     , read
     , readLn
+    , sequence
     , show
     , sum
     , take
@@ -283,6 +285,11 @@ mapM f = for cat $ \a -> do
         b <- lift (f a)
         return b ) >~ p
   #-}
+
+-- | Convert a stream of actions to a stream of values
+sequence :: (Monad m) => Pipe (m a) a m r
+sequence = mapM id
+{-# INLINABLE sequence #-}
 
 {- | Apply a function to all values flowing downstream, and
      forward each element of the result.
