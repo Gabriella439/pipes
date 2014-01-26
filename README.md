@@ -25,13 +25,13 @@ Then fire up `ghci`:
     Prelude P> -- Done!
 
 To learn more, read the
-[pipes tutorial](http://hackage.haskell.org/packages/archive/pipes/4.0.0/doc/html/Pipes-Tutorial.html).
+[pipes tutorial](http://hackage.haskell.org/packages/archive/pipes/4.1.0/doc/html/Pipes-Tutorial.html).
 
 ## Features
 
 * *Concise API*: Use simple commands like `for`, `(>->)`, `await`, and `yield`
 
-* *Blazing fast*: Implementation tuned for speed
+* *Blazing fast*: Implementation tuned for speed, including shortcut fusion
 
 * *Lightweight Dependency*: `pipes` is small and compiles very rapidly,
   including dependencies
@@ -86,17 +86,9 @@ Derived libraries that build on top of these include:
 
 [![Build Status](https://travis-ci.org/Gabriel439/Haskell-Pipes-Library.png)](https://travis-ci.org/Gabriel439/Haskell-Pipes-Library)
 
-The `pipes` ecosystem is in the middle of a transition to use the new 4.0.0 API.
-This version should be the last significant API change for the core `pipes`
-library, although downstream libraries may still exhibit some API instability
-for a couple of months as they experiment with a few new features enabled by the
-4.0.0 API.
-
-All development work currently focuses on transitioning downstream libraries to
-use `pipes-4.0.0` and building out the `pipes` ecosystem.
-
-The long term goal is to get `pipes` into the Haskell platform and become the
-basic building block for streaming APIs.
+`pipes` is stable, and current work focuses on packaging `pipes` for various
+package managers.  The long term goal is to get `pipes` into the Haskell
+platform and become the basic building block for streaming APIs.
 
 ## Community Resources
 

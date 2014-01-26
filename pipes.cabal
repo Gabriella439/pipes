@@ -17,7 +17,7 @@ Description:
   .
   * /Concise API/: Use simple commands like 'for', ('>->'), 'await', and 'yield'
   .
-  * /Blazing fast/: Implementation tuned for speed
+  * /Blazing fast/: Implementation tuned for speed, including shortcut fusion
   .
   * /Lightweight Dependency/: @pipes@ is small and compiles very rapidly,
     including dependencies
