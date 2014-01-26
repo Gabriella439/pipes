@@ -106,7 +106,7 @@ platform and become the basic building block for streaming APIs.
 
 ## License (BSD 3-clause)
 
-Copyright (c) 2012, 2013 Gabriel Gonzalez
+Copyright (c) 2012-2014 Gabriel Gonzalez
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
