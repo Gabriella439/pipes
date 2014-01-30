@@ -32,6 +32,7 @@ module Pipes.Prelude (
     , stdoutLn
     , print
     , toHandle
+    , drain
 
     -- * Pipes
     -- $pipes
@@ -232,6 +233,16 @@ toHandle handle = for cat (\str -> liftIO (IO.hPutStrLn handle str))
 {-# RULES
     "p >-> toHandle handle" forall p handle .
         p >-> toHandle handle = for p (\str -> liftIO (IO.hPutStrLn handle str))
+  #-}
+
+-- | 'discard' all incoming values
+drain :: Monad m => Consumer' a m r
+drain = for cat discard
+{-# INLINABLE drain #-}
+
+{-# RULES
+    "p >-> drain" forall p .
+        p >-> drain = for p discard
   #-}
 
 {- $pipes
