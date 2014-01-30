@@ -3,56 +3,41 @@
     actions so that they work in the 'Proxy' monad transformer.
 -}
 
-{-# LANGUAGE CPP #-}
-
 module Pipes.Lift (
+    -- * Utilities
+      distribute
+
     -- * ErrorT
-      errorP
-#ifndef haskell98
+    , errorP
     , runErrorP
     , catchError
-#endif
     , liftCatchError
 
     -- * MaybeT
     , maybeP
-#ifndef haskell98
     , runMaybeP
-#endif
 
     -- * ReaderT
     , readerP
-#ifndef haskell98
     , runReaderP
-#endif
 
     -- * StateT
     , stateP
-#ifndef haskell98
     , runStateP
     , evalStateP
     , execStateP
-#endif
 
     -- * WriterT
     -- $writert
     , writerP
-#ifndef haskell98
     , runWriterP
     , execWriterP
-#endif
 
     -- * RWST
     , rwsP
-#ifndef haskell98
     , runRWSP
     , evalRWSP
     , execRWSP
-
-    -- * Utilities
-    , distribute
-#endif
-
     ) where
 
 import Control.Monad.Trans.Class (lift, MonadTrans(..))
@@ -64,10 +49,8 @@ import qualified Control.Monad.Trans.Writer.Strict as W
 import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Data.Monoid (Monoid)
 import Pipes.Internal (Proxy(..), unsafeHoist)
-#ifndef haskell98
 import Control.Monad.Morph (hoist, MFunctor(..))
 import Pipes.Core (runEffect, request, respond, (//>), (>\\))
-#endif
 
 -- | Wrap the base monad in 'E.ErrorT'
 errorP
@@ -79,7 +62,6 @@ errorP p = do
     lift $ E.ErrorT (return x)
 {-# INLINABLE errorP #-}
 
-#ifndef haskell98
 -- | Run 'E.ErrorT' in the base monad
 runErrorP
     :: (Monad m, E.Error e)
@@ -99,7 +81,6 @@ catchError
 catchError e h = errorP . E.runErrorT $ 
     E.catchError (distribute e) (distribute . h)
 {-# INLINABLE catchError #-}
-#endif
 
 -- | Catch an error using a catch function for the base monad
 liftCatchError
@@ -132,7 +113,6 @@ maybeP p = do
     lift $ M.MaybeT (return x)
 {-# INLINABLE maybeP #-}
 
-#ifndef haskell98
 -- | Run 'M.MaybeT' in the base monad
 runMaybeP
     :: Monad m
@@ -140,7 +120,6 @@ runMaybeP
     -> Proxy a' a b' b m (Maybe r)
 runMaybeP p = M.runMaybeT $ distribute p
 {-# INLINABLE runMaybeP #-}
-#endif
 
 -- | Wrap the base monad in 'R.ReaderT'
 readerP
@@ -151,7 +130,6 @@ readerP k = do
     unsafeHoist lift (k i)
 {-# INLINABLE readerP #-}
 
-#ifndef haskell98
 -- | Run 'R.ReaderT' in the base monad
 runReaderP
     :: Monad m
@@ -160,7 +138,6 @@ runReaderP
     -> Proxy a' a b' b m r
 runReaderP r p = (`R.runReaderT` r) $ distribute p
 {-# INLINABLE runReaderP #-}
-#endif
 
 -- | Wrap the base monad in 'S.StateT'
 stateP
@@ -173,7 +150,6 @@ stateP k = do
     return r
 {-# INLINABLE stateP #-}
 
-#ifndef haskell98
 -- | Run 'S.StateT' in the base monad
 runStateP
     :: Monad m
@@ -200,7 +176,6 @@ execStateP
     -> Proxy a' a b' b m s
 execStateP s p = fmap snd $ runStateP s p
 {-# INLINABLE execStateP #-}
-#endif
 
 {- $writert
     Note that 'runWriterP' and 'execWriterP' will keep the accumulator in
@@ -223,7 +198,6 @@ writerP p = do
     return r
 {-# INLINABLE writerP #-}
 
-#ifndef haskell98
 -- | Run 'W.WriterT' in the base monad
 runWriterP
     :: (Monad m, Monoid w)
@@ -239,7 +213,6 @@ execWriterP
     -> Proxy a' a b' b m w
 execWriterP p = fmap snd $ runWriterP p
 {-# INLINABLE execWriterP #-}
-#endif
 
 -- | Wrap the base monad in 'RWS.RWST'
 rwsP
@@ -256,7 +229,6 @@ rwsP k = do
     return r
 {-# INLINABLE rwsP #-}
 
-#ifndef haskell98
 -- | Run 'RWS.RWST' in the base monad
 runRWSP
     :: (Monad m, Monoid w)
@@ -308,4 +280,3 @@ distribute p =  runEffect $ request' >\\ unsafeHoist (hoist lift) p //> respond'
     request' = lift . lift . request
     respond' = lift . lift . respond
 {-# INLINABLE distribute #-}
-#endif

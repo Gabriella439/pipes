@@ -23,13 +23,8 @@
   , MultiParamTypeClasses
   , RankNTypes
   , UndecidableInstances
-  , CPP
+  , Trustworthy
   #-}
-
--- The rewrite RULES require the 'TrustWorthy' annotation
-#if __GLASGOW_HASKELL__ >= 702
-{-# LANGUAGE Trustworthy #-}
-#endif
 
 module Pipes.Internal (
     -- * Internal
@@ -44,14 +39,12 @@ import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-#ifndef haskell98
 import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
 import Data.Monoid (mempty,mappend)
-#endif
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
     an upstream and downstream interface.
@@ -139,7 +132,6 @@ unsafeHoist nat = go
         Pure       r   -> Pure r
 {-# INLINABLE unsafeHoist #-}
 
-#ifndef haskell98
 instance MFunctor (Proxy a' a b' b) where
     hoist nat p0 = go (observe p0) where
         go p = case p of
@@ -147,12 +139,10 @@ instance MFunctor (Proxy a' a b' b) where
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (nat (m >>= \p' -> return (go p')))
             Pure       r   -> Pure r
-#endif
 
 instance MonadIO m => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
 
-#ifndef haskell98
 instance MonadReader r m => MonadReader r (Proxy a' a b' b m) where
     ask = lift ask
     local f = go
@@ -162,21 +152,15 @@ instance MonadReader r m => MonadReader r (Proxy a' a b' b m) where
               Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
               Pure    r      -> Pure r
               M       m      -> M (local f m >>= \r -> return (go r))
-#if MIN_VERSION_mtl(2,1,0)
     reader = lift . reader
-#endif
 
 instance MonadState s m => MonadState s (Proxy a' a b' b m) where
     get = lift get
     put = lift . put
-#if MIN_VERSION_mtl(2,1,0)
     state = lift . state
-#endif
 
 instance MonadWriter w m => MonadWriter w (Proxy a' a b' b m) where
-#if MIN_VERSION_mtl(2,1,0)
     writer = lift . writer
-#endif
     tell = lift . tell
     listen p0 = go p0 mempty
       where
@@ -209,7 +193,6 @@ instance MonadError e m => MonadError e (Proxy a' a b' b m) where
             M          m   -> M ((do
                 p' <- m
                 return (go p') ) `catchError` (\e -> return (f e)) )
-#endif
 
 instance MonadPlus m => Alternative (Proxy a' a b' b m) where
     empty = mzero

@@ -1,21 +1,16 @@
+{-# LANGUAGE
+    RankNTypes
+  , FlexibleInstances
+  , MultiParamTypeClasses
+  , UndecidableInstances
+  , Trustworthy
+  #-}
+
 {-| This module is the recommended entry point to the @pipes@ library.
 
     Read "Pipes.Tutorial" if you want a tutorial explaining how to use this
     library.
 -}
-
-{-# LANGUAGE
-    RankNTypes
-  , CPP
-  , FlexibleInstances
-  , MultiParamTypeClasses
-  , UndecidableInstances
-  #-}
-
--- The rewrite RULES require the 'TrustWorthy' annotation
-#if __GLASGOW_HASKELL__ >= 702
-{-# LANGUAGE Trustworthy #-}
-#endif
 
 module Pipes (
     -- * The Proxy Monad Transformer
@@ -63,35 +58,29 @@ module Pipes (
     -- $reexports
     , module Control.Monad.IO.Class
     , module Control.Monad.Trans.Class
-#ifndef haskell98
     , module Control.Monad.Morph
-#endif
     , module Data.Foldable
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
-import Control.Monad (MonadPlus(mzero, mplus))
+import Control.Monad.Error (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad (MonadPlus(mzero, mplus))
+import Control.Monad.Reader (MonadReader(..))
+import Control.Monad.State (MonadState(..))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Trans.Error (ErrorT(runErrorT))
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
-import Data.Foldable (Foldable)
-import qualified Data.Foldable as F
-import Data.Monoid (Monoid(..))
-import Pipes.Internal (Proxy(..))
-import Pipes.Core
-#ifndef haskell98
-import Control.Monad.Error (MonadError(..))
-import Control.Monad.Reader (MonadReader(..))
-import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
-#endif
+import Data.Foldable (Foldable)
+import Data.Monoid (Monoid(..))
+import Pipes.Core
+import Pipes.Internal (Proxy(..))
+import qualified Data.Foldable as F
 
 -- Re-exports
-#ifndef haskell98
 import Control.Monad.Morph (MFunctor(hoist))
-#endif
 
 infixl 4 <~
 infixr 4 ~>
@@ -362,29 +351,22 @@ instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
     mplus = (<|>)
 
-#ifndef haskell98
 instance MFunctor ListT where
     hoist morph = Select . hoist morph . enumerate
-#endif
 
 instance (Monad m) => Monoid (ListT m a) where
     mempty = empty
     mappend = (<|>)
 
-#ifndef haskell98
 instance (MonadState s m) => MonadState s (ListT m) where
     get     = lift  get
 
     put   s = lift (put   s)
 
-#if MIN_VERSION_mtl(2,1,0)
     state f = lift (state f)
-#endif
 
 instance (MonadWriter w m) => MonadWriter w (ListT m) where
-#if MIN_VERSION_mtl(2,1,0)
     writer = lift . writer
-#endif
 
     tell w = lift (tell w)
 
@@ -414,15 +396,12 @@ instance (MonadReader i m) => MonadReader i (ListT m) where
 
     local f l = Select (local f (enumerate l))
 
-#if MIN_VERSION_mtl(2,1,0)
     reader f = lift (reader f)
-#endif
 
 instance (MonadError e m) => MonadError e (ListT m) where
     throwError e = lift (throwError e)
 
     catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
-#endif
 
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
@@ -505,9 +484,7 @@ p2 <-< p1 = p1 >-> p2
 
     "Control.Monad.Trans.Class" re-exports 'MonadTrans'.
 
-#ifndef haskell98
     "Control.Monad.Morph" re-exports 'MFunctor'.
 
-#endif
     "Data.Foldable" re-exports 'Foldable' (the class name only)
 -}

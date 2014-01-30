@@ -16,13 +16,8 @@
     newlines.
 -}
 
-{-# LANGUAGE RankNTypes, CPP #-}
+{-# LANGUAGE RankNTypes, Trustworthy #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
-
--- The rewrite RULES require the 'TrustWorthy' annotation
-#if __GLASGOW_HASKELL__ >= 702
-{-# LANGUAGE Trustworthy #-}
-#endif
 
 module Pipes.Prelude (
     -- * Producers
@@ -86,26 +81,23 @@ module Pipes.Prelude (
     -- * Zips
     , zip
     , zipWith
-#ifndef haskell98
+
     -- * Utilities
     , tee
     , generalize
-#endif
     ) where
 
 import Control.Exception (throwIO, try)
 import Control.Monad (liftM, replicateM_, when, unless)
+import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
 import Foreign.C.Error (Errno(Errno), ePIPE)
-import qualified GHC.IO.Exception as G
 import Pipes
 import Pipes.Core
 import Pipes.Internal
-import qualified System.IO as IO
-#ifndef haskell98
-import Control.Monad.Trans.State.Strict (get, put)
 import Pipes.Lift (evalStateP)
-#endif
+import qualified GHC.IO.Exception as G
+import qualified System.IO as IO
 import qualified Prelude
 import Prelude hiding (
       all
@@ -681,7 +673,6 @@ zipWith f = go
                         go p1' p2'
 {-# INLINABLE zipWith #-}
 
-#ifndef haskell98
 {-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
     downstream
 -}
@@ -721,4 +712,3 @@ generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
         x <- respond a
         lift $ put x
 {-# INLINABLE generalize #-}
-#endif
