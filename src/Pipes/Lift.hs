@@ -1,6 +1,9 @@
 {-| Many actions in base monad transformers cannot be automatically
     'Control.Monad.Trans.Class.lift'ed.  These functions lift these remaining
     actions so that they work in the 'Proxy' monad transformer.
+
+    See the mini-tutorial at the bottom of this module for example code and
+    typical use cases where this module will come in handy.
 -}
 
 module Pipes.Lift (
@@ -38,6 +41,9 @@ module Pipes.Lift (
     , runRWSP
     , evalRWSP
     , execRWSP
+
+    -- * Tutorial
+    -- $tutorial
     ) where
 
 import Control.Monad.Trans.Class (lift, MonadTrans(..))
@@ -51,6 +57,24 @@ import Data.Monoid (Monoid)
 import Pipes.Internal (Proxy(..), unsafeHoist)
 import Control.Monad.Morph (hoist, MFunctor(..))
 import Pipes.Core (runEffect, request, respond, (//>), (>\\))
+
+-- | Distribute 'Proxy' over a monad transformer
+distribute
+    ::  ( Monad m
+        , MonadTrans t
+        , MFunctor t
+        , Monad (t m)
+        , Monad (t (Proxy a' a b' b m))
+        )
+    => Proxy a' a b' b (t m) r
+    -- ^ 
+    -> t (Proxy a' a b' b m) r
+    -- ^ 
+distribute p =  runEffect $ request' >\\ unsafeHoist (hoist lift) p //> respond'
+  where
+    request' = lift . lift . request
+    respond' = lift . lift . respond
+{-# INLINABLE distribute #-}
 
 -- | Wrap the base monad in 'E.ErrorT'
 errorP
@@ -263,20 +287,94 @@ execRWSP i s p = fmap f $ runRWSP i s p
     f x = let (_, s', w) = x in (s', w)
 {-# INLINABLE execRWSP #-}
 
--- | Distribute 'Proxy' over a monad transformer
-distribute
-    ::  ( Monad m
-        , MonadTrans t
-        , MFunctor t
-        , Monad (t m)
-        , Monad (t (Proxy a' a b' b m))
-        )
-    => Proxy a' a b' b (t m) r
-    -- ^ 
-    -> t (Proxy a' a b' b m) r
-    -- ^ 
-distribute p =  runEffect $ request' >\\ unsafeHoist (hoist lift) p //> respond'
-  where
-    request' = lift . lift . request
-    respond' = lift . lift . respond
-{-# INLINABLE distribute #-}
+{- $tutorial
+    Probably the most useful functionality in this is lifted error handling.
+    Suppose that you have a 'Pipes.Pipe' whose base monad can fail using
+    'E.ErrorT':
+
+> import Control.Monad.Trans.Error
+> import Pipes
+>
+> example :: Monad m => Pipe Int Int (ErrorT String m) r
+> example = for cat $ \n ->
+>     if n == 0
+>     then lift $ throwError "Zero is forbidden"
+>     else yield n
+
+    Without the tools in this module you cannot recover from any potential error
+    until after you compose and run the pipeline:
+
+>>> import qualified Pipes.Prelude as P
+>>> runErrorT $ runEffect $ P.readLn >-> example >-> P.print
+42<Enter>
+42
+1<Enter>
+1
+0<Enter>
+Zero is forbidden
+>>>
+
+    This module provides `catchError`, which lets you catch and recover from
+    errors inside the 'Pipe':
+
+>  import qualified Pipes.Lift as Lift
+> 
+>  caught :: Pipe Int Int (ErrorT String IO) r
+>  caught = example `Lift.catchError` \str -> do
+>      liftIO (putStrLn str)
+>      caught
+
+    This lets you resume streaming in the face of errors raised within the bas
+    monad:
+
+>>> runErrorT $ runEffect $ P.readLn >-> caught >-> P.print
+0<Enter>
+Zero is forbidden
+42<Enter>
+42
+0<Enter>
+Zero is forbidden
+1<Enter>
+1
+...
+
+    Another common use case is running a base monad before running the pipeline.
+    For example, the following contrived 'Producer' uses 'S.StateT' gratuitously
+    to increment numbers:
+
+> import Control.Monad (forever)
+> import Control.Monad.Trans.State.Strict
+> import Pipes
+> 
+> numbers :: Monad m => Producer Int (StateT Int m) r
+> numbers = forever $ do
+>     n <- lift get
+>     yield n
+>     lift $ put $! n + 1
+
+    You can run the 'StateT' monad by supplying an initial state, before you
+    ever compose the 'Producer':
+
+> import Pipes.Lift
+>
+> naturals :: Monad m => Producer Int m r
+> naturals = evalStateP 0 numbers
+
+    This deletes 'StateT' from the base monad entirely, give you a completely
+    pure 'Pipes.Producer':
+
+>>> Pipes.Prelude.toList naturals
+[0,1,2,3,4,5,6...]
+
+    Note that the convention for the 'S.StateT' run functions is backwards from
+    @transformers@ for convenience: the initial state is the first argument.
+
+    All of these functions internally use 'distribute', which can pull out most
+    monad transformers from the base monad.  For example, 'evalStateP' is
+    defined in terms of 'distribute':
+
+> evalStateP s p = evalStateT (distribute p) s
+
+    Therefore you can use 'distribute' to run other monad transformers, too, as
+    long as they implement the 'MFunctor' type class from the @mmorph@ library.
+-}
