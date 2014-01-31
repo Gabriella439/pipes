@@ -389,7 +389,7 @@ instance (MonadWriter w m) => MonadWriter w (ListT m) where
             M               m   -> M (do
                 (p', w') <- listen m
                 return (go p' $! mappend w w') )
-            Pure    r           -> Pure r
+            Pure     r          -> Pure r
 
 instance (MonadReader i m) => MonadReader i (ListT m) where
     ask = lift ask

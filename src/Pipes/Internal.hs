@@ -82,7 +82,7 @@ instance Monad m => Applicative (Proxy a' a b' b m) where
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (m >>= \p' -> return (go p'))
-            Pure     f     -> fmap f px
+            Pure    f      -> fmap f px
 
 instance Monad m => Monad (Proxy a' a b' b m) where
     return = Pure
@@ -98,7 +98,7 @@ p0 `_bind` f = go p0 where
         Request a' fa  -> Request a' (\a  -> go (fa  a ))
         Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
         M          m   -> M (m >>= \p' -> return (go p'))
-        Pure     r     -> f r
+        Pure    r      -> f r
 
 {-# RULES
     "_bind (Request a' k) f" forall a' k f .
@@ -129,7 +129,7 @@ unsafeHoist nat = go
         Request a' fa  -> Request a' (\a  -> go (fa  a ))
         Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
         M          m   -> M (nat (m >>= \p' -> return (go p')))
-        Pure       r   -> Pure r
+        Pure    r      -> Pure r
 {-# INLINABLE unsafeHoist #-}
 
 instance MFunctor (Proxy a' a b' b) where
@@ -138,7 +138,7 @@ instance MFunctor (Proxy a' a b' b) where
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (nat (m >>= \p' -> return (go p')))
-            Pure       r   -> Pure r
+            Pure    r      -> Pure r
 
 instance MonadIO m => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (m >>= \r -> return (Pure r)))
@@ -180,7 +180,7 @@ instance MonadWriter w m => MonadWriter w (Proxy a' a b' b m) where
             M       m      -> M (do
                 (p', w') <- listen m
                 return (go p' $! mappend w w') )
-            Pure    (r, f) -> M (pass (return (Pure r, \_ -> f w)))
+            Pure   (r, f)  -> M (pass (return (Pure r, \_ -> f w)))
 
 instance MonadError e m => MonadError e (Proxy a' a b' b m) where
     throwError = lift . throwError
