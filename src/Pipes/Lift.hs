@@ -288,9 +288,9 @@ execRWSP i s p = fmap f $ runRWSP i s p
 {-# INLINABLE execRWSP #-}
 
 {- $tutorial
-    Probably the most useful functionality in this is lifted error handling.
-    Suppose that you have a 'Pipes.Pipe' whose base monad can fail using
-    'E.ErrorT':
+    Probably the most useful functionality in this module is lifted error
+    handling.  Suppose that you have a 'Pipes.Pipe' whose base monad can fail
+    using 'E.ErrorT':
 
 > import Control.Monad.Trans.Error
 > import Pipes
@@ -324,7 +324,7 @@ Zero is forbidden
 >      liftIO (putStrLn str)
 >      caught
 
-    This lets you resume streaming in the face of errors raised within the bas
+    This lets you resume streaming in the face of errors raised within the base
     monad:
 
 >>> runErrorT $ runEffect $ P.readLn >-> caught >-> P.print
