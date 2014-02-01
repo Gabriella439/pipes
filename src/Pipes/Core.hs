@@ -827,16 +827,28 @@ k <<+ p = p +>> k
 {-# INLINABLE (<<+) #-}
 
 {-# RULES
-    "(p //> f) //> g" forall p f g . (p //> f) //> g = p //> (\a -> f a //> g)
+    "(p //> f) //> g" forall p f g . (p //> f) //> g = p //> (\x -> f x //> g)
 
   ; "p //> respond" forall p . p //> respond = p
 
   ; "respond x //> f" forall x f . respond x //>  f = f x
 
-  ; "f >\\ (g >\\ p)" forall f g p . f >\\ (g >\\ p) = (\a -> f >\\ g a) >\\ p
+  ; "f >\\ (g >\\ p)" forall f g p . f >\\ (g >\\ p) = (\x -> f >\\ g x) >\\ p
 
   ; "request >\\ p" forall p . request >\\ p = p
 
   ; "f >\\ request x" forall f x . f >\\ request x = f x
+
+  ; "(p >>~ f) >>~ g" forall p f g . (p >>~ f) >>~ g = p >>~ (\x -> f x >>~ g)
+
+  ; "p >>~ push" forall p . p >>~ push = p
+
+  ; "push x >>~ f" forall x f . push x >>~ f = f x
+
+  ; "f +>> (g +>> p)" forall f g p . f +>> (g +>> p) = (\x -> f +>> g x) +>> p
+
+  ; "pull +>> p" forall p . pull +>> p = p
+
+  ; "f +>> pull x" forall f x . f +>> pull x = f x
 
   #-}

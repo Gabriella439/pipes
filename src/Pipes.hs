@@ -177,6 +177,14 @@ for = (//>)
                     yield x
                     go
             in  go
+
+  ; "p1 >-> (p2 >-> p3)" forall p1 p2 p3 .
+        p1 >-> (p2 >-> p3) = (p1 >-> p2) >-> p3
+
+  ; "p >-> cat" forall p . p >-> cat = p
+
+  ; "cat >-> p" forall p . cat >-> p = p
+
   #-}
 
 {-| Compose loop bodies
