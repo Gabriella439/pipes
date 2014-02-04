@@ -75,7 +75,7 @@ test-suite tests
     Type:             exitcode-stdio-1.0
     HS-Source-Dirs:   tests
     Main-Is:          Main.hs
-    GHC-Options:      -Wall -threaded -rtsopts -with-rtsopts=-N -fno-warn-missing-signatures
+    GHC-Options:      -Wall -rtsopts -fno-warn-missing-signatures
 
     Build-Depends:
         base                       >= 4       && < 5   ,
