@@ -400,7 +400,10 @@ findIndices predicate = loop 0
         loop $! n + 1
 {-# INLINABLE findIndices #-}
 
--- | Strict left scan
+{-| Strict left scan
+
+> Control.Foldl.purely scan :: Monad m => Fold a b -> Pipe a b m r
+-}
 scan :: Monad m => (x -> a -> x) -> x -> (x -> b) -> Pipe a b m r
 scan step begin done = loop begin
   where
@@ -411,7 +414,10 @@ scan step begin done = loop begin
         loop $! x'
 {-# INLINABLE scan #-}
 
--- | Strict, monadic left scan
+{-| Strict, monadic left scan
+
+> Control.Foldl.impurely scan :: Monad m => FoldM a m b -> Pipe a b m r
+-}
 scanM :: Monad m => (x -> a -> m x) -> m x -> (x -> m b) -> Pipe a b m r
 scanM step begin done = do
     x <- lift begin
@@ -476,7 +482,10 @@ True
 
 -}
 
--- | Strict fold of the elements of a 'Producer'
+{-| Strict fold of the elements of a 'Producer'
+
+> Control.Foldl.purely fold :: Monad m => Fold a b -> Producer a m () -> m b
+-}
 fold :: Monad m => (x -> a -> x) -> x -> (x -> b) -> Producer a m () -> m b
 fold step begin done p0 = loop p0 begin
   where
@@ -487,7 +496,10 @@ fold step begin done p0 = loop p0 begin
         Pure    _     -> return (done x)
 {-# INLINABLE fold #-}
 
--- | Strict, monadic fold of the elements of a 'Producer'
+{-| Strict, monadic fold of the elements of a 'Producer'
+
+> Control.Foldl.impurely foldM :: Monad m => FoldM a b -> Producer a m () -> m b
+-}
 foldM
     :: Monad m
     => (x -> a -> m x) -> m x -> (x -> m b) -> Producer a m () -> m b
