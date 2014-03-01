@@ -250,13 +250,13 @@ import Prelude hiding ((.), id)
     signature is just a special case of the second one:
 
 @
- 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b    m ()) -> 'Producer' b    m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' b m ()) -> 'Producer' b m r
 
 \ -- Specialize \'b\' to \'X\'
  'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Producer' 'X' m ()) -> 'Producer' 'X' m r
 
 \ -- Producer X = Effect
- 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Effect'        m ()) -> 'Effect'        m r
+ 'for' :: 'Monad' m => 'Producer' a m r -> (a -> 'Effect'     m ()) -> 'Effect'     m r
 @
 
     This is the same trick that all @pipes@ functions use to work with various
@@ -1019,7 +1019,7 @@ quit<Enter>
 
 > customerService :: Producer String IO ()
 > customerService = do
->     each [ "Hello, how can I help you?"      -- Begin with a script
+>     each [ "Hello, how can I help you?"        -- Begin with a script
 >          , "Hold for one second."
 >          ]
 >     P.stdinLn >-> P.takeWhile (/= "Goodbye!")  -- Now continue with a human
