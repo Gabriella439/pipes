@@ -25,6 +25,7 @@ module Pipes.Prelude (
       stdinLn
     , readLn
     , fromHandle
+    , repeatM
     , replicateM
 
     -- * Consumers
@@ -179,8 +180,17 @@ fromHandle h = go
             go
 {-# INLINABLE fromHandle #-}
 
+-- | Repeat a monadic action indefinitely, 'yield'ing each result
+repeatM :: Monad m => m a -> Producer' a m r
+repeatM m = lift m >~ cat
+{-# INLINABLE repeatM #-}
+
+{-# RULES
+  "repeatM m >-> p" forall m p . repeatM m >-> p = lift m >~ p
+  #-}
+
 -- | Repeat a monadic action a fixed number of times, 'yield'ing each result
-replicateM :: Monad m => Int -> m a -> Producer a m ()
+replicateM :: Monad m => Int -> m a -> Producer' a m ()
 replicateM n m = lift m >~ take n
 {-# INLINABLE replicateM #-}
 
