@@ -46,6 +46,7 @@ module Pipes (
 
     -- * ListT
     , ListT(..)
+    , runListT
     , Enumerable(..)
 
     -- * Utilities
@@ -410,6 +411,11 @@ instance (MonadError e m) => MonadError e (ListT m) where
     throwError e = lift (throwError e)
 
     catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
+
+-- | Run a self-contained `ListT` computation
+runListT :: Monad m => ListT m X -> m ()
+runListT l = runEffect (enumerate l)
+{-# INLINABLE runListT #-}
 
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
