@@ -189,7 +189,16 @@ repeatM m = lift m >~ cat
   "repeatM m >-> p" forall m p . repeatM m >-> p = lift m >~ p
   #-}
 
--- | Repeat a monadic action a fixed number of times, 'yield'ing each result
+{-| Repeat a monadic action a fixed number of times, 'yield'ing each result
+
+> replicateM  0      x = return ()
+>
+> replicateM (m + n) x = replicateM m x >> replicateM n x  -- 0 <= {m,n}
+
+> replicateM  1      = lift
+>
+> replicateM (m * n) = replicateM m >|> replicate n        -- 0 <= {m,n}
+-}
 replicateM :: Monad m => Int -> m a -> Producer' a m ()
 replicateM n m = lift m >~ take n
 {-# INLINABLE replicateM #-}
@@ -268,7 +277,12 @@ quit<Enter>
 
 -}
 
--- | Apply a function to all values flowing downstream
+{-| Apply a function to all values flowing downstream
+
+> map id = cat
+>
+> map (g . f) = map f >-> map g
+-}
 map :: Monad m => (a -> b) -> Pipe a b m r
 map f = for cat (\a -> yield (f a))
 {-# INLINABLE map #-}
@@ -281,7 +295,12 @@ map f = for cat (\a -> yield (f a))
         return (f a) ) >~ p
   #-}
 
--- | Apply a monadic function to all values flowing downstream
+{-| Apply a monadic function to all values flowing downstream
+
+> mapM return = cat
+>
+> mapM (f >=> g) = mapM f >-> mapM g
+-}
 mapM :: Monad m => (a -> m b) -> Pipe a b m r
 mapM f = for cat $ \a -> do
     b <- lift (f a)
@@ -316,7 +335,12 @@ mapFoldable f = for cat (\a -> each (f a))
         p >-> mapFoldable f = for p (\a -> each (f a))
   #-}
 
--- | @(filter predicate)@ only forwards values that satisfy the predicate.
+{-| @(filter predicate)@ only forwards values that satisfy the predicate.
+
+> filter (pure True) = cat
+>
+> filter (liftA2 (&&) p1 p2) = filter p1 >-> filter p2
+-}
 filter :: Monad m => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat $ \a -> when (predicate a) (yield a)
 {-# INLINABLE filter #-}
@@ -328,6 +352,10 @@ filter predicate = for cat $ \a -> when (predicate a) (yield a)
 
 {-| @(filterM predicate)@ only forwards values that satisfy the monadic
     predicate
+
+> filterM (pure (pure True)) = cat
+>
+> filterM (liftA2 (liftA2 (&&)) p1 p2) = filterM p1 >-> filterM p2
 -}
 filterM :: Monad m => (a -> m Bool) -> Pipe a a m r
 filterM predicate = for cat $ \a -> do
@@ -342,7 +370,16 @@ filterM predicate = for cat $ \a -> do
             when b (yield a) )
   #-}
 
--- | @(take n)@ only allows @n@ values to pass through
+{-| @(take n)@ only allows @n@ values to pass through
+
+> take 0 = return ()
+>
+> take (m + n) = take m >> take n
+
+> take <infinity> = cat
+>
+> take (min m n) = take m >-> take n
+-}
 take :: Monad m => Int -> Pipe a a m ()
 take n = replicateM_ n $ do
     a <- await
@@ -351,6 +388,10 @@ take n = replicateM_ n $ do
 
 {-| @(takeWhile p)@ allows values to pass downstream so long as they satisfy
     the predicate @p@.
+
+> takeWhile (pure True) = cat
+>
+> takeWhile (liftA2 (&&) p1 p2) = takeWhile p1 >-> takeWhile p2
 -}
 takeWhile :: Monad m => (a -> Bool) -> Pipe a a m ()
 takeWhile predicate = go
@@ -364,7 +405,12 @@ takeWhile predicate = go
             else return ()
 {-# INLINABLE takeWhile #-}
 
--- | @(drop n)@ discards @n@ values going downstream
+{-| @(drop n)@ discards @n@ values going downstream
+
+> drop 0 = cat
+>
+> drop (m + n) = drop m >-> drop n
+-}
 drop :: Monad m => Int -> Pipe a a m r
 drop n = do
     replicateM_ n await
@@ -373,6 +419,10 @@ drop n = do
 
 {-| @(dropWhile p)@ discards values going downstream until one violates the
     predicate @p@.
+
+> dropWhile (pure False) = cat
+>
+> dropWhile (liftA2 (||) p1 p2) = dropWhile p1 >-> dropWhile p2
 -}
 dropWhile :: Monad m => (a -> Bool) -> Pipe a a m r
 dropWhile predicate = go
@@ -441,7 +491,12 @@ scanM step begin done = do
         loop $! x'
 {-# INLINABLE scanM #-}
 
--- | Apply an action to all values flowing downstream
+{-| Apply an action to all values flowing downstream
+
+> chain (pure (return ())) = cat
+>
+> chain (liftA2 (>>) m1 m2) = chain m1 >-> chain m2
+-}
 chain :: Monad m => (a -> m ()) -> Pipe a a m r
 chain f = for cat $ \a -> do
     lift (f a)
