@@ -39,7 +39,7 @@ import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.Monad.Morph (MFunctor(hoist))
+import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
@@ -133,11 +133,21 @@ unsafeHoist nat = go
 {-# INLINABLE unsafeHoist #-}
 
 instance MFunctor (Proxy a' a b' b) where
-    hoist nat p0 = go (observe p0) where
+    hoist nat p0 = go (observe p0)
+      where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (nat (m >>= \p' -> return (go p')))
+            Pure    r      -> Pure r
+
+instance MMonad (Proxy a' a b' b) where
+    embed f = go
+      where
+        go p = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ))
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+            M          m   -> f m >>= go
             Pure    r      -> Pure r
 
 instance MonadIO m => MonadIO (Proxy a' a b' b m) where
