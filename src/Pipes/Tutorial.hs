@@ -1049,10 +1049,11 @@ quit<Enter>
     You can even use 'Enumerable' to traverse effectful types that are not even
     proper containers, like 'Control.Monad.Trans.Maybe.MaybeT':
 
-> input :: MaybeT IO Int
+> input :: MaybeT IO String
 > input = do
 >     str <- lift getLine
 >     guard (str /= "Fail")
+>     return str
 
 >>> runEffect $ every input >-> P.stdoutLn
 Test<Enter>
