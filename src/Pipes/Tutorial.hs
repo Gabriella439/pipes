@@ -438,9 +438,9 @@ import Prelude hiding ((.), id)
 
 @
  (~>) :: Monad m
-      => (a -> 'Producer' b m r)
-      -> (b -> 'Producer' c m r)
-      -> (a -> 'Producer' c m r)
+      => (a -> 'Producer' b m ())
+      -> (b -> 'Producer' c m ())
+      -> (a -> 'Producer' c m ())
  (f ~> g) x = for (f x) g
 @
 
@@ -448,9 +448,9 @@ import Prelude hiding ((.), id)
     into the following more symmetric equation:
 
 @
- f :: Monad m => a -> 'Producer' b m r
- g :: Monad m => b -> 'Producer' c m r
- h :: Monad m => c -> 'Producer' d m r
+ f :: Monad m => a -> 'Producer' b m ()
+ g :: Monad m => b -> 'Producer' c m ()
+ h :: Monad m => c -> 'Producer' d m ()
 
 \ \-\- Associativity
  (f ~> g) ~> h = f ~> (g ~> h)
