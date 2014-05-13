@@ -568,7 +568,7 @@ import Prelude hiding ((.), id)
 @
 
     One way to feed a 'Consumer' is to repeatedly feed the same input using
-    using ('>~') (pronounced \"feed\"):
+    ('>~') (pronounced \"feed\"):
 
 @
  \-\-                 +- Feed       +- Consumer to    +- Returns new
