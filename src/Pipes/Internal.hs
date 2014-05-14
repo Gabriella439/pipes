@@ -35,7 +35,8 @@ module Pipes.Internal (
     , closed
     ) where
 
-import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
+import Control.Applicative (
+    Applicative(pure, (<*>), (*>)), Alternative(empty, (<|>)) )
 import Control.Monad (MonadPlus(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
@@ -83,6 +84,7 @@ instance Monad m => Applicative (Proxy a' a b' b m) where
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure    f      -> fmap f px
+    (*>) = (>>)
 
 instance Monad m => Monad (Proxy a' a b' b m) where
     return = Pure
