@@ -194,10 +194,6 @@ repeatM m = lift m >~ cat
 > replicateM  0      x = return ()
 >
 > replicateM (m + n) x = replicateM m x >> replicateM n x  -- 0 <= {m,n}
-
-> replicateM  1      = lift
->
-> replicateM (m * n) = replicateM m >|> replicate n        -- 0 <= {m,n}
 -}
 replicateM :: Monad m => Int -> m a -> Producer' a m ()
 replicateM n m = lift m >~ take n
