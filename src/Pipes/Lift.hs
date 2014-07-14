@@ -185,7 +185,7 @@ runStateP s p = (`S.runStateT` s) $ distribute p
 
 -- | Evaluate 'S.StateT' in the base monad
 evalStateP
-    :: Monad m
+    :: (Functor m,Monad m)
     => s
     -> Proxy a' a b' b (S.StateT s m) r
     -> Proxy a' a b' b m r
@@ -194,7 +194,7 @@ evalStateP s p = fmap fst $ runStateP s p
 
 -- | Execute 'S.StateT' in the base monad
 execStateP
-    :: Monad m
+    :: (Functor m,Monad m)
     => s
     -> Proxy a' a b' b (S.StateT s m) r
     -> Proxy a' a b' b m s
@@ -232,7 +232,7 @@ runWriterP p = W.runWriterT $ distribute p
 
 -- | Execute 'W.WriterT' in the base monad
 execWriterP
-    :: (Monad m, Monoid w)
+    :: (Functor m,Monad m, Monoid w)
     => Proxy a' a b' b (W.WriterT w m) r
     -> Proxy a' a b' b m w
 execWriterP p = fmap snd $ runWriterP p
@@ -265,7 +265,7 @@ runRWSP  i s p = (\b -> RWS.runRWST b i s) $ distribute p
 
 -- | Evaluate 'RWS.RWST' in the base monad
 evalRWSP
-    :: (Monad m, Monoid w)
+    :: (Functor m,Monad m, Monoid w)
     => r
     -> s
     -> Proxy a' a b' b (RWS.RWST r w s m) d
@@ -277,7 +277,7 @@ evalRWSP i s p = fmap f $ runRWSP i s p
 
 -- | Execute 'RWS.RWST' in the base monad
 execRWSP
-    :: (Monad m, Monoid w)
+    :: (Functor m,Monad m, Monoid w)
     => r
     -> s
     -> Proxy a' a b' b (RWS.RWST r w s m) d
