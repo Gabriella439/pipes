@@ -36,7 +36,7 @@ module Pipes.Internal (
     ) where
 
 import Control.Applicative (
-    Applicative(pure, (<*>), (*>)), Alternative(empty, (<|>)) )
+    Applicative(pure, (<*>) ), Alternative(empty, (<|>)) )
 import Control.Monad (MonadPlus(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
@@ -68,23 +68,22 @@ data Proxy a' a b' b m r
     | M          (m    (Proxy a' a b' b m r))
     | Pure    r
 
-instance Monad m => Functor (Proxy a' a b' b m) where
+instance Functor m => Functor (Proxy a' a b' b m) where
     fmap f p0 = go p0 where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (m >>= \p' -> return (go p'))
+            M          m   -> M (fmap go m)
             Pure    r      -> Pure (f r)
 
-instance Monad m => Applicative (Proxy a' a b' b m) where
+instance Applicative m => Applicative (Proxy a' a b' b m) where
     pure      = Pure
     pf <*> px = go pf where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (m >>= \p' -> return (go p'))
+            M          m   -> M (fmap go m)
             Pure    f      -> fmap f px
-    (*>) = (>>)
 
 instance Monad m => Monad (Proxy a' a b' b m) where
     return = Pure
@@ -206,9 +205,15 @@ instance MonadError e m => MonadError e (Proxy a' a b' b m) where
                 p' <- m
                 return (go p') ) `catchError` (\e -> return (f e)) )
 
-instance MonadPlus m => Alternative (Proxy a' a b' b m) where
-    empty = mzero
-    (<|>) = mplus
+instance Alternative m => Alternative (Proxy a' a b' b m) where
+    empty = M empty
+    p0 <|> p1 = go p0
+      where
+        go p = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ))
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+            Pure    r      -> Pure r
+            M          m   -> M (fmap go m <|> pure p1)
 
 instance MonadPlus m => MonadPlus (Proxy a' a b' b m) where
     mzero = lift mzero

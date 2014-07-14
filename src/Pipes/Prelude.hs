@@ -760,7 +760,7 @@ zipWith f = go
 {-| Transform a 'Consumer' to a 'Pipe' that reforwards all values further
     downstream
 -}
-tee :: Monad m => Consumer a m r -> Pipe a a m r
+tee :: (Functor m,Monad m) => Consumer a m r -> Pipe a a m r
 tee p = evalStateP Nothing $ do
     r <- up >\\ (hoist lift p //> dn)
     ma <- lift get
@@ -786,7 +786,7 @@ tee p = evalStateP Nothing $ do
 >
 > generalize cat = pull
 -}
-generalize :: Monad m => Pipe a b m r -> x -> Proxy x a x b m r
+generalize :: (Functor m,Monad m) => Pipe a b m r -> x -> Proxy x a x b m r
 generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
   where
     up () = do
