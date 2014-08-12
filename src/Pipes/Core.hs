@@ -237,7 +237,7 @@ f '/>/' 'respond' = f
 ('/>/') :: 'Monad' m
       => (a -> 'Proxy' x' x b' b m a')
       -> (b -> 'Proxy' x' x c' c m b')
-      -> (a -> 'Proxy' x' x b' b m a')
+      -> (a -> 'Proxy' x' x c' c m a')
 
 \          a                   /===> b                      a
           |                  /      |                      |
