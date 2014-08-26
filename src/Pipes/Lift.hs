@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-| Many actions in base monad transformers cannot be automatically
     'Control.Monad.Trans.Class.lift'ed.  These functions lift these remaining
     actions so that they work in the 'Proxy' monad transformer.
@@ -15,6 +17,13 @@ module Pipes.Lift (
     , runErrorP
     , catchError
     , liftCatchError
+
+#if MIN_VERSION_transformers(0,4,0)
+    -- * ExceptT
+    , exceptP
+    , runExceptP
+    , catchExcept
+#endif
 
     -- * MaybeT
     , maybeP
@@ -58,6 +67,10 @@ import Pipes.Internal (Proxy(..), unsafeHoist)
 import Control.Monad.Morph (hoist, MFunctor(..))
 import Pipes.Core (runEffect, request, respond, (//>), (>\\))
 
+#if MIN_VERSION_transformers(0,4,0)
+import qualified Control.Monad.Trans.Except as Ex
+#endif
+
 -- | Distribute 'Proxy' over a monad transformer
 distribute
     ::  ( Monad m
@@ -67,9 +80,9 @@ distribute
         , Monad (t (Proxy a' a b' b m))
         )
     => Proxy a' a b' b (t m) r
-    -- ^ 
+    -- ^
     -> t (Proxy a' a b' b m) r
-    -- ^ 
+    -- ^
 distribute p =  runEffect $ request' >\\ unsafeHoist (hoist lift) p //> respond'
   where
     request' = lift . lift . request
@@ -91,18 +104,18 @@ runErrorP
     :: (Monad m, E.Error e)
     => Proxy a' a b' b (E.ErrorT e m) r
     -> Proxy a' a b' b m (Either e r)
-runErrorP    = E.runErrorT . distribute 
+runErrorP    = E.runErrorT . distribute
 {-# INLINABLE runErrorP #-}
 
 -- | Catch an error in the base monad
 catchError
-    :: (Monad m, E.Error e) 
+    :: (Monad m, E.Error e)
     => Proxy a' a b' b (E.ErrorT e m) r
     -- ^
     -> (e -> Proxy a' a b' b (E.ErrorT e m) r)
     -- ^
     -> Proxy a' a b' b (E.ErrorT e m) r
-catchError e h = errorP . E.runErrorT $ 
+catchError e h = errorP . E.runErrorT $
     E.catchError (distribute e) (distribute . h)
 {-# INLINABLE catchError #-}
 
@@ -136,6 +149,42 @@ maybeP p = do
     x <- unsafeHoist lift p
     lift $ M.MaybeT (return x)
 {-# INLINABLE maybeP #-}
+
+
+#if MIN_VERSION_transformers(0,4,0)
+
+-- | Wrap the base monad in 'Ex.ExceptT'
+exceptP
+    :: (Monad m)
+    => Proxy a' a b' b m (Either e r)
+    -> Proxy a' a b' b (Ex.ExceptT e m) r
+exceptP p = do
+    x <- unsafeHoist lift p
+    lift $ Ex.ExceptT (return x)
+{-# INLINABLE exceptP #-}
+
+-- | Run 'Ex.ExceptT' in the base monad
+runExceptP
+    :: (Monad m)
+    => Proxy a' a b' b (Ex.ExceptT e m) r
+    -> Proxy a' a b' b m (Either e r)
+runExceptP = Ex.runExceptT . distribute
+{-# INLINABLE runExceptP #-}
+
+-- | Catch an error in the base monad
+catchExcept
+    :: (Monad m)
+    => Proxy a' a b' b (Ex.ExceptT e m) r
+    -- ^
+    -> (e -> Proxy a' a b' b (Ex.ExceptT e' m) r)
+    -- ^
+    -> Proxy a' a b' b (Ex.ExceptT e' m) r
+catchExcept e h = exceptP . Ex.runExceptT $
+    Ex.catchE (distribute e) (distribute . h)
+{-# INLINABLE catchExcept #-}
+
+#endif
+
 
 -- | Run 'M.MaybeT' in the base monad
 runMaybeP
@@ -318,7 +367,7 @@ Zero is forbidden
     errors inside the 'Pipe':
 
 >  import qualified Pipes.Lift as Lift
-> 
+>
 >  caught :: Pipe Int Int (ErrorT String IO) r
 >  caught = example `Lift.catchError` \str -> do
 >      liftIO (putStrLn str)
@@ -345,7 +394,7 @@ Zero is forbidden
 > import Control.Monad (forever)
 > import Control.Monad.Trans.State.Strict
 > import Pipes
-> 
+>
 > numbers :: Monad m => Producer Int (StateT Int m) r
 > numbers = forever $ do
 >     n <- lift get
