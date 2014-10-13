@@ -1076,11 +1076,15 @@ Fail<Enter>
 
     * @pipes-safe@: Resource management and exception safety for @pipes@
 
+    * @pipes-group@: Grouping streams in constant space
+
     These libraries provide functionality specialized to common streaming
     domains.  Additionally, there are several libraries on Hackage that provide
     even higher-level functionality, which you can find by searching under the
     \"Pipes\" category or by looking for packages with a @pipes-@ prefix in
     their name.  Current examples include:
+
+    * @pipes-extras@: Miscellaneous utilities
 
     * @pipes-network@/@pipes-network-tls@: Networking
 
