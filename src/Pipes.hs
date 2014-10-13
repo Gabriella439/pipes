@@ -419,6 +419,15 @@ runListT l = runEffect (enumerate l)
 
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
     containers to 'ListT's.
+
+    Instances of 'Enumerable' must satisfy these two laws:
+
+> toListT (return r) = return r
+>
+> toListT $ do x <- m  =  do x <- toListT m
+>              f x           toListT (f x)
+
+    In other words, 'toListT' is monad morphism.
 -}
 class Enumerable t where
     toListT :: Monad m => t m a -> ListT m a

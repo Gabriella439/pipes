@@ -59,7 +59,9 @@ module Pipes.Prelude (
     -- * Folds
     -- $folds
     , fold
+    , fold'
     , foldM
+    , foldM'
     , all
     , any
     , and
@@ -557,6 +559,20 @@ fold step begin done p0 = loop p0 begin
         Pure    _     -> return (done x)
 {-# INLINABLE fold #-}
 
+{-| Strict fold of the elements of a 'Producer' that preserves the return value
+
+> Control.Foldl.purely fold' :: Monad m => Fold a b -> Producer a m r -> m (b, r)
+-}
+fold' :: Monad m => (x -> a -> x) -> x -> (x -> b) -> Producer a m r -> m (b, r)
+fold' step begin done p0 = loop p0 begin
+  where
+    loop p x = case p of
+        Request v  _  -> closed v
+        Respond a  fu -> loop (fu ()) $! step x a
+        M          m  -> m >>= \p' -> loop p' x
+        Pure    r     -> return (done x, r)
+{-# INLINABLE fold' #-}
+
 {-| Strict, monadic fold of the elements of a 'Producer'
 
 > Control.Foldl.impurely foldM :: Monad m => FoldM a b -> Producer a m () -> m b
@@ -576,6 +592,28 @@ foldM step begin done p0 = do
         M          m  -> m >>= \p' -> loop p' x
         Pure    _     -> done x
 {-# INLINABLE foldM #-}
+
+{-| Strict, monadic fold of the elements of a 'Producer'
+
+> Control.Foldl.impurely foldM' :: Monad m => FoldM a b -> Producer a m r -> m (b, r)
+-}
+foldM'
+    :: Monad m
+    => (x -> a -> m x) -> m x -> (x -> m b) -> Producer a m r -> m (b, r)
+foldM' step begin done p0 = do
+    x0 <- begin
+    loop p0 x0
+  where
+    loop p x = case p of
+        Request v  _  -> closed v
+        Respond a  fu -> do
+            x' <- step x a
+            loop (fu ()) $! x'
+        M          m  -> m >>= \p' -> loop p' x
+        Pure    r     -> do
+            b <- done x
+            return (b, r)
+{-# INLINABLE foldM' #-}
 
 {-| @(all predicate p)@ determines whether all the elements of @p@ satisfy the
     predicate.
