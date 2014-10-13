@@ -57,6 +57,7 @@ module Pipes (
 
     -- * Re-exports
     -- $reexports
+    , module Control.Monad
     , module Control.Monad.IO.Class
     , module Control.Monad.Trans.Class
     , module Control.Monad.Morph
@@ -64,6 +65,7 @@ module Pipes (
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
+import Control.Monad (void)
 import Control.Monad.Error (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad (MonadPlus(mzero, mplus))
@@ -503,6 +505,8 @@ p2 <-< p1 = p1 >-> p2
 {-# INLINABLE (<-<) #-}
 
 {- $reexports
+    "Control.Monad" re-exports 'void'
+
     "Control.Monad.IO.Class" re-exports 'MonadIO'.
 
     "Control.Monad.Trans.Class" re-exports 'MonadTrans'.
