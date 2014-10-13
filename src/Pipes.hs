@@ -414,7 +414,18 @@ instance (MonadError e m) => MonadError e (ListT m) where
 
     catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
 
--- | Run a self-contained `ListT` computation
+{-| Run a self-contained 'ListT' computation
+
+    Note: 'runListT` only accepts empty 'ListT's, to prevent accidentally
+    discarding values.  You can explicitly confirm that you want to discard the
+    value using 'mempty' or 'mzero':
+
+> example :: ListT m ()  -- `()` will not type-check as `X`
+>
+> main = runListT $ do
+>     example
+>     mzero  -- `mzero`'s return value will type-check as `X`
+-}
 runListT :: Monad m => ListT m X -> m ()
 runListT l = runEffect (enumerate l)
 {-# INLINABLE runListT #-}
