@@ -45,7 +45,7 @@ import Control.Monad.Error (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
-import Data.Monoid (mempty,mappend)
+import Data.Monoid (Monoid(mempty,mappend))
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
     an upstream and downstream interface.
@@ -112,6 +112,15 @@ p0 `_bind` f = go p0 where
     "_bind (Pure    r   ) f" forall r    f .
         _bind (Pure    r   ) f = f r;
   #-}
+
+instance (Monad m, Monoid r) => Monoid (Proxy a' a b' b m r) where
+    mempty        = Pure mempty
+    mappend p1 p2 = go p1 where
+        go p = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ))
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+            M          m   -> M (m >>= \p' -> return (go p'))
+            Pure    r1     -> fmap (mappend r1) p2
 
 instance MonadTrans (Proxy a' a b' b) where
     lift m = M (m >>= \r -> return (Pure r))
