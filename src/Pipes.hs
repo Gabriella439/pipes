@@ -413,8 +413,8 @@ instance (MonadError e m) => MonadError e (ListT m) where
     catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
 
 -- | Run a self-contained `ListT` computation
-runListT :: Monad m => ListT m X -> m ()
-runListT l = runEffect (enumerate l)
+runListT :: Monad m => ListT m a -> m ()
+runListT l = runEffect (enumerate (l >> mzero))
 {-# INLINABLE runListT #-}
 
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
