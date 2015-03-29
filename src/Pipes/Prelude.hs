@@ -81,6 +81,7 @@ module Pipes.Prelude (
     , product
     , toList
     , toListM
+    , toListM'
 
     -- * Zips
     , zip
@@ -765,6 +766,23 @@ toListM = loop
         M         m  -> m >>= loop
         Pure    _    -> return []
 {-# INLINABLE toListM #-}
+
+
+{-| Convert an effectful 'Producer' into a list, preserving the return value
+
+    Note: like 'toListM', this is not an idiomatic use of @pipes@.
+-}
+toListM' :: Monad m => Producer a m r -> m ([a],r)
+toListM' = loop
+  where
+    loop p = case p of
+        Request v _  -> closed v
+        Respond a fu -> do
+            (as,r) <- loop (fu ())
+            return ((a:as),r)
+        M       m  -> m >>= loop
+        Pure    r    -> return ([],r)
+{-# INLINABLE toListM' #-}
 
 -- | Zip two 'Producer's
 zip :: Monad m
