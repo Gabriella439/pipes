@@ -549,7 +549,7 @@ True
 
 > Control.Foldl.purely fold :: Monad m => Fold a b -> Producer a m () -> m b
 -}
-fold :: Monad m => (x -> a -> x) -> x -> (x -> b) -> Producer a m () -> m b
+fold :: Monad m => (x -> a -> x) -> x -> (x -> b) -> Producer a m r -> m b
 fold step begin done p0 = loop p0 begin
   where
     loop p x = case p of
@@ -695,12 +695,12 @@ last p0 = do
 {-# INLINABLE last #-}
 
 -- | Count the number of elements in a 'Producer'
-length :: Monad m => Producer a m () -> m Int
+length :: Monad m => Producer a m r -> m Int
 length = fold (\n _ -> n + 1) 0 id
 {-# INLINABLE length #-}
 
 -- | Find the maximum element of a 'Producer'
-maximum :: (Monad m, Ord a) => Producer a m () -> m (Maybe a)
+maximum :: (Monad m, Ord a) => Producer a m r -> m (Maybe a)
 maximum = fold step Nothing id
   where
     step x a = Just $ case x of
@@ -709,7 +709,7 @@ maximum = fold step Nothing id
 {-# INLINABLE maximum #-}
 
 -- | Find the minimum element of a 'Producer'
-minimum :: (Monad m, Ord a) => Producer a m () -> m (Maybe a)
+minimum :: (Monad m, Ord a) => Producer a m r -> m (Maybe a)
 minimum = fold step Nothing id
   where
     step x a = Just $ case x of
@@ -718,7 +718,7 @@ minimum = fold step Nothing id
 {-# INLINABLE minimum #-}
 
 -- | Determine if a 'Producer' is empty
-null :: Monad m => Producer a m () -> m Bool
+null :: Monad m => Producer a m r -> m Bool
 null p = do
     x <- next p
     return $ case x of
@@ -727,17 +727,17 @@ null p = do
 {-# INLINABLE null #-}
 
 -- | Compute the sum of the elements of a 'Producer'
-sum :: (Monad m, Num a) => Producer a m () -> m a
+sum :: (Monad m, Num a) => Producer a m r -> m a
 sum = fold (+) 0 id
 {-# INLINABLE sum #-}
 
 -- | Compute the product of the elements of a 'Producer'
-product :: (Monad m, Num a) => Producer a m () -> m a
+product :: (Monad m, Num a) => Producer a m r -> m a
 product = fold (*) 1 id
 {-# INLINABLE product #-}
 
 -- | Convert a pure 'Producer' into a list
-toList :: Producer a Identity () -> [a]
+toList :: Producer a Identity r -> [a]
 toList = loop
   where
     loop p = case p of
@@ -754,7 +754,7 @@ toList = loop
     immediately as they are generated instead of loading all elements into
     memory.
 -}
-toListM :: Monad m => Producer a m () -> m [a]
+toListM :: Monad m => Producer a m r -> m [a]
 toListM = loop
   where
     loop p = case p of
