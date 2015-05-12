@@ -755,15 +755,11 @@ toList = loop
     memory.
 -}
 toListM :: Monad m => Producer a m () -> m [a]
-toListM = loop
+toListM = fold step begin done
   where
-    loop p = case p of
-        Request v _  -> closed v
-        Respond a fu -> do
-            as <- loop (fu ())
-            return (a:as)
-        M         m  -> m >>= loop
-        Pure    _    -> return []
+    step x a = x . (a:)
+    begin = id
+    done x = x []
 {-# INLINABLE toListM #-}
 
 -- | Zip two 'Producer's
