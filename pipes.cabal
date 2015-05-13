@@ -43,7 +43,7 @@ Library
 
     HS-Source-Dirs: src
     Build-Depends:
-        base         >= 4       && < 5  ,
+        base         >= 4.4     && < 5  ,
         transformers >= 0.2.0.0 && < 0.5,
         mmorph       >= 1.0.0   && < 1.1,
         mtl          >= 2.1     && < 2.3
@@ -65,7 +65,7 @@ Benchmark prelude-benchmarks
     GHC-Options:     -O2 -Wall -rtsopts -fno-warn-unused-do-bind
 
     Build-Depends:
-        base      >= 4       && < 5  ,
+        base      >= 4.4     && < 5  ,
         criterion >= 0.6.2.1 && < 1.2,
         mtl       >= 2.1     && < 2.3,
         pipes     >= 4.0.0   && < 4.2
@@ -78,7 +78,7 @@ test-suite tests
     GHC-Options:      -Wall -rtsopts -fno-warn-missing-signatures -fno-enable-rewrite-rules
 
     Build-Depends:
-        base                       >= 4       && < 5   ,
+        base                       >= 4.4     && < 5   ,
         pipes                      >= 4.0.0   && < 4.2 ,
         QuickCheck                 >= 2.4     && < 3   ,
         mtl                        >= 2.1     && < 2.3 ,
@@ -94,7 +94,7 @@ Benchmark lift-benchmarks
     GHC-Options:     -O2 -Wall -rtsopts -fno-warn-unused-do-bind
 
     Build-Depends:
-        base         >= 4       && < 5  ,
+        base         >= 4.4     && < 5  ,
         criterion    >= 0.6.2.1 && < 1.2,
         deepseq                         ,
         mtl          >= 2.1     && < 2.3,
