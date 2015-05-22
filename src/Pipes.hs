@@ -142,6 +142,19 @@ yield = respond
 'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Consumer' x   m ()) -> 'Consumer' x   m r
 'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Pipe'     x c m ()) -> 'Pipe'     x c m r
 @
+
+>                                          b
+>                                          |
+>                                          v
+>     +-----------+                  +-----------+                 +---------------+
+>     |           |                  |           |                 |               |
+> x' <==         <== b'          x' <==         <== c'         x' <==             <== c'
+>     |     p     |        +         |    body   |        =        |  for p body   |
+> x  ==>         ==> b           x  ==>         ==> c          x  ==>             ==> c
+>     |     |     |                  |     |     |                 |       |       |
+>     +-----|-----+                  +-----|-----+                 +-------|-------+
+>           v                              v                               v
+>           a'                             b'                              a'
 -}
 for :: Monad m
     =>       Proxy x' x b' b m a'
