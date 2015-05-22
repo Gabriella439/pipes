@@ -142,6 +142,24 @@ yield = respond
 'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Consumer' x   m ()) -> 'Consumer' x   m r
 'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Pipe'     x c m ()) -> 'Pipe'     x c m r
 @
+
+    The following diagrams show the flow of information:
+
+@
+                            /===>   b
+                           /        |
+   +-----------+          /   +-----|-----+             +---------------+
+   |           |         /    |     v     |             |               |
+   |           |        /     |           |             |               |
+x ==>    p    ==> b ===/   x ==>   body  ==> c   =   x ==> 'for' p body  ==> c
+   |           |              |           |             |               |
+   |     |     |              |           |             |       |       |
+   +-----|-----+              +-----------+             +-------|-------+
+         v                                                      v
+         a'                                                     a'
+@
+
+    For a more complete diagram including upstream interfaces, see "Pipes.Core#respond-diagram".
 -}
 for :: Monad m
     =>       Proxy x' x b' b m a'
