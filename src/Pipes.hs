@@ -146,20 +146,20 @@ yield = respond
     The following diagrams show the flow of information:
 
 @
-                            /===>   b
-                           /        |
-   +-----------+          /   +-----|-----+             +---------------+
-   |           |         /    |     v     |             |               |
-   |           |        /     |           |             |               |
-x ==>    p    ==> b ===/   x ==>   body  ==> c   =   x ==> 'for' p body  ==> c
-   |           |              |           |             |               |
-   |     |     |              |           |             |       |       |
-   +-----|-----+              +-----------+             +-------|-------+
-         v                                                      v
-         a'                                                     a'
+                              .--->   b
+                             /        |
+   +-----------+            /   +-----|-----+                 +---------------+
+   |           |           /    |     v     |                 |               |
+   |           |          /     |           |                 |               |
+x ==>    p    ==> b   ---'   x ==>   body  ==> c     =     x ==> 'for' p body  ==> c
+   |           |                |           |                 |               |
+   |     |     |                |     |     |                 |       |       |
+   +-----|-----+                +-----|-----+                 +-------|-------+
+         v                            v                               v
+         r                            ()                              r
 @
 
-    For a more complete diagram including upstream interfaces, see "Pipes.Core#respond-diagram".
+    For a more complete diagram including bidirectional flow, see "Pipes.Core#respond-diagram".
 -}
 for :: Monad m
     =>       Proxy x' x b' b m a'
@@ -216,6 +216,24 @@ for = (//>)
 ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m r) -> (b -> 'Consumer' x   m ()) -> (a -> 'Consumer' x   m r)
 ('~>') :: 'Monad' m => (a -> 'Pipe'   x b m r) -> (b -> 'Pipe'     x c m ()) -> (a -> 'Pipe'     x c m r)
 @
+
+    The following diagrams show the flow of information:
+
+@
+         a                    .--->   b                              a
+         |                   /        |                              |
+   +-----|-----+            /   +-----|-----+                 +------|------+
+   |     v     |           /    |     v     |                 |      v      |
+   |           |          /     |           |                 |             |
+x ==>    f    ==> b   ---'   x ==>    g    ==> c     =     x ==>   f '~>' g  ==> c
+   |           |                |           |                 |             |
+   |     |     |                |     |     |                 |      |      |
+   +-----|-----+                +-----|-----+                 +------|------+
+         v                            v                              v
+         r                            ()                             r
+@
+
+    For a more complete diagram including bidirectional flow, see "Pipes.Core#respond-diagram".
 -}
 (~>)
     :: Monad m
@@ -274,6 +292,24 @@ await = request ()
 ('>~') :: 'Monad' m => 'Producer'   y m b -> 'Pipe'     b y m c -> 'Producer'   y m c
 ('>~') :: 'Monad' m => 'Pipe'     a y m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
 @
+
+    The following diagrams show the flow of information:
+
+@
+
+
+   +-----------+                 +-----------+                 +-------------+
+   |           |                 |           |                 |             |
+   |           |                 |           |                 |             |
+a ==>    f    ==> y   .--->   b ==>    g    ==> y     =     a ==>   f '>~' g  ==> y
+   |           |     /           |           |                 |             |
+   |     |     |    /            |     |     |                 |      |      |
+   +-----|-----+   /             +-----|-----+                 +------|------+
+         v        /                    v                              v
+         b   ----'                     c                              c
+@
+
+    For a more complete diagram including bidirectional flow, see "Pipes.Core#request-diagram".
 -}
 (>~)
     :: Monad m
@@ -327,6 +363,24 @@ cat = pull ()
 ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
 ('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
 @
+
+    The following diagrams show the flow of information:
+
+@
+
+
+   +-----------+     +-----------+                 +-------------+
+   |           |     |           |                 |             |
+   |           |     |           |                 |             |
+a ==>    f    ==> b ==>    g    ==> c     =     a ==>  f '>->' g  ==> c
+   |           |     |           |                 |             |
+   |     |     |     |     |     |                 |      |      |
+   +-----|-----+     +-----|-----+                 +------|------+
+         v                 v                              v
+         r                 r                              r
+@
+
+    For a more complete diagram including bidirectional flow, see "Pipes.Core#pull-diagram".
 -}
 (>->)
     :: Monad m

@@ -350,6 +350,8 @@ f '\>\' 'request' = f
 (f '\>\' g) '\>\' h = f '\>\' (g '\>\' h)
 @
 
+#request-diagram#
+
     The following diagrams show the flow of information:
 
 @
@@ -379,6 +381,23 @@ f '\>\' 'request' = f
      |    v    |     \\        |    v    |            |    v    |
  a' <==       <== y'  \\== b' <==       <== y'    a' <==       <== y'
      |    f    |              |    g    |     =      | f '\>\' g |
+ a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
+     |    |    |     /        |    |    |            |    |    |
+     +----|----+    /         +----|----+            +----|----+
+          v        /               v                      v
+          b ======/                c                      c
+
+('>\\') :: Monad m
+      => (b' -> Proxy a' a y' y m b)
+      -> Proxy b' b y' y m c
+      -> Proxy a' a y' y m c
+
+\          b'<=====\\
+          |        \\
+     +----|----+    \\         +---------+            +---------+
+     |    v    |     \\        |         |            |         |
+ a' <==       <== y'  \\== b' <==       <== y'    a' <==       <== y'
+     |    f    |              |    g    |     =      | f '>\\' g |
  a  ==>       ==> y   /=> b  ==>       ==> y     a  ==>       ==> y
      |    |    |     /        |    |    |            |    |    |
      +----|----+    /         +----|----+            +----|----+
@@ -570,6 +589,8 @@ f '>+>' 'pull' = f
 \-\- Associativity
 (f '>+>' g) '>+>' h = f '>+>' (g '>+>' h)
 @
+
+#pull-diagram#
 
     The following diagrams show the flow of information:
 
