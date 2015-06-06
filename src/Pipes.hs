@@ -130,7 +130,7 @@ f '~>' 'yield' = f
 'yield' :: 'Monad' m => a -> 'Pipe' x a m ()
 @
 -}
-yield :: Monad m => a -> Producer' a m ()
+yield :: a -> Producer' a m ()
 yield = respond
 {-# INLINABLE yield #-}
 
@@ -280,7 +280,7 @@ f '>~' 'await' = f
 'await' :: 'Monad' m => 'Pipe' a y m a
 @
 -}
-await :: Monad m => Consumer' a m a
+await :: Consumer' a m a
 await = request ()
 {-# INLINABLE await #-}
 
@@ -351,7 +351,7 @@ f '>->' 'cat' = f
 -}
 
 -- | The identity 'Pipe', analogous to the Unix @cat@ program
-cat :: Monad m => Pipe a a m r
+cat :: Pipe a a m r
 cat = pull ()
 {-# INLINABLE cat #-}
 

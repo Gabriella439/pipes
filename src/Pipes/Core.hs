@@ -278,7 +278,7 @@ f '/>/' 'respond' = f
 
     'respond' is the identity of the respond category.
 -}
-respond :: Monad m => a -> Proxy x' x a' a m a'
+respond :: a -> Proxy x' x a' a m a'
 respond a = Respond a Pure
 {-# INLINABLE respond #-}
 
@@ -410,7 +410,7 @@ f '\>\' 'request' = f
 
     'request' is the identity of the request category.
 -}
-request :: Monad m => a' -> Proxy a' a y' y m a
+request :: a' -> Proxy a' a y' y m a
 request a' = Request a' Pure
 {-# INLINABLE request #-}
 
@@ -528,7 +528,7 @@ f '>~>' 'push' = f
 
     'push' is the identity of the push category.
 -}
-push :: Monad m => a -> Proxy a' a a' a m r
+push :: a -> Proxy a' a a' a m r
 push = go
   where
     go a = Respond a (\a' -> Request a' go)
@@ -638,7 +638,7 @@ f '>+>' 'pull' = f
 
     'pull' is the identity of the pull category.
 -}
-pull :: Monad m => a' -> Proxy a' a a' a m r
+pull :: a' -> Proxy a' a a' a m r
 pull = go
   where
     go a' = Request a' (\a -> Respond a go)
