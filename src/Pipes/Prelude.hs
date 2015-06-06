@@ -55,6 +55,7 @@ module Pipes.Prelude (
     , chain
     , read
     , show
+    , seq
 
     -- * Folds
     -- $folds
@@ -128,6 +129,7 @@ import Prelude hiding (
     , readLn
     , sequence
     , show
+    , seq
     , sum
     , take
     , takeWhile
@@ -531,6 +533,11 @@ read = for cat $ \str -> case (reads str) of
 show :: (Monad m, Show a) => Pipe a String m r
 show = map Prelude.show
 {-# INLINABLE show #-}
+
+-- | Evaluate all values flowing downstream to WHNF
+seq :: Monad m => Pipe a a m r
+seq = for cat $ \a -> yield $! a
+{-# INLINABLE seq #-}
 
 {- $folds
     Use these to fold the output of a 'Producer'.  Many of these folds will stop
