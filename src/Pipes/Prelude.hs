@@ -405,6 +405,25 @@ takeWhile predicate = go
             else return ()
 {-# INLINABLE takeWhile #-}
 
+{-| @(takeWhile' p)@ is a version of takeWhile that returns the value failing
+    the predicate.
+
+> takeWhile' (pure True) = cat
+>
+> takeWhile' (liftA2 (&&) p1 p2) = takeWhile' p1 >-> takeWhile' p2
+-}
+takeWhile' :: Monad m => (a -> Bool) -> Pipe a a m a
+takeWhile' predicate = go
+  where
+    go = do
+        a <- await
+        if (predicate a)
+            then do
+                yield a
+                go
+            else return a
+{-# INLINABLE takeWhile' #-}
+
 {-| @(drop n)@ discards @n@ values going downstream
 
 > drop 0 = cat
