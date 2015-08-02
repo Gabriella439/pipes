@@ -46,6 +46,7 @@ module Pipes.Prelude (
     , filterM
     , take
     , takeWhile
+    , takeWhile'
     , drop
     , dropWhile
     , concat
