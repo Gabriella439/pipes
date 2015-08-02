@@ -237,9 +237,7 @@ stdoutLn = go
            Right () -> go
 {-# INLINABLE stdoutLn #-}
 
-{-| Consume all values using a monadic function
-
--}
+-- | Consume all values using a monadic function
 mapM_ :: Monad m => (a -> m ()) -> Consumer' a m r
 mapM_ f = for cat (\a -> lift (f a))
 {-# INLINABLE mapM_ #-}
