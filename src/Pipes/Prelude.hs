@@ -31,6 +31,7 @@ module Pipes.Prelude (
     -- * Consumers
     -- $consumers
     , stdoutLn
+    , mapM_
     , print
     , toHandle
     , drain
@@ -118,6 +119,7 @@ import Prelude hiding (
     , length
     , map
     , mapM
+    , mapM_
     , maximum
     , minimum
     , notElem
@@ -233,6 +235,18 @@ stdoutLn = go
            Left  e  -> liftIO (throwIO e)
            Right () -> go
 {-# INLINABLE stdoutLn #-}
+
+{-| Consume all values using a monadic function
+
+-}
+mapM_ :: Monad m => (a -> m ()) -> Consumer' a m r
+mapM_ f = for cat (\a -> lift (f a))
+{-# INLINABLE mapM_ #-}
+
+{-# RULES
+    "p >-> mapM_ f" forall p f .
+        p >-> mapM_ f = for p (\a -> lift (f a))
+  #-}
 
 -- | 'print' values to 'IO.stdout'
 print :: (MonadIO m, Show a) => Consumer' a m r
