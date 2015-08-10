@@ -64,6 +64,7 @@ module Pipes (
     ) where
 
 import Control.Monad (void)
+import Control.Monad.Catch (MonadThrow(..), MonadCatch(..), MonadMask(..))
 import Control.Monad.Except (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad (MonadPlus(mzero, mplus))
@@ -509,6 +510,13 @@ instance (MonadError e m) => MonadError e (ListT m) where
     throwError e = lift (throwError e)
 
     catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
+instance MonadThrow m => MonadThrow (ListT m) where
+    throwM = Select . throwM
+    {-# INLINE throwM #-}
+
+instance MonadCatch m => MonadCatch (ListT m) where
+    catch l k = Select (catch (enumerate l) (\e -> enumerate (k e)))
+    {-# INLINE catch #-}
 
 -- | Run a self-contained `ListT` computation
 runListT :: Monad m => ListT m a -> m ()
