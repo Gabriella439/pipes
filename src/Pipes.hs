@@ -89,7 +89,7 @@ import Data.Monoid
 #endif
 
 -- Re-exports
-import Control.Monad.Morph (MFunctor(hoist))
+import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
 
 infixl 4 <~
 infixr 4 ~>
@@ -461,6 +461,9 @@ instance (Monad m) => MonadPlus (ListT m) where
 
 instance MFunctor ListT where
     hoist morph = Select . hoist morph . enumerate
+instance MMonad ListT where
+    embed f m = Select (enumerate (embed f m))
+    {-# INLINE embed #-}
 
 instance (Monad m) => Monoid (ListT m a) where
     mempty = empty
