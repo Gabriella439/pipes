@@ -75,6 +75,7 @@ import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.Writer (MonadWriter(..))
+import Control.Monad.Zip (MonadZip(..))
 import Data.Semigroup (Semigroup(..))
 import Pipes.Core
 import Pipes.Internal (Proxy(..))
@@ -524,6 +525,21 @@ instance MonadThrow m => MonadThrow (ListT m) where
 instance MonadCatch m => MonadCatch (ListT m) where
     catch l k = Select (catch (enumerate l) (\e -> enumerate (k e)))
     {-# INLINE catch #-}
+
+instance Monad m => MonadZip (ListT m) where
+    mzipWith f = go
+      where
+        go xs ys = Select $ do
+            xres <- lift $ next (enumerate xs)
+            case xres of
+                Left r -> return r
+                Right (x, xnext) -> do
+                    yres <- lift $ next (enumerate ys)
+                    case yres of
+                        Left r -> return r
+                        Right (y, ynext) -> do
+                            yield (f x y)
+                            enumerate (go (Select xnext) (Select ynext))
 
 -- | Run a self-contained `ListT` computation
 runListT :: Monad m => ListT m a -> m ()
