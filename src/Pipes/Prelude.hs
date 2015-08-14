@@ -27,6 +27,7 @@ module Pipes.Prelude (
     , fromHandle
     , repeatM
     , replicateM
+    , unfoldr
 
     -- * Consumers
     -- $consumers
@@ -900,3 +901,19 @@ generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
         x <- respond a
         lift $ put x
 {-# INLINABLE generalize #-}
+
+{-| The natural unfold into a 'Producer' with a step function and a seed 
+
+> unfoldr next = id
+-}
+unfoldr :: Monad m 
+        => (s -> m (Either r (a, s))) -> s -> Producer a m r
+unfoldr step = loop where
+  loop s0 = do 
+    e <- lift (step s0)
+    case e of
+      Left r -> return r
+      Right (a,s) -> do 
+        yield a
+        loop s
+{-# INLINABLE unfoldr #-}
