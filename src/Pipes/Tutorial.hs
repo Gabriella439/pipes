@@ -83,6 +83,9 @@ module Pipes.Tutorial (
 
     -- * Appendix: Time Complexity
     -- $timecomplexity
+
+    -- * Copyright
+    -- $copyright
     ) where
 
 import Control.Category
@@ -1510,4 +1513,9 @@ Fail<Enter>
 > linear n = lowerCodensity $ replicateM n $ lift await
 
     This will produce the exact same result, but in linear time.
+-}
+
+{- $copyright
+    This tutorial is licensed under a
+    <http://creativecommons.org/licenses/by/4.0/ Creative Commons Attribution 4.0 International License>
 -}
