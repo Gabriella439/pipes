@@ -96,7 +96,7 @@ Benchmark lift-benchmarks
     Build-Depends:
         base         >= 4.4     && < 5  ,
         criterion    >= 0.6.2.1 && < 1.2,
-        deepseq                         ,
+        deepseq      >= 1.4.0.0         ,
         mtl          >= 2.1     && < 2.3,
         pipes        >= 4.0.0   && < 4.2,
         transformers >= 0.2.0.0 && < 0.5

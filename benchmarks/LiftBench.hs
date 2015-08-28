@@ -14,8 +14,6 @@ import Pipes.Lift
 defaultMax :: Int
 defaultMax = 10000
 
-instance NFData a => NFData (Sum a)
-
 main :: IO ()
 main = commonMain defaultMax liftBenchmarks
 
