@@ -967,6 +967,104 @@ quit<Enter>
     Notice how this streams out values immediately as they are generated, rather
     than building up a large intermediate result and then printing all the
     values in one batch at the end.
+
+    `ListT` computations can be combined in more ways than `Pipe`s, so try to
+    program in `ListT` as much as possible and defer converting it to a `Pipe`
+    as late as possible using `P.loop`.
+
+    You can combine `ListT` computations even if their inputs and outputs are
+    completely different:
+
+> data In
+>     = InA A
+>     | InB B
+>     | InC C
+>
+> data Out
+>     = OutE E
+>     | OutF F
+>     | OutG G
+>
+> -- Independent computations
+>
+> example1 :: A -> ListT IO D
+> example2 :: B -> ListT IO E
+> example3 :: C -> ListT IO F
+>
+> -- Combined computation
+>
+> total :: In -> ListT IO Out
+> total input = case input of
+>     InA a -> fmap OutD (example1 a)
+>     InB b -> fmap OutE (example2 b)
+>     InC c -> fmap OutF (example3 c)
+
+    Sometimes you have multiple computations that handle different inputs but
+    the same output, in which case you don't need to unify their outputs:
+
+> -- Overlapping outputs
+>
+> example1 :: A -> ListT IO Out
+> example2 :: B -> ListT IO Out
+> example3 :: C -> ListT IO Out
+>
+> -- Combined computation
+>
+> total :: In -> ListT IO Out
+> total input = case input of
+>     InA a -> example1 a
+>     InB b -> example2 b
+>     InC c -> example3 c
+
+    Other times you have multiple computations that handle the same input but
+    produce different outputs.  You can unify their outputs using the `Monoid`
+    and `Functor` instances for `ListT`:
+
+> -- Overlapping inputs
+>
+> example1 :: In -> ListT IO A
+> example2 :: In -> ListT IO B
+> example3 :: In -> ListT IO C
+>
+> -- Combined computation
+>
+> total :: In -> ListT IO Out
+> total input =
+>        fmap OutA (example1 input)
+>     <> fmap OutB (example2 input)
+>     <> fmap OutC (example3 input)
+
+    You can also chain `ListT` computations, feeding the output of the first
+    computation as the input to the next computation:
+
+> -- End-to-end
+>
+> aToB :: A -> ListT IO B
+> bToC :: B -> ListT IO C
+>
+> -- Combined computation
+>
+> aToC :: A -> LIstT IO C
+> aToC = aToB >=> bToC
+
+    ... or you can just use @do@ notation if you prefer.
+
+    However, the `Pipe` type is more general than `ListT` and can represent
+    things like termination.  Therefore you should consider mixing `Pipe`s with
+    `ListT` when you need to take advantage of these extra features:
+
+> -- Mix ListT with Pipes
+>
+> example :: In -> ListT IO Out
+>
+> pipe :: Pipe In Out IO ()
+> pipe = Pipes.takeWhile (not . isC) >-> loop example
+>   where
+>     isC (InC _) = True
+>     isC  _      = False
+
+    So promote your `ListT` logic to a `Pipe` when you need to take advantage of
+    these `Pipe`-specific features.
 -}
 
 {- $tricks

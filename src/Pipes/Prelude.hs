@@ -61,6 +61,9 @@ module Pipes.Prelude (
     , show
     , seq
 
+    -- *ListT
+    , loop
+
     -- * Folds
     -- $folds
     , fold
@@ -587,6 +590,16 @@ show = map Prelude.show
 seq :: Monad m => Pipe a a m r
 seq = for cat $ \a -> yield $! a
 {-# INLINABLE seq #-}
+
+{-| Create a `Pipe` from a `ListT` transformation
+
+> loop (k1 >=> k2) = loop k1 >-> loop k2
+>
+> loop return = cat
+-}
+loop :: Monad m => (a -> ListT m b) -> Pipe a b m r
+loop k = for cat (every . k)
+{-# INLINABLE loop #-}
 
 {- $folds
     Use these to fold the output of a 'Producer'.  Many of these folds will stop
