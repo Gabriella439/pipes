@@ -61,6 +61,9 @@ module Pipes.Prelude (
     , show
     , seq
 
+    -- *ListT
+    , loop
+
     -- * Folds
     -- $folds
     , fold
@@ -501,12 +504,12 @@ elemIndices a = findIndices (a ==)
 
 -- | Outputs the indices of all elements that satisfied the predicate
 findIndices :: Monad m => (a -> Bool) -> Pipe a Int m r
-findIndices predicate = loop 0
+findIndices predicate = go 0
   where
-    loop n = do
+    go n = do
         a <- await
         when (predicate a) (yield n)
-        loop $! n + 1
+        go $! n + 1
 {-# INLINABLE findIndices #-}
 
 {-| Strict left scan
@@ -514,13 +517,13 @@ findIndices predicate = loop 0
 > Control.Foldl.purely scan :: Monad m => Fold a b -> Pipe a b m r
 -}
 scan :: Monad m => (x -> a -> x) -> x -> (x -> b) -> Pipe a b m r
-scan step begin done = loop begin
+scan step begin done = go begin
   where
-    loop x = do
+    go x = do
         yield (done x)
         a <- await
         let x' = step x a
-        loop $! x'
+        go $! x'
 {-# INLINABLE scan #-}
 
 {-| Strict, monadic left scan
@@ -530,14 +533,14 @@ scan step begin done = loop begin
 scanM :: Monad m => (x -> a -> m x) -> m x -> (x -> m b) -> Pipe a b m r
 scanM step begin done = do
     x <- lift begin
-    loop x
+    go x
   where
-    loop x = do
+    go x = do
         b <- lift (done x)
         yield b
         a  <- await
         x' <- lift (step x a)
-        loop $! x'
+        go $! x'
 {-# INLINABLE scanM #-}
 
 {-| Apply an action to all values flowing downstream
@@ -588,6 +591,16 @@ seq :: Monad m => Pipe a a m r
 seq = for cat $ \a -> yield $! a
 {-# INLINABLE seq #-}
 
+{-| Create a `Pipe` from a `ListT` transformation
+
+> loop (k1 >=> k2) = loop k1 >-> loop k2
+>
+> loop return = cat
+-}
+loop :: Monad m => (a -> ListT m b) -> Pipe a b m r
+loop k = for cat (every . k)
+{-# INLINABLE loop #-}
+
 {- $folds
     Use these to fold the output of a 'Producer'.  Many of these folds will stop
     drawing elements if they can compute their result early, like 'any':
@@ -606,12 +619,12 @@ True
 > Control.Foldl.purely fold :: Monad m => Fold a b -> Producer a m () -> m b
 -}
 fold :: Monad m => (x -> a -> x) -> x -> (x -> b) -> Producer a m () -> m b
-fold step begin done p0 = loop p0 begin
+fold step begin done p0 = go p0 begin
   where
-    loop p x = case p of
+    go p x = case p of
         Request v  _  -> closed v
-        Respond a  fu -> loop (fu ()) $! step x a
-        M          m  -> m >>= \p' -> loop p' x
+        Respond a  fu -> go (fu ()) $! step x a
+        M          m  -> m >>= \p' -> go p' x
         Pure    _     -> return (done x)
 {-# INLINABLE fold #-}
 
@@ -620,12 +633,12 @@ fold step begin done p0 = loop p0 begin
 > Control.Foldl.purely fold' :: Monad m => Fold a b -> Producer a m r -> m (b, r)
 -}
 fold' :: Monad m => (x -> a -> x) -> x -> (x -> b) -> Producer a m r -> m (b, r)
-fold' step begin done p0 = loop p0 begin
+fold' step begin done p0 = go p0 begin
   where
-    loop p x = case p of
+    go p x = case p of
         Request v  _  -> closed v
-        Respond a  fu -> loop (fu ()) $! step x a
-        M          m  -> m >>= \p' -> loop p' x
+        Respond a  fu -> go (fu ()) $! step x a
+        M          m  -> m >>= \p' -> go p' x
         Pure    r     -> return (done x, r)
 {-# INLINABLE fold' #-}
 
@@ -638,14 +651,14 @@ foldM
     => (x -> a -> m x) -> m x -> (x -> m b) -> Producer a m () -> m b
 foldM step begin done p0 = do
     x0 <- begin
-    loop p0 x0
+    go p0 x0
   where
-    loop p x = case p of
+    go p x = case p of
         Request v  _  -> closed v
         Respond a  fu -> do
             x' <- step x a
-            loop (fu ()) $! x'
-        M          m  -> m >>= \p' -> loop p' x
+            go (fu ()) $! x'
+        M          m  -> m >>= \p' -> go p' x
         Pure    _     -> done x
 {-# INLINABLE foldM #-}
 
@@ -658,14 +671,14 @@ foldM'
     => (x -> a -> m x) -> m x -> (x -> m b) -> Producer a m r -> m (b, r)
 foldM' step begin done p0 = do
     x0 <- begin
-    loop p0 x0
+    go p0 x0
   where
-    loop p x = case p of
+    go p x = case p of
         Request v  _  -> closed v
         Respond a  fu -> do
             x' <- step x a
-            loop (fu ()) $! x'
-        M          m  -> m >>= \p' -> loop p' x
+            go (fu ()) $! x'
+        M          m  -> m >>= \p' -> go p' x
         Pure    r     -> do
             b <- done x
             return (b, r)
@@ -741,13 +754,13 @@ last p0 = do
     x <- next p0
     case x of
         Left   _      -> return Nothing
-        Right (a, p') -> loop a p'
+        Right (a, p') -> go a p'
   where
-    loop a p = do
+    go a p = do
         x <- next p
         case x of
             Left   _       -> return (Just a)
-            Right (a', p') -> loop a' p'
+            Right (a', p') -> go a' p'
 {-# INLINABLE last #-}
 
 -- | Count the number of elements in a 'Producer'
@@ -794,12 +807,12 @@ product = fold (*) 1 id
 
 -- | Convert a pure 'Producer' into a list
 toList :: Producer a Identity () -> [a]
-toList = loop
+toList = go
   where
-    loop p = case p of
+    go p = case p of
         Request v _  -> closed v
-        Respond a fu -> a:loop (fu ())
-        M         m  -> loop (runIdentity m)
+        Respond a fu -> a:go (fu ())
+        M         m  -> go (runIdentity m)
         Pure    _    -> []
 {-# INLINABLE toList #-}
 
@@ -908,12 +921,12 @@ generalize p x0 = evalStateP x0 $ up >\\ hoist lift p //> dn
 -}
 unfoldr :: Monad m 
         => (s -> m (Either r (a, s))) -> s -> Producer a m r
-unfoldr step = loop where
-  loop s0 = do 
+unfoldr step = go where
+  go s0 = do
     e <- lift (step s0)
     case e of
       Left r -> return r
       Right (a,s) -> do 
         yield a
-        loop s
+        go s
 {-# INLINABLE unfoldr #-}
