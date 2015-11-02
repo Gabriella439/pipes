@@ -414,9 +414,12 @@ filterM predicate = for cat $ \a -> do
 > take (min m n) = take m >-> take n
 -}
 take :: Monad m => Int -> Pipe a a m ()
-take n = replicateM_ n $ do
+take = loop where
+  loop 0 = return () 
+  loop n = do 
     a <- await
     yield a
+    loop (n-1)
 {-# INLINABLE take #-}
 
 {-| @(takeWhile p)@ allows values to pass downstream so long as they satisfy
@@ -464,9 +467,12 @@ takeWhile' predicate = go
 > drop (m + n) = drop m >-> drop n
 -}
 drop :: Monad m => Int -> Pipe a a m r
-drop n = do
-    replicateM_ n await
-    cat
+drop = loop
+  where
+    loop 0 = cat
+    loop n =  do
+      await
+      loop (n-1)
 {-# INLINABLE drop #-}
 
 {-| @(dropWhile p)@ discards values going downstream until one violates the
