@@ -1,4 +1,4 @@
-# Pipes v4.1.6
+# Pipes v4.1.7
 
 `pipes` is a clean and powerful stream processing library that lets you build
 and connect reusable streaming components.
@@ -25,7 +25,7 @@ Then fire up `ghci`:
     Prelude P> -- Done!
 
 To learn more, read the
-[pipes tutorial](http://hackage.haskell.org/packages/archive/pipes/4.1.0/doc/html/Pipes-Tutorial.html).
+[pipes tutorial](http://hackage.haskell.org/package/pipes/docs/Pipes-Tutorial.html).
 
 ## Features
 
