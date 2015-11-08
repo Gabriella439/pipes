@@ -296,8 +296,6 @@ await = request ()
     The following diagrams show the flow of information:
 
 @
-
-
    +-----------+                 +-----------+                 +-------------+
    |           |                 |           |                 |             |
    |           |                 |           |                 |             |
@@ -367,8 +365,6 @@ cat = pull ()
     The following diagrams show the flow of information:
 
 @
-
-
    +-----------+     +-----------+                 +-------------+
    |           |     |           |                 |             |
    |           |     |           |                 |             |
@@ -585,5 +581,5 @@ p2 <-< p1 = p1 >-> p2
 
     "Control.Monad.Morph" re-exports 'MFunctor'.
 
-    "Data.Foldable" re-exports 'Foldable' (the class name only)
+    "Data.Foldable" re-exports 'Foldable' (the class name only).
 -}

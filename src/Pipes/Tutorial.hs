@@ -1218,7 +1218,7 @@ Fail<Enter>
 
 {- $types
     @pipes@ uses parametric polymorphism (i.e. generics) to overload all
-    operations.  You've probably noticed this overloading already::
+    operations.  You've probably noticed this overloading already:
 
     * 'yield' works within both 'Producer's and 'Pipe's
 
