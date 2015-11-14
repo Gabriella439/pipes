@@ -1,0 +1,76 @@
+4.1.7
+
+* Increase lower bound on `deepseq`
+* Add `unfoldr`
+* Add `loop`
+* Add `toListM'`
+* Improve efficiency of `drop`
+* License tutorial under Creative Commons license
+
+4.1.6
+
+* Increase lower bound on `base`
+* Add diagrams to `Pipes.Core` documentation
+* Add `mapM_`
+* Add `takeWhile'`
+* Add `seq`
+* Improve efficiency of `toListM`
+
+4.1.5
+
+* Increase upper bound on `criterion`
+
+4.1.4
+
+* Increase upper bound on `criterion`
+* Add `Monoid` instance for `Proxy`
+
+4.1.3
+
+* Increase lower bound on `mtl`
+* Re-export `void`
+* Add `fold'`
+* Add `foldM'`
+
+4.1.2
+
+* Increase upper bounds on `transformers` and `mtl`
+
+4.1.1
+
+* Add `runListT`
+* Add `MMonad` instance for `Proxy`
+* Add `repeatM`
+* Add laws to documentation of `Pipes.Prelude` utilities
+
+4.1.0
+
+* Remove Haskell98 support
+* Use internal `X` type instead of `Data.Void`
+* Document `Pipes.Lift` module:w
+* Add `drain`
+* Add `sequence`
+
+4.0.2
+
+* Improve performance of `each`
+* Add tutorial appendix explaining how to work around quadratic time complexity
+
+4.0.1
+
+* Remove `WriterT` and `RWST` benchmarks
+* Add `Enumerable` instance for `ErrorT`
+* Add cabal flag for Haskell98 compilation
+* Add several rewrite rules
+* Add `mtl` instances for `ListT`
+* Fix implementation of `pass`, which did not satisfy `Writer` laws
+* Implement `fail` for `ListT`
+* Add type synonym table to tutorial appendix
+* Add QuickCheck tests for `pipes` laws
+* Add `mapFoldable`
+* Add `Monoid` instance for `ListT`
+* Add manual proofs of `pipes` laws in `laws.md`
+
+4.0.0
+
+Major upgrade of `pipes` to no longer use `Proxy` type class
