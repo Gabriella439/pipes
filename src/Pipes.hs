@@ -408,7 +408,7 @@ instance (Monad m) => Applicative (ListT m) where
         yield (f x) ) ) )
 
 instance (Monad m) => Monad (ListT m) where
-    return a = Select (yield a)
+    return   = pure
     m >>= f  = Select (for (enumerate m) (\a -> enumerate (f a)))
     fail _   = mzero
 

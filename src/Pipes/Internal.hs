@@ -84,10 +84,10 @@ instance Monad m => Applicative (Proxy a' a b' b m) where
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (m >>= \p' -> return (go p'))
             Pure    f      -> fmap f px
-    (*>) = (>>)
+    m *> k = m >>= (\_ -> k)
 
 instance Monad m => Monad (Proxy a' a b' b m) where
-    return = Pure
+    return = pure
     (>>=)  = _bind
 
 _bind
