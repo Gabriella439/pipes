@@ -981,9 +981,9 @@ quit<Enter>
 >     | InC C
 >
 > data Out
->     = OutE E
+>     = OutD D
+>     | OutE E
 >     | OutF F
->     | OutG G
 >
 > -- Independent computations
 >
@@ -1022,17 +1022,17 @@ quit<Enter>
 
 > -- Overlapping inputs
 >
-> example1 :: In -> ListT IO A
-> example2 :: In -> ListT IO B
-> example3 :: In -> ListT IO C
+> example1 :: In -> ListT IO D
+> example2 :: In -> ListT IO E
+> example3 :: In -> ListT IO F
 >
 > -- Combined computation
 >
 > total :: In -> ListT IO Out
 > total input =
->        fmap OutA (example1 input)
->     <> fmap OutB (example2 input)
->     <> fmap OutC (example3 input)
+>        fmap OutD (example1 input)
+>     <> fmap OutE (example2 input)
+>     <> fmap OutF (example3 input)
 
     You can also chain `ListT` computations, feeding the output of the first
     computation as the input to the next computation:
