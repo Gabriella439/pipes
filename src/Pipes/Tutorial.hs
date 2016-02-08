@@ -373,45 +373,49 @@ import Prelude hiding ((.), id)
 
 {- $composability
     You might wonder why the body of a 'for' loop can be a 'Producer'.  Let's
-    test out this feature by defining a new loop body that @duplicate@s every
-    value:
+    test out this feature by defining a new loop body that creates three copies
+    of every value:
 
 > -- nested.hs
 >
 > import Pipes
 > import qualified Pipes.Prelude as P  -- Pipes.Prelude already has 'stdinLn'
 > 
-> duplicate :: Monad m => a -> Producer a m ()
-> duplicate x = do
+> triple :: Monad m => a -> Producer a m ()
+> triple x = do
+>     yield x
 >     yield x
 >     yield x
 >
 > loop :: Producer String IO ()
-> loop = for P.stdinLn duplicate
+> loop = for P.stdinLn triple
 >
 > -- This is the exact same as:
 > --
 > -- loop = for P.stdinLn $ \x -> do
 > --     yield x
 > --     yield x
+> --     yield x
 
     This time our @loop@ is a 'Producer' that outputs 'String's, specifically
-    two copies of each line that we read from standard input.  Since @loop@ is a
-    'Producer' we cannot run it because there is still unhandled output.
-    However, we can use yet another 'for' to handle this new duplicated stream:
+    three copies of each line that we read from standard input.  Since @loop@ is
+    a 'Producer' we cannot run it because there is still unhandled output.
+    However, we can use yet another 'for' to handle this new repeated stream:
 
 > -- nested.hs
 >
 > main = runEffect $ for loop (lift . putStrLn)
 
     This creates a program which echoes every line from standard input to
-    standard output twice:
+    standard output three times:
 
 > $ ./nested
 > Test<Enter>
 > Test
 > Test
+> Test
 > ABC<Enter>
+> ABC
 > ABC
 > ABC
 > <Ctrl-D>
@@ -422,7 +426,7 @@ import Prelude hiding ((.), id)
 
 > main = runEffect $
 >     for P.stdinLn $ \str1 ->
->         for (duplicate str1) $ \str2 ->
+>         for (triple str1) $ \str2 ->
 >             lift $ putStrLn str2
 
     Yes, we could have!  In fact, this is a special case of the following
@@ -430,7 +434,7 @@ import Prelude hiding ((.), id)
 
 @
  \-\- s :: Monad m =>      'Producer' a m ()  -- i.e. \'P.stdinLn\'
- \-\- f :: Monad m => a -> 'Producer' b m ()  -- i.e. \'duplicate\'
+ \-\- f :: Monad m => a -> 'Producer' b m ()  -- i.e. \'triple\'
  \-\- g :: Monad m => b -> 'Producer' c m ()  -- i.e. \'(lift . putStrLn)\'
 
 \ for (for s f) g = for s (\\x -> for (f x) g)
@@ -501,7 +505,7 @@ import Prelude hiding ((.), id)
     our original code into the following more succinct form that composes two
     transformations:
 
-> main = runEffect $ for P.stdinLn (duplicate ~> lift . putStrLn)
+> main = runEffect $ for P.stdinLn (triple ~> lift . putStrLn)
 
     This means that we can also choose to program in a more functional style and
     think of stream processing in terms of composing transformations using
