@@ -554,7 +554,7 @@ push = go
 (fa >~> fb) a = fa a >>~ fb
 {-# INLINABLE (>~>) #-}
 
-{-| @(p >>~ f)@ pairs each 'respond' in @p@ with an 'request' in @f@.
+{-| @(p >>~ f)@ pairs each 'respond' in @p@ with a 'request' in @f@.
 
     Point-ful version of ('>~>')
 -}
