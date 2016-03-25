@@ -41,6 +41,8 @@
     learn about by reading either:
 
     * the paper \"Monad Transformers - Step by Step\",
+    
+    * part III \"Monads in the Real World\" of the tutorial \"All About Monads\",
 
     * chapter 18 of \"Real World Haskell\" on monad transformers, or:
 
