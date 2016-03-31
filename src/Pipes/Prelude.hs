@@ -196,7 +196,7 @@ fromHandle h = go
 -- | Repeat a monadic action indefinitely, 'yield'ing each result
 repeatM :: Monad m => m a -> Producer' a m r
 repeatM m = lift m >~ cat
-{-# INLINABLE repeatM #-}
+{-# INLINABLE [1] repeatM #-}
 
 {-# RULES
   "repeatM m >-> p" forall m p . repeatM m >-> p = lift m >~ p
@@ -250,7 +250,7 @@ stdoutLn = go
 -}
 stdoutLn' :: MonadIO m => Consumer' String m r
 stdoutLn' = for cat (\str -> liftIO (putStrLn str))
-{-# INLINABLE stdoutLn' #-}
+{-# INLINABLE [1] stdoutLn' #-}
 
 {-# RULES
     "p >-> stdoutLn'" forall p .
@@ -260,7 +260,7 @@ stdoutLn' = for cat (\str -> liftIO (putStrLn str))
 -- | Consume all values using a monadic function
 mapM_ :: Monad m => (a -> m ()) -> Consumer' a m r
 mapM_ f = for cat (\a -> lift (f a))
-{-# INLINABLE mapM_ #-}
+{-# INLINABLE [1] mapM_ #-}
 
 {-# RULES
     "p >-> mapM_ f" forall p f .
@@ -270,7 +270,7 @@ mapM_ f = for cat (\a -> lift (f a))
 -- | 'print' values to 'IO.stdout'
 print :: (MonadIO m, Show a) => Consumer' a m r
 print = for cat (\a -> liftIO (Prelude.print a))
-{-# INLINABLE print #-}
+{-# INLINABLE [1] print #-}
 
 {-# RULES
     "p >-> print" forall p .
@@ -280,7 +280,7 @@ print = for cat (\a -> liftIO (Prelude.print a))
 -- | Write 'String's to a 'IO.Handle' using 'IO.hPutStrLn'
 toHandle :: MonadIO m => IO.Handle -> Consumer' String m r
 toHandle handle = for cat (\str -> liftIO (IO.hPutStrLn handle str))
-{-# INLINABLE toHandle #-}
+{-# INLINABLE [1] toHandle #-}
 
 {-# RULES
     "p >-> toHandle handle" forall p handle .
@@ -290,7 +290,7 @@ toHandle handle = for cat (\str -> liftIO (IO.hPutStrLn handle str))
 -- | 'discard' all incoming values
 drain :: Monad m => Consumer' a m r
 drain = for cat discard
-{-# INLINABLE drain #-}
+{-# INLINABLE [1] drain #-}
 
 {-# RULES
     "p >-> drain" forall p .
@@ -318,7 +318,7 @@ quit<Enter>
 -}
 map :: Monad m => (a -> b) -> Pipe a b m r
 map f = for cat (\a -> yield (f a))
-{-# INLINABLE map #-}
+{-# INLINABLE [1] map #-}
 
 {-# RULES
     "p >-> map f" forall p f . p >-> map f = for p (\a -> yield (f a))
@@ -338,7 +338,7 @@ mapM :: Monad m => (a -> m b) -> Pipe a b m r
 mapM f = for cat $ \a -> do
     b <- lift (f a)
     yield b
-{-# INLINABLE mapM #-}
+{-# INLINABLE [1] mapM #-}
 
 {-# RULES
     "p >-> mapM f" forall p f . p >-> mapM f = for p (\a -> do
@@ -361,7 +361,7 @@ sequence = mapM id
 -}
 mapFoldable :: (Monad m, Foldable t) => (a -> t b) -> Pipe a b m r
 mapFoldable f = for cat (\a -> each (f a))
-{-# INLINABLE mapFoldable #-}
+{-# INLINABLE [1] mapFoldable #-}
 
 {-# RULES
     "p >-> mapFoldable f" forall p f .
@@ -376,7 +376,7 @@ mapFoldable f = for cat (\a -> each (f a))
 -}
 filter :: Monad m => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat $ \a -> when (predicate a) (yield a)
-{-# INLINABLE filter #-}
+{-# INLINABLE [1] filter #-}
 
 {-# RULES
     "p >-> filter predicate" forall p predicate.
@@ -394,7 +394,7 @@ filterM :: Monad m => (a -> m Bool) -> Pipe a a m r
 filterM predicate = for cat $ \a -> do
     b <- lift (predicate a)
     when b (yield a)
-{-# INLINABLE filterM #-}
+{-# INLINABLE [1] filterM #-}
 
 {-# RULES
     "p >-> filterM predicate" forall p predicate .
@@ -497,7 +497,7 @@ dropWhile predicate = go
 -- | Flatten all 'Foldable' elements flowing downstream
 concat :: (Monad m, Foldable f) => Pipe (f a) a m r
 concat = for cat each
-{-# INLINABLE concat #-}
+{-# INLINABLE [1] concat #-}
 
 {-# RULES
     "p >-> concat" forall p . p >-> concat = for p each
@@ -559,7 +559,7 @@ chain :: Monad m => (a -> m ()) -> Pipe a a m r
 chain f = for cat $ \a -> do
     lift (f a)
     yield a
-{-# INLINABLE chain #-}
+{-# INLINABLE [1] chain #-}
 
 {-# RULES
     "p >-> chain f" forall p f .
@@ -578,7 +578,7 @@ read :: (Monad m, Read a) => Pipe String a m r
 read = for cat $ \str -> case (reads str) of
     [(a, "")] -> yield a
     _         -> return ()
-{-# INLINABLE read #-}
+{-# INLINABLE [1] read #-}
 
 {-# RULES
     "p >-> read" forall p .
