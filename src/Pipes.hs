@@ -132,7 +132,7 @@ f '~>' 'yield' = f
 -}
 yield :: Monad m => a -> Producer' a m ()
 yield = respond
-{-# INLINABLE yield #-}
+{-# INLINABLE [1] yield #-}
 
 {-| @(for p body)@ loops over @p@ replacing each 'yield' with @body@.
 
@@ -168,7 +168,7 @@ for :: Monad m
     -- ^
     ->       Proxy x' x c' c m a'
 for = (//>)
-{-# INLINABLE for #-}
+{-# INLINABLE [1] for #-}
 
 {-# RULES
     "for (for p f) g" forall p f g . for (for p f) g = for p (\a -> for (f a) g)
@@ -282,7 +282,7 @@ f '>~' 'await' = f
 -}
 await :: Monad m => Consumer' a m a
 await = request ()
-{-# INLINABLE await #-}
+{-# INLINABLE [1] await #-}
 
 {-| @(draw >~ p)@ loops over @p@ replacing each 'await' with @draw@
 
@@ -317,7 +317,7 @@ a ==>    f    ==> y   .--->   b ==>    g    ==> y     =     a ==>   f '>~' g  ==
     -- ^
     -> Proxy a' a y' y m c
 p1 >~ p2 = (\() -> p1) >\\ p2
-{-# INLINABLE (>~) #-}
+{-# INLINABLE [1] (>~) #-}
 
 -- | ('>~') with the arguments flipped
 (~<)
@@ -351,7 +351,7 @@ f '>->' 'cat' = f
 -- | The identity 'Pipe', analogous to the Unix @cat@ program
 cat :: Monad m => Pipe a a m r
 cat = pull ()
-{-# INLINABLE cat #-}
+{-# INLINABLE [1] cat #-}
 
 {-| 'Pipe' composition, analogous to the Unix pipe operator
 
@@ -386,7 +386,7 @@ a ==>    f    ==> b ==>    g    ==> c     =     a ==>  f '>->' g  ==> c
     -- ^
     -> Proxy a' a c' c m r
 p1 >-> p2 = (\() -> p1) +>> p2
-{-# INLINABLE (>->) #-}
+{-# INLINABLE [1] (>->) #-}
 
 {-| The list monad transformer, which extends a monad with non-determinism
 
