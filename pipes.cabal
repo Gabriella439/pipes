@@ -84,7 +84,7 @@ test-suite tests
         mtl                        >= 2.1     && < 2.3 ,
         test-framework             >= 0.4     && < 1   ,
         test-framework-quickcheck2 >= 0.2.0   && < 0.4 ,
-        transformers               >= 0.2.0.0 && < 0.5
+        transformers               >= 0.2.0.0 && < 0.6
 
 Benchmark lift-benchmarks
     Default-Language: Haskell2010
@@ -99,4 +99,4 @@ Benchmark lift-benchmarks
         deepseq      >= 1.4.0.0         ,
         mtl          >= 2.1     && < 2.3,
         pipes        >= 4.0.0   && < 4.2,
-        transformers >= 0.2.0.0 && < 0.5
+        transformers >= 0.2.0.0 && < 0.6
