@@ -168,7 +168,10 @@ for :: Monad m
     -- ^
     ->       Proxy x' x c' c m a'
 for = (//>)
-{-# INLINABLE [1] for #-}
+-- There are a number of useful rewrites which can be performed on various uses
+-- of this combinator; to ensure that they fire we defer inlining until quite
+-- late.
+{-# INLINABLE [0] for #-}
 
 {-# RULES
     "for (for p f) g" forall p f g . for (for p f) g = for p (\a -> for (f a) g)
