@@ -320,7 +320,7 @@ p0 //> fb = go p0
         Respond b  fb' -> fb b >>= \b' -> go (fb' b')
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       a   -> Pure a
-{-# INLINABLE [1] (//>) #-}
+{-# INLINE [1] (//>) #-}
 
 {-# RULES
     "(Request x' fx ) //> fb" forall x' fx  fb .
