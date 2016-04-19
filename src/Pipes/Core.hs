@@ -452,7 +452,7 @@ fb' >\\ p0 = go p0
         Respond x  fx' -> Respond x (\x' -> go (fx' x'))
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       a   -> Pure a
-{-# INLINABLE [1] (>\\) #-}
+{-# INLINE [1] (>\\) #-}
 
 {-# RULES
     "fb' >\\ (Request b' fb )" forall fb' b' fb  .
@@ -571,7 +571,7 @@ p >>~ fb = case p of
     Respond b  fb' -> fb' +>> fb b
     M          m   -> M (m >>= \p' -> return (p' >>~ fb))
     Pure       r   -> Pure r
-{-# INLINABLE [1] (>>~) #-}
+{-# INLINE [1] (>>~) #-}
 
 {- $pull
     The 'pull' category closely corresponds to pull-based Unix pipes.
