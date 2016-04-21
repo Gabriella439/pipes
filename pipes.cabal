@@ -62,6 +62,7 @@ Benchmark prelude-benchmarks
     Type:             exitcode-stdio-1.0
     HS-Source-Dirs:   benchmarks
     Main-Is:          PreludeBench.hs
+    Other-Modules:    Common
     GHC-Options:     -O2 -Wall -rtsopts -fno-warn-unused-do-bind
 
     Build-Depends:
@@ -91,6 +92,7 @@ Benchmark lift-benchmarks
     Type:             exitcode-stdio-1.0
     HS-Source-Dirs:   benchmarks
     Main-Is:          LiftBench.hs
+    Other-Modules:    Common
     GHC-Options:     -O2 -Wall -rtsopts -fno-warn-unused-do-bind
 
     Build-Depends:
