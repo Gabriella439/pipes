@@ -192,7 +192,7 @@ import Prelude hiding ((.), id)
 > --         |        |
 > --         |        |      +-- Every monad transformer has a base monad.
 > --         |        |      |   This time the base monad is 'IO'.
-> --         |        |      |
+> --         |        |      |  
 > --         |        |      |  +-- Every monadic action has a return value.
 > --         |        |      |  |   This action returns '()' when finished
 > --         v        v      v  v
@@ -421,7 +421,7 @@ import Prelude hiding ((.), id)
 >
 > import Pipes
 > import qualified Pipes.Prelude as P  -- Pipes.Prelude already has 'stdinLn'
->
+> 
 > triple :: Monad m => a -> Producer a m ()
 > triple x = do
 >     yield x
@@ -669,7 +669,7 @@ write what exactly _can_ be done with a Consumer.]
 @
  \-\-                 +- Feed       +- Consumer to    +- Returns new
  \-\-                 |  action     |  feed           |  Effect
- \-\-                 v             v                 v
+ \-\-                 v             v                 v  
  \-\-                 ----------    --------------    ----------
  ('>~') :: 'Monad' m => 'Effect' m b -> 'Consumer' b m c -> 'Effect' m c
 @
@@ -1023,7 +1023,7 @@ You shall not pass!
 
 
 > import Pipes
->
+> 
 > pair :: ListT IO (Int, Int)
 > pair = do
 >     x <- Select $ each [1, 2]
@@ -1071,10 +1071,10 @@ y = 4
 
 > import Pipes
 > import qualified Pipes.Prelude as P
->
+> 
 > input :: Producer String IO ()
 > input = P.stdinLn >-> P.takeWhile (/= "quit")
->
+> 
 > name :: ListT IO String
 > name = do
 >     firstName <- Select input
@@ -1521,7 +1521,7 @@ Fail<Enter>
 > Upstream | Downstream
 >     +---------+
 >     |         |
-> () <==       <== *
+> () <==       <== * 
 >     |         |
 > a  ==>       ==> *
 >     |    |    |
@@ -1536,7 +1536,7 @@ Fail<Enter>
 > Upstream | Downstream
 >     +---------+
 >     |         |
->  * <==       <== *
+>  * <==       <== * 
 >     |         |
 >  * ==>       ==> *
 >     |    |    |
@@ -1582,7 +1582,7 @@ Fail<Enter>
 @
 
     This type signature lets us use 'yield' within a 'Pipe', too, because the
-    'Pipe' type synonym is a special case of the polymorphic 'Producer'' type
+    'Pipe' type synonym is a special case of the polymorphic 'Producer'' type 
     synonym:
 
 @
@@ -1696,7 +1696,7 @@ Fail<Enter>
 > type Consumer    a      = Proxy () a  () X
 > type Pipe        a    b = Proxy () a  () b
 >
-> type Server        b' b = Proxy X  () b' b
+> type Server        b' b = Proxy X  () b' b 
 > type Client   a' a      = Proxy a' a  () X
 >
 > type Effect'            m r = forall x' x y' y . Proxy x' x y' y m r
@@ -1746,7 +1746,7 @@ Fail<Enter>
     To illustrate this, we'd transform the above example to:
 
 > import Control.Monad.Codensity (lowerCodensity)
->
+> 
 > linear :: Monad m => Int -> Consumer a m [a]
 > linear n = lowerCodensity $ replicateM n $ lift await
 
