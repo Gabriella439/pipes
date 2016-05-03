@@ -149,9 +149,23 @@ import Prelude hiding ((.), id)
 
     * ('>>=') handles return values
 
-    (At this point, it's not clear why you would want more than one way to connect components. The fourth point seems strange because we haven't explained why return values are a part of this type. At this point of the tutorial, I'm thinking only of one type of composition: plugging in the output of one stream into the input of another stream. I'm wondering why there are three types of composition instead of one. Also, I'm not sure what "handles" means in this context.)
+    (At this point, it's not clear why you would want more than one way to
+    connect components.  The fourth point seems strange because we haven't
+    explained why return values are a part of this type. At this point of the
+    tutorial, I'm thinking only of one type of composition: plugging in the
+    output of one stream into the input of another stream. I'm wondering why
+    there are three types of composition instead of one. Also, I'm not sure
+    what "handles" means in this context.)
 
-    As you connect components, their types will change to reflect inputs and outputs that you've fused away. For example, if you compose a producer with a consumer, you now have a unit that knows how to create values (by the producer) and how to use the values from the producer, without yielding any values downstream (by our Consumer), so you basically have an 'Effect'--something that doesn't take values from upstream or deposit values downstream. Since you have an 'Effect', which is basically equivalent to a value in the base monad, you can run this effect using 'runEffect'.
+    As you connect components, their types will change to reflect inputs and
+    outputs that you've fused away. For example, if you compose a producer with
+    a consumer, you now have a unit that knows how to create values (by the
+    producer) and how to use the values from the producer, without yielding any
+    values downstream (by our Consumer), so you basically have an
+    'Effect'--something that doesn't take values from upstream or deposit
+    values downstream. Since you have an 'Effect', which is basically
+    equivalent to a value in the base monad, you can run this effect using
+    'runEffect'.
 -}
 
 {- $producers
@@ -194,7 +208,14 @@ import Prelude hiding ((.), id)
     consumed.  If nobody consumes the value (which is possible) then 'yield'
     never returns.
 
-    Maybe insert a note here about how any component that terminates the streaming returns a value of type 'r', so in any case the Producer either finishes its streaming and returns the value of type 'r', or somebody downstream terminates early, returning a value of type 'r', and this becomes the return value of the Producer. (What I wrote here is misusing terminology---a Producer doesn't really return anything, since you need to make an Effect to actually run it. Maybe I should rewrite these sentences referring to the return value of the Effect, instead of the Producer.)
+    Maybe insert a note here about how any component that terminates the
+    streaming returns a value of type 'r', so in any case the Producer either
+    finishes its streaming and returns the value of type 'r', or somebody
+    downstream terminates early, returning a value of type 'r', and this
+    becomes the return value of the Producer. (What I wrote here is misusing
+    terminology---a Producer doesn't really return anything, since you need to
+    make an Effect to actually run it. Maybe I should rewrite these sentences
+    referring to the return value of the Effect, instead of the Producer.)
 
     You can think of 'yield' as having the following type:
 
@@ -602,7 +623,13 @@ import Prelude hiding ((.), id)
 >   result <- runEffect $ producer' >-> sumEvenNums' 0
 >   putStrLn result
 
-[Okay, now I realize that this was a bad example. This is essentially a fold, and we can't really implement folds because the consumer never gets notified when upstream terminates the pipe. We should come up with an example of something that hits the sweet spot of where a Consumer is useful---something that can be done with a Consumer (i.e. doesn't require the full power of 'next') that cannot be done with 'for'. After giving this example, we should write what exactly _can_ be done with a Consumer.]
+[Okay, now I realize that this was a bad example. This is essentially a fold,
+and we can't really implement folds because the consumer never gets notified
+when upstream terminates the pipe. We should come up with an example of
+something that hits the sweet spot of where a Consumer is useful---something
+that can be done with a Consumer (i.e. doesn't require the full power of
+'next') that cannot be done with 'for'. After giving this example, we should
+write what exactly _can_ be done with a Consumer.]
 
 >   The following @stdoutLn@ 'Consumer' shows how to incrementally 'await'
 >   'String's and print them to standard output, terminating gracefully when
@@ -647,9 +674,17 @@ import Prelude hiding ((.), id)
  ('>~') :: 'Monad' m => 'Effect' m b -> 'Consumer' b m c -> 'Effect' m c
 @
 
-    At this point, I am very confused because I finally got to see the full type @Consumer b m c@, and I have no idea what the @c@ is. Consumers can't yield, so @c@ can't be the type that is yielded. I don't have any other guesses right now.
+    At this point, I am very confused because I finally got to see the full
+    type @Consumer b m c@, and I have no idea what the @c@ is. Consumers can't
+    yield, so @c@ can't be the type that is yielded. I don't have any other
+    guesses right now.
 
-    Okay, I thought about it a bit more and I realize that @c@ is the return type of a Consumer. So a @Consumer b m c@ can @await@ values of type @b@ from upstream, invoke side-effects in @m@, and return values of type @c@. "Running" a consumer amounts to giving it a source of input (either a producer or using @>~@), which will give us a resulting Effect which we can run with @runEffect@.
+    Okay, I thought about it a bit more and I realize that @c@ is the return
+    type of a Consumer. So a @Consumer b m c@ can @await@ values of type @b@
+    from upstream, invoke side-effects in @m@, and return values of type @c@.
+    "Running" a consumer amounts to giving it a source of input (either a
+    producer or using @>~@), which will give us a resulting Effect which we can
+    run with @runEffect@.
 
     @(draw >~ consumer)@ loops over @(consumer)@, substituting each 'await' in
     @(consumer)@ with @(draw)@.
@@ -732,17 +767,23 @@ ABCDEF
 -}
 
 {- $pipes
-    Our previous programs were unsatisfactory because they were biased either towards the 'Producer' end or the 'Consumer' end.  As a result, we had to
-    choose between gracefully handling end of input (since @Producers@ like 'P.stdinLn' automatically terminate the whole pipeline when the Producer stops yielding and simply returns) or
-    gracefully handling end of output (since @Consumers@ like 'P.stdoutLn' automatically terminate the whole pipeline when the Consumer stops awaiting and simply returns), but not both at the
-    same time.
+    Our previous programs were unsatisfactory because they were biased either
+    towards the 'Producer' end or the 'Consumer' end.  As a result, we had to
+    choose between gracefully handling end of input (since @Producers@ like
+    'P.stdinLn' automatically terminate the whole pipeline when the Producer
+    stops yielding and simply returns) or gracefully handling end of output
+    (since @Consumers@ like 'P.stdoutLn' automatically terminate the whole
+    pipeline when the Consumer stops awaiting and simply returns), but not both
+    at the same time.
 
     Currently, we have the ability to
 
     * handle every element of that a Producer yields with a single handler (using @for@)
     * feed a single value repeatedly into a Consumer (using @>~@).
 
-    However, we don't know yet how to connect 'Producer's to 'Consumer's. We can connect 'Producer's and 'Consumer's directly together using ('>->') (pronounced \"pipe\"):
+    However, we don't know yet how to connect 'Producer's to 'Consumer's. We
+    can connect 'Producer's and 'Consumer's directly together using ('>->')
+    (pronounced \"pipe\"):
 
 @
  ('>->') :: 'Monad' m => 'Producer' a m r -> 'Consumer' a m r -> 'Effect' m r
@@ -885,7 +926,13 @@ You shall not pass!
 >>> runEffect $ P.stdinLn >-> take 3 >-> P.stdoutLn
 <Exact same behavior>
 
-    Note that in this example, the pipeline is terminated by whichever component finishes first: if we successfully receive 3 inputs from @P.stdinLn@ and deposit 3 outputs from @P.stdoutLn@, then @take 3@ terminates the pipeline; if before that happens, @P.stdinLn@ stops yielding, then @P.stdinLn@ terminates the pipeline; if before those two events happen, the stdout-pipe breaks and @P.stdoutLn@ stops awaiting, then @P.stdoutLn@ terminates the pipeline.
+    Note that in this example, the pipeline is terminated by whichever
+    component finishes first: if we successfully receive 3 inputs from
+    @P.stdinLn@ and deposit 3 outputs from @P.stdoutLn@, then @take 3@
+    terminates the pipeline; if before that happens, @P.stdinLn@ stops
+    yielding, then @P.stdinLn@ terminates the pipeline; if before those two
+    events happen, the stdout-pipe breaks and @P.stdoutLn@ stops awaiting, then
+    @P.stdoutLn@ terminates the pipeline.
 
     ('>->') is designed to behave like the Unix pipe operator, except with less
     quirks.  In fact, we can continue the analogy to Unix by defining 'cat'
@@ -905,8 +952,10 @@ You shall not pass!
 > -- Forwarding output to 'cat' does nothing
 > p >-> cat = p
 
-    Therefore, ('>->') and 'cat' form a 'Category', specifically the category of
-    Unix pipes (does it really make sense to call it the category of Unix pipes here? I like the analogy, but after all, these are pipes-library @Pipe@s, not Unix pipes), and 'Pipe's are also composable.
+    Therefore, ('>->') and 'cat' form a 'Category', specifically the category
+    of Unix pipes (does it really make sense to call it the category of Unix
+    pipes here? I like the analogy, but after all, these are pipes-library
+    @Pipe@s, not Unix pipes), and 'Pipe's are also composable.
 
     A lot of Unix tools have very simple definitions when written using @pipes@:
 
@@ -926,7 +975,10 @@ You shall not pass!
 >   yes
 >
 > -- or, more succinctly, yes = forever $ yield "y"
-> -- [I don't feel too strongly about this suggestion, but I think it's still worth mentioning. Yes, the reader ought to be familiar with monads, but we needn't punish them if they happened to forget that Control.Monad.forever is a thing. They might get confused and think that forever is a pipes combinator.]
+> -- [I don't feel too strongly about this suggestion, but I think it's still
+> -- worth mentioning. Yes, the reader ought to be familiar with monads, but we
+> -- needn't punish them if they happened to forget that Control.Monad.forever is a
+> -- thing. They might get confused and think that forever is a pipes combinator.]
 >
 > main = runEffect $ yes >-> head 3 >-> P.stdoutLn
 
@@ -948,7 +1000,10 @@ You shall not pass!
 -}
 
 {- $listT
-    @pipes@ also provides a \"ListT done right\" implementation. (@ListT@ is a monad transformer in the @transformers@ library. @ListT m a@ is basically a newtype wrapper around @m [a]@. Unfortunately, I am not a fan of this transformer, for both correctness and performance reasons.)
+    @pipes@ also provides a \"ListT done right\" implementation. (@ListT@ is a
+    monad transformer in the @transformers@ library. @ListT m a@ is basically a
+    newtype wrapper around @m [a]@. Unfortunately, I am not a fan of this
+    transformer, for both correctness and performance reasons.)
 
     Unlike the implementation of @ListT@ in @transformers@, this 'ListT':
 
@@ -959,8 +1014,9 @@ You shall not pass!
     The latter property is actually an elegant consequence of obeying the monad
     laws.
 
-    To bind a list within a 'ListT' computation, first convert it to a 'Producer' using 'each', and then convert the 'Producer' to a
-    'ListT' using Select':
+    To bind a list within a 'ListT' computation, first convert it to a
+    'Producer' using 'each', and then convert the 'Producer' to a 'ListT' using
+    Select':
 @
  'Select' :: 'Producer' a m () -> 'ListT' m a
 @
@@ -1050,7 +1106,11 @@ quit<Enter>
 
     `ListT` computations can be combined in more ways than `Pipe`s, so try to
     program in `ListT` as much as possible and defer converting it to a `Pipe`
-    as late as possible using `P.loop`. (Maybe give an example of P.loop here? Also, this seems like a very important point. Maybe we should mention this in the introduction, so that people know the whole time that they're reading this what each thing can be used for. Maybe also explain why "ListT is more useful/flexible than Pipe".)
+    as late as possible using `P.loop`. (Maybe give an example of P.loop here?
+    Also, this seems like a very important point. Maybe we should mention this
+    in the introduction, so that people know the whole time that they're
+    reading this what each thing can be used for. Maybe also explain why "ListT
+    is more useful/flexible than Pipe".)
 
     You can combine `ListT` computations even if their inputs and outputs are
     completely different:
