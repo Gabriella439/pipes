@@ -711,7 +711,12 @@ ABC
 
     ('>~') is the dual of ('~>'), composing 'Consumer's instead of 'Producer's.
 
-    This means that you can feed a 'Consumer' with yet another 'Consumer'. For example, if we did @consumerA >~ consumerB@, the combined 'Consumer' waits for input of type 'a', feeds these values into @consumerA@ until @consumerA@ returns, and then feeds this returned @b@ value into @consumerB@. It then continues feeding into @consumerA@ until it gets a second @b@ value, which it feeds into @consumerB@, and so on.
+    This means that you can feed a 'Consumer' with yet another 'Consumer'. For
+    example, if we did @consumerA >~ consumerB@, the combined 'Consumer' waits
+    for input of type 'a', feeds these values into @consumerA@ until
+      @consumerA@ returns, and then feeds this returned @b@ value into
+      @consumerB@. It then continues feeding into @consumerA@ until it gets a
+      second @b@ value, which it feeds into @consumerB@, and so on.
 
     For example, we could define the
     following intermediate 'Consumer' that requests two 'String's and returns
@@ -788,7 +793,9 @@ ABCDEF
 @
  ('>->') :: 'Monad' m => 'Producer' a m r -> 'Consumer' a m r -> 'Effect' m r
 @
-    When we run this 'Effect', the pipeline can be terminated in both ways: when the producer-side stops yielding values, or when the consumer-side stops awaiting values.
+    When we run this 'Effect', the pipeline can be terminated in both ways:
+    when the producer-side stops yielding values, or when the consumer-side
+    stops awaiting values.
 
     This returns an 'Effect' which we can run:
 
@@ -994,9 +1001,16 @@ You shall not pass!
 > y
 > $
 
-    This lets us write \"Haskell pipes\" instead of Unix pipes.  Because of the abstractions we provide here, these are much easier to build than an equivalent C program that defines a Unix utility. Furthermore, we can connect them directly within Haskell for interoperability with the Haskell language and ecosystem.
+    This lets us write \"Haskell pipes\" instead of Unix pipes.  Because of the
+    abstractions we provide here, these are much easier to build than an
+    equivalent C program that defines a Unix utility. Furthermore, we can
+    connect them directly within Haskell for interoperability with the Haskell
+    language and ecosystem.
 
-    [I'm not satisfied with the wording here. There's a difference between implementing Unix pipes---that is, implementing the pipes as you would in an operating systems course---and writing a utility that reads in and writes out text from a Unix pipe. How can we best clarify this?]
+    [I'm not satisfied with the wording here. There's a difference between
+    implementing Unix pipes---that is, implementing the pipes as you would in
+    an operating systems course---and writing a utility that reads in and
+    writes out text from a Unix pipe. How can we best clarify this?]
 -}
 
 {- $listT
