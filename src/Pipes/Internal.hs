@@ -102,12 +102,6 @@ p0 `_bind` f = go p0 where
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure    r      -> f r
 
--- While inlining this would allow us to specialise to the Monad m
--- dictionary, this generally isn't enough of a win to warrant the
--- code bloat that it induces. Moreover, inlining this (even only in phase 0)
--- appears to regress the Pipes/concat benchmark.
-{-# NOINLINE _bind #-}
-
 {-# RULES
     "_bind (Request a' k) f" forall a' k f .
         _bind (Request a' k) f = Request a' (\a  -> _bind (k a)  f);
