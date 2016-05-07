@@ -280,7 +280,7 @@ f '/>/' 'respond' = f
 -}
 respond :: Monad m => a -> Proxy x' x a' a m a'
 respond a = Respond a Pure
-{-# INLINABLE respond #-}
+{-# INLINABLE [1] respond #-}
 
 {-| Compose two unfolds, creating a new unfold
 
@@ -320,7 +320,7 @@ p0 //> fb = go p0
         Respond b  fb' -> fb b >>= \b' -> go (fb' b')
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       a   -> Pure a
-{-# INLINABLE (//>) #-}
+{-# INLINE [1] (//>) #-}
 
 {-# RULES
     "(Request x' fx ) //> fb" forall x' fx  fb .
@@ -412,7 +412,7 @@ f '\>\' 'request' = f
 -}
 request :: Monad m => a' -> Proxy a' a y' y m a
 request a' = Request a' Pure
-{-# INLINABLE request #-}
+{-# INLINABLE [1] request #-}
 
 {-| Compose two folds, creating a new fold
 
@@ -452,7 +452,7 @@ fb' >\\ p0 = go p0
         Respond x  fx' -> Respond x (\x' -> go (fx' x'))
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure       a   -> Pure a
-{-# INLINABLE (>\\) #-}
+{-# INLINE [1] (>\\) #-}
 
 {-# RULES
     "fb' >\\ (Request b' fb )" forall fb' b' fb  .
@@ -532,7 +532,7 @@ push :: Monad m => a -> Proxy a' a a' a m r
 push = go
   where
     go a = Respond a (\a' -> Request a' go)
-{-# INLINABLE push #-}
+{-# INLINABLE [1] push #-}
 
 {-| Compose two proxies blocked while 'request'ing data, creating a new proxy
     blocked while 'request'ing data
@@ -571,7 +571,7 @@ p >>~ fb = case p of
     Respond b  fb' -> fb' +>> fb b
     M          m   -> M (m >>= \p' -> return (p' >>~ fb))
     Pure       r   -> Pure r
-{-# INLINABLE (>>~) #-}
+{-# INLINE [1] (>>~) #-}
 
 {- $pull
     The 'pull' category closely corresponds to pull-based Unix pipes.
@@ -642,7 +642,7 @@ pull :: Monad m => a' -> Proxy a' a a' a m r
 pull = go
   where
     go a' = Request a' (\a -> Respond a go)
-{-# INLINABLE pull #-}
+{-# INLINABLE [1] pull #-}
 
 {-| Compose two proxies blocked in the middle of 'respond'ing, creating a new
     proxy blocked in the middle of 'respond'ing
@@ -681,7 +681,7 @@ fb' +>> p = case p of
     Respond c  fc' -> Respond c (\c' -> fb' +>> fc' c')
     M          m   -> M (m >>= \p' -> return (fb' +>> p'))
     Pure       r   -> Pure r
-{-# INLINABLE (+>>) #-}
+{-# INLINABLE [1] (+>>) #-}
 
 {- $reflect
     @(reflect .)@ transforms each streaming category into its dual:
