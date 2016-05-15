@@ -105,6 +105,7 @@ import Control.Monad (liftM, when, unless)
 import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
 import Foreign.C.Error (Errno(Errno), ePIPE)
+import GHC.Exts (build)
 import Pipes
 import Pipes.Core
 import Pipes.Internal
@@ -813,14 +814,15 @@ product = fold (*) 1 id
 
 -- | Convert a pure 'Producer' into a list
 toList :: Producer a Identity () -> [a]
-toList = go
+toList prod0 = build (go prod0)
   where
-    go p = case p of
+    go prod cons nil =
+      case prod of
         Request v _  -> closed v
-        Respond a fu -> a:go (fu ())
-        M         m  -> go (runIdentity m)
-        Pure    _    -> []
-{-# INLINABLE toList #-}
+        Respond a fu -> cons a (go (fu ()) cons nil)
+        M         m  -> go (runIdentity m) cons nil
+        Pure    _    -> nil
+{-# INLINE toList #-}
 
 {-| Convert an effectful 'Producer' into a list
 
