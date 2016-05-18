@@ -2,6 +2,7 @@ Name: pipes
 Version: 4.1.9
 Cabal-Version: >= 1.10
 Build-Type: Simple
+Tested-With: GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.2
 License: BSD3
 License-File: LICENSE
 Copyright: 2012-2014 Gabriel Gonzalez
