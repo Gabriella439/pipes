@@ -101,6 +101,7 @@ p0 `_bind` f = go p0 where
         Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
         M          m   -> M (m >>= \p' -> return (go p'))
         Pure    r      -> f r
+{-# NOINLINE[1] _bind #-}
 
 {-# RULES
     "_bind (Request a' k) f" forall a' k f .
