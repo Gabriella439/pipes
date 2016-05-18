@@ -3,6 +3,7 @@ module Common (commonMain) where
 import Criterion.Main (Benchmark, runMode)
 import Criterion.Main.Options as Criterion
 import Data.Maybe (fromMaybe)
+import Data.Monoid
 import Options.Applicative
 
 commonMain :: Int                    -- ^ default maximum data size

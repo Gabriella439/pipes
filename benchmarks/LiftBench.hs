@@ -2,7 +2,6 @@
 module Main (main) where
 
 import Common (commonMain)
-import Control.DeepSeq
 import Control.Monad.Identity
 import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
