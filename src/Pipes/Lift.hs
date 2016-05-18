@@ -10,9 +10,9 @@ module Pipes.Lift (
     -- * Utilities
       distribute
 
-    -- * ErrorT
-    , errorP
-    , runErrorP
+    -- * ExceptT
+    , exceptP
+    , runExceptP
     , catchError
     , liftCatchError
 
@@ -47,7 +47,7 @@ module Pipes.Lift (
     ) where
 
 import Control.Monad.Trans.Class (lift, MonadTrans(..))
-import qualified Control.Monad.Trans.Error as E
+import qualified Control.Monad.Trans.Except as E
 import qualified Control.Monad.Trans.Maybe as M
 import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
@@ -76,34 +76,34 @@ distribute p =  runEffect $ request' >\\ unsafeHoist (hoist lift) p //> respond'
     respond' = lift . lift . respond
 {-# INLINABLE distribute #-}
 
--- | Wrap the base monad in 'E.ErrorT'
-errorP
-    :: (Monad m, E.Error e)
+-- | Wrap the base monad in 'E.ExceptT'
+exceptP
+    :: Monad m
     => Proxy a' a b' b m (Either e r)
-    -> Proxy a' a b' b (E.ErrorT e m) r
-errorP p = do
+    -> Proxy a' a b' b (E.ExceptT e m) r
+exceptP p = do
     x <- unsafeHoist lift p
-    lift $ E.ErrorT (return x)
-{-# INLINABLE errorP #-}
+    lift $ E.ExceptT (return x)
+{-# INLINABLE exceptP #-}
 
--- | Run 'E.ErrorT' in the base monad
-runErrorP
-    :: (Monad m, E.Error e)
-    => Proxy a' a b' b (E.ErrorT e m) r
+-- | Run 'E.ExceptT' in the base monad
+runExceptP
+    :: Monad m
+    => Proxy a' a b' b (E.ExceptT e m) r
     -> Proxy a' a b' b m (Either e r)
-runErrorP    = E.runErrorT . distribute 
-{-# INLINABLE runErrorP #-}
+runExceptP    = E.runExceptT . distribute 
+{-# INLINABLE runExceptP #-}
 
 -- | Catch an error in the base monad
 catchError
-    :: (Monad m, E.Error e) 
-    => Proxy a' a b' b (E.ErrorT e m) r
+    :: Monad m
+    => Proxy a' a b' b (E.ExceptT e m) r
     -- ^
-    -> (e -> Proxy a' a b' b (E.ErrorT e m) r)
+    -> (e -> Proxy a' a b' b (E.ExceptT e m) r)
     -- ^
-    -> Proxy a' a b' b (E.ErrorT e m) r
-catchError e h = errorP . E.runErrorT $ 
-    E.catchError (distribute e) (distribute . h)
+    -> Proxy a' a b' b (E.ExceptT e m) r
+catchError e h = exceptP . E.runExceptT $ 
+    E.catchE (distribute e) (distribute . h)
 {-# INLINABLE catchError #-}
 
 -- | Catch an error using a catch function for the base monad
@@ -290,12 +290,12 @@ execRWSP i s p = fmap f $ runRWSP i s p
 {- $tutorial
     Probably the most useful functionality in this module is lifted error
     handling.  Suppose that you have a 'Pipes.Pipe' whose base monad can fail
-    using 'E.ErrorT':
+    using 'E.ExceptT':
 
 > import Control.Monad.Trans.Error
 > import Pipes
 >
-> example :: Monad m => Pipe Int Int (ErrorT String m) r
+> example :: Monad m => Pipe Int Int (ExceptT String m) r
 > example = for cat $ \n ->
 >     if n == 0
 >     then lift $ throwError "Zero is forbidden"
@@ -305,7 +305,7 @@ execRWSP i s p = fmap f $ runRWSP i s p
     until after you compose and run the pipeline:
 
 >>> import qualified Pipes.Prelude as P
->>> runErrorT $ runEffect $ P.readLn >-> example >-> P.print
+>>> runExceptT $ runEffect $ P.readLn >-> example >-> P.print
 42<Enter>
 42
 1<Enter>
@@ -319,7 +319,7 @@ Zero is forbidden
 
 >  import qualified Pipes.Lift as Lift
 > 
->  caught :: Pipe Int Int (ErrorT String IO) r
+>  caught :: Pipe Int Int (ExceptT String IO) r
 >  caught = example `Lift.catchError` \str -> do
 >      liftIO (putStrLn str)
 >      caught
@@ -327,7 +327,7 @@ Zero is forbidden
     This lets you resume streaming in the face of errors raised within the base
     monad:
 
->>> runErrorT $ runEffect $ P.readLn >-> caught >-> P.print
+>>> runExceptT $ runEffect $ P.readLn >-> caught >-> P.print
 0<Enter>
 Zero is forbidden
 42<Enter>
