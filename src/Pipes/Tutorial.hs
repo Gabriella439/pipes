@@ -92,10 +92,7 @@ module Pipes.Tutorial (
 
 import Control.Category
 import Control.Monad
-import Control.Monad.Trans.Error
-import Control.Monad.Trans.Writer.Strict
 import Pipes
-import Pipes.Lift
 import qualified Pipes.Prelude as P
 import Prelude hiding ((.), id)
 
