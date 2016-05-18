@@ -66,13 +66,13 @@ module Pipes (
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (void)
-import Control.Monad.Error (MonadError(..))
+import Control.Monad.Except (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Trans.Class (MonadTrans(lift))
-import Control.Monad.Trans.Error (ErrorT(runErrorT))
+import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.Writer (MonadWriter(..))
@@ -520,9 +520,9 @@ instance Enumerable MaybeT where
             Nothing -> return ()
             Just a  -> yield a
 
-instance Enumerable (ErrorT e) where
+instance Enumerable (ExceptT e) where
     toListT m = Select $ do
-        x <- lift $ runErrorT m
+        x <- lift $ runExceptT m
         case x of
             Left  _ -> return ()
             Right a -> yield a
