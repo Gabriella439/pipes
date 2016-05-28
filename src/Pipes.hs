@@ -61,7 +61,7 @@ module Pipes (
     , module Control.Monad.IO.Class
     , module Control.Monad.Trans.Class
     , module Control.Monad.Morph
-    , module Data.Foldable
+    , Foldable
     ) where
 
 import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
@@ -76,7 +76,7 @@ import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.Writer (MonadWriter(..))
-import Data.Foldable (Foldable)
+import Data.Foldable (Foldable, foldMap)
 import Data.Monoid (Monoid(..))
 import Pipes.Core
 import Pipes.Internal (Proxy(..))
@@ -421,7 +421,7 @@ instance (Foldable m) => Foldable (ListT m) where
         go p = case p of
             Request v _  -> closed v
             Respond a fu -> f a `mappend` go (fu ())
-            M       m    -> foldMap go m
+            M       m    -> Data.Foldable.foldMap go m
             Pure    _    -> mempty
     {-# INLINE foldMap #-}
 
