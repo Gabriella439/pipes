@@ -1,10 +1,9 @@
-{-# LANGUAGE
-    RankNTypes
-  , FlexibleInstances
-  , MultiParamTypeClasses
-  , UndecidableInstances
-  , Trustworthy
-  #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE Trustworthy           #-}
 
 {-| This module is the recommended entry point to the @pipes@ library.
 
@@ -64,7 +63,6 @@ module Pipes (
     , Foldable
     ) where
 
-import Control.Applicative (Applicative(pure, (<*>)), Alternative(empty, (<|>)))
 import Control.Monad (void)
 import Control.Monad.Except (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
@@ -76,11 +74,17 @@ import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.Writer (MonadWriter(..))
-import Data.Foldable (Foldable, foldMap)
-import Data.Monoid (Monoid(..))
 import Pipes.Core
 import Pipes.Internal (Proxy(..))
 import qualified Data.Foldable as F
+
+#if MIN_VERSION_base(4,8,0)
+import Control.Applicative (Alternative(..))
+#else
+import Control.Applicative
+import Data.Foldable (Foldable)
+import Data.Monoid
+#endif
 
 -- Re-exports
 import Control.Monad.Morph (MFunctor(hoist))
@@ -421,7 +425,7 @@ instance (Foldable m) => Foldable (ListT m) where
         go p = case p of
             Request v _  -> closed v
             Respond a fu -> f a `mappend` go (fu ())
-            M       m    -> Data.Foldable.foldMap go m
+            M       m    -> F.foldMap go m
             Pure    _    -> mempty
     {-# INLINE foldMap #-}
 

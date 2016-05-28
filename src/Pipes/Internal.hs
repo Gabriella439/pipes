@@ -18,13 +18,12 @@
     any functions which can violate the monad transformer laws.
 -}
 
-{-# LANGUAGE
-    FlexibleInstances
-  , MultiParamTypeClasses
-  , RankNTypes
-  , UndecidableInstances
-  , Trustworthy
-  #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE Trustworthy           #-}
 
 module Pipes.Internal (
     -- * Internal
@@ -35,8 +34,6 @@ module Pipes.Internal (
     , closed
     ) where
 
-import Control.Applicative (
-    Applicative(pure, (<*>), (*>)), Alternative(empty, (<|>)) )
 import Control.Monad (MonadPlus(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
@@ -45,7 +42,13 @@ import Control.Monad.Except (MonadError(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
-import Data.Monoid (Monoid(mempty,mappend))
+
+#if MIN_VERSION_base(4,8,0)
+import Control.Applicative (Alternative(..))
+#else
+import Control.Applicative
+import Data.Monoid
+#endif
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
     an upstream and downstream interface.

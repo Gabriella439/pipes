@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-| Many actions in base monad transformers cannot be automatically
     'Control.Monad.Trans.Class.lift'ed.  These functions lift these remaining
     actions so that they work in the 'Proxy' monad transformer.
@@ -53,10 +55,14 @@ import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Control.Monad.Trans.Writer.Strict as W
 import qualified Control.Monad.Trans.RWS.Strict as RWS
-import Data.Monoid (Monoid)
 import Pipes.Internal (Proxy(..), unsafeHoist)
 import Control.Monad.Morph (hoist, MFunctor(..))
 import Pipes.Core (runEffect, request, respond, (//>), (>\\))
+
+#if MIN_VERSION_base(4,8,0)
+#else
+import Data.Monoid
+#endif
 
 -- | Distribute 'Proxy' over a monad transformer
 distribute
