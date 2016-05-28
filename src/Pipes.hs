@@ -415,6 +415,16 @@ instance (Monad m) => Monad (ListT m) where
     m >>= f  = Select (for (enumerate m) (\a -> enumerate (f a)))
     fail _   = mzero
 
+instance (Foldable m) => Foldable (ListT m) where
+    foldMap f = go . enumerate
+      where
+        go p = case p of
+            Request v _  -> closed v
+            Respond a fu -> f a `mappend` go (fu ())
+            M       m    -> foldMap go m
+            Pure    _    -> mempty
+    {-# INLINE foldMap #-}
+
 instance MonadTrans ListT where
     lift m = Select (do
         a <- lift m
