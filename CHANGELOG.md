@@ -1,3 +1,21 @@
+4.2.0
+
+* BREAKING CHANGE: Switch from `ErrorT` to `ExceptT`
+* Add `Foldable` instance for `ListT`
+* Fix all warnings
+* Enable foldr/build fusion for `toList`
+
+4.1.9
+
+* Increase lower bound on `criterion`
+* Increase upper bound on `transformers` for tests/benchmarks
+* Optimize code by delaying `INLINABLE` annotations
+
+4.1.8
+
+* Increase upper bound on `transformers`
+* Prepare for MRP (Monad of no Return Proposal)
+
 4.1.7
 
 * Increase lower bound on `deepseq`
