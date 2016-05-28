@@ -1,4 +1,4 @@
-# Pipes v4.1.9
+# Pipes v4.2.0
 
 `pipes` is a clean and powerful stream processing library that lets you build
 and connect reusable streaming components.

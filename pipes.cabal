@@ -1,11 +1,11 @@
 Name: pipes
-Version: 4.1.9
+Version: 4.2.0
 Cabal-Version: >= 1.10
 Build-Type: Simple
 Tested-With: GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.2, GHC == 8.0.1
 License: BSD3
 License-File: LICENSE
-Copyright: 2012-2014 Gabriel Gonzalez
+Copyright: 2012-2016 Gabriel Gonzalez
 Author: Gabriel Gonzalez
 Maintainer: Gabriel439@gmail.com
 Bug-Reports: https://github.com/Gabriel439/Haskell-Pipes-Library/issues
@@ -71,7 +71,7 @@ Benchmark prelude-benchmarks
         criterion >= 1.1.1.0 && < 1.2,
         optparse-applicative >= 0.12 && < 0.13,
         mtl       >= 2.1     && < 2.3,
-        pipes     >= 4.0.0   && < 4.2
+        pipes
 
 test-suite tests
     Default-Language: Haskell2010
@@ -82,7 +82,7 @@ test-suite tests
 
     Build-Depends:
         base                       >= 4.4     && < 5   ,
-        pipes                      >= 4.0.0   && < 4.2 ,
+        pipes                                          ,
         QuickCheck                 >= 2.4     && < 3   ,
         mtl                        >= 2.1     && < 2.3 ,
         test-framework             >= 0.4     && < 1   ,
@@ -98,9 +98,9 @@ Benchmark lift-benchmarks
     GHC-Options:     -O2 -Wall -rtsopts -fno-warn-unused-do-bind
 
     Build-Depends:
-        base         >= 4.4     && < 5  ,
-        criterion    >= 1.1.1.0 && < 1.2,
-        optparse-applicative >= 0.12 && < 0.13,
-        mtl          >= 2.1     && < 2.3,
-        pipes        >= 4.0.0   && < 4.2,
-        transformers >= 0.2.0.0 && < 0.6
+        base                 >= 4.4     && < 5   ,
+        criterion            >= 1.1.1.0 && < 1.2 ,
+        optparse-applicative >= 0.12    && < 0.13,
+        mtl                  >= 2.1     && < 2.3 ,
+        pipes                                    ,
+        transformers         >= 0.2.0.0 && < 0.6
