@@ -404,22 +404,22 @@ p1 >-> p2 = (\() -> p1) +>> p2
 -}
 newtype ListT m a = Select { enumerate :: Producer a m () }
 
-instance (Monad m) => Functor (ListT m) where
+instance Monad m => Functor (ListT m) where
     fmap f p = Select (for (enumerate p) (\a -> yield (f a)))
 
-instance (Monad m) => Applicative (ListT m) where
+instance Monad m => Applicative (ListT m) where
     pure a = Select (yield a)
     mf <*> mx = Select (
         for (enumerate mf) (\f ->
         for (enumerate mx) (\x ->
         yield (f x) ) ) )
 
-instance (Monad m) => Monad (ListT m) where
+instance Monad m => Monad (ListT m) where
     return   = pure
     m >>= f  = Select (for (enumerate m) (\a -> enumerate (f a)))
     fail _   = mzero
 
-instance (Foldable m) => Foldable (ListT m) where
+instance Foldable m => Foldable (ListT m) where
     foldMap f = go . enumerate
       where
         go p = case p of
@@ -428,6 +428,16 @@ instance (Foldable m) => Foldable (ListT m) where
             M       m    -> F.foldMap go m
             Pure    _    -> mempty
     {-# INLINE foldMap #-}
+
+instance (Monad m, Traversable m) => Traversable (ListT m) where
+    traverse k (Select p) = fmap Select (traverse_ p)
+      where
+        traverse_ (Request v _ ) = closed v
+        traverse_ (Respond a fu) = _Respond <$> k a <*> traverse_ (fu ())
+          where
+            _Respond a_ a' = Respond a_ (\_ -> a')
+        traverse_ (M       m   ) = fmap M (sequenceA (fmap traverse_ m))
+        traverse_ (Pure     r  ) = pure (Pure r)
 
 instance MonadTrans ListT where
     lift m = Select (do
