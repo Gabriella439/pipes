@@ -83,6 +83,7 @@ import Control.Applicative (Alternative(..))
 #else
 import Control.Applicative
 import Data.Foldable (Foldable)
+import Data.Traversable (Traversable (traverse))
 import Data.Monoid
 #endif
 
@@ -428,6 +429,9 @@ instance (Foldable m) => Foldable (ListT m) where
             M       m    -> F.foldMap go m
             Pure    _    -> mempty
     {-# INLINE foldMap #-}
+
+instance (Monad m, Foldable m) => Traversable (ListT m) where
+  traverse f xs = Select . each <$> traverse f (F.toList xs)
 
 instance MonadTrans ListT where
     lift m = Select (do
