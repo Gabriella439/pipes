@@ -83,7 +83,7 @@ import Control.Applicative (Alternative(..))
 #else
 import Control.Applicative
 import Data.Foldable (Foldable)
-import Data.Traversable (Traversable, sequenceA)
+import Data.Traversable (Traversable(..))
 import Data.Monoid
 #endif
 
