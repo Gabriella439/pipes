@@ -437,7 +437,7 @@ instance (Monad m, Traversable m) => Traversable (ListT m) where
         traverse_ (Respond a fu) = _Respond <$> k a <*> traverse_ (fu ())
           where
             _Respond a_ a' = Respond a_ (\_ -> a')
-        traverse_ (M       m   ) = fmap M (sequenceA (fmap traverse_ m))
+        traverse_ (M       m   ) = fmap M (traverse traverse_ m)
         traverse_ (Pure     r  ) = pure (Pure r)
 
 instance MonadTrans ListT where
