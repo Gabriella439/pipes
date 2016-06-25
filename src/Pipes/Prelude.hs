@@ -613,7 +613,7 @@ loop k = for cat (every . k)
     Use these to fold the output of a 'Producer'.  Many of these folds will stop
     drawing elements if they can compute their result early, like 'any':
 
->>> P.any null P.stdinLn
+>>> P.any Prelude.null P.stdinLn
 Test<Enter>
 ABC<Enter>
 <Enter>
