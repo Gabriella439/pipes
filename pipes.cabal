@@ -35,6 +35,8 @@ Description:
   .
   Read "Pipes.Tutorial" for an extensive tutorial.
 Category: Control, Pipes
+Extra-Source-Files:
+    CHANGELOG.md
 Source-Repository head
     Type: git
     Location: https://github.com/Gabriel439/Haskell-Pipes-Library
