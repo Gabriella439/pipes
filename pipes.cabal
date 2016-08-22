@@ -49,7 +49,7 @@ Library
         base         >= 4.4     && < 5  ,
         transformers >= 0.2.0.0 && < 0.6,
         mmorph       >= 1.0.0   && < 1.1,
-        mtl          >= 2.1     && < 2.3
+        mtl          >= 2.2.1   && < 2.3
 
     Exposed-Modules:
         Pipes,
