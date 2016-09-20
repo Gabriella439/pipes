@@ -78,8 +78,13 @@ instance Monad m => Functor (Proxy a' a b' b m) where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (m >>= \p' -> return (go p'))
+            M          m   -> M (merge m)
             Pure    r      -> Pure (f r)
+          where
+            -- Merge M actions in the base monad.
+            merge m = m >>= \p' -> case p' of
+                M m' -> merge m'
+                _ -> return (go p')
 
 instance Monad m => Applicative (Proxy a' a b' b m) where
     pure      = Pure
@@ -87,8 +92,13 @@ instance Monad m => Applicative (Proxy a' a b' b m) where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            M          m   -> M (m >>= \p' -> return (go p'))
+            M          m   -> M (merge m)
             Pure    f      -> fmap f px
+          where
+            -- Merge M actions in the base monad.
+            merge m = m >>= \p' -> case p' of
+                M m' -> merge m'
+                _ -> return (go p')
     m *> k = m >>= (\_ -> k)
 
 instance Monad m => Monad (Proxy a' a b' b m) where
@@ -104,8 +114,13 @@ p0 `_bind` f = go p0 where
     go p = case p of
         Request a' fa  -> Request a' (\a  -> go (fa  a ))
         Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-        M          m   -> M (m >>= \p' -> return (go p'))
+        M m            -> M (merge m)
         Pure    r      -> f r
+      where
+        -- Merge M actions in the base monad.
+        merge m = m >>= \p' -> case p' of
+            M m' -> merge m'
+            _ -> return (go p')
 {-# NOINLINE[1] _bind #-}
 
 {-# RULES
