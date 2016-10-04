@@ -76,7 +76,6 @@ import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.Writer (MonadWriter(..))
 import Control.Monad.Zip (MonadZip(..))
-import Data.Semigroup (Semigroup(..))
 import Pipes.Core
 import Pipes.Internal (Proxy(..))
 import qualified Data.Foldable as F
@@ -477,10 +476,6 @@ instance MFunctor ListT where
 instance MMonad ListT where
     embed f m = Select (enumerate (embed f m))
     {-# INLINE embed #-}
-
-instance Monad m => Semigroup (ListT m a) where
-    (<>) = (<|>)
-    {-# INLINE (<>) #-}
 
 instance (Monad m) => Monoid (ListT m a) where
     mempty = empty
