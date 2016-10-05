@@ -64,6 +64,7 @@ module Pipes (
     ) where
 
 import Control.Monad (void)
+import Control.Monad.Catch (MonadThrow(..), MonadCatch(..), MonadMask(..))
 import Control.Monad.Except (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad (MonadPlus(mzero, mplus))
@@ -74,6 +75,7 @@ import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Control.Monad.Trans.Identity (IdentityT(runIdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.Writer (MonadWriter(..))
+import Control.Monad.Zip (MonadZip(..))
 import Pipes.Core
 import Pipes.Internal (Proxy(..))
 import qualified Data.Foldable as F
@@ -88,7 +90,7 @@ import Data.Monoid
 #endif
 
 -- Re-exports
-import Control.Monad.Morph (MFunctor(hoist))
+import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
 
 infixl 4 <~
 infixr 4 ~>
@@ -407,9 +409,11 @@ newtype ListT m a = Select { enumerate :: Producer a m () }
 
 instance Monad m => Functor (ListT m) where
     fmap f p = Select (for (enumerate p) (\a -> yield (f a)))
+    {-# INLINE fmap #-}
 
 instance Monad m => Applicative (ListT m) where
     pure a = Select (yield a)
+    {-# INLINE pure #-}
     mf <*> mx = Select (
         for (enumerate mf) (\f ->
         for (enumerate mx) (\x ->
@@ -417,8 +421,11 @@ instance Monad m => Applicative (ListT m) where
 
 instance Monad m => Monad (ListT m) where
     return   = pure
+    {-# INLINE return #-}
     m >>= f  = Select (for (enumerate m) (\a -> enumerate (f a)))
+    {-# INLINE (>>=) #-}
     fail _   = mzero
+    {-# INLINE fail #-}
 
 instance Foldable m => Foldable (ListT m) where
     foldMap f = go . enumerate
@@ -447,35 +454,51 @@ instance MonadTrans ListT where
 
 instance (MonadIO m) => MonadIO (ListT m) where
     liftIO m = lift (liftIO m)
+    {-# INLINE liftIO #-}
 
 instance (Monad m) => Alternative (ListT m) where
     empty = Select (return ())
+    {-# INLINE empty #-}
     p1 <|> p2 = Select (do
         enumerate p1
         enumerate p2 )
 
 instance (Monad m) => MonadPlus (ListT m) where
     mzero = empty
+    {-# INLINE mzero #-}
     mplus = (<|>)
+    {-# INLINE mplus #-}
 
 instance MFunctor ListT where
     hoist morph = Select . hoist morph . enumerate
+    {-# INLINE hoist #-}
+
+instance MMonad ListT where
+    embed f m = Select (enumerate (embed f m))
+    {-# INLINE embed #-}
 
 instance (Monad m) => Monoid (ListT m a) where
     mempty = empty
+    {-# INLINE mempty #-}
     mappend = (<|>)
+    {-# INLINE mappend #-}
 
 instance (MonadState s m) => MonadState s (ListT m) where
     get     = lift  get
+    {-# INLINE get #-}
 
     put   s = lift (put   s)
+    {-# INLINE put #-}
 
     state f = lift (state f)
+    {-# INLINE state #-}
 
 instance (MonadWriter w m) => MonadWriter w (ListT m) where
     writer = lift . writer
+    {-# INLINE writer #-}
 
     tell w = lift (tell w)
+    {-# INLINE tell #-}
 
     listen l = Select (go (enumerate l) mempty)
       where
@@ -500,15 +523,43 @@ instance (MonadWriter w m) => MonadWriter w (ListT m) where
 
 instance (MonadReader i m) => MonadReader i (ListT m) where
     ask = lift ask
+    {-# INLINE ask #-}
 
     local f l = Select (local f (enumerate l))
+    {-# INLINE local #-}
 
     reader f = lift (reader f)
+    {-# INLINE reader #-}
 
 instance (MonadError e m) => MonadError e (ListT m) where
     throwError e = lift (throwError e)
+    {-# INLINE throwError #-}
 
     catchError l k = Select (catchError (enumerate l) (\e -> enumerate (k e)))
+    {-# INLINE catchError #-}
+
+instance MonadThrow m => MonadThrow (ListT m) where
+    throwM = Select . throwM
+    {-# INLINE throwM #-}
+
+instance MonadCatch m => MonadCatch (ListT m) where
+    catch l k = Select (catch (enumerate l) (\e -> enumerate (k e)))
+    {-# INLINE catch #-}
+
+instance Monad m => MonadZip (ListT m) where
+    mzipWith f = go
+      where
+        go xs ys = Select $ do
+            xres <- lift $ next (enumerate xs)
+            case xres of
+                Left r -> return r
+                Right (x, xnext) -> do
+                    yres <- lift $ next (enumerate ys)
+                    case yres of
+                        Left r -> return r
+                        Right (y, ynext) -> do
+                            yield (f x y)
+                            enumerate (go (Select xnext) (Select ynext))
 
 -- | Run a self-contained `ListT` computation
 runListT :: Monad m => ListT m a -> m ()
