@@ -574,7 +574,7 @@ evalListT :: Monad m => ListT m a -> m [a]
 evalListT listT =
       runEffect
   $   execWriterP
-  $   (writerP $ (\() -> ((), [])) <$> (enumerate $ listT >> mzero))
+  $   (writerP $ (\() -> ((), [])) <$> enumerate listT)
   >-> (M.forever $ pass ((\element -> ((), (element :))) <$> await))
 
 {-| 'Enumerable' generalizes 'Data.Foldable.Foldable', converting effectful
