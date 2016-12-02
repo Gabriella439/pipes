@@ -34,7 +34,6 @@ module Pipes.Internal (
     , closed
     ) where
 
-import Control.Monad (MonadPlus(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
@@ -234,22 +233,6 @@ instance MonadCatch m => MonadCatch (Proxy a' a b' b m) where
             M          m   -> M ((do
                 p' <- m
                 return (go p') ) `catch` (\e -> return (f e)) )
-
-instance MonadPlus m => Alternative (Proxy a' a b' b m) where
-    empty = mzero
-    (<|>) = mplus
-
-instance MonadPlus m => MonadPlus (Proxy a' a b' b m) where
-    mzero = lift mzero
-    mplus p0 p1 = go p0
-      where
-        go p = case p of
-            Request a' fa  -> Request a' (\a  -> go (fa  a ))
-            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
-            Pure    r      -> Pure r
-            M          m   -> M ((do
-                p' <- m
-                return (go p') ) `mplus` return p1 )
 
 {-| The monad transformer laws are correct when viewed through the 'observe'
     function:
