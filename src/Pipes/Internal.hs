@@ -50,6 +50,8 @@ import Control.Applicative
 import Data.Monoid
 #endif
 
+import qualified Control.Monad.Catch
+
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
     an upstream and downstream interface.
 
@@ -232,7 +234,7 @@ instance MonadCatch m => MonadCatch (Proxy a' a b' b m) where
             Pure    r      -> Pure r
             M          m   -> M ((do
                 p' <- m
-                return (go p') ) `catch` (\e -> return (f e)) )
+                return (go p') ) `Control.Monad.Catch.catch` (\e -> return (f e)) )
 
 {-| The monad transformer laws are correct when viewed through the 'observe'
     function:
