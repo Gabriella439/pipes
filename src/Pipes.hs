@@ -89,6 +89,8 @@ import Data.Traversable (Traversable(..))
 import Data.Monoid
 #endif
 
+import qualified Control.Monad.Catch
+
 -- Re-exports
 import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
 
@@ -543,7 +545,7 @@ instance MonadThrow m => MonadThrow (ListT m) where
     {-# INLINE throwM #-}
 
 instance MonadCatch m => MonadCatch (ListT m) where
-    catch l k = Select (catch (enumerate l) (\e -> enumerate (k e)))
+    catch l k = Select (Control.Monad.Catch.catch (enumerate l) (\e -> enumerate (k e)))
     {-# INLINE catch #-}
 
 instance Monad m => MonadZip (ListT m) where
