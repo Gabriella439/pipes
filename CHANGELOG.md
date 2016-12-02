@@ -1,3 +1,14 @@
+4.3.0
+
+* BREAKING CHANGE: Remove `Alternative`/`MonadPlus` instances for `Proxy`
+    * See commit 08e7302f43dbf2a40bd367c5ee73ee3367e17768 which explains why
+* Add `Traversable` instance for `ListT`
+* New `MonadThrow`/`MonadCatch`/`MMonad`/`Semigroup`/`MonadZip` instances for
+  `ListT`
+* New `MonadThrow`/`MonadCatch` instances for `Proxy`
+* Fix lower bound on `mtl`
+* Increase upper bound on `optparse-applicative`
+
 4.2.0
 
 * BREAKING CHANGE: Switch from `ErrorT` to `ExceptT`
