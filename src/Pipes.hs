@@ -476,7 +476,12 @@ instance MFunctor ListT where
     {-# INLINE hoist #-}
 
 instance MMonad ListT where
-    embed f m = Select (enumerate (embed f m))
+    embed f (Select p0) = Select (loop p0)
+      where
+        loop (Request a' fa ) = Request a' (\a  -> loop (fa  a ))
+        loop (Respond b  fb') = Respond b  (\b' -> loop (fb' b'))
+        loop (M          m  ) = for (enumerate (fmap loop (f m))) id
+        loop (Pure    r     ) = Pure r
     {-# INLINE embed #-}
 
 instance (Monad m) => Monoid (ListT m a) where
