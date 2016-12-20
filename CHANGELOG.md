@@ -1,3 +1,12 @@
+4.3.2
+
+* BUG FIX: Fix `MMonad` instance for `ListT`
+    * The old instance was an infinite loop
+
+4.3.1
+
+* Support building against `ghc-7.4`
+
 4.3.0
 
 * BREAKING CHANGE: Remove `Alternative`/`MonadPlus` instances for `Proxy`
