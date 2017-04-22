@@ -1,3 +1,6 @@
+4.3.3
+    * Make `X` a synonym for `Data.Void.Void`
+
 4.3.2
 
 * BUG FIX: Fix `MMonad` instance for `ListT`
