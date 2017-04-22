@@ -42,6 +42,7 @@ import Control.Monad.Catch (MonadThrow(..), MonadCatch(..), MonadMask(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
+import Data.Void (Void)
 
 #if MIN_VERSION_base(4,8,0)
 import Control.Applicative (Alternative(..))
@@ -51,6 +52,7 @@ import Data.Monoid
 #endif
 
 import qualified Control.Monad.Catch
+import qualified Data.Void
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
     an upstream and downstream interface.
@@ -260,15 +262,10 @@ observe p0 = M (go p0) where
         Pure    r      -> return (Pure r)
 {-# INLINABLE observe #-}
 
-{-| The empty type, used to close output ends
-
-    When @Data.Void@ is merged into @base@, this will change to:
-
-> type X = Void
--}
-newtype X = X X
+-- | The empty type, used to close output ends
+type X = Void
 
 -- | Use 'closed' to \"handle\" impossible outputs
 closed :: X -> a
-closed (X x) = closed x
+closed = Data.Void.absurd
 {-# INLINABLE closed #-}
