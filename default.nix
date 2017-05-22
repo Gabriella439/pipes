@@ -1,9 +1,10 @@
-{ mkDerivation, base, exceptions, mmorph, mtl, QuickCheck, stdenv
-, test-framework, test-framework-quickcheck2, transformers, void
+{ mkDerivation, base, criterion, exceptions, mmorph, mtl
+, optparse-applicative, QuickCheck, stdenv, test-framework
+, test-framework-quickcheck2, transformers, void
 }:
 mkDerivation {
   pname = "pipes";
-  version = "4.3.2";
+  version = "4.3.3";
   src = ./.;
   libraryHaskellDepends = [
     base exceptions mmorph mtl transformers void
@@ -11,6 +12,9 @@ mkDerivation {
   testHaskellDepends = [
     base mtl QuickCheck test-framework test-framework-quickcheck2
     transformers
+  ];
+  benchmarkHaskellDepends = [
+    base criterion mtl optparse-applicative transformers
   ];
   description = "Compositional pipelines";
   license = stdenv.lib.licenses.bsd3;
