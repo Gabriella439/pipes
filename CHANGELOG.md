@@ -1,5 +1,10 @@
+4.3.4
+
+* Increase upper bound on `mmorph`
+
 4.3.3
-    * Make `X` a synonym for `Data.Void.Void`
+
+* Make `X` a synonym for `Data.Void.Void`
 
 4.3.2
 
