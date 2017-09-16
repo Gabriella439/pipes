@@ -48,8 +48,8 @@ import Data.Void (Void)
 import Control.Applicative (Alternative(..))
 #else
 import Control.Applicative
-import Data.Monoid
 #endif
+import Data.Semigroup
 
 import qualified Control.Monad.Catch
 import qualified Data.Void
@@ -121,14 +121,19 @@ p0 `_bind` f = go p0 where
         _bind (Pure    r   ) f = f r;
   #-}
 
-instance (Monad m, Monoid r) => Monoid (Proxy a' a b' b m r) where
-    mempty        = Pure mempty
-    mappend p1 p2 = go p1 where
+instance (Monad m, Semigroup r) => Semigroup (Proxy a' a b' b m r) where
+    p1 <> p2 = go p1 where
         go p = case p of
             Request a' fa  -> Request a' (\a  -> go (fa  a ))
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (m >>= \p' -> return (go p'))
-            Pure    r1     -> fmap (mappend r1) p2
+            Pure    r1     -> fmap (r1 <>) p2
+
+instance (Monad m, Monoid r, Semigroup r) => Monoid (Proxy a' a b' b m r) where
+    mempty        = Pure mempty
+#if !(MIN_VERSION_base(4,11,0))
+    mappend = (<>)
+#endif
 
 instance MonadTrans (Proxy a' a b' b) where
     lift m = M (m >>= \r -> return (Pure r))

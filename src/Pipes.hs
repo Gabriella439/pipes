@@ -86,10 +86,10 @@ import Control.Applicative (Alternative(..))
 import Control.Applicative
 import Data.Foldable (Foldable)
 import Data.Traversable (Traversable(..))
-import Data.Monoid
 #endif
 
 import qualified Control.Monad.Catch
+import Data.Semigroup
 
 -- Re-exports
 import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
@@ -484,11 +484,17 @@ instance MMonad ListT where
         loop (Pure    r     ) = Pure r
     {-# INLINE embed #-}
 
+instance (Monad m) => Semigroup (ListT m a) where
+    (<>) = (<|>)
+    {-# INLINE (<>) #-}
+
 instance (Monad m) => Monoid (ListT m a) where
     mempty = empty
     {-# INLINE mempty #-}
+#if !(MIN_VERSION_base(4,11,0))
     mappend = (<|>)
     {-# INLINE mappend #-}
+#endif
 
 instance (MonadState s m) => MonadState s (ListT m) where
     get     = lift  get
