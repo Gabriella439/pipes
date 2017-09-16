@@ -63,11 +63,10 @@ module Pipes (
     , Foldable
     ) where
 
-import Control.Monad (void)
-import Control.Monad.Catch (MonadThrow(..), MonadCatch(..), MonadMask(..))
+import Control.Monad (void, MonadPlus(mzero, mplus))
+import Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import Control.Monad.Except (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Control.Monad (MonadPlus(mzero, mplus))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Trans.Class (MonadTrans(lift))
@@ -87,8 +86,6 @@ import Control.Applicative
 import Data.Foldable (Foldable)
 import Data.Traversable (Traversable(..))
 #endif
-
-import qualified Control.Monad.Catch
 import Data.Semigroup
 
 -- Re-exports

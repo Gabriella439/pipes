@@ -38,7 +38,7 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
 import Control.Monad.Except (MonadError(..))
-import Control.Monad.Catch (MonadThrow(..), MonadCatch(..), MonadMask(..))
+import Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
 import Control.Monad.Writer (MonadWriter(..))
@@ -51,7 +51,6 @@ import Control.Applicative
 #endif
 import Data.Semigroup
 
-import qualified Control.Monad.Catch
 import qualified Data.Void
 
 {-| A 'Proxy' is a monad transformer that receives and sends information on both
