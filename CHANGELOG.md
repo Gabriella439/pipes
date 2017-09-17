@@ -1,3 +1,7 @@
+4.3.5
+
+* Support `Semigroup` being a super-class of `Monoid`
+
 4.3.4
 
 * Increase upper bound on `mmorph`

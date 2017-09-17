@@ -1,13 +1,13 @@
 { mkDerivation, base, criterion, exceptions, mmorph, mtl
-, optparse-applicative, QuickCheck, stdenv, test-framework
-, test-framework-quickcheck2, transformers, void
+, optparse-applicative, QuickCheck, semigroups, stdenv
+, test-framework, test-framework-quickcheck2, transformers, void
 }:
 mkDerivation {
   pname = "pipes";
-  version = "4.3.4";
+  version = "4.3.5";
   src = ./.;
   libraryHaskellDepends = [
-    base exceptions mmorph mtl transformers void
+    base exceptions mmorph mtl semigroups transformers void
   ];
   testHaskellDepends = [
     base mtl QuickCheck test-framework test-framework-quickcheck2
