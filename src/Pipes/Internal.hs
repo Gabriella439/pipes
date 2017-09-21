@@ -41,7 +41,7 @@ import Control.Monad.Except (MonadError(..))
 import Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
-import Control.Monad.Writer (MonadWriter(..))
+import Control.Monad.Writer (MonadWriter(..), censor)
 import Data.Void (Void)
 
 #if MIN_VERSION_base(4,8,0)
@@ -211,7 +211,7 @@ instance MonadWriter w m => MonadWriter w (Proxy a' a b' b m) where
             Request a' fa  -> Request a' (\a  -> go (fa  a ) w)
             Respond b  fb' -> Respond b  (\b' -> go (fb' b') w)
             M       m      -> M (do
-                (p', w') <- listen m
+                (p', w') <- censor (const mempty) (listen m)
                 return (go p' $! mappend w w') )
             Pure   (r, f)  -> M (pass (return (Pure r, \_ -> f w)))
 
