@@ -1,3 +1,7 @@
+4.3.6
+
+* Fix implementation of `pass` in `MonadWriter` instance for `Proxy`
+
 4.3.5
 
 * Support `Semigroup` being a super-class of `Monoid`
