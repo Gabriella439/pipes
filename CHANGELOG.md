@@ -1,3 +1,7 @@
+4.3.7
+
+* Documentation fix
+
 4.3.6
 
 * Fix implementation of `pass` in `MonadWriter` instance for `Proxy`
