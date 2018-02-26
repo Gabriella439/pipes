@@ -1,3 +1,7 @@
+4.3.8
+
+* Increase upper bound on `exceptions`
+
 4.3.7
 
 * Documentation fix
