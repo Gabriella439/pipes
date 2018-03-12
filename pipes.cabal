@@ -48,7 +48,7 @@ Library
     Build-Depends:
         base         >= 4.4     && < 5   ,
         transformers >= 0.2.0.0 && < 0.6 ,
-        exceptions   >= 0.4     && < 0.10,
+        exceptions   >= 0.4     && < 0.11,
         mmorph       >= 1.0.0   && < 1.2 ,
         mtl          >= 2.2.1   && < 2.3 ,
         void         >= 0.4     && < 0.8 ,
