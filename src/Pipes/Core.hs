@@ -221,7 +221,7 @@ f '/>/' 'respond' = f
     The following diagrams show the flow of information:
 
 @
-'respond' :: 'Monad' m
+'respond' :: 'Functor' m
        =>  a -> 'Proxy' x' x a' a m a'
 
 \          a
@@ -236,7 +236,7 @@ f '/>/' 'respond' = f
           v
           a'
 
-('/>/') :: 'Monad' m
+('/>/') :: 'Functor' m
       => (a -> 'Proxy' x' x b' b m a')
       -> (b -> 'Proxy' x' x c' c m b')
       -> (a -> 'Proxy' x' x c' c m a')
@@ -253,7 +253,7 @@ f '/>/' 'respond' = f
           v                  \\      v                      v
           a'                  \\==== b'                     a'
 
-('//>') :: 'Monad' m
+('//>') :: 'Functor' m
       => 'Proxy' x' x b' b m a'
       -> (b -> 'Proxy' x' x c' c m b')
       -> 'Proxy' x' x c' c m a'
@@ -278,7 +278,7 @@ f '/>/' 'respond' = f
 
     'respond' is the identity of the respond category.
 -}
-respond :: Monad m => a -> Proxy x' x a' a m a'
+respond :: Functor m => a -> Proxy x' x a' a m a'
 respond a = Respond a Pure
 {-# INLINABLE [1] respond #-}
 
@@ -291,7 +291,7 @@ respond a = Respond a Pure
     ('/>/') is the composition operator of the respond category.
 -}
 (/>/)
-    :: Monad m
+    :: Functor m
     => (a -> Proxy x' x b' b m a')
     -- ^
     -> (b -> Proxy x' x c' c m b')
@@ -306,7 +306,7 @@ respond a = Respond a Pure
     Point-ful version of ('/>/')
 -}
 (//>)
-    :: Monad m
+    :: Functor m
     =>       Proxy x' x b' b m a'
     -- ^
     -> (b -> Proxy x' x c' c m b')
@@ -318,7 +318,7 @@ p0 //> fb = go p0
     go p = case p of
         Request x' fx  -> Request x' (\x -> go (fx x))
         Respond b  fb' -> fb b >>= \b' -> go (fb' b')
-        M          m   -> M (m >>= \p' -> return (go p'))
+        M          m   -> M (go <$> m)
         Pure       a   -> Pure a
 {-# INLINE [1] (//>) #-}
 
@@ -328,7 +328,7 @@ p0 //> fb = go p0
     "(Respond b  fb') //> fb" forall b  fb' fb .
         (Respond b  fb') //> fb = fb b >>= \b' -> fb' b' //> fb;
     "(M          m  ) //> fb" forall    m   fb .
-        (M          m  ) //> fb = M (m >>= \p' -> return (p' //> fb));
+        (M          m  ) //> fb = M ((\p' -> p' //> fb) <$> m);
     "(Pure      a   ) //> fb" forall a      fb .
         (Pure    a     ) //> fb = Pure a;
   #-}
@@ -355,7 +355,7 @@ f '\>\' 'request' = f
     The following diagrams show the flow of information:
 
 @
-'request' :: 'Monad' m
+'request' :: 'Functor' m
         =>  a' -> 'Proxy' a' a y' y m a
 
 \          a'
@@ -370,7 +370,7 @@ f '\>\' 'request' = f
           v
           a
 
-('\>\') :: 'Monad' m
+('\>\') :: 'Functor' m
       => (b' -> 'Proxy' a' a y' y m b)
       -> (c' -> 'Proxy' b' b y' y m c)
       -> (c' -> 'Proxy' a' a y' y m c)
@@ -387,7 +387,7 @@ f '\>\' 'request' = f
           v        /               v                      v
           b ======/                c                      c
 
-('>\\') :: Monad m
+('>\\') :: Functor m
       => (b' -> Proxy a' a y' y m b)
       -> Proxy b' b y' y m c
       -> Proxy a' a y' y m c
@@ -410,7 +410,7 @@ f '\>\' 'request' = f
 
     'request' is the identity of the request category.
 -}
-request :: Monad m => a' -> Proxy a' a y' y m a
+request :: Functor m => a' -> Proxy a' a y' y m a
 request a' = Request a' Pure
 {-# INLINABLE [1] request #-}
 
@@ -423,7 +423,7 @@ request a' = Request a' Pure
     ('\>\') is the composition operator of the request category.
 -}
 (\>\)
-    :: Monad m
+    :: Functor m
     => (b' -> Proxy a' a y' y m b)
     -- ^
     -> (c' -> Proxy b' b y' y m c)
@@ -438,7 +438,7 @@ request a' = Request a' Pure
     Point-ful version of ('\>\')
 -}
 (>\\)
-    :: Monad m
+    :: Functor m
     => (b' -> Proxy a' a y' y m b)
     -- ^
     ->        Proxy b' b y' y m c
@@ -450,7 +450,7 @@ fb' >\\ p0 = go p0
     go p = case p of
         Request b' fb  -> fb' b' >>= \b -> go (fb b)
         Respond x  fx' -> Respond x (\x' -> go (fx' x'))
-        M          m   -> M (m >>= \p' -> return (go p'))
+        M          m   -> M (go <$> m)
         Pure       a   -> Pure a
 {-# INLINE [1] (>\\) #-}
 
@@ -460,7 +460,7 @@ fb' >\\ p0 = go p0
     "fb' >\\ (Respond x  fx')" forall fb' x  fx' .
         fb' >\\ (Respond x  fx') = Respond x (\x' -> fb' >\\ fx' x');
     "fb' >\\ (M          m  )" forall fb'    m   .
-        fb' >\\ (M          m  ) = M (m >>= \p' -> return (fb' >\\ p'));
+        fb' >\\ (M          m  ) = M ((\p' -> fb' >\\ p') <$> m);
     "fb' >\\ (Pure    a    )" forall fb' a      .
         fb' >\\ (Pure    a     ) = Pure a;
   #-}
@@ -485,7 +485,7 @@ f '>~>' 'push' = f
     The following diagram shows the flow of information:
 
 @
-'push'  :: 'Monad' m
+'push'  :: 'Functor' m
       =>  a -> 'Proxy' a' a a' a m r
 
 \          a
@@ -500,7 +500,7 @@ f '>~>' 'push' = f
           v
           r
 
-('>~>') :: 'Monad' m
+('>~>') :: 'Functor' m
       => (a -> 'Proxy' a' a b' b m r)
       -> (b -> 'Proxy' b' b c' c m r)
       -> (a -> 'Proxy' a' a c' c m r)
@@ -528,7 +528,7 @@ f '>~>' 'push' = f
 
     'push' is the identity of the push category.
 -}
-push :: Monad m => a -> Proxy a' a a' a m r
+push :: Functor m => a -> Proxy a' a a' a m r
 push = go
   where
     go a = Respond a (\a' -> Request a' go)
@@ -544,7 +544,7 @@ push = go
     ('>~>') is the composition operator of the push category.
 -}
 (>~>)
-    :: Monad m
+    :: Functor m
     => (_a -> Proxy a' a b' b m r)
     -- ^
     -> ( b -> Proxy b' b c' c m r)
@@ -559,7 +559,7 @@ push = go
     Point-ful version of ('>~>')
 -}
 (>>~)
-    :: Monad m
+    :: Functor m
     =>       Proxy a' a b' b m r
     -- ^
     -> (b -> Proxy b' b c' c m r)
@@ -569,7 +569,7 @@ push = go
 p >>~ fb = case p of
     Request a' fa  -> Request a' (\a -> fa a >>~ fb)
     Respond b  fb' -> fb' +>> fb b
-    M          m   -> M (m >>= \p' -> return (p' >>~ fb))
+    M          m   -> M ((\p' -> p' >>~ fb) <$> m)
     Pure       r   -> Pure r
 {-# INLINE [1] (>>~) #-}
 
@@ -595,7 +595,7 @@ f '>+>' 'pull' = f
     The following diagrams show the flow of information:
 
 @
-'pull'  :: 'Monad' m
+'pull'  :: 'Functor' m
       =>  a' -> 'Proxy' a' a a' a m r
 
 \          a'
@@ -610,7 +610,7 @@ f '>+>' 'pull' = f
           v
           r
 
-('>+>') :: 'Monad' m
+('>+>') :: 'Functor' m
       -> (b' -> 'Proxy' a' a b' b m r)
       -> (c' -> 'Proxy' b' b c' c m r)
       -> (c' -> 'Proxy' a' a c' c m r)
@@ -638,7 +638,7 @@ f '>+>' 'pull' = f
 
     'pull' is the identity of the pull category.
 -}
-pull :: Monad m => a' -> Proxy a' a a' a m r
+pull :: Functor m => a' -> Proxy a' a a' a m r
 pull = go
   where
     go a' = Request a' (\a -> Respond a go)
@@ -654,7 +654,7 @@ pull = go
     ('>+>') is the composition operator of the pull category.
 -}
 (>+>)
-    :: Monad m
+    :: Functor m
     => ( b' -> Proxy a' a b' b m r)
     -- ^
     -> (_c' -> Proxy b' b c' c m r)
@@ -669,7 +669,7 @@ pull = go
     Point-ful version of ('>+>')
 -}
 (+>>)
-    :: Monad m
+    :: Functor m
     => (b' -> Proxy a' a b' b m r)
     -- ^
     ->        Proxy b' b c' c m r
@@ -679,7 +679,7 @@ pull = go
 fb' +>> p = case p of
     Request b' fb  -> fb' b' >>~ fb
     Respond c  fc' -> Respond c (\c' -> fb' +>> fc' c')
-    M          m   -> M (m >>= \p' -> return (fb' +>> p'))
+    M          m   -> M ((\p' -> fb' +>> p') <$> m)
     Pure       r   -> Pure r
 {-# INLINABLE [1] (+>>) #-}
 
@@ -716,13 +716,13 @@ fb' +>> p = case p of
 -}
 
 -- | Switch the upstream and downstream ends
-reflect :: Monad m => Proxy a' a b' b m r -> Proxy b b' a a' m r
+reflect :: Functor m => Proxy a' a b' b m r -> Proxy b b' a a' m r
 reflect = go
   where
     go p = case p of
         Request a' fa  -> Respond a' (\a  -> go (fa  a ))
         Respond b  fb' -> Request b  (\b' -> go (fb' b'))
-        M          m   -> M (m >>= \p' -> return (go p'))
+        M          m   -> M (go <$> m)
         Pure    r      -> Pure r
 {-# INLINABLE reflect #-}
 
@@ -772,7 +772,7 @@ type Client' a' a m r = forall y' y . Proxy a' a y' y m r
 
 -- | Equivalent to ('/>/') with the arguments flipped
 (\<\)
-    :: Monad m
+    :: Functor m
     => (b -> Proxy x' x c' c m b')
     -- ^
     -> (a -> Proxy x' x b' b m a')
@@ -784,7 +784,7 @@ p1 \<\ p2 = p2 />/ p1
 
 -- | Equivalent to ('\>\') with the arguments flipped
 (/</)
-    :: Monad m
+    :: Functor m
     => (c' -> Proxy b' b x' x m c)
     -- ^
     -> (b' -> Proxy a' a x' x m b)
@@ -796,7 +796,7 @@ p1 /</ p2 = p2 \>\ p1
 
 -- | Equivalent to ('>~>') with the arguments flipped
 (<~<)
-    :: Monad m
+    :: Functor m
     => (b -> Proxy b' b c' c m r)
     -- ^
     -> (a -> Proxy a' a b' b m r)
@@ -808,7 +808,7 @@ p1 <~< p2 = p2 >~> p1
 
 -- | Equivalent to ('>+>') with the arguments flipped
 (<+<)
-    :: Monad m
+    :: Functor m
     => (c' -> Proxy b' b c' c m r)
     -- ^
     -> (b' -> Proxy a' a b' b m r)
@@ -820,7 +820,7 @@ p1 <+< p2 = p2 >+> p1
 
 -- | Equivalent to ('//>') with the arguments flipped
 (<\\)
-    :: Monad m
+    :: Functor m
     => (b -> Proxy x' x c' c m b')
     -- ^
     ->       Proxy x' x b' b m a'
@@ -832,7 +832,7 @@ f <\\ p = p //> f
 
 -- | Equivalent to ('>\\') with the arguments flipped
 (//<)
-    :: Monad m
+    :: Functor m
     =>        Proxy b' b y' y m c
     -- ^
     -> (b' -> Proxy a' a y' y m b)
@@ -844,7 +844,7 @@ p //< f = f >\\ p
 
 -- | Equivalent to ('>>~') with the arguments flipped
 (~<<)
-    :: Monad m
+    :: Functor m
     => (b  -> Proxy b' b c' c m r)
     -- ^
     ->        Proxy a' a b' b m r
@@ -856,7 +856,7 @@ k ~<< p = p >>~ k
 
 -- | Equivalent to ('+>>') with the arguments flipped
 (<<+)
-    :: Monad m
+    :: Functor m
     =>         Proxy b' b c' c m r
     -- ^
     -> (b'  -> Proxy a' a b' b m r)

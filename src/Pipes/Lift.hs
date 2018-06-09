@@ -97,7 +97,7 @@ runExceptP
     :: Monad m
     => Proxy a' a b' b (E.ExceptT e m) r
     -> Proxy a' a b' b m (Either e r)
-runExceptP    = E.runExceptT . distribute 
+runExceptP    = E.runExceptT . distribute
 {-# INLINABLE runExceptP #-}
 
 -- | Catch an error in the base monad
