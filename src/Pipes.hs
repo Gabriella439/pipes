@@ -136,17 +136,17 @@ f '~>' 'yield' = f
 'yield' :: 'Monad' m => a -> 'Pipe' x a m ()
 @
 -}
-yield :: Monad m => a -> Producer' a m ()
+yield :: Functor m => a -> Producer' a m ()
 yield = respond
 {-# INLINABLE [1] yield #-}
 
 {-| @(for p body)@ loops over @p@ replacing each 'yield' with @body@.
 
 @
-'for' :: 'Monad' m => 'Producer' b m r -> (b -> 'Effect'       m ()) -> 'Effect'       m r
-'for' :: 'Monad' m => 'Producer' b m r -> (b -> 'Producer'   c m ()) -> 'Producer'   c m r
-'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Consumer' x   m ()) -> 'Consumer' x   m r
-'for' :: 'Monad' m => 'Pipe'   x b m r -> (b -> 'Pipe'     x c m ()) -> 'Pipe'     x c m r
+'for' :: 'Functor' m => 'Producer' b m r -> (b -> 'Effect'       m ()) -> 'Effect'       m r
+'for' :: 'Functor' m => 'Producer' b m r -> (b -> 'Producer'   c m ()) -> 'Producer'   c m r
+'for' :: 'Functor' m => 'Pipe'   x b m r -> (b -> 'Consumer' x   m ()) -> 'Consumer' x   m r
+'for' :: 'Functor' m => 'Pipe'   x b m r -> (b -> 'Pipe'     x c m ()) -> 'Pipe'     x c m r
 @
 
     The following diagrams show the flow of information:
@@ -167,7 +167,7 @@ x ==>    p    ==> b   ---'   x ==>   body  ==> c     =     x ==> 'for' p body  =
 
     For a more complete diagram including bidirectional flow, see "Pipes.Core#respond-diagram".
 -}
-for :: Monad m
+for :: Functor m
     =>       Proxy x' x b' b m a'
     -- ^
     -> (b -> Proxy x' x c' c m b')
@@ -220,10 +220,10 @@ for = (//>)
 {-| Compose loop bodies
 
 @
-('~>') :: 'Monad' m => (a -> 'Producer' b m r) -> (b -> 'Effect'       m ()) -> (a -> 'Effect'       m r)
-('~>') :: 'Monad' m => (a -> 'Producer' b m r) -> (b -> 'Producer'   c m ()) -> (a -> 'Producer'   c m r)
-('~>') :: 'Monad' m => (a -> 'Pipe'   x b m r) -> (b -> 'Consumer' x   m ()) -> (a -> 'Consumer' x   m r)
-('~>') :: 'Monad' m => (a -> 'Pipe'   x b m r) -> (b -> 'Pipe'     x c m ()) -> (a -> 'Pipe'     x c m r)
+('~>') :: 'Functor' m => (a -> 'Producer' b m r) -> (b -> 'Effect'       m ()) -> (a -> 'Effect'       m r)
+('~>') :: 'Functor' m => (a -> 'Producer' b m r) -> (b -> 'Producer'   c m ()) -> (a -> 'Producer'   c m r)
+('~>') :: 'Functor' m => (a -> 'Pipe'   x b m r) -> (b -> 'Consumer' x   m ()) -> (a -> 'Consumer' x   m r)
+('~>') :: 'Functor' m => (a -> 'Pipe'   x b m r) -> (b -> 'Pipe'     x c m ()) -> (a -> 'Pipe'     x c m r)
 @
 
     The following diagrams show the flow of information:
@@ -245,7 +245,7 @@ x ==>    f    ==> b   ---'   x ==>    g    ==> c     =     x ==>   f '~>' g  ==>
     For a more complete diagram including bidirectional flow, see "Pipes.Core#respond-diagram".
 -}
 (~>)
-    :: Monad m
+    :: Functor m
     => (a -> Proxy x' x b' b m a')
     -- ^
     -> (b -> Proxy x' x c' c m b')
@@ -256,7 +256,7 @@ x ==>    f    ==> b   ---'   x ==>    g    ==> c     =     x ==>   f '~>' g  ==>
 
 -- | ('~>') with the arguments flipped
 (<~)
-    :: Monad m
+    :: Functor m
     => (b -> Proxy x' x c' c m b')
     -- ^
     -> (a -> Proxy x' x b' b m a')
@@ -286,20 +286,20 @@ f '>~' 'await' = f
 {-| Consume a value
 
 @
-'await' :: 'Monad' m => 'Pipe' a y m a
+'await' :: 'Functor' m => 'Pipe' a y m a
 @
 -}
-await :: Monad m => Consumer' a m a
+await :: Functor m => Consumer' a m a
 await = request ()
 {-# INLINABLE [1] await #-}
 
 {-| @(draw >~ p)@ loops over @p@ replacing each 'await' with @draw@
 
 @
-('>~') :: 'Monad' m => 'Effect'       m b -> 'Consumer' b   m c -> 'Effect'       m c
-('>~') :: 'Monad' m => 'Consumer' a   m b -> 'Consumer' b   m c -> 'Consumer' a   m c
-('>~') :: 'Monad' m => 'Producer'   y m b -> 'Pipe'     b y m c -> 'Producer'   y m c
-('>~') :: 'Monad' m => 'Pipe'     a y m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
+('>~') :: 'Functor' m => 'Effect'       m b -> 'Consumer' b   m c -> 'Effect'       m c
+('>~') :: 'Functor' m => 'Consumer' a   m b -> 'Consumer' b   m c -> 'Consumer' a   m c
+('>~') :: 'Functor' m => 'Producer'   y m b -> 'Pipe'     b y m c -> 'Producer'   y m c
+('>~') :: 'Functor' m => 'Pipe'     a y m b -> 'Pipe'     b y m c -> 'Pipe'     a y m c
 @
 
     The following diagrams show the flow of information:
@@ -319,7 +319,7 @@ a ==>    f    ==> y   .--->   b ==>    g    ==> y     =     a ==>   f '>~' g  ==
     For a more complete diagram including bidirectional flow, see "Pipes.Core#request-diagram".
 -}
 (>~)
-    :: Monad m
+    :: Functor m
     => Proxy a' a y' y m b
     -- ^
     -> Proxy () b y' y m c
@@ -330,7 +330,7 @@ p1 >~ p2 = (\() -> p1) >\\ p2
 
 -- | ('>~') with the arguments flipped
 (~<)
-    :: Monad m
+    :: Functor m
     => Proxy () b y' y m c
     -- ^
     -> Proxy a' a y' y m b
@@ -358,17 +358,17 @@ f '>->' 'cat' = f
 -}
 
 -- | The identity 'Pipe', analogous to the Unix @cat@ program
-cat :: Monad m => Pipe a a m r
+cat :: Functor m => Pipe a a m r
 cat = pull ()
 {-# INLINABLE [1] cat #-}
 
 {-| 'Pipe' composition, analogous to the Unix pipe operator
 
 @
-('>->') :: 'Monad' m => 'Producer' b m r -> 'Consumer' b   m r -> 'Effect'       m r
-('>->') :: 'Monad' m => 'Producer' b m r -> 'Pipe'     b c m r -> 'Producer'   c m r
-('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
-('>->') :: 'Monad' m => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
+('>->') :: 'Functor' m => 'Producer' b m r -> 'Consumer' b   m r -> 'Effect'       m r
+('>->') :: 'Functor' m => 'Producer' b m r -> 'Pipe'     b c m r -> 'Producer'   c m r
+('>->') :: 'Functor' m => 'Pipe'   a b m r -> 'Consumer' b   m r -> 'Consumer' a   m r
+('>->') :: 'Functor' m => 'Pipe'   a b m r -> 'Pipe'     b c m r -> 'Pipe'     a c m r
 @
 
     The following diagrams show the flow of information:
@@ -388,7 +388,7 @@ a ==>    f    ==> b ==>    g    ==> c     =     a ==>  f '>->' g  ==> c
     For a more complete diagram including bidirectional flow, see "Pipes.Core#pull-diagram".
 -}
 (>->)
-    :: Monad m
+    :: Functor m
     => Proxy a' a () b m r
     -- ^
     -> Proxy () b c' c m r
@@ -406,11 +406,11 @@ p1 >-> p2 = (\() -> p1) +>> p2
 -}
 newtype ListT m a = Select { enumerate :: Producer a m () }
 
-instance Monad m => Functor (ListT m) where
+instance Functor m => Functor (ListT m) where
     fmap f p = Select (for (enumerate p) (\a -> yield (f a)))
     {-# INLINE fmap #-}
 
-instance Monad m => Applicative (ListT m) where
+instance Functor m => Applicative (ListT m) where
     pure a = Select (yield a)
     {-# INLINE pure #-}
     mf <*> mx = Select (
@@ -436,7 +436,7 @@ instance Foldable m => Foldable (ListT m) where
             Pure    _    -> mempty
     {-# INLINE foldMap #-}
 
-instance (Monad m, Traversable m) => Traversable (ListT m) where
+instance (Functor m, Traversable m) => Traversable (ListT m) where
     traverse k (Select p) = fmap Select (traverse_ p)
       where
         traverse_ (Request v _ ) = closed v
@@ -455,7 +455,7 @@ instance (MonadIO m) => MonadIO (ListT m) where
     liftIO m = lift (liftIO m)
     {-# INLINE liftIO #-}
 
-instance (Monad m) => Alternative (ListT m) where
+instance (Functor m) => Alternative (ListT m) where
     empty = Select (return ())
     {-# INLINE empty #-}
     p1 <|> p2 = Select (do
@@ -481,11 +481,11 @@ instance MMonad ListT where
         loop (Pure    r     ) = Pure r
     {-# INLINE embed #-}
 
-instance (Monad m) => Semigroup (ListT m a) where
+instance (Functor m) => Semigroup (ListT m a) where
     (<>) = (<|>)
     {-# INLINE (<>) #-}
 
-instance (Monad m) => Monoid (ListT m a) where
+instance (Functor m) => Monoid (ListT m a) where
     mempty = empty
     {-# INLINE mempty #-}
 #if !(MIN_VERSION_base(4,11,0))
@@ -629,7 +629,7 @@ next = go
 {-# INLINABLE next #-}
 
 -- | Convert a 'F.Foldable' to a 'Producer'
-each :: (Monad m, Foldable f) => f a -> Producer' a m ()
+each :: (Functor m, Foldable f) => f a -> Producer' a m ()
 each = F.foldr (\a p -> yield a >> p) (return ())
 {-# INLINABLE each #-}
 {-  The above code is the same as:
@@ -652,7 +652,7 @@ discard _ = return ()
 
 -- | ('>->') with the arguments flipped
 (<-<)
-    :: Monad m
+    :: Functor m
     => Proxy () b c' c m r
     -- ^
     -> Proxy a' a () b m r

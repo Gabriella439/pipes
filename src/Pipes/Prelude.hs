@@ -289,7 +289,7 @@ toHandle handle = for cat (\str -> liftIO (IO.hPutStrLn handle str))
   #-}
 
 -- | 'discard' all incoming values
-drain :: Monad m => Consumer' a m r
+drain :: Functor m => Consumer' a m r
 drain = for cat discard
 {-# INLINABLE [1] drain #-}
 
@@ -317,7 +317,7 @@ quit<Enter>
 >
 > map (g . f) = map f >-> map g
 -}
-map :: Monad m => (a -> b) -> Pipe a b m r
+map :: Functor m => (a -> b) -> Pipe a b m r
 map f = for cat (\a -> yield (f a))
 {-# INLINABLE [1] map #-}
 
@@ -360,7 +360,7 @@ sequence = mapM id
 {- | Apply a function to all values flowing downstream, and
      forward each element of the result.
 -}
-mapFoldable :: (Monad m, Foldable t) => (a -> t b) -> Pipe a b m r
+mapFoldable :: (Functor m, Foldable t) => (a -> t b) -> Pipe a b m r
 mapFoldable f = for cat (\a -> each (f a))
 {-# INLINABLE [1] mapFoldable #-}
 
@@ -375,7 +375,7 @@ mapFoldable f = for cat (\a -> each (f a))
 >
 > filter (liftA2 (&&) p1 p2) = filter p1 >-> filter p2
 -}
-filter :: Monad m => (a -> Bool) -> Pipe a a m r
+filter :: Functor m => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat $ \a -> when (predicate a) (yield a)
 {-# INLINABLE [1] filter #-}
 
@@ -414,7 +414,7 @@ filterM predicate = for cat $ \a -> do
 >
 > take (min m n) = take m >-> take n
 -}
-take :: Monad m => Int -> Pipe a a m ()
+take :: Functor m => Int -> Pipe a a m ()
 take = go
   where
     go 0 = return () 
@@ -431,7 +431,7 @@ take = go
 >
 > takeWhile (liftA2 (&&) p1 p2) = takeWhile p1 >-> takeWhile p2
 -}
-takeWhile :: Monad m => (a -> Bool) -> Pipe a a m ()
+takeWhile :: Functor m => (a -> Bool) -> Pipe a a m ()
 takeWhile predicate = go
   where
     go = do
@@ -450,7 +450,7 @@ takeWhile predicate = go
 >
 > takeWhile' (liftA2 (&&) p1 p2) = takeWhile' p1 >-> takeWhile' p2
 -}
-takeWhile' :: Monad m => (a -> Bool) -> Pipe a a m a
+takeWhile' :: Functor m => (a -> Bool) -> Pipe a a m a
 takeWhile' predicate = go
   where
     go = do
@@ -468,7 +468,7 @@ takeWhile' predicate = go
 >
 > drop (m + n) = drop m >-> drop n
 -}
-drop :: Monad m => Int -> Pipe a a m r
+drop :: Functor m => Int -> Pipe a a m r
 drop = go
   where
     go 0 = cat
@@ -484,7 +484,7 @@ drop = go
 >
 > dropWhile (liftA2 (||) p1 p2) = dropWhile p1 >-> dropWhile p2
 -}
-dropWhile :: Monad m => (a -> Bool) -> Pipe a a m r
+dropWhile :: Functor m => (a -> Bool) -> Pipe a a m r
 dropWhile predicate = go
   where
     go = do
@@ -497,7 +497,7 @@ dropWhile predicate = go
 {-# INLINABLE dropWhile #-}
 
 -- | Flatten all 'Foldable' elements flowing downstream
-concat :: (Monad m, Foldable f) => Pipe (f a) a m r
+concat :: (Functor m, Foldable f) => Pipe (f a) a m r
 concat = for cat each
 {-# INLINABLE [1] concat #-}
 
@@ -506,12 +506,12 @@ concat = for cat each
   #-}
 
 -- | Outputs the indices of all elements that match the given element
-elemIndices :: (Monad m, Eq a) => a -> Pipe a Int m r
+elemIndices :: (Functor m, Eq a) => a -> Pipe a Int m r
 elemIndices a = findIndices (a ==)
 {-# INLINABLE elemIndices #-}
 
 -- | Outputs the indices of all elements that satisfied the predicate
-findIndices :: Monad m => (a -> Bool) -> Pipe a Int m r
+findIndices :: Functor m => (a -> Bool) -> Pipe a Int m r
 findIndices predicate = go 0
   where
     go n = do
@@ -524,7 +524,7 @@ findIndices predicate = go 0
 
 > Control.Foldl.purely scan :: Monad m => Fold a b -> Pipe a b m r
 -}
-scan :: Monad m => (x -> a -> x) -> x -> (x -> b) -> Pipe a b m r
+scan :: Functor m => (x -> a -> x) -> x -> (x -> b) -> Pipe a b m r
 scan step begin done = go begin
   where
     go x = do
@@ -576,7 +576,7 @@ chain f = for cat $ \a -> do
   #-}
 
 -- | Parse 'Read'able values, only forwarding the value if the parse succeeds
-read :: (Monad m, Read a) => Pipe String a m r
+read :: (Functor m, Read a) => Pipe String a m r
 read = for cat $ \str -> case (reads str) of
     [(a, "")] -> yield a
     _         -> return ()
@@ -590,12 +590,12 @@ read = for cat $ \str -> case (reads str) of
   #-}
 
 -- | Convert 'Show'able values to 'String's
-show :: (Monad m, Show a) => Pipe a String m r
+show :: (Functor m, Show a) => Pipe a String m r
 show = map Prelude.show
 {-# INLINABLE show #-}
 
 -- | Evaluate all values flowing downstream to WHNF
-seq :: Monad m => Pipe a a m r
+seq :: Functor m => Pipe a a m r
 seq = for cat $ \a -> yield $! a
 {-# INLINABLE seq #-}
 
