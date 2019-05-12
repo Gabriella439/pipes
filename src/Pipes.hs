@@ -66,6 +66,7 @@ module Pipes (
 import Control.Monad (void, MonadPlus(mzero, mplus))
 import Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import Control.Monad.Except (MonadError(..))
+import Control.Monad.Fail (MonadFail(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
@@ -423,7 +424,13 @@ instance Monad m => Monad (ListT m) where
     {-# INLINE return #-}
     m >>= f  = Select (for (enumerate m) (\a -> enumerate (f a)))
     {-# INLINE (>>=) #-}
+#if !MIN_VERSION_base(4,13,0)
     fail _   = mzero
+    {-# INLINE fail #-}
+#endif
+
+instance Monad m => MonadFail (ListT m) where
+    fail _ = mzero
     {-# INLINE fail #-}
 
 instance Foldable m => Foldable (ListT m) where
