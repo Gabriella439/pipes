@@ -66,9 +66,7 @@ module Pipes (
 import Control.Monad (void, MonadPlus(mzero, mplus))
 import Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import Control.Monad.Except (MonadError(..))
-#if !MIN_VERSION_base(4,9,0)
 import Control.Monad.Fail (MonadFail(..))
-#endif
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Reader (MonadReader(..))
 import Control.Monad.State (MonadState(..))
