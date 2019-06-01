@@ -429,7 +429,7 @@ instance Monad m => Monad (ListT m) where
 #if !MIN_VERSION_base(4,13,0)
     fail _   = mzero
     {-# INLINE fail #-}
-#if
+#endif
 
 instance Monad m => MonadFail (ListT m) where
     fail _ = mzero
