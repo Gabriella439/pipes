@@ -4,7 +4,7 @@
 }:
 mkDerivation {
   pname = "pipes";
-  version = "4.3.9";
+  version = "4.3.10";
   src = ./.;
   libraryHaskellDepends = [
     base exceptions mmorph mtl semigroups transformers void

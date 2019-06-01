@@ -1,3 +1,8 @@
+4.3.10
+
+* Relax `Monad` constraints to `Functor`
+* Support GHC 8.8
+
 4.3.9
 
 * Increase upper bound on `exceptions`
