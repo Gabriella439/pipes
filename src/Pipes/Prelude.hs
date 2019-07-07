@@ -536,7 +536,7 @@ scan step begin done = go begin
 
 {-| Strict, monadic left scan
 
-> Control.Foldl.impurely scan :: Monad m => FoldM a m b -> Pipe a b m r
+> Control.Foldl.impurely scanM :: Monad m => FoldM m a b -> Pipe a b m r
 -}
 scanM :: Monad m => (x -> a -> m x) -> m x -> (x -> m b) -> Pipe a b m r
 scanM step begin done = do
