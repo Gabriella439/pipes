@@ -1,3 +1,12 @@
+4.3.12
+
+* Fix space leak introduced in version 4.3.10
+    * This leak primarily affects the use of `forever`
+
+4.3.11
+
+* Fix documentation for `scanM`
+
 4.3.10
 
 * Relax `Monad` constraints to `Functor`
