@@ -90,6 +90,12 @@ instance Functor m => Applicative (Proxy a' a b' b m) where
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> M (go <$> m)
             Pure    f      -> fmap f px
+    l *> r = go l where
+        go p = case p of
+            Request a' fa  -> Request a' (\a  -> go (fa  a ))
+            Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
+            M          m   -> M (go <$> m)
+            Pure    _      -> r
 
 instance Functor m => Monad (Proxy a' a b' b m) where
     return = pure
