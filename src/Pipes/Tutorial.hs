@@ -750,7 +750,7 @@ ABCDEF
 
     A 'Pipe' is a monad transformer that is a mix between a 'Producer' and
     'Consumer', because a 'Pipe' can both 'await' and 'yield'.  The following
-    example 'Pipe' is analagous to the Prelude's 'take', only allowing a fixed
+    example 'Pipe' is analogous to the Prelude's 'take', only allowing a fixed
     number of values to flow through:
 
 > -- take.hs
