@@ -34,6 +34,7 @@ module Pipes.Internal (
     , closed
     ) where
 
+import qualified Control.Monad.Fail as F (MonadFail(fail))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (MonadTrans(lift))
 import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
@@ -177,6 +178,9 @@ instance MMonad (Proxy a' a b' b) where
             Respond b  fb' -> Respond b  (\b' -> go (fb' b'))
             M          m   -> f m >>= go
             Pure    r      -> Pure r
+
+instance F.MonadFail m => F.MonadFail (Proxy a' a b' b m) where
+    fail = lift . F.fail
 
 instance MonadIO m => MonadIO (Proxy a' a b' b m) where
     liftIO m = M (liftIO (Pure <$> m))
