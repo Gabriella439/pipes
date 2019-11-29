@@ -13,7 +13,7 @@ let
     packageOverrides = pkgs: {
       haskellPackages = pkgs.haskellPackages.override {
         overrides = haskellPackagesNew: haskellPackagesOld: {
-          pipes = haskellPackagesNew.callPackage ./default.nix { };
+          pipes = haskellPackagesNew.callCabal2nix "pipes" ./. { };
         };
       };
     };
