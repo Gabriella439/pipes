@@ -1,3 +1,7 @@
+4.3.13
+
+* Add `MonadFail` instance for `Proxy`
+
 4.3.12
 
 * Fix space leak introduced in version 4.3.10
