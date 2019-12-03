@@ -45,7 +45,9 @@ module Pipes.Prelude (
     , sequence
     , mapFoldable
     , filter
+    , mapMaybe
     , filterM
+    , wither
     , take
     , takeWhile
     , takeWhile'
@@ -101,7 +103,7 @@ module Pipes.Prelude (
     ) where
 
 import Control.Exception (throwIO, try)
-import Control.Monad (liftM, when, unless)
+import Control.Monad (liftM, when, unless, (>=>))
 import Control.Monad.Trans.State.Strict (get, put)
 import Data.Functor.Identity (Identity, runIdentity)
 import Foreign.C.Error (Errno(Errno), ePIPE)
@@ -374,6 +376,8 @@ mapFoldable f = for cat (\a -> each (f a))
 > filter (pure True) = cat
 >
 > filter (liftA2 (&&) p1 p2) = filter p1 >-> filter p2
+>
+> filter f = mapMaybe (\a -> a <$ guard (f a))
 -}
 filter :: Functor m => (a -> Bool) -> Pipe a a m r
 filter predicate = for cat $ \a -> when (predicate a) (yield a)
@@ -384,12 +388,37 @@ filter predicate = for cat $ \a -> when (predicate a) (yield a)
         p >-> filter predicate = for p (\a -> when (predicate a) (yield a))
   #-}
 
+{-| @(mapMaybe f)@ yields 'Just' results of 'f'.
+
+Basic laws:
+
+> mapMaybe (f >=> g) = mapMaybe f >-> mapMaybe g
+>
+> mapMaybe (pure @Maybe . f) = mapMaybe (Just . f) = map f
+>
+> mapMaybe (const Nothing) = drain
+
+As a result of the second law,
+
+> mapMaybe return = mapMaybe Just = cat
+-}
+mapMaybe :: Functor m => (a -> Maybe b) -> Pipe a b m r
+mapMaybe f = for cat $ maybe (pure ()) yield . f
+{-# INLINABLE [1] mapMaybe #-}
+
+{-# RULES
+    "p >-> mapMaybe f" forall p f.
+        p >-> mapMaybe f = for p $ maybe (pure ()) yield . f
+  #-}
+
 {-| @(filterM predicate)@ only forwards values that satisfy the monadic
     predicate
 
 > filterM (pure (pure True)) = cat
 >
 > filterM (liftA2 (liftA2 (&&)) p1 p2) = filterM p1 >-> filterM p2
+>
+> filterM f = wither (\a -> (\b -> a <$ guard b) <$> f a)
 -}
 filterM :: Monad m => (a -> m Bool) -> Pipe a a m r
 filterM predicate = for cat $ \a -> do
@@ -402,6 +431,34 @@ filterM predicate = for cat $ \a -> do
         p >-> filterM predicate = for p (\a -> do
             b <- lift (predicate a)
             when b (yield a) )
+  #-}
+
+{-| @(wither f)@ forwards 'Just' values produced by the
+    monadic action.
+
+Basic laws:
+
+> wither (runMaybeT . (MaybeT . f >=> MaybeT . g)) = wither f >-> wither g
+>
+> wither (runMaybeT . lift . f) = wither (fmap Just . f) = mapM f
+>
+> wither (pure . f) = mapMaybe f
+
+As a result of the second law,
+
+> wither (runMaybeT . return) = cat
+
+As a result of the third law,
+
+> wither (pure . const Nothing) = wither (const (pure Nothing)) = drain
+-}
+wither :: Monad m => (a -> m (Maybe b)) -> Pipe a b m r
+wither f = for cat $ lift . f >=> maybe (pure ()) yield
+{-# INLINABLE [1] wither #-}
+
+{-# RULES
+    "p >-> wither f" forall p f .
+        p >-> wither f = for p $ lift . f >=> maybe (pure ()) yield
   #-}
 
 {-| @(take n)@ only allows @n@ values to pass through
