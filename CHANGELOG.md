@@ -1,3 +1,7 @@
+????
+
+* Add `mapMaybe` and `wither`, and more laws for `filter` and `filterM`.
+
 4.3.13
 
 * Add `MonadFail` instance for `Proxy`
