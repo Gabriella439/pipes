@@ -51,11 +51,12 @@ Library
         exceptions   >= 0.4     && < 0.11,
         mmorph       >= 1.0.4   && < 1.2 ,
         mtl          >= 2.2.1   && < 2.3 ,
-        void         >= 0.4     && < 0.8 ,
-        semigroups   >= 0.17    && < 0.20
+        void         >= 0.4     && < 0.8
 
     if impl(ghc < 8.0)
-        Build-depends: fail == 4.9.*
+        Build-depends:
+            fail       == 4.9.*         ,
+            semigroups >= 0.17 && < 0.20
 
     Exposed-Modules:
         Pipes,
