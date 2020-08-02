@@ -1,4 +1,4 @@
-????
+4.3.14
 
 * Add `mapMaybe` and `wither`, and more laws for `filter` and `filterM`.
 
