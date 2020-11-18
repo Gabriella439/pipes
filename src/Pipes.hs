@@ -134,10 +134,11 @@ f '~>' 'yield' = f
 {-| Produce a value
 
 @
-'yield' :: 'Monad' m => a -> 'Pipe' x a m ()
+'yield' :: 'Monad' m => a -> 'Producer' a m ()
+'yield' :: 'Monad' m => a -> 'Pipe'   x a m ()
 @
 -}
-yield :: Functor m => a -> Producer' a m ()
+yield :: Functor m => forall x' x . a -> Proxy x' x () a m ()
 yield = respond
 {-# INLINABLE [1] yield #-}
 
