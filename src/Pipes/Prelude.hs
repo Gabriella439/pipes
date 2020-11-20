@@ -184,8 +184,12 @@ readLn = stdinLn >-> read
 {-| Read 'String's from a 'IO.Handle' using 'IO.hGetLine'
 
     Terminates on end of input
+
+@
+'fromHandle' :: 'MonadIO' m => 'IO.Handle' -> 'Producer' 'String' m ()
+@
 -}
-fromHandle :: MonadIO m => IO.Handle -> Producer' String m ()
+fromHandle :: MonadIO m => IO.Handle -> Proxy x' x () String m ()
 fromHandle h = go
   where
     go = do
@@ -196,8 +200,11 @@ fromHandle h = go
             go
 {-# INLINABLE fromHandle #-}
 
--- | Repeat a monadic action indefinitely, 'yield'ing each result
-repeatM :: Monad m => m a -> Producer' a m r
+{-| Repeat a monadic action indefinitely, 'yield'ing each result
+
+'repeatM' :: 'Monad' m => m a -> 'Producer' a m r
+-}
+repeatM :: Monad m => m a -> Proxy x' x () a m r
 repeatM m = lift m >~ cat
 {-# INLINABLE [1] repeatM #-}
 
@@ -210,8 +217,12 @@ repeatM m = lift m >~ cat
 > replicateM  0      x = return ()
 >
 > replicateM (m + n) x = replicateM m x >> replicateM n x  -- 0 <= {m,n}
+
+@
+'replicateM' :: 'Monad' m => Int -> m a -> 'Producer' a m ()
+@
 -}
-replicateM :: Monad m => Int -> m a -> Producer' a m ()
+replicateM :: Monad m => Int -> m a -> Proxy x' x () a m ()
 replicateM n m = lift m >~ take n
 {-# INLINABLE replicateM #-}
 
@@ -914,9 +925,9 @@ toListM' = fold' step begin done
 
 -- | Zip two 'Producer's
 zip :: Monad m
-    => (Producer   a     m r)
-    -> (Producer      b  m r)
-    -> (Producer' (a, b) m r)
+    => (Producer       a     m r)
+    -> (Producer          b  m r)
+    -> (Proxy x' x () (a, b) m r)
 zip = zipWith (,)
 {-# INLINABLE zip #-}
 
@@ -925,7 +936,7 @@ zipWith :: Monad m
     => (a -> b -> c)
     -> (Producer  a m r)
     -> (Producer  b m r)
-    -> (Producer' c m r)
+    -> (Proxy x' x () c m r)
 zipWith f = go
   where
     go p1 p2 = do

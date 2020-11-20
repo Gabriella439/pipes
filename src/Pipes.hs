@@ -138,7 +138,7 @@ f '~>' 'yield' = f
 'yield' :: 'Monad' m => a -> 'Pipe'   x a m ()
 @
 -}
-yield :: Functor m => forall x' x . a -> Proxy x' x () a m ()
+yield :: Functor m => a -> Proxy x' x () a m ()
 yield = respond
 {-# INLINABLE [1] yield #-}
 
@@ -636,8 +636,13 @@ next = go
         Pure    r    -> return (Left r)
 {-# INLINABLE next #-}
 
--- | Convert a 'F.Foldable' to a 'Producer'
-each :: (Functor m, Foldable f) => f a -> Producer' a m ()
+{-| Convert a 'F.Foldable' to a 'Producer'
+
+@
+'each' :: ('Functor' m, 'Foldable' f) => f a -> 'Producer' a m ()
+@
+-}
+each :: (Functor m, Foldable f) => f a -> Proxy x' x () a m ()
 each = F.foldr (\a p -> yield a >> p) (return ())
 {-# INLINABLE each #-}
 {-  The above code is the same as:
@@ -648,8 +653,13 @@ each = F.foldr (\a p -> yield a >> p) (return ())
     build/foldr fusion
 -}
 
--- | Convert an 'Enumerable' to a 'Producer'
-every :: (Monad m, Enumerable t) => t m a -> Producer' a m ()
+{-| Convert an 'Enumerable' to a 'Producer'
+
+@
+'each' :: ('Monad' m, 'Enumerable' t) => t m a -> 'Producer' a m ()
+@
+-}
+every :: (Monad m, Enumerable t) => t m a -> Proxy x' x () a m ()
 every it = discard >\\ enumerate (toListT it)
 {-# INLINABLE every #-}
 
