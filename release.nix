@@ -13,7 +13,9 @@ let
     packageOverrides = pkgs: {
       haskellPackages = pkgs.haskellPackages.override {
         overrides = haskellPackagesNew: haskellPackagesOld: {
-          pipes = haskellPackagesNew.callCabal2nix "pipes" ./. { };
+          pipes =
+            pkgs.haskell.lib.doBenchmark
+              (haskellPackagesNew.callCabal2nix "pipes" ./. { });
         };
       };
     };

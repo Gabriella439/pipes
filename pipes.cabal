@@ -77,8 +77,8 @@ Benchmark prelude-benchmarks
 
     Build-Depends:
         base      >= 4.4     && < 5  ,
-        criterion >= 1.1.1.0 && < 1.5,
-        optparse-applicative >= 0.12 && < 0.15,
+        criterion >= 1.1.1.0 && < 1.6,
+        optparse-applicative >= 0.12 && < 0.17,
         mtl       >= 2.1     && < 2.3,
         pipes
 
@@ -108,8 +108,8 @@ Benchmark lift-benchmarks
 
     Build-Depends:
         base                 >= 4.4     && < 5   ,
-        criterion            >= 1.1.1.0 && < 1.5 ,
-        optparse-applicative >= 0.12    && < 0.15,
+        criterion            >= 1.1.1.0 && < 1.6 ,
+        optparse-applicative >= 0.12    && < 0.17,
         mtl                  >= 2.1     && < 2.3 ,
         pipes                                    ,
         transformers         >= 0.2.0.0 && < 0.6
