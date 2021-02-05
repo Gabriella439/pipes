@@ -24,6 +24,7 @@ module Pipes (
     , Producer
     , Producer'
     , yield
+    , yield'
     , for
     , (~>)
     , (<~)
@@ -51,6 +52,7 @@ module Pipes (
     -- * Utilities
     , next
     , each
+    , each'
     , every
     , discard
 
@@ -91,6 +93,8 @@ import Data.Semigroup
 
 -- Re-exports
 import Control.Monad.Morph (MFunctor(hoist), MMonad(embed))
+
+import Control.DeepSeq
 
 infixl 4 <~
 infixr 4 ~>
@@ -141,6 +145,10 @@ f '~>' 'yield' = f
 yield :: Functor m => a -> Proxy x' x () a m ()
 yield = respond
 {-# INLINABLE [1] yield #-}
+
+-- | Produce a fully evaluated value
+yield' :: (NFData a, Functor m) => a -> Proxy x' x () a m ()
+yield' dat = dat `deepseq` yield dat
 
 {-| @(for p body)@ loops over @p@ replacing each 'yield' with @body@.
 
@@ -652,6 +660,10 @@ each = F.foldr (\a p -> yield a >> p) (return ())
     ... except writing it directly in terms of `Data.Foldable.foldr` improves
     build/foldr fusion
 -}
+
+-- | Convert a 'F.Foldable' of fully evaluated values to a 'Producer'
+each' :: (Functor m, Foldable f, NFData (f a)) => f a -> Proxy x' x () a m ()
+each' dat = dat `deepseq` each dat
 
 {-| Convert an 'Enumerable' to a 'Producer'
 
