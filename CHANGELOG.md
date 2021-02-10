@@ -1,3 +1,7 @@
+4.3.15
+
+* Build against `ghc-9.0`
+
 4.3.14
 
 * Add `mapMaybe` and `wither`, and more laws for `filter` and `filterM`.
