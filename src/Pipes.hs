@@ -656,7 +656,7 @@ each = F.foldr (\a p -> yield a >> p) (return ())
 {-| Convert an 'Enumerable' to a 'Producer'
 
 @
-'each' :: ('Monad' m, 'Enumerable' t) => t m a -> 'Producer' a m ()
+'every' :: ('Monad' m, 'Enumerable' t) => t m a -> 'Producer' a m ()
 @
 -}
 every :: (Monad m, Enumerable t) => t m a -> Proxy x' x () a m ()
