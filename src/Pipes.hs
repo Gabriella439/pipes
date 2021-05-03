@@ -401,10 +401,39 @@ p1 >-> p2 = (\() -> p1) +>> p2
 
 {-| The list monad transformer, which extends a monad with non-determinism
 
-    'return' corresponds to 'yield', yielding a single value
+    The type variables signify:
 
-    ('>>=') corresponds to 'for', calling the second computation once for each
-    time the first computation 'yield's.
+      * @m@ - The base monad
+      * @a@ - The values that the computation 'yield's throughout its execution
+
+    For basic construction and composition of 'ListT' computations, much can be
+    accomplished using common typeclass methods.
+
+      * 'return' corresponds to 'yield', yielding a single value.
+      * ('>>=') corresponds to 'for', calling the second computation once
+        for each time the first computation 'yield's.
+      * 'mempty' neither 'yield's any values nor produces any effects in the
+        base monad.
+      * ('<>') sequences two computations, 'yield'ing all the values of the
+        first followed by all the values of the second.
+      * 'lift' converts an action in the base monad into a ListT computation
+        which performs the action and 'yield's a single value.
+
+    'ListT' is a newtype wrapper for 'Producer'. You will likely need to use
+    'Select' and 'enumerate' to convert back and forth between these two types
+    to take advantage of all the 'Producer'-related utilities that
+    "Pipes.Prelude" has to offer.
+
+      * To lift a plain list into a 'ListT' computation, first apply 'each'
+        to turn the list into a 'Producer'. Then apply the 'Select'
+        constructor to convert from 'Producer' to 'ListT'.
+      * For other ways to construct 'ListT' computations, see the
+        “Producers” section in "Pipes.Prelude" to build 'Producer's.
+        These can then be converted to 'ListT' using 'Select'.
+      * To aggregate the values from a 'ListT' computation (for example,
+        to compute the sum of a 'ListT' of numbers), first apply
+        'enumerate' to obtain a 'Producer'. Then see the “Folds”
+        section in "Pipes.Prelude" to proceed.
 -}
 newtype ListT m a = Select { enumerate :: Producer a m () }
 
