@@ -1,3 +1,8 @@
+4.3.16
+
+* Fix example code for `every`
+* Improved documentation for `ListT`
+
 4.3.15
 
 * Build against `ghc-9.0`
