@@ -1,33 +1,28 @@
-# You can build this repository using Nix by running:
-#
-#     $ nix-build -A pipes release.nix
-#
-# You can also open up this repository inside of a Nix shell by running:
-#
-#     $ nix-shell -A pipes.env release.nix
-#
-# ... and then Nix will supply the correct Haskell development environment for
-# you
 let
-  config = {
-    packageOverrides = pkgs: {
-      haskellPackages = pkgs.haskellPackages.override {
-        overrides = haskellPackagesNew: haskellPackagesOld: {
-          pipes =
-            pkgs.haskell.lib.doBenchmark
-              (haskellPackagesNew.callCabal2nix "pipes" ./. { });
-        };
-      };
-    };
+  overlay = pkgsNew: pkgsOld: {
+    haskellPackages = pkgsOld.haskellPackages.override (old: {
+      overrides =
+        pkgsNew.lib.fold pkgsNew.lib.composeExtensions
+          (old.overrides or (_: _: { }))
+          [ (pkgsNew.haskell.lib.packageSourceOverrides {
+              pipes = ./.;
+            })
+            (pkgsNew.haskell.lib.packagesFromDirectory {
+              directory = ./nix;
+            })
+            (haskellPackagesNew: haskellPackagesOld: {
+            })
+          ];
+    });
   };
 
   nixpkgs = builtins.fetchTarball {
-    url = "https://github.com/NixOs/nixpkgs/archive/312a059bef8b29b4db4e73dc02ff441cab7bb26d.tar.gz";
+    url = "https://github.com/NixOs/nixpkgs/archive/1b55bc5d4b5cb6b35d71e7fe22cae9558c312937.tar.gz";
 
-    sha256 = "1j52yvkhw1inp6ilpqy81xv1bbwgwqjn0v9647whampkqgn6dxhk";
+    sha256 = "05761c8bi6chlj15428h3k30r8b8g4w3h0m4xpsj6f9qcz27d9nf";
   };
 
-  pkgs = import nixpkgs { inherit config; };
+  pkgs = import nixpkgs { config = { }; overlays = [ overlay ]; };
 
 in
   { pipes = pkgs.haskellPackages.pipes;
