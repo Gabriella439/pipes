@@ -47,10 +47,10 @@ Library
     HS-Source-Dirs: src
     Build-Depends:
         base         >= 4.8     && < 5   ,
-        transformers >= 0.2.0.0 && < 0.6 ,
+        transformers >= 0.2.0.0 && < 0.7 ,
         exceptions   >= 0.4     && < 0.11,
         mmorph       >= 1.0.4   && < 1.3 ,
-        mtl          >= 2.2.1   && < 2.3 ,
+        mtl          >= 2.2.1   && < 2.4 ,
         void         >= 0.4     && < 0.8
 
     if impl(ghc < 8.0)
@@ -79,7 +79,7 @@ Benchmark prelude-benchmarks
         base      >= 4.4     && < 5  ,
         criterion >= 1.1.1.0 && < 1.6,
         optparse-applicative >= 0.12 && < 0.18,
-        mtl       >= 2.1     && < 2.3,
+        mtl       >= 2.1     && < 2.4,
         pipes
 
 test-suite tests
@@ -93,10 +93,10 @@ test-suite tests
         base                       >= 4.4     && < 5   ,
         pipes                                          ,
         QuickCheck                 >= 2.4     && < 3   ,
-        mtl                        >= 2.1     && < 2.3 ,
+        mtl                        >= 2.1     && < 2.4 ,
         test-framework             >= 0.4     && < 1   ,
         test-framework-quickcheck2 >= 0.2.0   && < 0.4 ,
-        transformers               >= 0.2.0.0 && < 0.6
+        transformers               >= 0.2.0.0 && < 0.7
 
 Benchmark lift-benchmarks
     Default-Language: Haskell2010
@@ -110,6 +110,6 @@ Benchmark lift-benchmarks
         base                 >= 4.4     && < 5   ,
         criterion            >= 1.1.1.0 && < 1.6 ,
         optparse-applicative                     ,
-        mtl                  >= 2.1     && < 2.3 ,
+        mtl                  >= 2.1     && < 2.4 ,
         pipes                                    ,
-        transformers         >= 0.2.0.0 && < 0.6
+        transformers         >= 0.2.0.0 && < 0.7
