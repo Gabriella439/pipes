@@ -108,7 +108,7 @@ Benchmark lift-benchmarks
 
     Build-Depends:
         base                 >= 4.4     && < 5   ,
-        criterion            >= 1.1.1.0 && < 1.6 ,
+        criterion            >= 1.1.1.0 && < 1.7 ,
         optparse-applicative                     ,
         mtl                  >= 2.1     && < 2.4 ,
         pipes                                    ,
