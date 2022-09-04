@@ -5,10 +5,10 @@ Build-Type: Simple
 Tested-With: GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.4, GHC == 8.6.5, GHC == 8.8.1
 License: BSD3
 License-File: LICENSE
-Copyright: 2012-2016 Gabriel Gonzalez
-Author: Gabriel Gonzalez
-Maintainer: Gabriel439@gmail.com
-Bug-Reports: https://github.com/Gabriel439/Haskell-Pipes-Library/issues
+Copyright: 2012-2016 Gabriella Gonzalez
+Author: Gabriella Gonzalez
+Maintainer: GenuineGabriella@gmail.com
+Bug-Reports: https://github.com/Gabriella439/Haskell-Pipes-Library/issues
 Synopsis: Compositional pipelines
 Description:
   `pipes` is a clean and powerful stream processing library that lets you build
@@ -39,7 +39,7 @@ Extra-Source-Files:
     CHANGELOG.md
 Source-Repository head
     Type: git
-    Location: https://github.com/Gabriel439/Haskell-Pipes-Library
+    Location: https://github.com/Gabriella439/Haskell-Pipes-Library
 
 Library
     Default-Language: Haskell2010
