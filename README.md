@@ -84,7 +84,7 @@ Derived libraries that build on top of these include:
 
 ## Development Status
 
-[![Build Status](https://travis-ci.org/Gabriel439/Haskell-Pipes-Library.png)](https://travis-ci.org/Gabriel439/Haskell-Pipes-Library)
+[![Build Status](https://travis-ci.org/Gabriella439/Haskell-Pipes-Library.png)](https://travis-ci.org/Gabriella439/Haskell-Pipes-Library)
 
 `pipes` is stable, and current work focuses on packaging `pipes` for various
 package managers.  The long term goal is to get `pipes` into the Haskell
@@ -106,7 +106,7 @@ platform and become the basic building block for streaming APIs.
 
 ## License (BSD 3-clause)
 
-Copyright (c) 2012-2014 Gabriel Gonzalez
+Copyright (c) 2012-2014 Gabriella Gonzalez
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
@@ -119,7 +119,7 @@ are permitted provided that the following conditions are met:
   list of conditions and the following disclaimer in the documentation and/or
   other materials provided with the distribution.
 
-* Neither the name of Gabriel Gonzalez nor the names of other contributors may
+* Neither the name of Gabriella Gonzalez nor the names of other contributors may
   be used to endorse or promote products derived from this software without
   specific prior written permission.
 
